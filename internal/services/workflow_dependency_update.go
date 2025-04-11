@@ -26,12 +26,11 @@ type WorkflowDependencyUpdateService struct {
 	commandExecutor    utils.CommandExecutor
 }
 
-func newWorkflowDependencyUpdateService(afterUpdate []AfterUpdate, logger *zap.Logger, installer InstallerService, updater UpdaterService, repository RepositoryService, vcsProviderFactory codehosting.VcsProviderFactory, config internal.Config, commandExecutor utils.CommandExecutor, s3Client internal.S3Client) *WorkflowDependencyUpdateService {
+func newWorkflowDependencyUpdateService(afterUpdate []AfterUpdate, logger *zap.Logger, installer InstallerService, updater UpdaterService, repository RepositoryService, vcsProviderFactory codehosting.VcsProviderFactory, config internal.Config, commandExecutor utils.CommandExecutor) *WorkflowDependencyUpdateService {
 	return &WorkflowDependencyUpdateService{
 		WorkflowBaseService: WorkflowBaseService{
-			logger:   logger,
-			config:   config,
-			s3client: s3Client,
+			logger: logger,
+			config: config,
 		},
 		afterUpdate:        afterUpdate,
 		installer:          installer,
@@ -71,7 +70,7 @@ func (ws *WorkflowDependencyUpdateService) StartUpdate() error {
 	}
 
 	beforeUpdateCommit, _ := ws.repository.GetHeadCommit(repository)
-	updateReport, err := ws.updater.UpdateDependencies(path, ws.config.PackagesToUpdate, worktree, false)
+	updateReport, err := ws.updater.UpdateDependencies(path, []string{}, worktree, false)
 	if err != nil {
 		return err
 	}
@@ -111,12 +110,6 @@ func (ws *WorkflowDependencyUpdateService) StartUpdate() error {
 		}
 	}
 
-	afterUpdateCommit, _ := ws.repository.GetHeadCommit(repository)
-	patch := ws.repository.GetPatch(beforeUpdateCommit, afterUpdateCommit)
-	if err = ws.UploadFile(patch, "diff.patch"); err != nil {
-		return err
-	}
-
 	data := TemplateData{
 		ComposerDiff:           table,
 		DependencyUpdateReport: updateReport,
@@ -126,10 +119,6 @@ func (ws *WorkflowDependencyUpdateService) StartUpdate() error {
 	description, err := ws.GenerateDescription(data, "dependency_update.go.tmpl")
 	if err != nil {
 		ws.logger.Error("failed to generate description", zap.Error(err))
-		return err
-	}
-
-	if err = ws.UploadFile(description, "summary.md"); err != nil {
 		return err
 	}
 

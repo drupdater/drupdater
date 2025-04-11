@@ -4,6 +4,7 @@ import (
 	"crypto/md5"
 	"fmt"
 	"os"
+	"slices"
 	"sync"
 	"time"
 
@@ -25,12 +26,11 @@ type WorkflowSecurityUpdateService struct {
 	composerService    ComposerService
 }
 
-func newWorkflowSecurityUpdateService(logger *zap.Logger, installer InstallerService, updater UpdaterService, repository RepositoryService, vcsProviderFactory codehosting.VcsProviderFactory, config internal.Config, commandExecutor utils.CommandExecutor, composerService ComposerService, s3Client internal.S3Client) *WorkflowSecurityUpdateService {
+func newWorkflowSecurityUpdateService(logger *zap.Logger, installer InstallerService, updater UpdaterService, repository RepositoryService, vcsProviderFactory codehosting.VcsProviderFactory, config internal.Config, commandExecutor utils.CommandExecutor, composerService ComposerService) *WorkflowSecurityUpdateService {
 	return &WorkflowSecurityUpdateService{
 		WorkflowBaseService: WorkflowBaseService{
-			logger:   logger,
-			config:   config,
-			s3client: s3Client,
+			logger: logger,
+			config: config,
 		},
 		installer:          installer,
 		updater:            updater,
@@ -43,8 +43,18 @@ func newWorkflowSecurityUpdateService(logger *zap.Logger, installer InstallerSer
 
 func (ws *WorkflowSecurityUpdateService) StartUpdate() error {
 
-	if len(ws.config.PackagesToUpdate) == 0 {
-		ws.logger.Info("for security updates, at least one package must be specified")
+	repository, worktree, path, err := ws.repository.CloneRepository(ws.config.RepositoryURL, ws.config.Branch, ws.config.Token)
+	if err != nil {
+		return err
+	}
+
+	beforeUpdateAudit, err := ws.composerService.RunComposerAudit(path)
+	if err != nil {
+		return err
+	}
+
+	if len(beforeUpdateAudit.Advisories) == 0 {
+		ws.logger.Info("no security advisories found, skipping security update")
 		return nil
 	}
 
@@ -61,18 +71,16 @@ func (ws *WorkflowSecurityUpdateService) StartUpdate() error {
 		}
 	}()
 
-	repository, worktree, path, err := ws.repository.CloneRepository(ws.config.RepositoryURL, ws.config.Branch, ws.config.Token)
-	if err != nil {
-		return err
-	}
-
-	beforeUpdateAudit, err := ws.composerService.RunComposerAudit(path)
-	if err != nil {
-		return err
+	packagesToUpdate := make([]string, 0)
+	for _, advisory := range beforeUpdateAudit.Advisories {
+		if slices.Contains(packagesToUpdate, advisory.PackageName) {
+			continue
+		}
+		packagesToUpdate = append(packagesToUpdate, advisory.PackageName)
 	}
 
 	beforeUpdateCommit, _ := ws.repository.GetHeadCommit(repository)
-	updateReport, err := ws.updater.UpdateDependencies(path, ws.config.PackagesToUpdate, worktree, true)
+	updateReport, err := ws.updater.UpdateDependencies(path, packagesToUpdate, worktree, true)
 	if err != nil {
 		return err
 	}
@@ -123,12 +131,6 @@ func (ws *WorkflowSecurityUpdateService) StartUpdate() error {
 		return err
 	}
 
-	afterUpdateCommit, _ := ws.repository.GetHeadCommit(repository)
-	patch := ws.repository.GetPatch(beforeUpdateCommit, afterUpdateCommit)
-	if err = ws.UploadFile(patch, "diff.patch"); err != nil {
-		return err
-	}
-
 	data := TemplateData{
 		ComposerDiff:           table,
 		DependencyUpdateReport: updateReport,
@@ -143,10 +145,6 @@ func (ws *WorkflowSecurityUpdateService) StartUpdate() error {
 	description, err := ws.GenerateDescription(data, "security_update.go.tmpl")
 	if err != nil {
 		ws.logger.Error("failed to generate description", zap.Error(err))
-	}
-
-	if err = ws.UploadFile(description, "summary.md"); err != nil {
-		return err
 	}
 
 	if !ws.config.DryRun {

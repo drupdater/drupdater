@@ -1,0 +1,14 @@
+with-expecter: true
+packages:
+  ebersolve.com/updater:
+    config:
+      all: true
+      dir: '{{.InterfaceDir}}'
+      outpkg: '{{.PackageName}}'
+      inpackage: true
+      recursive: true
+
+dir: mocks
+outpkg: mocks
+resolve-type-alias: false
+issue-845-fix: true

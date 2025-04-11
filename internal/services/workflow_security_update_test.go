@@ -7,7 +7,6 @@ import (
 	internal "ebersolve.com/updater/internal"
 	"ebersolve.com/updater/internal/codehosting"
 	"ebersolve.com/updater/internal/utils"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 	object "github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
@@ -80,19 +79,15 @@ func TestSecurityUpdateStartUpdate(t *testing.T) {
 	repository := internal.NewMockRepository(t)
 	commandExecutor := utils.NewMockCommandExecutor(t)
 	composerService := NewMockComposerService(t)
-	s3Client := internal.NewMockS3Client(t)
 	config := internal.Config{
-		RepositoryURL:    "https://example.com/repo.git",
-		Branch:           "main",
-		Token:            "token",
-		Sites:            []string{"site1", "site2"},
-		PackagesToUpdate: []string{"package1", "package2"},
-		DryRun:           false,
+		RepositoryURL: "https://example.com/repo.git",
+		Branch:        "main",
+		Token:         "token",
+		Sites:         []string{"site1", "site2"},
+		DryRun:        false,
 	}
 
-	workflowService := newWorkflowSecurityUpdateService(logger, installer, updater, repositoryService, vcsProviderFactory, config, commandExecutor, composerService, s3Client)
-
-	s3Client.On("PutObject", mock.Anything, mock.Anything, mock.Anything).Return(&s3.PutObjectOutput{}, nil)
+	workflowService := newWorkflowSecurityUpdateService(logger, installer, updater, repositoryService, vcsProviderFactory, config, commandExecutor, composerService)
 
 	worktree := internal.NewMockWorktree(t)
 	worktree.On("Checkout", mock.Anything).Return(nil)
@@ -100,10 +95,9 @@ func TestSecurityUpdateStartUpdate(t *testing.T) {
 	installer.On("InstallDrupal", config.RepositoryURL, config.Branch, config.Token, config.Sites).Return(nil)
 	repositoryService.On("CloneRepository", config.RepositoryURL, config.Branch, config.Token).Return(repository, worktree, "/tmp", nil)
 	repositoryService.On("GetHeadCommit", repository).Return(&object.Commit{}, nil)
-	repositoryService.On("GetPatch", mock.Anything, mock.Anything).Return("")
 	repositoryService.On("BranchExists", mock.Anything, "security-update-ddd").Return(false, nil)
 
-	updater.On("UpdateDependencies", "/tmp", config.PackagesToUpdate, mock.Anything, true).Return(DependencyUpdateReport{}, nil)
+	updater.On("UpdateDependencies", "/tmp", []string{"package1"}, mock.Anything, true).Return(DependencyUpdateReport{}, nil)
 	updater.On("UpdateDrupal", "/tmp", mock.Anything, config.Sites).Return(UpdateHooksPerSite{}, nil)
 	vcsProviderFactory.On("Create", "https://example.com/repo.git", "token").Return(vcsProvider)
 
@@ -139,17 +133,15 @@ func TestSecurityUpdateStartUpdateWithDryRun(t *testing.T) {
 	repository := internal.NewMockRepository(t)
 	commandExecutor := utils.NewMockCommandExecutor(t)
 	composerService := NewMockComposerService(t)
-	s3Client := internal.NewMockS3Client(t)
 	config := internal.Config{
-		RepositoryURL:    "https://example.com/repo.git",
-		Branch:           "main",
-		Token:            "token",
-		Sites:            []string{"site1", "site2"},
-		PackagesToUpdate: []string{"package1", "package2"},
-		DryRun:           true,
+		RepositoryURL: "https://example.com/repo.git",
+		Branch:        "main",
+		Token:         "token",
+		Sites:         []string{"site1", "site2"},
+		DryRun:        true,
 	}
 
-	workflowService := newWorkflowSecurityUpdateService(logger, installer, updater, repositoryService, vcsProviderFactory, config, commandExecutor, composerService, s3Client)
+	workflowService := newWorkflowSecurityUpdateService(logger, installer, updater, repositoryService, vcsProviderFactory, config, commandExecutor, composerService)
 
 	worktree := internal.NewMockWorktree(t)
 	worktree.On("Checkout", mock.Anything).Return(nil)
@@ -157,13 +149,16 @@ func TestSecurityUpdateStartUpdateWithDryRun(t *testing.T) {
 	repositoryService.On("BranchExists", mock.Anything, "security-update-ddd").Return(false, nil)
 	repositoryService.On("CloneRepository", config.RepositoryURL, config.Branch, config.Token).Return(repository, worktree, "/tmp", nil)
 	repositoryService.On("GetHeadCommit", repository).Return(&object.Commit{}, nil)
-	repositoryService.On("GetPatch", mock.Anything, mock.Anything).Return("")
-	updater.On("UpdateDependencies", "/tmp", config.PackagesToUpdate, mock.Anything, true).Return(DependencyUpdateReport{}, nil)
+	updater.On("UpdateDependencies", "/tmp", []string{"package1"}, mock.Anything, true).Return(DependencyUpdateReport{}, nil)
 	updater.On("UpdateDrupal", "/tmp", mock.Anything, config.Sites).Return(UpdateHooksPerSite{}, nil)
 	commandExecutor.On("GenerateDiffTable", mock.Anything, mock.Anything, true).Return("foo", nil)
-	composerService.On("RunComposerAudit", "/tmp").Return(ComposerAudit{}, nil)
+	composerService.On("RunComposerAudit", "/tmp").Return(ComposerAudit{
+		Advisories: []Advisory{
+			{CVE: "CVE-1234", Title: "Vul 1", Severity: "high    ", Link: "https://example.com", PackageName: "package1"},
+			{CVE: "CVE-5678", Title: "Vul 2", Severity: "high    ", Link: "https://example.com", PackageName: "package1"},
+		},
+	}, nil)
 	composerService.On("GetComposerLockHash", "/tmp").Return("ddd", nil)
-	s3Client.On("PutObject", mock.Anything, mock.Anything, mock.Anything).Return(&s3.PutObjectOutput{}, nil)
 
 	err := workflowService.StartUpdate()
 

@@ -17,7 +17,6 @@ import (
 type RepositoryService interface {
 	CloneRepository(repository string, branch string, token string) (internal.Repository, internal.Worktree, string, error)
 	GetHeadCommit(repository internal.Repository) (*object.Commit, error)
-	GetPatch(from *object.Commit, to *object.Commit) string
 	IsSomethingStagedInPath(worktree internal.Worktree, dir string) bool
 	BranchExists(repository internal.Repository, branch string) (bool, error)
 }
@@ -121,11 +120,6 @@ func (rs *GitRepositoryService) GetHeadCommit(repository internal.Repository) (*
 	}
 
 	return object, nil
-}
-
-func (rs *GitRepositoryService) GetPatch(from *object.Commit, to *object.Commit) string {
-	patch, _ := from.Patch(to)
-	return patch.String()
 }
 
 func (rs *GitRepositoryService) IsSomethingStagedInPath(worktree internal.Worktree, dir string) bool {
