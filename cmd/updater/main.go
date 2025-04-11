@@ -11,8 +11,6 @@ import (
 	"ebersolve.com/updater/internal/codehosting"
 	"ebersolve.com/updater/internal/services"
 	"ebersolve.com/updater/internal/utils"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 
 	"github.com/maypok86/otter"
 	"github.com/spf13/cobra"
@@ -78,15 +76,6 @@ func newCache() (otter.Cache[string, string], error) {
 	return otter.MustBuilder[string, string](100).Build()
 }
 
-func newS3Client() *s3.Client {
-	cfg, err := config.LoadDefaultConfig(context.TODO())
-	if err != nil {
-		panic(err)
-	}
-
-	return s3.NewFromConfig(cfg)
-}
-
 func runApp(config internal.Config) {
 	app := fx.New(
 		fx.WithLogger(func(log *zap.Logger) fxevent.Logger {
@@ -101,13 +90,7 @@ func runApp(config internal.Config) {
 				return logger, err
 			},
 			newCache,
-			fx.Annotate(newS3Client, fx.As(new(internal.S3Client))),
-			func(encryptionService utils.EncryptionService) internal.Config {
-				token, err := encryptionService.Decrypt(config.Token, os.Getenv("KMS_KEY_ARN"))
-				if err != nil {
-					panic(err)
-				}
-				config.Token = token
+			func() internal.Config {
 				return config
 			},
 			func(lc fx.Lifecycle, sh fx.Shutdowner, logger *zap.Logger, dependencyUpdateService *services.WorkflowDependencyUpdateService, securityUpdateService *services.WorkflowSecurityUpdateService) *Action {

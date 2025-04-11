@@ -27,6 +27,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends git unzip patch \
     && rm -rf /var/lib/apt/lists/*;
 
+ENV COMPOSER_HOME=/usr/local/composer
 ENV COMPOSER_ALLOW_SUPERUSER=1
 ENV COMPOSER_NO_AUDIT=1
 ENV COMPOSER_FUND=0
@@ -35,10 +36,12 @@ COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
 # Add mglaman/composer-drupal-lenient as a global composer plugin.
 RUN composer global config --no-plugins allow-plugins.mglaman/composer-drupal-lenient true; \
     composer global config --no-plugins allow-plugins.ion-bazan/composer-diff true; \
-    composer global require mglaman/composer-drupal-lenient ion-bazan/composer-diff
+    composer global require mglaman/composer-drupal-lenient ion-bazan/composer-diff;
 
 RUN git config --global user.email "update@drupdater.com" && \
     git config --global user.name "Drupdater"
+
+COPY scripts/ /opt/drupdater/
 
 CMD [ "" ]
 ENTRYPOINT [ "" ]
@@ -46,15 +49,16 @@ ENTRYPOINT [ "" ]
 
 # Production image.
 FROM base AS prod
-COPY --from=build /build/drupdater /opt/drupdater
+COPY --from=build /build/drupdater /opt/drupdater/bin
 
 
 # Development image.
 FROM base AS dev
 
 # Install go.
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends golang \
-    && rm -rf /var/lib/apt/lists/*;
+RUN cd /usr/local && \
+    curl -sSL https://dl.google.com/go/go1.23.4.linux-arm64.tar.gz -o go1.23.4.linux-arm64.tar.gz && \
+    rm -rf /usr/local/go && tar -C /usr/local -xzf go1.23.4.linux-arm64.tar.gz;
+ENV PATH="/usr/local/go/bin:${PATH}"
 RUN go env -w GOCACHE=/go-cache
 RUN go env -w GOMODCACHE=/gomod-cache

@@ -155,7 +155,7 @@ func (e DefaultCommandExecutor) UpdateSite(dir string, site string) error {
 
 func (e DefaultCommandExecutor) ConfigResave(dir string, site string) error {
 	e.logger.Debug("config resave")
-	_, err := e.ExecDrush(dir, site, "php:script", "/var/task/config-resave.php")
+	_, err := e.ExecDrush(dir, site, "php:script", "/opt/drupdater/config-resave.php")
 	return err
 }
 
@@ -239,7 +239,7 @@ func (e DefaultCommandExecutor) RunRector(dir string) (string, error) {
 
 	}
 
-	args := []string{"exec", "--", "rector", "process", "--config=/var/task/rector.php", "--no-progress-bar", "--no-diffs", "--debug", "--output-format=json"}
+	args := []string{"exec", "--", "rector", "process", "--config=/opt/drupdater/rector.php", "--no-progress-bar", "--no-diffs", "--debug", "--output-format=json"}
 	args = append(args, customCodeDirectories...)
 
 	return e.ExecComposer(dir, args...)
@@ -351,8 +351,4 @@ func (e DefaultCommandExecutor) GetCustomCodeDirectories(dir string) ([]string, 
 
 var Module = fx.Provide(
 	NewCommandExecutor,
-	fx.Annotate(
-		NewDefaultEncryptionService,
-		fx.As(new(EncryptionService)),
-	),
 )
