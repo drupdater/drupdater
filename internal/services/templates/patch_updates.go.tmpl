@@ -1,0 +1,42 @@
+{{ define "patch_updates" }}
+## 🩹 Patch updates
+
+{{ if .Removed -}}
+✅ **Removed Patches**
+
+The following patches were removed as they are no longer needed:
+
+{{ range .Removed -}}
+- {{ .PatchDescription }}:
+
+  - Package: {{ .Package }}
+  - Patch: `{{ .PatchPath }}`
+  - Reason: {{ .Reason }}
+
+{{ end -}}
+{{ end -}}
+{{ if .Updated -}}
+🔄 **Updated Patches**
+
+{{ range .Updated -}}
+- {{ .PatchDescription }}
+
+  - Package: {{ .Package }}
+  - Previous patch: `{{ .PreviousPatchPath }}`
+  - New patch: `{{ .NewPatchPath }}`
+
+{{ end -}}
+{{ end -}}
+{{ if .Conflicts -}}
+⚠️ **Packages Not Updated Due to Patch Conflicts**
+
+{{ range .Conflicts -}}
+- {{ .Package }} was fixed to version {{ .FixedVersion }} because
+
+  - Description: {{ .PatchDescription }}
+  - Patch: `{{ .PatchPath }}`
+  - Reason: Patch is not compatible with the new version {{ .NewVersion }} and a newer patch that is compatible with the new version is not available
+
+{{ end -}}
+{{ end -}}
+{{ end -}}
