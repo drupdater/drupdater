@@ -1,0 +1,187 @@
+package services
+
+import (
+	"crypto/md5"
+	"fmt"
+	"os"
+	"sync"
+	"time"
+
+	"ebersolve.com/updater/internal"
+	"ebersolve.com/updater/internal/codehosting"
+	"ebersolve.com/updater/internal/utils"
+	git "github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
+	"go.uber.org/zap"
+)
+
+type WorkflowSecurityUpdateService struct {
+	WorkflowBaseService
+	installer          InstallerService
+	updater            UpdaterService
+	repository         RepositoryService
+	vcsProviderFactory codehosting.VcsProviderFactory
+	commandExecutor    utils.CommandExecutor
+	composerService    ComposerService
+}
+
+func newWorkflowSecurityUpdateService(logger *zap.Logger, installer InstallerService, updater UpdaterService, repository RepositoryService, vcsProviderFactory codehosting.VcsProviderFactory, config internal.Config, commandExecutor utils.CommandExecutor, composerService ComposerService, s3Client internal.S3Client) *WorkflowSecurityUpdateService {
+	return &WorkflowSecurityUpdateService{
+		WorkflowBaseService: WorkflowBaseService{
+			logger:   logger,
+			config:   config,
+			s3client: s3Client,
+		},
+		installer:          installer,
+		updater:            updater,
+		repository:         repository,
+		vcsProviderFactory: vcsProviderFactory,
+		commandExecutor:    commandExecutor,
+		composerService:    composerService,
+	}
+}
+
+func (ws *WorkflowSecurityUpdateService) StartUpdate() error {
+
+	if len(ws.config.PackagesToUpdate) == 0 {
+		ws.logger.Info("for security updates, at least one package must be specified")
+		return nil
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	errChannel := make(chan error, 1)
+
+	go func() {
+		defer wg.Done()
+		err := ws.installer.InstallDrupal(ws.config.RepositoryURL, ws.config.Branch, ws.config.Token, ws.config.Sites)
+		if err != nil {
+			errChannel <- err
+			ws.logger.Error("failed to install Drupal", zap.Error(err))
+		}
+	}()
+
+	repository, worktree, path, err := ws.repository.CloneRepository(ws.config.RepositoryURL, ws.config.Branch, ws.config.Token)
+	if err != nil {
+		return err
+	}
+
+	beforeUpdateAudit, err := ws.composerService.RunComposerAudit(path)
+	if err != nil {
+		return err
+	}
+
+	beforeUpdateCommit, _ := ws.repository.GetHeadCommit(repository)
+	updateReport, err := ws.updater.UpdateDependencies(path, ws.config.PackagesToUpdate, worktree, true)
+	if err != nil {
+		return err
+	}
+
+	table, err := ws.commandExecutor.GenerateDiffTable(path, beforeUpdateCommit.Hash.String(), true)
+	if err != nil {
+		return err
+	}
+
+	if table == "" {
+		ws.logger.Info("no packages were updated, skipping security update")
+		return nil
+	}
+
+	composerLockHash, err := ws.composerService.GetComposerLockHash(path)
+	if err != nil {
+		return err
+	}
+	updateBranchName := fmt.Sprintf("security-update-%s", composerLockHash)
+
+	if exists, _ := ws.repository.BranchExists(repository, updateBranchName); exists {
+		ws.logger.Info("branch already exists", zap.String("branch", updateBranchName))
+		return nil
+	}
+
+	if err := worktree.Checkout(&git.CheckoutOptions{
+		Branch: plumbing.NewBranchReferenceName(updateBranchName),
+		Create: true,
+		Force:  false,
+		Keep:   true,
+	}); err != nil {
+		ws.logger.Error("failed to checkout branch", zap.Error(err))
+		return err
+	}
+
+	afterUpdateAudit, err := ws.composerService.RunComposerAudit(path)
+	if err != nil {
+		return err
+	}
+
+	wg.Wait()
+	if len(errChannel) > 0 {
+		return <-errChannel
+	}
+
+	updateHooks, err := ws.updater.UpdateDrupal(path, worktree, ws.config.Sites)
+	if err != nil {
+		return err
+	}
+
+	afterUpdateCommit, _ := ws.repository.GetHeadCommit(repository)
+	patch := ws.repository.GetPatch(beforeUpdateCommit, afterUpdateCommit)
+	if err = ws.UploadFile(patch, "diff.patch"); err != nil {
+		return err
+	}
+
+	data := TemplateData{
+		ComposerDiff:           table,
+		DependencyUpdateReport: updateReport,
+		SecurityReport: SecurityReport{
+			FixedAdvisories:       ws.GetFixedAdvisories(beforeUpdateAudit.Advisories, afterUpdateAudit.Advisories),
+			AfterUpdateAdvisories: afterUpdateAudit.Advisories,
+			NumUnresolvedIssues:   len(afterUpdateAudit.Advisories),
+		},
+		UpdateHooks: updateHooks,
+	}
+
+	description, err := ws.GenerateDescription(data, "security_update.go.tmpl")
+	if err != nil {
+		ws.logger.Error("failed to generate description", zap.Error(err))
+	}
+
+	if err = ws.UploadFile(description, "summary.md"); err != nil {
+		return err
+	}
+
+	if !ws.config.DryRun {
+		if err = ws.PushChanges(repository, updateBranchName); err != nil {
+			return err
+		}
+
+		gitlab := ws.vcsProviderFactory.Create(ws.config.RepositoryURL, ws.config.Token)
+		title := fmt.Sprintf("%s: Drupal Security Updates", time.Now().Format("2006-01-02"))
+		if err = gitlab.CreateMergeRequest(title, description, updateBranchName, ws.config.Branch); err != nil {
+			ws.logger.Error("failed to create merge request", zap.Error(err))
+		}
+	}
+
+	tmpDirName := fmt.Sprintf("/tmp/%x", md5.Sum([]byte(ws.config.RepositoryURL)))
+	os.RemoveAll(tmpDirName)
+
+	return nil
+}
+
+func (ws *WorkflowSecurityUpdateService) GetFixedAdvisories(before []Advisory, after []Advisory) []Advisory {
+	// Get advisories from before that are not present in after
+	var fixed = make([]Advisory, 0)
+	for _, beforeAdvisory := range before {
+		found := false
+		for _, afterAdvisory := range after {
+			if beforeAdvisory.CVE == afterAdvisory.CVE {
+				found = true
+				break
+			}
+		}
+		if !found {
+			fixed = append(fixed, beforeAdvisory)
+		}
+	}
+	return fixed
+
+}

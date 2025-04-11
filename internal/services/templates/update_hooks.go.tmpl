@@ -1,0 +1,16 @@
+{{ define "update_hooks" -}}
+## 📄 Job Logs
+
+<details>
+<summary>⚙️ Update Hooks</summary>
+
+{{ range $site, $hooks := . -}}
+{{ if . | len | gt 1 -}}### Site: {{ $site }}{{ end -}}
+| Hook | Description |
+| ---- | ----------- |
+{{ range $hookName, $hookDetails := $hooks -}}
+| {{ $hookName }} | {{$hookDetails.Description }} |
+{{ end -}}
+{{ end }}
+</details>
+{{ end }}

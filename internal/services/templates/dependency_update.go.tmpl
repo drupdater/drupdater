@@ -1,0 +1,8 @@
+This automated merge request includes updates for your Drupal site. Please review the changes carefully to ensure compatibility and stability before merging.
+{{ if .DependencyUpdateReport.PatchUpdates.Changes }}{{ template "patch_updates" .DependencyUpdateReport.PatchUpdates }}{{ end -}}
+{{ if .DependencyUpdateReport.AddedAllowPlugins }}{{ template "composer_plugins" .DependencyUpdateReport.AddedAllowPlugins }}{{ end -}}
+{{ template "composer_diff" .ComposerDiff }}
+{{ if .UpdateHooks }}{{ template "update_hooks" .UpdateHooks }}{{ end }}
+---
+
+_Thanks for participating in our beta program! We would like to get your feedback on this merge request. Please take a minute and participate in the survey: [Feedback Form](https://example.com)_
