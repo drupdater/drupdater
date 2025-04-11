@@ -14,10 +14,11 @@ RUN go env -w GOCACHE=/go-cache
 RUN go env -w GOMODCACHE=/gomod-cache
 
 RUN --mount=type=cache,target=/gomod-cache go mod download
-RUN --mount=type=cache,target=/gomod-cache --mount=type=cache,target=/go-cache GOOS=linux go build -o /build/dubot ./cmd/updater
+RUN --mount=type=cache,target=/gomod-cache --mount=type=cache,target=/go-cache GOOS=linux go build -o /build/drupdater ./cmd/updater
+
 
 # Build php image.
-FROM php:${PHP_VERSION}-cli-bookworm
+FROM php:${PHP_VERSION}-cli-bookworm AS base
 
 COPY --from=ghcr.io/mlocati/php-extension-installer:2 /usr/bin/install-php-extensions /usr/local/bin/
 RUN install-php-extensions pdo_mysql gd zip imagick
@@ -36,10 +37,24 @@ RUN composer global config --no-plugins allow-plugins.mglaman/composer-drupal-le
     composer global config --no-plugins allow-plugins.ion-bazan/composer-diff true; \
     composer global require mglaman/composer-drupal-lenient ion-bazan/composer-diff
 
-COPY --from=build /build/dubot /opt/dubot
-
-RUN git config --global user.email "update@dubot.com" && \
-    git config --global user.name "DUBot"
+RUN git config --global user.email "update@drupdater.com" && \
+    git config --global user.name "Drupdater"
 
 CMD [ "" ]
 ENTRYPOINT [ "" ]
+
+
+# Production image.
+FROM base AS prod
+COPY --from=build /build/drupdater /opt/drupdater
+
+
+# Development image.
+FROM base AS dev
+
+# Install go.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends golang \
+    && rm -rf /var/lib/apt/lists/*;
+RUN go env -w GOCACHE=/go-cache
+RUN go env -w GOMODCACHE=/gomod-cache
