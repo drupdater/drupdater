@@ -68,6 +68,8 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             PHP_VERSION=${{ matrix.php }}
+          cache-from: type=registry,src=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:cache-php${{ matrix.php }}
+          cache-to: type=registry,mode=max,dest=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:cache-php${{ matrix.php }}
       
       # This step generates an artifact attestation for the image, which is an unforgeable statement about where and how it was built. It increases supply chain security for people who consume the image. For more information, see [Using artifact attestations to establish provenance for builds](/actions/security-guides/using-artifact-attestations-to-establish-provenance-for-builds).
 #      - name: Generate artifact attestation
