@@ -3,6 +3,7 @@ name: Docker Image CI
 on:
   push:
     branches: [ "main" ]
+    tags: [ "v*" ]
   pull_request:
     branches: [ "main" ]
 
@@ -44,7 +45,7 @@ jobs:
           flavor: |
             latest=auto
             prefix=
-            suffix=php${{ matrix.php }}
+            suffix=-php${{ matrix.php }},onlatest=true
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
