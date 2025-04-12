@@ -1,11 +1,9 @@
-package main
+package cmd
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
-	"runtime"
 
 	"ebersolve.com/updater/internal"
 	"ebersolve.com/updater/internal/codehosting"
@@ -56,9 +54,6 @@ func (act *Action) stop(_ context.Context) error {
 }
 
 func (act *Action) run() {
-
-	act.logger.Info("System", zap.Int("vcpu", runtime.NumCPU()), zap.String("architecture", runtime.GOARCH), zap.String("os", runtime.GOOS), zap.String("version", runtime.Version()), zap.Strings("env", os.Environ()))
-
 	exitCode := 0
 	err := act.workflowService.StartUpdate()
 	if err != nil {
@@ -70,10 +65,6 @@ func (act *Action) run() {
 	if err != nil {
 		act.logger.Error("failed to shutdown", zap.Error(err))
 	}
-}
-
-func newCache() (otter.Cache[string, string], error) {
-	return otter.MustBuilder[string, string](100).Build()
 }
 
 func runApp(config internal.Config) {
@@ -89,7 +80,9 @@ func runApp(config internal.Config) {
 				}
 				return logger, err
 			},
-			newCache,
+			func() (otter.Cache[string, string], error) {
+				return otter.MustBuilder[string, string](100).Build()
+			},
 			func() internal.Config {
 				return config
 			},
@@ -109,23 +102,32 @@ func runApp(config internal.Config) {
 	app.Run()
 }
 
-func main() {
+var config internal.Config
 
-	var rootCmd = &cobra.Command{
-		Use:   "drupal-updater [config]",
-		Short: "Drupal updater",
-		Args:  cobra.ExactArgs(1),
-		Run: func(_ *cobra.Command, args []string) {
-			var config internal.Config
-			err := json.Unmarshal([]byte(args[0]), &config)
-			if err != nil {
-				fmt.Println("Failed to parse config", err)
-				os.Exit(1)
-			}
-			runApp(config)
-		},
-	}
+var rootCmd = &cobra.Command{
+	Use:   "drupdater",
+	Short: "Drupal Updater",
+	Run: func(_ *cobra.Command, args []string) {
+		runApp(config)
+	},
+}
 
+func init() {
+	rootCmd.PersistentFlags().StringVar(&config.RepositoryURL, "repository", "", "Repository URL")
+	rootCmd.MarkPersistentFlagRequired("repository")
+	rootCmd.PersistentFlags().StringVar(&config.Token, "token", "", "Token")
+	rootCmd.MarkPersistentFlagRequired("token")
+	rootCmd.PersistentFlags().StringVar(&config.Branch, "branch", "main", "Branch")
+	rootCmd.PersistentFlags().StringArrayVar(&config.Sites, "sites", []string{"default"}, "Sites")
+	rootCmd.PersistentFlags().StringVar(&config.UpdateStrategy, "update-strategy", "Regular", "Update strategy (Regular or Security)")
+	rootCmd.PersistentFlags().BoolVar(&config.AutoMerge, "auto-merge", false, "Auto merge")
+	rootCmd.PersistentFlags().BoolVar(&config.RunCBF, "run-cbf", false, "Run CBF")
+	rootCmd.PersistentFlags().BoolVar(&config.RunRector, "run-rector", false, "Run Rector")
+	rootCmd.PersistentFlags().BoolVar(&config.DryRun, "dry-run", false, "Dry run")
+	rootCmd.PersistentFlags().BoolVar(&config.Verbose, "verbose", false, "Verbose")
+}
+
+func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)

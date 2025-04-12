@@ -14,7 +14,7 @@ RUN go env -w GOCACHE=/go-cache
 RUN go env -w GOMODCACHE=/gomod-cache
 
 RUN --mount=type=cache,target=/gomod-cache go mod download
-RUN --mount=type=cache,target=/gomod-cache --mount=type=cache,target=/go-cache GOOS=linux go build -o /build/drupdater ./cmd/updater
+RUN --mount=type=cache,target=/gomod-cache --mount=type=cache,target=/go-cache GOOS=linux go build -o /build/drupdater .
 
 
 # Build php image.
@@ -43,14 +43,13 @@ RUN git config --global user.email "update@drupdater.com" && \
 
 COPY scripts/ /opt/drupdater/
 
-CMD [ "" ]
-ENTRYPOINT [ "" ]
-
 
 # Production image.
 FROM base AS prod
 COPY --from=build /build/drupdater /opt/drupdater/bin
 
+CMD [""]
+ENTRYPOINT ["/opt/drupdater/bin"]
 
 # Development image.
 FROM base AS dev
