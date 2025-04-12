@@ -17,18 +17,5 @@ go test -v ./...
 ## Execute programm
 
 ```bash
-go run cmd/updater/main.go "{
-  \"repositoryUrl\": \"https://gitlab.com/my-project\",
-  \"branch\": \"main\",
-  \"token\": \"token\",
-  \"sites\": [
-    \"default\"
-  ],
-  \"updateStrategy\": \"Regular\",
-  \"autoMerge\": true,
-  \"runCBF\": true,
-  \"runRector\": false,
-  \"dryRun\": false,
-  \"verbose\": true
-}"
+go run cmd/updater/main.go --repository <repository> --token <branch> 
 ```
