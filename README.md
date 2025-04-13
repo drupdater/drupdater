@@ -21,7 +21,7 @@ Drupdater can be integrated into your CI/CD pipeline or run manually.
 ```yaml
 drupdater_scheduled_job:
   image: 
-    name: ghcr.io/drupdater/drupdater:latest-php8.3
+    name: ghcr.io/drupdater/drupdater-php8.3:latest
     entrypoint: [""]
   script: 
     - /opt/drupdater/bin --repository $CI_PROJECT_URL --token <your_token>

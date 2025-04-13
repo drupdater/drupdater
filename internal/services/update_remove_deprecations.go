@@ -38,7 +38,7 @@ func newUpdateRemoveDeprecations(logger *zap.Logger, commandExecutor utils.Comma
 }
 
 func (h *UpdateRemoveDeprecations) Execute(path string, worktree internal.Worktree) error {
-	if !h.config.RunRector {
+	if h.config.SkipRector {
 		h.logger.Debug("rector is disabled, skipping remove deprecations")
 		return nil
 	}

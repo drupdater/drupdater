@@ -17,5 +17,5 @@ go test -v ./...
 ## Execute programm
 
 ```bash
-go run cmd/updater/main.go --repository <repository> --token <branch> 
+go run main.go <repository> <token> 
 ```

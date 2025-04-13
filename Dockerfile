@@ -28,6 +28,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*;
 
 ENV COMPOSER_HOME=/usr/local/composer
+ENV COMPOSER_CACHE_DIR=/tmp/composer/cache
 ENV COMPOSER_ALLOW_SUPERUSER=1
 ENV COMPOSER_NO_AUDIT=1
 ENV COMPOSER_FUND=0
@@ -55,9 +56,11 @@ ENTRYPOINT ["/opt/drupdater/bin"]
 FROM base AS dev
 
 # Install go.
-RUN cd /usr/local && \
-    curl -sSL https://dl.google.com/go/go1.23.4.linux-arm64.tar.gz -o go1.23.4.linux-arm64.tar.gz && \
-    rm -rf /usr/local/go && tar -C /usr/local -xzf go1.23.4.linux-arm64.tar.gz;
+RUN echo "I'm building for $TARGETARCH"
+RUN dpkgArch="$(dpkg --print-architecture)" && \
+    cd /usr/local && \
+    curl -sSL https://dl.google.com/go/go1.23.4.linux-$dpkgArch.tar.gz -o go1.23.4.linux-$dpkgArch.tar.gz && \
+    rm -rf /usr/local/go && tar -C /usr/local -xzf go1.23.4.linux-$dpkgArch.tar.gz;
 ENV PATH="/usr/local/go/bin:${PATH}"
 RUN go env -w GOCACHE=/go-cache
 RUN go env -w GOMODCACHE=/gomod-cache

@@ -72,9 +72,6 @@ func (e DefaultCommandExecutor) ExecDrush(dir string, site string, args ...strin
 	output := strings.TrimSuffix(string(out), "\n")
 
 	e.logger.Debug("executing drush", zap.String("dir", dir), zap.String("site", site), zap.Strings("args", args), zap.String("output", output))
-	if err != nil {
-		e.logger.Error("failed to execute drush", zap.String("dir", dir), zap.String("site", site), zap.Strings("args", args), zap.Error(err))
-	}
 
 	return output, err
 }
@@ -87,9 +84,6 @@ func (e DefaultCommandExecutor) ExecComposer(dir string, args ...string) (string
 	output := strings.TrimSuffix(string(out), "\n")
 
 	e.logger.Debug("executing composer", zap.String("dir", dir), zap.Strings("args", args), zap.String("output", output))
-	if err != nil {
-		e.logger.Error("failed to execute composer", zap.String("dir", dir), zap.Strings("args", args), zap.Error(err))
-	}
 
 	return output, err
 }
@@ -220,7 +214,7 @@ func (e DefaultCommandExecutor) RemovePackages(dir string, packages ...string) (
 }
 
 func (e DefaultCommandExecutor) RunRector(dir string) (string, error) {
-	e.logger.Info("remove deprecations")
+	e.logger.Debug("remove deprecations")
 
 	customCodeDirectories, err := e.GetCustomCodeDirectories(dir)
 	if err != nil {

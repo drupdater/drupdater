@@ -59,7 +59,7 @@ var fileExists = func(path string) bool {
 
 func (h *UpdateCodingStyles) Execute(path string, worktree internal.Worktree) error {
 
-	if !h.config.RunCBF {
+	if h.config.SkipCBF {
 		h.logger.Debug("skipping coding styles update")
 		return nil
 	}
