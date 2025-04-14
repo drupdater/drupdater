@@ -48,7 +48,7 @@ drupdater_scheduled_job:
     name: ghcr.io/drupdater/drupdater-php8.3:latest
     entrypoint: [""]
   script: 
-    - /opt/drupdater/bin --repository $CI_PROJECT_URL --token <your_token>
+    - /opt/drupdater/bin $CI_PROJECT_URL <your_token>
   only:
     - schedules
 ```
