@@ -33,6 +33,8 @@ func NewGitRepositoryService(logger *zap.Logger) *GitRepositoryService {
 
 func (rs *GitRepositoryService) CloneRepository(repository string, branch string, token string) (internal.Repository, internal.Worktree, string, error) {
 
+	rs.logger.Info("Cloning repository", zap.String("repository", repository), zap.String("branch", branch))
+
 	randString := func(n int) string {
 		const letters = "abcdef0123456789"
 		b := make([]byte, n)

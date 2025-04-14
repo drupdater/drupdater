@@ -31,6 +31,7 @@ func newDefaultInstallerService(logger *zap.Logger, repository RepositoryService
 
 func (is *DefaultInstallerService) InstallDrupal(repositoryURL string, branch string, token string, sites []string) error {
 
+	is.logger.Info("Installing project")
 	_, _, path, err := is.repository.CloneRepository(repositoryURL, branch, token)
 	if err != nil {
 		is.logger.Error("failed to clone repository", zap.String("repositoryURL", repositoryURL), zap.String("branch", branch), zap.Error(err))
