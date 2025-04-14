@@ -56,7 +56,6 @@ ENTRYPOINT ["/opt/drupdater/bin"]
 FROM base AS dev
 
 # Install go.
-RUN echo "I'm building for $TARGETARCH"
 RUN dpkgArch="$(dpkg --print-architecture)" && \
     cd /usr/local && \
     curl -sSL https://dl.google.com/go/go1.23.4.linux-$dpkgArch.tar.gz -o go1.23.4.linux-$dpkgArch.tar.gz && \
