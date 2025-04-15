@@ -103,7 +103,7 @@ func TestSecurityUpdateStartUpdate(t *testing.T) {
 	vcsProviderFactory.On("Create", "https://example.com/repo.git", "token").Return(vcsProvider)
 
 	fixture, _ := os.ReadFile("testdata/security_update.md")
-	vcsProvider.On("CreateMergeRequest", mock.Anything, string(fixture), mock.Anything, config.Branch).Return(nil)
+	vcsProvider.On("CreateMergeRequest", mock.Anything, string(fixture), mock.Anything, config.Branch).Return(codehosting.MergeRequest{}, nil)
 	repository.On("Push", mock.Anything).Return(nil)
 	commandExecutor.On("GenerateDiffTable", mock.Anything, mock.Anything, true).Return("Dummy Table", nil)
 	composerService.On("RunComposerAudit", "/tmp").Return(ComposerAudit{

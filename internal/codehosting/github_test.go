@@ -30,7 +30,7 @@ func TestGithub_CreateMergeRequest(t *testing.T) {
 
 		jsonString := make([]byte, 0)
 		if r.URL.Path == "/api/v3/repos/test_owner/test_project/pulls" {
-			jsonString = []byte("{}")
+			jsonString = []byte(`{"number": 1, "html_url": "http://example.com"}`)
 			w.WriteHeader(http.StatusOK)
 		} else {
 			w.WriteHeader(http.StatusNotFound)
@@ -50,8 +50,11 @@ func TestGithub_CreateMergeRequest(t *testing.T) {
 		fs:     afero.NewMemMapFs(),
 	}
 
-	err := github.CreateMergeRequest("Test MR", "This is a test MR", "source-branch", "target-branch")
+	mr, err := github.CreateMergeRequest("Test MR", "This is a test MR", "source-branch", "target-branch")
 	assert.NoError(t, err)
+	assert.Equal(t, 1, mr.ID)
+	assert.Equal(t, "http://example.com", mr.URL)
+
 }
 
 func TestGithub_DownloadComposerFiles(t *testing.T) {

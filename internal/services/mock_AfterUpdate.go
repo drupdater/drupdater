@@ -4,6 +4,7 @@ package services
 
 import (
 	internal "drupdater/internal"
+
 	mock "github.com/stretchr/testify/mock"
 )
 

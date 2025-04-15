@@ -162,11 +162,13 @@ func (ws *WorkflowSecurityUpdateService) StartUpdate() error {
 			return err
 		}
 
-		gitlab := ws.vcsProviderFactory.Create(ws.config.RepositoryURL, ws.config.Token)
+		codehostingPlatform := ws.vcsProviderFactory.Create(ws.config.RepositoryURL, ws.config.Token)
 		title := fmt.Sprintf("%s: Drupal Security Updates", time.Now().Format("2006-01-02"))
-		if err = gitlab.CreateMergeRequest(title, description, updateBranchName, ws.config.Branch); err != nil {
+		mr, err := codehostingPlatform.CreateMergeRequest(title, description, updateBranchName, ws.config.Branch)
+		if err != nil {
 			ws.logger.Error("failed to create merge request", zap.Error(err))
 		}
+		ws.logger.Info("merge request created", zap.String("url", mr.URL))
 	}
 
 	tmpDirName := fmt.Sprintf("/tmp/%x", md5.Sum([]byte(ws.config.RepositoryURL)))

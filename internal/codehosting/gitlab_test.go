@@ -30,9 +30,9 @@ func TestGitlab_CreateMergeRequest(t *testing.T) {
 	targetBranch := "main"
 	description := "Test MR description"
 
-	t.Run("failed to get composer diff", func(t *testing.T) {
+	t.Run("failed to get create mr", func(t *testing.T) {
 
-		err := gitlab.CreateMergeRequest(title, description, sourceBranch, targetBranch)
+		_, err := gitlab.CreateMergeRequest(title, description, sourceBranch, targetBranch)
 		assert.Error(t, err)
 	})
 
@@ -69,7 +69,7 @@ func TestCreateMergeRequest(t *testing.T) {
 
 		jsonString := make([]byte, 0)
 		if r.URL.Path == "/api/v4/projects/test_project/merge_requests" {
-			jsonString = []byte("{}")
+			jsonString = []byte(`{"iid": 1, "web_url": "http://example.com"}`)
 			w.WriteHeader(http.StatusOK)
 		} else {
 			w.WriteHeader(http.StatusNotFound)
@@ -88,8 +88,10 @@ func TestCreateMergeRequest(t *testing.T) {
 		fs:          afero.NewMemMapFs(),
 	}
 
-	err := gitlab.CreateMergeRequest("Test MR", "This is a test MR", "source-branch", "target-branch")
+	mr, err := gitlab.CreateMergeRequest("Test MR", "This is a test MR", "source-branch", "target-branch")
 	assert.NoError(t, err)
+	assert.Equal(t, 1, mr.ID)
+	assert.Equal(t, "http://example.com", mr.URL)
 }
 
 func TestDownloadComposerFiles(t *testing.T) {
