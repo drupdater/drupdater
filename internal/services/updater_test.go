@@ -29,6 +29,7 @@ func TestUpdateDependencies(t *testing.T) {
 		commandExecutor.On("GetComposerAllowPlugins", "/tmp").Return(map[string]bool{}, nil)
 		commandExecutor.On("SetComposerConfig", "/tmp", "allow-plugins", "true").Return(nil)
 		commandExecutor.On("UpdateDependencies", "/tmp", []string{}, false, false).Return("", nil)
+		commandExecutor.On("RunComposerNormalize", "/tmp").Return("", nil)
 		commandExecutor.On("SetComposerAllowPlugins", "/tmp", map[string]bool{}).Return(nil)
 
 		composerService.On("GetInstalledPlugins", "/tmp").Return(map[string]interface{}{}, nil)

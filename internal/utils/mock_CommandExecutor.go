@@ -1111,6 +1111,62 @@ func (_c *MockCommandExecutor_RemovePackages_Call) RunAndReturn(run func(string,
 	return _c
 }
 
+// RunComposerNormalize provides a mock function with given fields: dir
+func (_m *MockCommandExecutor) RunComposerNormalize(dir string) (string, error) {
+	ret := _m.Called(dir)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RunComposerNormalize")
+	}
+
+	var r0 string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(string) (string, error)); ok {
+		return rf(dir)
+	}
+	if rf, ok := ret.Get(0).(func(string) string); ok {
+		r0 = rf(dir)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	if rf, ok := ret.Get(1).(func(string) error); ok {
+		r1 = rf(dir)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockCommandExecutor_RunComposerNormalize_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RunComposerNormalize'
+type MockCommandExecutor_RunComposerNormalize_Call struct {
+	*mock.Call
+}
+
+// RunComposerNormalize is a helper method to define mock.On call
+//   - dir string
+func (_e *MockCommandExecutor_Expecter) RunComposerNormalize(dir interface{}) *MockCommandExecutor_RunComposerNormalize_Call {
+	return &MockCommandExecutor_RunComposerNormalize_Call{Call: _e.mock.On("RunComposerNormalize", dir)}
+}
+
+func (_c *MockCommandExecutor_RunComposerNormalize_Call) Run(run func(dir string)) *MockCommandExecutor_RunComposerNormalize_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(string))
+	})
+	return _c
+}
+
+func (_c *MockCommandExecutor_RunComposerNormalize_Call) Return(_a0 string, _a1 error) *MockCommandExecutor_RunComposerNormalize_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockCommandExecutor_RunComposerNormalize_Call) RunAndReturn(run func(string) (string, error)) *MockCommandExecutor_RunComposerNormalize_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // RunPHPCBF provides a mock function with given fields: dir
 func (_m *MockCommandExecutor) RunPHPCBF(dir string) error {
 	ret := _m.Called(dir)
