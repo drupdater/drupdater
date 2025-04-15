@@ -42,7 +42,9 @@ func newWorkflowSecurityUpdateService(logger *zap.Logger, installer InstallerSer
 }
 
 func (ws *WorkflowSecurityUpdateService) StartUpdate() error {
+	ws.logger.Info("starting security update workflow")
 
+	ws.logger.Info("cloning repository for update", zap.String("repositoryURL", ws.config.RepositoryURL), zap.String("branch", ws.config.Branch))
 	repository, worktree, path, err := ws.repository.CloneRepository(ws.config.RepositoryURL, ws.config.Branch, ws.config.Token)
 	if err != nil {
 		return err
@@ -57,6 +59,8 @@ func (ws *WorkflowSecurityUpdateService) StartUpdate() error {
 		ws.logger.Info("no security advisories found, skipping security update")
 		return nil
 	}
+	ws.logger.Info("found security advisories", zap.Int("numAdvisories", len(beforeUpdateAudit.Advisories)))
+	ws.logger.Info("advisories", zap.Any("advisories", beforeUpdateAudit.Advisories))
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -80,6 +84,11 @@ func (ws *WorkflowSecurityUpdateService) StartUpdate() error {
 	}
 
 	beforeUpdateCommit, _ := ws.repository.GetHeadCommit(repository)
+	if slices.Contains(packagesToUpdate, "drupal/core") {
+		packagesToUpdate = append(packagesToUpdate, "drupal/core-recommended")
+		packagesToUpdate = append(packagesToUpdate, "drupal/core-composer-scaffold")
+	}
+	ws.logger.Info("updating dependencies", zap.Strings("packages", packagesToUpdate))
 	updateReport, err := ws.updater.UpdateDependencies(path, packagesToUpdate, worktree, true)
 	if err != nil {
 		return err

@@ -5,6 +5,7 @@ Drupdater is a standalone tool for updating Drupal sites. It is designed to stre
 ## Features
 
 - Update PHP dependencies using Composer.
+- Security scans for vulnerable dependencies.
 - Remove/update merged/updated patches.
 - Export and update Drupal configurations.
 - Update translations for multilingual sites.
@@ -59,7 +60,7 @@ Drupdater supports the following flags:
 
 - `--branch`: The branch to update (default: `main`).
 - `--sites`: A list of Drupal site directories to update (default: `default`).
-- `--update-strategy`: Update strategy (`Regular` or `Security`).
+- `--security`: Only update vulnerable dependencies.
 - `--auto-merge`: Automatically merge the update branch if set to `true`.
 - `--skip-cbf`: Skip running `phpcbf` for fixing code style issues.
 - `--skip-rector`: Skip running `drupal-rector` for removing deprecated code.

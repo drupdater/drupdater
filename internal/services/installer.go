@@ -31,7 +31,7 @@ func newDefaultInstallerService(logger *zap.Logger, repository RepositoryService
 
 func (is *DefaultInstallerService) InstallDrupal(repositoryURL string, branch string, token string, sites []string) error {
 
-	is.logger.Info("Installing project")
+	is.logger.Info("cloning repository for site-install", zap.String("repositoryURL", repositoryURL), zap.String("branch", branch))
 	_, _, path, err := is.repository.CloneRepository(repositoryURL, branch, token)
 	if err != nil {
 		is.logger.Error("failed to clone repository", zap.String("repositoryURL", repositoryURL), zap.String("branch", branch), zap.Error(err))
@@ -51,7 +51,7 @@ func (is *DefaultInstallerService) InstallDrupal(repositoryURL string, branch st
 		for _, site := range chunk {
 			wg.Add(1)
 
-			go func() {
+			go func(site string) {
 				defer wg.Done()
 
 				is.logger.Info("installing site", zap.String("site", site))
@@ -71,7 +71,7 @@ func (is *DefaultInstallerService) InstallDrupal(repositoryURL string, branch st
 					return
 				}
 
-			}()
+			}(site)
 		}
 		wg.Wait()
 

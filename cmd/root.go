@@ -93,12 +93,10 @@ func runApp(config internal.Config) {
 				return config
 			},
 			func(lc fx.Lifecycle, sh fx.Shutdowner, logger *zap.Logger, dependencyUpdateService *services.WorkflowDependencyUpdateService, securityUpdateService *services.WorkflowSecurityUpdateService) *Action {
-				if config.UpdateStrategy == "Regular" {
-					return newAction(lc, sh, logger, dependencyUpdateService)
-				} else if config.UpdateStrategy == "Security" {
+				if config.Security {
 					return newAction(lc, sh, logger, securityUpdateService)
 				}
-				return nil
+				return newAction(lc, sh, logger, dependencyUpdateService)
 			},
 		),
 		fx.Options(services.Module, utils.Module, codehosting.Module),
@@ -126,7 +124,7 @@ func init() {
 
 	rootCmd.PersistentFlags().StringVar(&config.Branch, "branch", "main", "Branch")
 	rootCmd.PersistentFlags().StringArrayVar(&config.Sites, "sites", []string{"default"}, "Sites")
-	rootCmd.PersistentFlags().StringVar(&config.UpdateStrategy, "update-strategy", "Regular", "Update strategy (Regular or Security)")
+	rootCmd.PersistentFlags().BoolVar(&config.Security, "security", false, "Only security updates. If true, only security updates will be applied.")
 	rootCmd.PersistentFlags().BoolVar(&config.AutoMerge, "auto-merge", false, "Auto merge. If true, the merge request will be merged automatically.")
 	rootCmd.PersistentFlags().BoolVar(&config.SkipCBF, "skip-cbf", false, "Skip CBF. If true, the PHPCBF will not be run.")
 	rootCmd.PersistentFlags().BoolVar(&config.SkipRector, "skip-rector", false, "Skip Rector. If true, the Rector will not run to remove deprecated code.")

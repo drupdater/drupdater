@@ -42,6 +42,7 @@ func newWorkflowDependencyUpdateService(afterUpdate []AfterUpdate, logger *zap.L
 }
 
 func (ws *WorkflowDependencyUpdateService) StartUpdate() error {
+	ws.logger.Info("starting update workflow")
 	var wg sync.WaitGroup
 	wg.Add(1)
 	errChannel := make(chan error, 1)
@@ -56,6 +57,7 @@ func (ws *WorkflowDependencyUpdateService) StartUpdate() error {
 	}()
 
 	updateBranchName := fmt.Sprintf("update-%s", time.Now().Format("20060102150405"))
+	ws.logger.Info("cloning repository for update", zap.String("repositoryURL", ws.config.RepositoryURL), zap.String("branch", ws.config.Branch))
 	repository, worktree, path, err := ws.repository.CloneRepository(ws.config.RepositoryURL, ws.config.Branch, ws.config.Token)
 	if err != nil {
 		return err
@@ -70,6 +72,7 @@ func (ws *WorkflowDependencyUpdateService) StartUpdate() error {
 	}
 
 	beforeUpdateCommit, _ := ws.repository.GetHeadCommit(repository)
+	ws.logger.Info("updating dependencies")
 	updateReport, err := ws.updater.UpdateDependencies(path, []string{}, worktree, false)
 	if err != nil {
 		return err
