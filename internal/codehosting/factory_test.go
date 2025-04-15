@@ -18,6 +18,6 @@ func TestDefaultVcsProviderFactory_Create(t *testing.T) {
 
 		factory := NewDefaultVcsProviderFactory()
 		provider := factory.Create("https://gitfoo.com", "dummy-token")
-		assert.Nil(t, provider)
+		assert.IsType(t, &Gitlab{}, provider)
 	})
 }

@@ -17,12 +17,10 @@ func NewDefaultVcsProviderFactory() *DefaultVcsProviderFactory {
 
 func (vpf *DefaultVcsProviderFactory) Create(repositoryURL string, token string) Platform {
 	switch vpf.getProvider(repositoryURL) {
-	case "gitlab":
-		return newGitlab(repositoryURL, token)
 	case "github":
 		return newGithub(repositoryURL, token)
 	default:
-		return nil
+		return newGitlab(repositoryURL, token)
 	}
 }
 func (vpf *DefaultVcsProviderFactory) getProvider(repositoryURL string) string {
