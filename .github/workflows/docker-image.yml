@@ -3,8 +3,7 @@ name: Docker Image CI
 on:
   push:
     tags: [ "v*" ]
-  pull_request:
-    branches: [ "main" ]
+  workflow_dispatch: # Allows manual triggering of the workflow
 
 # Defines two custom environment variables for the workflow. These are used for the Container registry domain, and a name for the Docker image that this workflow builds.
 env:
