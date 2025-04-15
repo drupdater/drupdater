@@ -42,6 +42,7 @@ type CommandExecutor interface {
 	GetCustomCodeDirectories(dir string) ([]string, error)
 	GetComposerAllowPlugins(dir string) (map[string]bool, error)
 	SetComposerAllowPlugins(dir string, plugins map[string]bool) error
+	RunComposerNormalize(dir string) (string, error)
 }
 
 // DefaultCommandExecutor is the default implementation of CommandExecutor
@@ -318,6 +319,11 @@ func (e DefaultCommandExecutor) UpdateComposerLockHash(dir string) error {
 func (e DefaultCommandExecutor) RunPHPCS(dir string) (string, error) {
 	e.logger.Debug("running phpcs")
 	return e.ExecComposer(dir, "exec", "--", "phpcs", "--report=json", "--runtime-set", "ignore_errors_on_exit", "1", "--runtime-set", "ignore_warnings_on_exit", "1")
+}
+
+func (e DefaultCommandExecutor) RunComposerNormalize(dir string) (string, error) {
+	e.logger.Debug("running composer normalize")
+	return e.ExecComposer(dir, "normalize")
 }
 
 func (e DefaultCommandExecutor) RunPHPCBF(dir string) error {

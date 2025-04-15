@@ -184,6 +184,10 @@ func (us *DefaultUpdater) UpdateDependencies(path string, packagesToUpdate []str
 		return updateReport, err
 	}
 
+	if _, err := us.commandExecutor.RunComposerNormalize(path); err != nil {
+		us.logger.Debug("failed to run composer normalize", zap.Error(err))
+	}
+
 	err = worktree.AddGlob("composer.*")
 	if err != nil {
 		us.logger.Error("failed to add composer.* files", zap.Error(err))
