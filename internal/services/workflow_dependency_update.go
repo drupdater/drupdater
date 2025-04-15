@@ -131,6 +131,7 @@ func (ws *WorkflowDependencyUpdateService) StartUpdate() error {
 			return err
 		}
 
+		ws.logger.Debug("creating merge request", zap.String("title", "Drupal Maintenance Updates"), zap.String("description", description), zap.String("sourceBranch", updateBranchName), zap.String("targetBranch", ws.config.Branch))
 		gitlab := ws.vcsProviderFactory.Create(ws.config.RepositoryURL, ws.config.Token)
 		title := fmt.Sprintf("%s: Drupal Maintenance Updates", time.Now().Format("January 2006"))
 		if err = gitlab.CreateMergeRequest(title, description, updateBranchName, ws.config.Branch); err != nil {
