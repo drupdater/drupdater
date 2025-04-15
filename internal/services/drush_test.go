@@ -3,7 +3,8 @@ package services
 import (
 	"testing"
 
-	"ebersolve.com/updater/internal/utils"
+	"drupdater/internal/utils"
+
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 )

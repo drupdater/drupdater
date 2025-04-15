@@ -6,7 +6,8 @@ import (
 	"strings"
 	"sync"
 
-	"ebersolve.com/updater/internal/utils"
+	"drupdater/internal/utils"
+
 	"github.com/spf13/afero"
 	"go.uber.org/zap"
 )
@@ -108,7 +109,7 @@ func (s *DefaultComposerService) initTempDir() {
 
 	// Create a composer.json file
 	composerJSON := `{
-		"name": "ebersolve/patch-test",
+		"name": "drupdater/patch-test",
 		"type": "project",
 		"repositories": [
 			{

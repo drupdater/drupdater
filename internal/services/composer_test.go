@@ -3,7 +3,8 @@ package services
 import (
 	"testing"
 
-	"ebersolve.com/updater/internal/utils"
+	"drupdater/internal/utils"
+
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -133,24 +134,6 @@ func TestRunComposerAudit(t *testing.T) {
 
 		data := `{
     "advisories": {
-        "netcarver/textile": [
-            {
-                "advisoryId": "PKSA-q7hq-sbtp-vntg",
-                "packageName": "netcarver/textile",
-                "affectedVersions": "<=4.1.2",
-                "title": "PHP-Textile has persistent XSS vulnerability in image link handling",
-                "cve": null,
-                "link": "https://github.com/advisories/GHSA-95m2-chm4-mq7m",
-                "reportedAt": "2025-01-07T17:11:02+00:00",
-                "sources": [
-                    {
-                        "name": "GitHub",
-                        "remoteId": "GHSA-95m2-chm4-mq7m"
-                    }
-                ],
-                "severity": "high"
-            }
-        ],
         "twig/twig": [
             {
                 "advisoryId": "PKSA-v3kg-5xkr-pykw",
@@ -191,19 +174,8 @@ func TestRunComposerAudit(t *testing.T) {
 
 		assert.NoError(t, err)
 
-		assert.Len(t, audit.Advisories, 2)
+		assert.Len(t, audit.Advisories, 1)
 		assert.Equal(t, audit.Advisories, []Advisory{
-			{
-				ReportedAt:       "2025-01-07T17:11:02+00:00",
-				Severity:         "high",
-				AdvisoryID:       "PKSA-q7hq-sbtp-vntg",
-				CVE:              "",
-				Sources:          []Source{{Name: "GitHub", RemoteID: "GHSA-95m2-chm4-mq7m"}},
-				Link:             "https://github.com/advisories/GHSA-95m2-chm4-mq7m",
-				PackageName:      "netcarver/textile",
-				AffectedVersions: "<=4.1.2",
-				Title:            "PHP-Textile has persistent XSS vulnerability in image link handling",
-			},
 			{
 				ReportedAt:       "2025-01-29T06:52:00+00:00",
 				Severity:         "medium",

@@ -3,7 +3,7 @@
 package services
 
 import (
-	internal "ebersolve.com/updater/internal"
+	internal "drupdater/internal"
 	mock "github.com/stretchr/testify/mock"
 
 	object "github.com/go-git/go-git/v5/plumbing/object"

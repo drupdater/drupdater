@@ -7,7 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"ebersolve.com/updater/internal/utils"
+	"drupdater/internal/utils"
+
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 )

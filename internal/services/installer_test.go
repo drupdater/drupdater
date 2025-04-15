@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"ebersolve.com/updater/internal/utils"
+	"drupdater/internal/utils"
 
 	"go.uber.org/zap"
 )

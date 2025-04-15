@@ -1,4 +1,4 @@
-module ebersolve.com/updater
+module drupdater
 
 go 1.23.4
 

@@ -6,7 +6,8 @@ import (
 	"fmt"
 	"text/template"
 
-	"ebersolve.com/updater/internal"
+	"drupdater/internal"
+
 	git "github.com/go-git/go-git/v5"
 	gitConfig "github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"

@@ -6,7 +6,8 @@ import (
 	"math/rand"
 	"strings"
 
-	"ebersolve.com/updater/internal"
+	"drupdater/internal"
+
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -64,7 +65,7 @@ func (rs *GitRepositoryService) CloneRepository(repository string, branch string
 	// Set the user name and email for the commit
 	config, _ := checkout.Config()
 	config.User.Name = "DrupalUpdaterBot"
-	config.User.Email = "technology@ebersolve.com"
+	config.User.Email = "technology@drupdater.com"
 	err = checkout.SetConfig(config)
 	if err != nil {
 		return checkout, nil, "", err

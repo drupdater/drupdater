@@ -8,9 +8,10 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"ebersolve.com/updater/internal"
-	"ebersolve.com/updater/internal/codehosting"
-	"ebersolve.com/updater/internal/utils"
+	"drupdater/internal"
+	"drupdater/internal/codehosting"
+	"drupdater/internal/utils"
+
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"go.uber.org/zap"

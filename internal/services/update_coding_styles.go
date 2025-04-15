@@ -6,8 +6,9 @@ import (
 	"strings"
 	"text/template"
 
-	"ebersolve.com/updater/internal"
-	"ebersolve.com/updater/internal/utils"
+	"drupdater/internal"
+	"drupdater/internal/utils"
+
 	"github.com/go-git/go-git/v5"
 	"go.uber.org/zap"
 )
