@@ -724,7 +724,6 @@ func TestUpdateDrupal(t *testing.T) {
 		result, err := updater.UpdateDrupal("/tmp", worktree, []string{"site1", "site2"})
 
 		assert.Equal(t, UpdateHooksPerSite{
-			"site1": map[string]UpdateHook{},
 			"site2": map[string]UpdateHook{
 				"pre-update": {
 					Module:      "module",

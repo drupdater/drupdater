@@ -68,6 +68,3 @@ Dummy Table
 
 </details>
 
----
-
-_Thanks for participating in our beta program! We would like to get your feedback on this merge request. Please take a minute and participate in the survey: [Feedback Form](https://example.com)_

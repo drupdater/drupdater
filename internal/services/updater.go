@@ -267,7 +267,9 @@ func (us *DefaultUpdater) UpdateDrupal(path string, worktree internal.Worktree, 
 			if result.err != nil {
 				return nil, result.err
 			}
-			updateHooksPerSite[result.Site] = result.UpdateHooks
+			if len(result.UpdateHooks) != 0 {
+				updateHooksPerSite[result.Site] = result.UpdateHooks
+			}
 		}
 	}
 
