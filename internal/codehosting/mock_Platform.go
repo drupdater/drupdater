@@ -18,21 +18,31 @@ func (_m *MockPlatform) EXPECT() *MockPlatform_Expecter {
 }
 
 // CreateMergeRequest provides a mock function with given fields: title, description, sourceBranch, targetBranch
-func (_m *MockPlatform) CreateMergeRequest(title string, description string, sourceBranch string, targetBranch string) error {
+func (_m *MockPlatform) CreateMergeRequest(title string, description string, sourceBranch string, targetBranch string) (MergeRequest, error) {
 	ret := _m.Called(title, description, sourceBranch, targetBranch)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CreateMergeRequest")
 	}
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(string, string, string, string) error); ok {
+	var r0 MergeRequest
+	var r1 error
+	if rf, ok := ret.Get(0).(func(string, string, string, string) (MergeRequest, error)); ok {
+		return rf(title, description, sourceBranch, targetBranch)
+	}
+	if rf, ok := ret.Get(0).(func(string, string, string, string) MergeRequest); ok {
 		r0 = rf(title, description, sourceBranch, targetBranch)
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(MergeRequest)
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(string, string, string, string) error); ok {
+		r1 = rf(title, description, sourceBranch, targetBranch)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // MockPlatform_CreateMergeRequest_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateMergeRequest'
@@ -56,12 +66,12 @@ func (_c *MockPlatform_CreateMergeRequest_Call) Run(run func(title string, descr
 	return _c
 }
 
-func (_c *MockPlatform_CreateMergeRequest_Call) Return(_a0 error) *MockPlatform_CreateMergeRequest_Call {
-	_c.Call.Return(_a0)
+func (_c *MockPlatform_CreateMergeRequest_Call) Return(_a0 MergeRequest, _a1 error) *MockPlatform_CreateMergeRequest_Call {
+	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockPlatform_CreateMergeRequest_Call) RunAndReturn(run func(string, string, string, string) error) *MockPlatform_CreateMergeRequest_Call {
+func (_c *MockPlatform_CreateMergeRequest_Call) RunAndReturn(run func(string, string, string, string) (MergeRequest, error)) *MockPlatform_CreateMergeRequest_Call {
 	_c.Call.Return(run)
 	return _c
 }

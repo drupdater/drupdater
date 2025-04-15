@@ -29,14 +29,21 @@ func newGithub(repositoryURL string, token string) *Github {
 	}
 }
 
-func (g Github) CreateMergeRequest(title string, description string, sourceBranch string, targetBranch string) error {
-	_, _, err := g.client.PullRequests.Create(context.TODO(), g.owner, g.repo, &github.NewPullRequest{
+func (g Github) CreateMergeRequest(title string, description string, sourceBranch string, targetBranch string) (MergeRequest, error) {
+	mr, _, err := g.client.PullRequests.Create(context.TODO(), g.owner, g.repo, &github.NewPullRequest{
 		Head:  &sourceBranch,
 		Base:  &targetBranch,
 		Title: &title,
 		Body:  &description,
 	})
-	return err
+
+	if err != nil {
+		return MergeRequest{}, err
+	}
+	return MergeRequest{
+		ID:  mr.GetNumber(),
+		URL: mr.GetHTMLURL(),
+	}, nil
 }
 
 func (g Github) DownloadComposerFiles(branch string) string {

@@ -32,14 +32,22 @@ func newGitlab(repositoryURL string, token string) *Gitlab {
 	}
 }
 
-func (g Gitlab) CreateMergeRequest(title string, description string, sourceBranch string, targetBranch string) error {
-	_, _, err := g.client.MergeRequests.CreateMergeRequest(g.projectPath, &gitlab.CreateMergeRequestOptions{
+func (g Gitlab) CreateMergeRequest(title string, description string, sourceBranch string, targetBranch string) (MergeRequest, error) {
+	mr, _, err := g.client.MergeRequests.CreateMergeRequest(g.projectPath, &gitlab.CreateMergeRequestOptions{
 		SourceBranch: &sourceBranch,
 		TargetBranch: &targetBranch,
 		Title:        &title,
 		Description:  &description,
 	})
-	return err
+
+	if err != nil {
+		return MergeRequest{}, err
+	}
+
+	return MergeRequest{
+		ID:  mr.IID,
+		URL: mr.WebURL,
+	}, nil
 }
 
 func (g Gitlab) DownloadComposerFiles(branch string) string {

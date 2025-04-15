@@ -132,13 +132,15 @@ func (ws *WorkflowDependencyUpdateService) StartUpdate() error {
 		}
 
 		ws.logger.Debug("creating merge request", zap.String("title", "Drupal Maintenance Updates"), zap.String("description", description), zap.String("sourceBranch", updateBranchName), zap.String("targetBranch", ws.config.Branch))
-		gitlab := ws.vcsProviderFactory.Create(ws.config.RepositoryURL, ws.config.Token)
+		codehostingPlatform := ws.vcsProviderFactory.Create(ws.config.RepositoryURL, ws.config.Token)
 		title := fmt.Sprintf("%s: Drupal Maintenance Updates", time.Now().Format("January 2006"))
-		if err = gitlab.CreateMergeRequest(title, description, updateBranchName, ws.config.Branch); err != nil {
+		mr, err := codehostingPlatform.CreateMergeRequest(title, description, updateBranchName, ws.config.Branch)
+		if err != nil {
 			ws.logger.Error("failed to create merge request", zap.Error(err))
 			// remove the branch if the merge request creation failed
 			//worktree.
 		}
+		ws.logger.Info("merge request created", zap.String("url", mr.URL))
 	}
 
 	tmpDirName := fmt.Sprintf("/tmp/%x", md5.Sum([]byte(ws.config.RepositoryURL)))

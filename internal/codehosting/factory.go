@@ -11,6 +11,11 @@ type VcsProviderFactory interface {
 type DefaultVcsProviderFactory struct {
 }
 
+type MergeRequest struct {
+	ID  int    `json:"id"`
+	URL string `json:"url"`
+}
+
 func NewDefaultVcsProviderFactory() *DefaultVcsProviderFactory {
 	return &DefaultVcsProviderFactory{}
 }
@@ -34,6 +39,6 @@ func (vpf *DefaultVcsProviderFactory) getProvider(repositoryURL string) string {
 }
 
 type Platform interface {
-	CreateMergeRequest(title string, description string, sourceBranch string, targetBranch string) error
+	CreateMergeRequest(title string, description string, sourceBranch string, targetBranch string) (MergeRequest, error)
 	DownloadComposerFiles(branch string) string
 }
