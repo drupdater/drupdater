@@ -5,7 +5,8 @@ import (
 	"slices"
 	"sync"
 
-	"ebersolve.com/updater/internal/utils"
+	"drupdater/internal/utils"
+
 	"go.uber.org/zap"
 )
 

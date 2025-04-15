@@ -3,7 +3,8 @@ package services
 import (
 	"testing"
 
-	internal "ebersolve.com/updater/internal"
+	internal "drupdater/internal"
+
 	"github.com/go-git/go-git/v5"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"

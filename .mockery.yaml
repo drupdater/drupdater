@@ -1,6 +1,6 @@
 with-expecter: true
 packages:
-  ebersolve.com/updater:
+  drupdater:
     config:
       all: true
       dir: '{{.InterfaceDir}}'

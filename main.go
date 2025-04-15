@@ -1,6 +1,6 @@
 package main
 
-import "ebersolve.com/updater/cmd"
+import "drupdater/cmd"
 
 func main() {
 	cmd.Execute()

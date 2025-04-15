@@ -1,8 +1,9 @@
 package services
 
 import (
-	"ebersolve.com/updater/internal"
-	"ebersolve.com/updater/internal/utils"
+	"drupdater/internal"
+	"drupdater/internal/utils"
+
 	git "github.com/go-git/go-git/v5"
 	"go.uber.org/zap"
 )

@@ -13,8 +13,9 @@ import (
 	"strings"
 	"sync"
 
-	"ebersolve.com/updater/internal"
-	"ebersolve.com/updater/internal/utils"
+	"drupdater/internal"
+	"drupdater/internal/utils"
+
 	gitlab "gitlab.com/gitlab-org/api/client-go"
 
 	git "github.com/go-git/go-git/v5"

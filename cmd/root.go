@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"os"
 
-	"ebersolve.com/updater/internal"
-	"ebersolve.com/updater/internal/codehosting"
-	"ebersolve.com/updater/internal/services"
-	"ebersolve.com/updater/internal/utils"
+	"drupdater/internal"
+	"drupdater/internal/codehosting"
+	"drupdater/internal/services"
+	"drupdater/internal/utils"
 
 	"github.com/maypok86/otter"
 	"github.com/spf13/cobra"

@@ -4,9 +4,10 @@ import (
 	"os"
 	"testing"
 
-	"ebersolve.com/updater/internal"
-	"ebersolve.com/updater/internal/codehosting"
-	"ebersolve.com/updater/internal/utils"
+	"drupdater/internal"
+	"drupdater/internal/codehosting"
+	"drupdater/internal/utils"
+
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"

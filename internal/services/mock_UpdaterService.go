@@ -3,7 +3,7 @@
 package services
 
 import (
-	internal "ebersolve.com/updater/internal"
+	internal "drupdater/internal"
 	mock "github.com/stretchr/testify/mock"
 )
 

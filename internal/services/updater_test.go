@@ -6,8 +6,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	internal "ebersolve.com/updater/internal"
-	"ebersolve.com/updater/internal/utils"
+	internal "drupdater/internal"
+	"drupdater/internal/utils"
+
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/stretchr/testify/assert"
