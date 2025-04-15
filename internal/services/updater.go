@@ -107,7 +107,6 @@ func newDefaultUpdater(afterSiteUpdate []AfterSiteUpdate, logger *zap.Logger, co
 }
 
 func (us *DefaultUpdater) UpdateDependencies(path string, packagesToUpdate []string, worktree internal.Worktree, minimalChanges bool) (DependencyUpdateReport, error) {
-	us.logger.Debug("updating dependencies", zap.Strings("packagesToUpdate", packagesToUpdate))
 	var updateReport DependencyUpdateReport
 
 	patches := make(map[string]map[string]string)
@@ -215,7 +214,7 @@ func (us *DefaultUpdater) UpdateDrupal(path string, worktree internal.Worktree, 
 
 			wg.Add(1)
 
-			go func() {
+			go func(site string) {
 				defer wg.Done()
 
 				us.logger.Info("updating site", zap.String("site", site))
@@ -226,6 +225,7 @@ func (us *DefaultUpdater) UpdateDrupal(path string, worktree internal.Worktree, 
 				}
 
 				hooks, err := us.drush.GetUpdateHooks(path, site)
+				us.logger.Info("update hooks", zap.Any("hooks", hooks))
 				if err != nil {
 					resultChannel <- Result{err: err}
 					return
@@ -248,13 +248,14 @@ func (us *DefaultUpdater) UpdateDrupal(path string, worktree internal.Worktree, 
 					}
 				}
 
+				us.logger.Info("export configuration", zap.String("site", site))
 				if err := us.ExportConfiguration(worktree, path, site); err != nil {
 					resultChannel <- Result{err: err}
 					return
 				}
 
 				resultChannel <- Result{Site: site, UpdateHooks: hooks, err: nil}
-			}()
+			}(site)
 		}
 
 		wg.Wait()
@@ -288,6 +289,7 @@ func (us *DefaultUpdater) UpdatePatches(path string, worktree internal.Worktree,
 						us.logger.Error("failed to remove patch", zap.String("patch", patchPath), zap.Error(err))
 					}
 				}
+				us.logger.Info("removing patch, because it's no longer needed", zap.String("package", packageName), zap.String("patch", patchPath))
 				updates.Removed = append(updates.Removed, RemovedPatch{Package: packageName, PatchPath: patchPath, PatchDescription: description, Reason: fmt.Sprintf("%s is not installed in the project", packageName)})
 			}
 			delete(patches, packageName)
@@ -337,6 +339,7 @@ func (us *DefaultUpdater) UpdatePatches(path string, worktree internal.Worktree,
 										if len(patches[operation.Package]) == 0 {
 											delete(patches, operation.Package)
 										}
+										us.logger.Debug("removing patch, because it's no longer needed", zap.String("package", operation.Package), zap.String("patch", patchPath))
 										updates.Removed = append(updates.Removed, RemovedPatch{Package: operation.Package, PatchPath: patchPath, Reason: fmt.Sprintf("Issue [#%s](%s) is fixed in %s %s", issue.ID, issue.Title, operation.Package, operation.To), PatchDescription: description})
 									}
 									continue
@@ -429,9 +432,10 @@ func (us *DefaultUpdater) UpdatePatches(path string, worktree internal.Worktree,
 										us.logger.Error("failed to add patch", zap.Error(err))
 										continue
 									}
+									us.logger.Info("replacing patch", zap.String("package", operation.Package), zap.String("previous patch", patchPath), zap.String("new patch", newPatchPath+"/"+newPatchFile))
 									updates.Updated = append(updates.Updated, UpdatedPatch{Package: operation.Package, PreviousPatchPath: patchPath, NewPatchPath: newPatchPath + "/" + newPatchFile, PatchDescription: description})
 								} else {
-									us.logger.Debug("patch does not apply", zap.String("package", operation.Package), zap.String("version", operation.To), zap.String("patch", path+"/"+newPatchPath))
+									us.logger.Info("merge request does not apply, locking package", zap.String("package", operation.Package), zap.String("version", operation.To), zap.String("patch", path+"/"+newPatchPath))
 									// notify
 									updates.Conflicts = append(updates.Conflicts, ConflictPatch{Package: operation.Package, FixedVersion: operation.From, PatchPath: patchPath, NewVersion: operation.To, PatchDescription: description})
 									_, err := us.commandExecutor.InstallPackages(path, operation.Package+":"+operation.From, "--no-install")
@@ -443,6 +447,7 @@ func (us *DefaultUpdater) UpdatePatches(path string, worktree internal.Worktree,
 						} else {
 							// notify
 							// try to get github link from description
+							us.logger.Info("patch does not apply, locking package", zap.String("package", operation.Package), zap.String("version", operation.From), zap.String("patch", patchPath))
 							updates.Conflicts = append(updates.Conflicts, ConflictPatch{Package: operation.Package, FixedVersion: operation.From, PatchPath: patchPath, NewVersion: operation.To, PatchDescription: description})
 							_, err := us.commandExecutor.InstallPackages(path, operation.Package+":"+operation.From, "--no-install")
 							if err != nil {
@@ -456,6 +461,7 @@ func (us *DefaultUpdater) UpdatePatches(path string, worktree internal.Worktree,
 
 		if operation.Action == "Remove" {
 			for description, patchPath := range patches[operation.Package] {
+				us.logger.Debug("removing patch", zap.String("package", operation.Package), zap.String("patch", patchPath))
 				updates.Removed = append(updates.Removed, RemovedPatch{Package: operation.Package, PatchPath: patchPath, PatchDescription: description, Reason: fmt.Sprintf("%s is no longer installed", operation.Package)})
 				_, err := url.ParseRequestURI(patchPath)
 				if err != nil {

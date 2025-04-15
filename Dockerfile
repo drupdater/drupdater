@@ -24,7 +24,7 @@ COPY --from=ghcr.io/mlocati/php-extension-installer:2 /usr/bin/install-php-exten
 RUN install-php-extensions pdo_mysql gd zip imagick
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends git unzip patch \
+    && apt-get install -y --no-install-recommends git unzip patch sqlite3 \
     && rm -rf /var/lib/apt/lists/*;
 
 ENV COMPOSER_HOME=/usr/local/composer
