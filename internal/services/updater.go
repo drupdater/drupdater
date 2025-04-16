@@ -230,7 +230,7 @@ func (us *DefaultUpdater) UpdateDrupal(path string, worktree internal.Worktree, 
 				}
 
 				hooks, err := us.drush.GetUpdateHooks(path, site)
-				us.logger.Info("update hooks", zap.Any("hooks", hooks))
+				us.logger.Debug("update hooks", zap.Any("hooks", hooks))
 				if err != nil {
 					resultChannel <- Result{err: err}
 					return
@@ -326,32 +326,36 @@ func (us *DefaultUpdater) UpdatePatches(path string, worktree internal.Worktree,
 
 						delete(patches[operation.Package], description)
 
-						// 2 = Fixed, 7 = Closed (fixed), 15 = Patch (to be ported)
-						if issue.Status == "2" || issue.Status == "7" || issue.Status == "15" {
+						if os.Getenv("DRUPALCODE_ACCESS_TOKEN") == "" {
+							us.logger.Debug("skipping issue check, because DRUPALCODE_ACCESS_TOKEN is not set")
+						} else {
 
-							commits, _, err := us.gitlab.Search.CommitsByProject("project/"+issue.Project.MaschineName, issue.ID,
-								&gitlab.SearchOptions{
-									Ref: &operation.To,
-								})
+							// 2 = Fixed, 7 = Closed (fixed), 15 = Patch (to be ported)
+							if issue.Status == "2" || issue.Status == "7" || issue.Status == "15" {
 
-							if err != nil {
-								us.logger.Error("failed to search commit history", zap.Error(err))
-							} else {
-								if len(commits) != 0 {
-									us.logger.Debug("issue is fixed", zap.String("issue", issue.ID))
-									_, err := worktree.Remove(patchPath)
-									if err != nil {
-										us.logger.Error("failed to remove patch", zap.Error(err))
-									} else {
-										if len(patches[operation.Package]) == 0 {
-											delete(patches, operation.Package)
+								commits, _, err := us.gitlab.Search.CommitsByProject("project/"+issue.Project.MaschineName, issue.ID,
+									&gitlab.SearchOptions{
+										Ref: &operation.To,
+									})
+
+								if err != nil {
+									us.logger.Error("failed to search commit history", zap.Error(err))
+								} else {
+									if len(commits) != 0 {
+										us.logger.Debug("issue is fixed", zap.String("issue", issue.ID))
+										_, err := worktree.Remove(patchPath)
+										if err != nil {
+											us.logger.Error("failed to remove patch", zap.Error(err))
+										} else {
+											if len(patches[operation.Package]) == 0 {
+												delete(patches, operation.Package)
+											}
+											us.logger.Debug("removing patch, because it's no longer needed", zap.String("package", operation.Package), zap.String("patch", patchPath))
+											updates.Removed = append(updates.Removed, RemovedPatch{Package: operation.Package, PatchPath: patchPath, Reason: fmt.Sprintf("Issue [#%s](%s) is fixed in %s %s", issue.ID, issue.Title, operation.Package, operation.To), PatchDescription: description})
 										}
-										us.logger.Debug("removing patch, because it's no longer needed", zap.String("package", operation.Package), zap.String("patch", patchPath))
-										updates.Removed = append(updates.Removed, RemovedPatch{Package: operation.Package, PatchPath: patchPath, Reason: fmt.Sprintf("Issue [#%s](%s) is fixed in %s %s", issue.ID, issue.Title, operation.Package, operation.To), PatchDescription: description})
+										continue
 									}
-									continue
 								}
-
 							}
 						}
 
@@ -422,7 +426,7 @@ func (us *DefaultUpdater) UpdatePatches(path string, worktree internal.Worktree,
 								newPatchFile := fmt.Sprintf("%s-%s-%s.diff", issue.ID, mergeRequests[0].SHA, us.cleanURLString(issue.Title))
 								us.logger.Debug("downloading patch", zap.String("url", diff), zap.String("path", newPatchPath))
 								if err := us.downloadFile(diff, path+"/"+newPatchPath, newPatchFile); err != nil {
-									us.logger.Error("failed to download patch", zap.Error(err))
+									us.logger.Debug("failed to download patch", zap.Error(err))
 								}
 
 								if ok, err := us.composer.CheckPatchApplies(operation.Package, operation.To, path+"/"+newPatchPath+"/"+newPatchFile); err != nil {
@@ -431,14 +435,14 @@ func (us *DefaultUpdater) UpdatePatches(path string, worktree internal.Worktree,
 									if !externalPatch {
 										_, err := worktree.Remove(patchPath)
 										if err != nil {
-											us.logger.Error("failed to remove patch", zap.Error(err))
+											us.logger.Debug("failed to remove patch", zap.Error(err))
 											continue
 										}
 									}
 									patches[operation.Package][description] = newPatchPath + "/" + newPatchFile
 									_, err = worktree.Add(newPatchPath + "/" + newPatchFile)
 									if err != nil {
-										us.logger.Error("failed to add patch", zap.Error(err))
+										us.logger.Debug("failed to add patch", zap.Error(err))
 										continue
 									}
 									us.logger.Info("replacing patch", zap.String("package", operation.Package), zap.String("previous patch", patchPath), zap.String("new patch", newPatchPath+"/"+newPatchFile))
@@ -449,7 +453,7 @@ func (us *DefaultUpdater) UpdatePatches(path string, worktree internal.Worktree,
 									updates.Conflicts = append(updates.Conflicts, ConflictPatch{Package: operation.Package, FixedVersion: operation.From, PatchPath: patchPath, NewVersion: operation.To, PatchDescription: description})
 									_, err := us.commandExecutor.InstallPackages(path, operation.Package+":"+operation.From, "--no-install")
 									if err != nil {
-										us.logger.Error("failed to install package", zap.Error(err))
+										us.logger.Debug("failed to install package", zap.Error(err))
 									}
 								}
 							}

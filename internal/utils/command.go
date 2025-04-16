@@ -318,7 +318,7 @@ func (e DefaultCommandExecutor) UpdateComposerLockHash(dir string) error {
 
 func (e DefaultCommandExecutor) RunPHPCS(dir string) (string, error) {
 	e.logger.Debug("running phpcs")
-	return e.ExecComposer(dir, "exec", "--", "phpcs", "--report=json", "--runtime-set", "ignore_errors_on_exit", "1", "--runtime-set", "ignore_warnings_on_exit", "1")
+	return e.ExecComposer(dir, "exec", "--", "phpcs", "--report=json", "-q", "--runtime-set", "ignore_errors_on_exit", "1", "--runtime-set", "ignore_warnings_on_exit", "1")
 }
 
 func (e DefaultCommandExecutor) RunComposerNormalize(dir string) (string, error) {
