@@ -66,3 +66,7 @@ Drupdater supports the following flags:
 - `--skip-rector`: Skip running `drupal-rector` for removing deprecated code.
 - `--dry-run`: Perform a dry run without creating branches or merge requests.
 - `--verbose`: Enable verbose logging.
+
+### Environment Variables
+
+- `DRUPALCODE_ACCESS_TOKEN`: Set this to your Drupal.org GitLab access token to enable patch removal of committed patches during updates.

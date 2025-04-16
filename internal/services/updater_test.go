@@ -90,6 +90,7 @@ func TestExportConfiguration(t *testing.T) {
 func TestUpdatePatches(t *testing.T) {
 
 	logger := zap.NewNop()
+	t.Setenv("DRUPALCODE_ACCESS_TOKEN", "test")
 
 	t.Run("Local patch still applies", func(t *testing.T) {
 		commandExecutor := utils.NewMockCommandExecutor(t)

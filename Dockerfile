@@ -21,7 +21,7 @@ RUN --mount=type=cache,target=/gomod-cache --mount=type=cache,target=/go-cache G
 FROM php:${PHP_VERSION}-cli-bookworm AS base
 
 COPY --from=ghcr.io/mlocati/php-extension-installer:2 /usr/bin/install-php-extensions /usr/local/bin/
-RUN install-php-extensions pdo_mysql gd zip imagick
+RUN install-php-extensions pdo_mysql gd zip imagick intl
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends git unzip patch sqlite3 \
