@@ -89,12 +89,16 @@ func (ws *WorkflowDependencyUpdateService) StartUpdate() error {
 		return nil
 	}
 
+	tableForLog, err := ws.commandExecutor.GenerateDiffTable(path, beforeUpdateCommit.Hash.String(), false)
+	if err != nil {
+		return err
+	}
+	ws.logger.Sugar().Info("composer diff table", fmt.Sprintf("\n%s", tableForLog))
+
+	// If table is too long, Github/Gitlab will not accept it. So we use the version without the links.
 	tableCharCount := utf8.RuneCountInString(table)
 	if tableCharCount > 63000 {
-		table, err = ws.commandExecutor.GenerateDiffTable(path, beforeUpdateCommit.Hash.String(), false)
-		if err != nil {
-			return err
-		}
+		table = tableForLog
 	}
 
 	wg.Wait()

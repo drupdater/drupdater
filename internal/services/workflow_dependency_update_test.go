@@ -98,6 +98,7 @@ func TestStartUpdate(t *testing.T) {
 	vcsProvider.On("CreateMergeRequest", mock.Anything, string(fixture), mock.Anything, config.Branch).Return(codehosting.MergeRequest{}, nil)
 	repository.On("Push", mock.Anything).Return(nil)
 	commandExecutor.On("GenerateDiffTable", mock.Anything, mock.Anything, true).Return("Dummy Table", nil)
+	commandExecutor.On("GenerateDiffTable", mock.Anything, mock.Anything, false).Return("Dummy Table", nil)
 
 	err := workflowService.StartUpdate()
 
@@ -144,6 +145,7 @@ func TestStartUpdateWithDryRun(t *testing.T) {
 	updater.On("UpdateDependencies", "/tmp", []string{}, mock.Anything, false).Return(DependencyUpdateReport{}, nil)
 	updater.On("UpdateDrupal", "/tmp", mock.Anything, config.Sites).Return(UpdateHooksPerSite{}, nil)
 	commandExecutor.On("GenerateDiffTable", mock.Anything, mock.Anything, true).Return("Dummy Table", nil)
+	commandExecutor.On("GenerateDiffTable", mock.Anything, mock.Anything, false).Return("Dummy Table", nil)
 
 	err := workflowService.StartUpdate()
 

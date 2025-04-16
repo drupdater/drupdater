@@ -106,6 +106,7 @@ func TestSecurityUpdateStartUpdate(t *testing.T) {
 	vcsProvider.On("CreateMergeRequest", mock.Anything, string(fixture), mock.Anything, config.Branch).Return(codehosting.MergeRequest{}, nil)
 	repository.On("Push", mock.Anything).Return(nil)
 	commandExecutor.On("GenerateDiffTable", mock.Anything, mock.Anything, true).Return("Dummy Table", nil)
+	commandExecutor.On("GenerateDiffTable", mock.Anything, mock.Anything, false).Return("Dummy Table", nil)
 	composerService.On("RunComposerAudit", "/tmp").Return(ComposerAudit{
 		Advisories: []Advisory{
 			{CVE: "CVE-1234", Title: "Vul 1", Severity: "high    ", Link: "https://example.com", PackageName: "package1"},
@@ -153,6 +154,7 @@ func TestSecurityUpdateStartUpdateWithDryRun(t *testing.T) {
 	updater.On("UpdateDependencies", "/tmp", []string{"package1"}, mock.Anything, true).Return(DependencyUpdateReport{}, nil)
 	updater.On("UpdateDrupal", "/tmp", mock.Anything, config.Sites).Return(UpdateHooksPerSite{}, nil)
 	commandExecutor.On("GenerateDiffTable", mock.Anything, mock.Anything, true).Return("foo", nil)
+	commandExecutor.On("GenerateDiffTable", mock.Anything, mock.Anything, false).Return("foo", nil)
 	composerService.On("RunComposerAudit", "/tmp").Return(ComposerAudit{
 		Advisories: []Advisory{
 			{CVE: "CVE-1234", Title: "Vul 1", Severity: "high    ", Link: "https://example.com", PackageName: "package1"},
