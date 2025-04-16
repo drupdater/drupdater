@@ -388,21 +388,23 @@ func (us *DefaultUpdater) UpdatePatches(path string, worktree internal.Worktree,
 
 							us.logger.Debug("fork project", zap.Any("project", forkProject))
 
-							foo := struct {
+							// We can't use ListMergeRequests here, because it doesn't support filtering by source project
+							// and we need to use the fork project as source project.
+							opt := struct {
 								gitlab.ListProjectMergeRequestsOptions
-								SoureProjectID int `url:"source_project_id"`
+								SourceProjectID int `url:"source_project_id"`
 							}{
-								SoureProjectID: forkProject.ID,
+								SourceProjectID: forkProject.ID,
 							}
 
 							u := "projects/project%2F" + issue.Project.MaschineName + "/merge_requests"
 
-							req, err := us.gitlab.NewRequest(http.MethodGet, u, foo, nil)
+							req, err := us.gitlab.NewRequest(http.MethodGet, u, opt, nil)
 							if err != nil {
 								continue
 							}
 
-							var mergeRequests []*gitlab.MergeRequest
+							var mergeRequests []*gitlab.BasicMergeRequest
 							_, err = us.gitlab.Do(req, &mergeRequests)
 							if err != nil {
 								continue

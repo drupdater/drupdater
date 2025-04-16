@@ -105,6 +105,12 @@ func (ws *WorkflowSecurityUpdateService) StartUpdate() error {
 		return nil
 	}
 
+	tableForLog, err := ws.commandExecutor.GenerateDiffTable(path, beforeUpdateCommit.Hash.String(), false)
+	if err != nil {
+		return err
+	}
+	ws.logger.Sugar().Info("composer diff table", fmt.Sprintf("\n%s", tableForLog))
+
 	composerLockHash, err := ws.composerService.GetComposerLockHash(path)
 	if err != nil {
 		return err

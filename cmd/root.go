@@ -49,7 +49,6 @@ func (act *Action) start(_ context.Context) error {
 }
 
 func (act *Action) stop(_ context.Context) error {
-	fmt.Println("Stopped")
 	return nil
 }
 
