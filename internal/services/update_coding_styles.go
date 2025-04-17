@@ -6,8 +6,8 @@ import (
 	"strings"
 	"text/template"
 
-	"drupdater/internal"
-	"drupdater/internal/utils"
+	"github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/internal/utils"
 
 	"github.com/go-git/go-git/v5"
 	"go.uber.org/zap"

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	"drupdater/internal/utils"
+	"github.com/drupdater/drupdater/internal/utils"
 
 	"github.com/spf13/afero"
 	"go.uber.org/zap"

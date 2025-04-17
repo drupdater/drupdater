@@ -13,8 +13,8 @@ import (
 	"strings"
 	"sync"
 
-	"drupdater/internal"
-	"drupdater/internal/utils"
+	"github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/internal/utils"
 
 	gitlab "gitlab.com/gitlab-org/api/client-go"
 

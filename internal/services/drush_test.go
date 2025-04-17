@@ -3,7 +3,7 @@ package services
 import (
 	"testing"
 
-	"drupdater/internal/utils"
+	"github.com/drupdater/drupdater/internal/utils"
 
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"

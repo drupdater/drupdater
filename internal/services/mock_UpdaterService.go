@@ -3,7 +3,7 @@
 package services
 
 import (
-	internal "drupdater/internal"
+	internal "github.com/drupdater/drupdater/internal"
 
 	mock "github.com/stretchr/testify/mock"
 )

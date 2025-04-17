@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"strings"
 
-	"drupdater/internal/utils"
+	"github.com/drupdater/drupdater/internal/utils"
 
 	"go.uber.org/zap"
 )
