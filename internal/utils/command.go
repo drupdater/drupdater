@@ -87,6 +87,15 @@ func (e DefaultCommandExecutor) ExecComposer(ctx context.Context, dir string, ar
 
 	e.logger.Debug("executing composer", zap.String("dir", dir), zap.Strings("args", args), zap.String("output", output))
 
+	// Create a child context with a cancellation signal
+	_, childCancel := context.WithCancel(ctx)
+	defer childCancel()
+
+	if err != nil {
+
+		childCancel() // Cancel the child context if there's an error
+	}
+
 	return output, err
 }
 

@@ -54,8 +54,6 @@ func (act *Action) stop(_ context.Context) error {
 }
 
 func (act *Action) run(ctx context.Context) {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
 
 	exitCode := 0
 	err := act.workflowService.StartUpdate(ctx)
