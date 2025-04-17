@@ -104,11 +104,9 @@ func TestDownloadComposerFiles(t *testing.T) {
 		case "/api/v4/projects/test_project/repository/files/composer.json/raw":
 			jsonString = []byte("{}")
 			w.WriteHeader(http.StatusOK)
-			break
 		case "/api/v4/projects/test_project/repository/files/composer.lock/raw":
 			jsonString = []byte("{}")
 			w.WriteHeader(http.StatusOK)
-			break
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
