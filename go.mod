@@ -1,4 +1,4 @@
-module drupdater
+module github.com/drupdater/drupdater
 
 go 1.23.4
 

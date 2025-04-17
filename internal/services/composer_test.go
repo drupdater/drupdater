@@ -3,7 +3,7 @@ package services
 import (
 	"testing"
 
-	"drupdater/internal/utils"
+	"github.com/drupdater/drupdater/internal/utils"
 
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"

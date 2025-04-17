@@ -1,6 +1,6 @@
 with-expecter: true
 packages:
-  drupdater:
+  github.com/drupdater/drupdater:
     config:
       all: true
       dir: '{{.InterfaceDir}}'

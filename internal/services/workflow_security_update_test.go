@@ -4,9 +4,9 @@ import (
 	"os"
 	"testing"
 
-	internal "drupdater/internal"
-	"drupdater/internal/codehosting"
-	"drupdater/internal/utils"
+	internal "github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/internal/codehosting"
+	"github.com/drupdater/drupdater/internal/utils"
 
 	object "github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/stretchr/testify/assert"

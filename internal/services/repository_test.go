@@ -3,7 +3,7 @@ package services
 import (
 	"testing"
 
-	internal "drupdater/internal"
+	internal "github.com/drupdater/drupdater/internal"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/stretchr/testify/assert"
