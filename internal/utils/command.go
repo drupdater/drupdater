@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/maypok86/otter"
 	"github.com/spf13/afero"
@@ -86,15 +87,6 @@ func (e DefaultCommandExecutor) ExecComposer(ctx context.Context, dir string, ar
 	output := strings.TrimSuffix(string(out), "\n")
 
 	e.logger.Debug("executing composer", zap.String("dir", dir), zap.Strings("args", args), zap.String("output", output))
-
-	// Create a child context with a cancellation signal
-	_, childCancel := context.WithCancel(ctx)
-	defer childCancel()
-
-	if err != nil {
-
-		childCancel() // Cancel the child context if there's an error
-	}
 
 	return output, err
 }
@@ -258,7 +250,20 @@ func (e DefaultCommandExecutor) GenerateDiffTable(ctx context.Context, dir strin
 		args = append(args, "--with-links")
 	}
 
-	return e.ExecComposer(ctx, dir, args...)
+	out, err := e.ExecComposer(ctx, dir, args...)
+	if err != nil {
+		return "", err
+	}
+
+	if withLinks {
+		// If table is too long, Github/Gitlab will not accept it. So we use the version without the links.
+		tableCharCount := utf8.RuneCountInString(out)
+		if tableCharCount > 63000 {
+			return e.GenerateDiffTable(ctx, dir, targetBranch, false)
+		}
+	}
+
+	return out, err
 }
 
 func (e DefaultCommandExecutor) IsModuleEnabled(ctx context.Context, dir string, site string, module string) (bool, error) {
