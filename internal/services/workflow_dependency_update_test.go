@@ -8,7 +8,6 @@ import (
 	"github.com/drupdater/drupdater/internal/codehosting"
 	"github.com/drupdater/drupdater/internal/utils"
 
-	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"go.uber.org/zap"
@@ -32,7 +31,7 @@ func TestStartUpdate(t *testing.T) {
 	}
 
 	afterUpdateCommand := NewMockAfterUpdate(t)
-	afterUpdateCommand.On("Execute", t.Context(), "/tmp", mock.Anything).Return(nil)
+	afterUpdateCommand.On("Execute", mock.Anything, "/tmp", mock.Anything).Return(nil)
 
 	afterUpdate := []AfterUpdate{
 		afterUpdateCommand,
@@ -43,10 +42,9 @@ func TestStartUpdate(t *testing.T) {
 	worktree := internal.NewMockWorktree(t)
 	worktree.On("Checkout", mock.Anything).Return(nil)
 
-	installer.On("InstallDrupal", t.Context(), config.RepositoryURL, config.Branch, config.Token, config.Sites).Return(nil)
+	installer.On("InstallDrupal", mock.Anything, config.RepositoryURL, config.Branch, config.Token, config.Sites).Return(nil)
 	repositoryService.On("CloneRepository", config.RepositoryURL, config.Branch, config.Token).Return(repository, worktree, "/tmp", nil)
-	repositoryService.On("GetHeadCommit", repository).Return(&object.Commit{}, nil)
-	updater.On("UpdateDependencies", t.Context(), "/tmp", []string{}, mock.Anything, false).Return(DependencyUpdateReport{
+	updater.On("UpdateDependencies", mock.Anything, "/tmp", []string{}, mock.Anything, false).Return(DependencyUpdateReport{
 		PatchUpdates: PatchUpdates{
 			Removed: []RemovedPatch{
 				{
@@ -82,7 +80,7 @@ func TestStartUpdate(t *testing.T) {
 		},
 		AddedAllowPlugins: []string{"plugin1", "plugin2"},
 	}, nil)
-	updater.On("UpdateDrupal", t.Context(), "/tmp", mock.Anything, config.Sites).Return(UpdateHooksPerSite{
+	updater.On("UpdateDrupal", mock.Anything, "/tmp", mock.Anything, config.Sites).Return(UpdateHooksPerSite{
 		"site1": map[string]UpdateHook{
 			"hook": {
 				Module:      "module",
@@ -97,8 +95,7 @@ func TestStartUpdate(t *testing.T) {
 	fixture, _ := os.ReadFile("testdata/dependency_update.md")
 	vcsProvider.On("CreateMergeRequest", mock.Anything, string(fixture), mock.Anything, config.Branch).Return(codehosting.MergeRequest{}, nil)
 	repository.On("Push", mock.Anything).Return(nil)
-	commandExecutor.On("GenerateDiffTable", t.Context(), mock.Anything, mock.Anything, true).Return("Dummy Table", nil)
-	commandExecutor.On("GenerateDiffTable", t.Context(), mock.Anything, mock.Anything, false).Return("Dummy Table", nil)
+	commandExecutor.On("GenerateDiffTable", mock.Anything, mock.Anything, mock.Anything, true).Return("Dummy Table", nil)
 
 	err := workflowService.StartUpdate(t.Context())
 
@@ -128,7 +125,7 @@ func TestStartUpdateWithDryRun(t *testing.T) {
 	}
 
 	afterUpdateCommand := NewMockAfterUpdate(t)
-	afterUpdateCommand.On("Execute", t.Context(), "/tmp", mock.Anything).Return(nil)
+	afterUpdateCommand.On("Execute", mock.Anything, "/tmp", mock.Anything).Return(nil)
 
 	afterUpdate := []AfterUpdate{
 		afterUpdateCommand,
@@ -139,13 +136,11 @@ func TestStartUpdateWithDryRun(t *testing.T) {
 	worktree := internal.NewMockWorktree(t)
 	worktree.On("Checkout", mock.Anything).Return(nil)
 
-	installer.On("InstallDrupal", t.Context(), config.RepositoryURL, config.Branch, config.Token, config.Sites).Return(nil)
+	installer.On("InstallDrupal", mock.Anything, config.RepositoryURL, config.Branch, config.Token, config.Sites).Return(nil)
 	repositoryService.On("CloneRepository", config.RepositoryURL, config.Branch, config.Token).Return(repository, worktree, "/tmp", nil)
-	repositoryService.On("GetHeadCommit", repository).Return(&object.Commit{}, nil)
-	updater.On("UpdateDependencies", t.Context(), "/tmp", []string{}, mock.Anything, false).Return(DependencyUpdateReport{}, nil)
-	updater.On("UpdateDrupal", t.Context(), "/tmp", mock.Anything, config.Sites).Return(UpdateHooksPerSite{}, nil)
-	commandExecutor.On("GenerateDiffTable", t.Context(), mock.Anything, mock.Anything, true).Return("Dummy Table", nil)
-	commandExecutor.On("GenerateDiffTable", t.Context(), mock.Anything, mock.Anything, false).Return("Dummy Table", nil)
+	updater.On("UpdateDependencies", mock.Anything, "/tmp", []string{}, mock.Anything, false).Return(DependencyUpdateReport{}, nil)
+	updater.On("UpdateDrupal", mock.Anything, "/tmp", mock.Anything, config.Sites).Return(UpdateHooksPerSite{}, nil)
+	commandExecutor.On("GenerateDiffTable", mock.Anything, mock.Anything, mock.Anything, true).Return("Dummy Table", nil)
 
 	err := workflowService.StartUpdate(t.Context())
 

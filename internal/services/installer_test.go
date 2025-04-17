@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/drupdater/drupdater/internal/utils"
+	"github.com/stretchr/testify/mock"
 
 	"go.uber.org/zap"
 )
@@ -41,19 +42,19 @@ module:
 	token := "token"
 	sites := []string{"site1", "site2"}
 
-	settingsService.On("ConfigureDatabase", t.Context(), "/tmp", "site1").Return(nil)
-	settingsService.On("ConfigureDatabase", t.Context(), "/tmp", "site2").Return(nil)
-	settingsService.On("RemoveProfile", t.Context(), "/tmp", "site1").Return(nil)
-	settingsService.On("RemoveProfile", t.Context(), "/tmp", "site2").Return(nil)
+	settingsService.On("ConfigureDatabase", mock.Anything, "/tmp", "site1").Return(nil)
+	settingsService.On("ConfigureDatabase", mock.Anything, "/tmp", "site2").Return(nil)
+	settingsService.On("RemoveProfile", mock.Anything, "/tmp", "site1").Return(nil)
+	settingsService.On("RemoveProfile", mock.Anything, "/tmp", "site2").Return(nil)
 
 	repositoryService.On("CloneRepository", repositoryURL, branch, token).Return(nil, nil, "/tmp", nil)
 
 	t.Run("Success", func(t *testing.T) {
 		commandExecutor := utils.NewMockCommandExecutor(t)
-		commandExecutor.On("InstallDependencies", t.Context(), "/tmp").Return(nil)
+		commandExecutor.On("InstallDependencies", mock.Anything, "/tmp").Return(nil)
 
-		commandExecutor.On("InstallSite", t.Context(), "/tmp", "site1").Return(nil)
-		commandExecutor.On("InstallSite", t.Context(), "/tmp", "site2").Return(nil)
+		commandExecutor.On("InstallSite", mock.Anything, "/tmp", "site1").Return(nil)
+		commandExecutor.On("InstallSite", mock.Anything, "/tmp", "site2").Return(nil)
 
 		installer := &DefaultInstallerService{
 			logger:          logger,
@@ -71,9 +72,9 @@ module:
 
 	t.Run("Failure", func(t *testing.T) {
 		commandExecutor := utils.NewMockCommandExecutor(t)
-		commandExecutor.On("InstallDependencies", t.Context(), "/tmp").Return(nil)
-		commandExecutor.On("InstallSite", t.Context(), "/tmp", "site1").Return(nil)
-		commandExecutor.On("InstallSite", t.Context(), "/tmp", "site2").Return(errors.New("failed to install site"))
+		commandExecutor.On("InstallDependencies", mock.Anything, "/tmp").Return(nil)
+		commandExecutor.On("InstallSite", mock.Anything, "/tmp", "site1").Return(nil)
+		commandExecutor.On("InstallSite", mock.Anything, "/tmp", "site2").Return(errors.New("failed to install site"))
 
 		installer := &DefaultInstallerService{
 			logger:          logger,

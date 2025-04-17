@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/drupdater/drupdater/internal/utils"
+	"github.com/stretchr/testify/mock"
 
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
@@ -24,7 +25,7 @@ func TestIsSqliteModuleEnabled(t *testing.T) {
 	configSyncDir := "/tmp/config/sync"
 	coreExtensionPath := configSyncDir + "/core.extension.yml"
 
-	commandExecutor.On("GetConfigSyncDir", t.Context(), "/tmp", "default", false).Return(configSyncDir, nil)
+	commandExecutor.On("GetConfigSyncDir", mock.Anything, "/tmp", "default", false).Return(configSyncDir, nil)
 
 	// Create a temporary directory and file to act as the config sync directory and core.extension.yml
 	if err := os.MkdirAll(configSyncDir, 0755); err != nil {
@@ -118,7 +119,7 @@ profile: thunder
 		commandExecutor: commandExecutor,
 	}
 
-	commandExecutor.On("GetConfigSyncDir", t.Context(), "/tmp", "default", false).Return("/tmp", nil)
+	commandExecutor.On("GetConfigSyncDir", mock.Anything, "/tmp", "default", false).Return("/tmp", nil)
 
 	// Call the function to add the SQLite module
 	if err := settingsService.AddSqliteModule(t.Context(), "/tmp", "default"); err != nil {
@@ -190,7 +191,7 @@ profile: standard
 		commandExecutor: commandExecutor,
 	}
 
-	commandExecutor.On("GetConfigSyncDir", t.Context(), "/tmp", "default", false).Return("/tmp", nil)
+	commandExecutor.On("GetConfigSyncDir", mock.Anything, "/tmp", "default", false).Return("/tmp", nil)
 
 	// Call the function to add the SQLite module
 	if err := settingsService.RemoveProfile(t.Context(), "/tmp", "default"); err != nil {

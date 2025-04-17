@@ -9,6 +9,7 @@ import (
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"go.uber.org/zap"
 )
 
@@ -24,12 +25,12 @@ func TestUpdateTranslationsEventHandlerWithoutLocaleDeploy(t *testing.T) {
 	worktree := internal.NewMockWorktree(t)
 
 	// Set up expectations
-	mockCommandExecutor.On("IsModuleEnabled", t.Context(), "/tmp", "example.com", "locale_deploy").Return(false, nil)
+	mockCommandExecutor.On("IsModuleEnabled", mock.Anything, "/tmp", "example.com", "locale_deploy").Return(false, nil)
 
 	// Verify the results
 	assert.NoError(t, handler.Execute(t.Context(), "/tmp", worktree, "example.com"))
 
-	mockCommandExecutor.On("IsModuleEnabled", t.Context(), "/tmp", "example.com", "locale_deploy").Return(true, nil)
+	mockCommandExecutor.On("IsModuleEnabled", mock.Anything, "/tmp", "example.com", "locale_deploy").Return(true, nil)
 
 	assert.NoError(t, handler.Execute(t.Context(), "/tmp", worktree, "example.com"))
 
@@ -49,9 +50,9 @@ func TestUpdateTranslationsEventHandlerWitLocaleDeploy(t *testing.T) {
 	worktree := internal.NewMockWorktree(t)
 
 	// Set up expectations
-	mockCommandExecutor.On("IsModuleEnabled", t.Context(), "/tmp", "example.com", "locale_deploy").Return(true, nil)
-	mockCommandExecutor.On("LocalizeTranslations", t.Context(), "/tmp", "example.com").Return(nil)
-	mockCommandExecutor.On("GetTranslationPath", t.Context(), "/tmp", "example.com", true).Return("translations", nil)
+	mockCommandExecutor.On("IsModuleEnabled", mock.Anything, "/tmp", "example.com", "locale_deploy").Return(true, nil)
+	mockCommandExecutor.On("LocalizeTranslations", mock.Anything, "/tmp", "example.com").Return(nil)
+	mockCommandExecutor.On("GetTranslationPath", mock.Anything, "/tmp", "example.com", true).Return("translations", nil)
 
 	mockRepository.On("IsSomethingStagedInPath", worktree, "translations").Return(true, nil)
 

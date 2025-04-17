@@ -12,6 +12,7 @@ import (
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	gitlab "gitlab.com/gitlab-org/api/client-go"
 	"go.uber.org/zap"
 )
@@ -25,15 +26,15 @@ func TestUpdateDependencies(t *testing.T) {
 		drupalOrgService := NewMockDrupalOrgService(t)
 		worktree := internal.NewMockWorktree(t)
 
-		commandExecutor.On("GetComposerConfig", t.Context(), "/tmp", "extra.patches").Return("", assert.AnError)
-		commandExecutor.On("GetComposerAllowPlugins", t.Context(), "/tmp").Return(map[string]bool{}, nil)
-		commandExecutor.On("SetComposerConfig", t.Context(), "/tmp", "allow-plugins", "true").Return(nil)
-		commandExecutor.On("UpdateDependencies", t.Context(), "/tmp", []string{}, []string{}, false, false).Return("", nil)
-		commandExecutor.On("RunComposerNormalize", t.Context(), "/tmp").Return("", nil)
-		commandExecutor.On("SetComposerAllowPlugins", t.Context(), "/tmp", map[string]bool{}).Return(nil)
+		commandExecutor.On("GetComposerConfig", mock.Anything, "/tmp", "extra.patches").Return("", assert.AnError)
+		commandExecutor.On("GetComposerAllowPlugins", mock.Anything, "/tmp").Return(map[string]bool{}, nil)
+		commandExecutor.On("SetComposerConfig", mock.Anything, "/tmp", "allow-plugins", "true").Return(nil)
+		commandExecutor.On("UpdateDependencies", mock.Anything, "/tmp", []string{}, []string{}, false, false).Return("", nil)
+		commandExecutor.On("RunComposerNormalize", mock.Anything, "/tmp").Return("", nil)
+		commandExecutor.On("SetComposerAllowPlugins", mock.Anything, "/tmp", map[string]bool{}).Return(nil)
 
-		composerService.On("GetInstalledPlugins", t.Context(), "/tmp").Return(map[string]interface{}{}, nil)
-		composerService.On("GetComposerUpdates", t.Context(), "/tmp", []string{}, false).Return([]PackageChange{}, nil)
+		composerService.On("GetInstalledPlugins", mock.Anything, "/tmp").Return(map[string]interface{}{}, nil)
+		composerService.On("GetComposerUpdates", mock.Anything, "/tmp", []string{}, false).Return([]PackageChange{}, nil)
 
 		worktree.On("AddGlob", "composer.*").Return(nil)
 		worktree.On("Commit", "Update composer.json and composer.lock", &git.CommitOptions{}).Return(plumbing.NewHash(""), nil)
@@ -68,8 +69,8 @@ func TestExportConfiguration(t *testing.T) {
 	repositoryService := NewMockRepositoryService(t)
 	repositoryService.On("IsSomethingStagedInPath", worktree, "/tmp").Return(true, nil)
 	commandExecutor := utils.NewMockCommandExecutor(t)
-	commandExecutor.On("ExportConfiguration", t.Context(), "/tmp", "site1").Return(nil)
-	commandExecutor.On("GetConfigSyncDir", t.Context(), "/tmp", "site1", true).Return("/tmp", nil)
+	commandExecutor.On("ExportConfiguration", mock.Anything, "/tmp", "site1").Return(nil)
+	commandExecutor.On("GetConfigSyncDir", mock.Anything, "/tmp", "site1", true).Return("/tmp", nil)
 
 	logger := zap.NewNop()
 
@@ -99,12 +100,12 @@ func TestUpdatePatches(t *testing.T) {
 
 		worktree := internal.NewMockWorktree(t)
 
-		commandExecutor.On("IsPackageInstalled", t.Context(), "/tmp", "drupal/core").Return(true, nil)
+		commandExecutor.On("IsPackageInstalled", mock.Anything, "/tmp", "drupal/core").Return(true, nil)
 
 		drupalOrgService.On("FindIssueNumber", "local patch without issue number").Return("", false)
 		drupalOrgService.On("FindIssueNumber", "patches/core/0001-local-patch.patch").Return("", false)
 
-		composerService.On("CheckPatchApplies", t.Context(), "drupal/core", "8.8.0", "/tmp/patches/core/0001-local-patch.patch").Return(true, nil)
+		composerService.On("CheckPatchApplies", mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/core/0001-local-patch.patch").Return(true, nil)
 		updater := &DefaultUpdater{
 			logger:          logger,
 			commandExecutor: commandExecutor,
@@ -144,8 +145,8 @@ func TestUpdatePatches(t *testing.T) {
 		drupalOrgService.On("FindIssueNumber", "local patch without issue number").Return("", false)
 		drupalOrgService.On("FindIssueNumber", "patches/core/0001-local-patch.patch").Return("", false)
 
-		composerService.On("CheckPatchApplies", t.Context(), "drupal/core", "8.8.0", "/tmp/patches/core/0001-local-patch.patch").Return(false, nil)
-		commandExecutor.On("IsPackageInstalled", t.Context(), "/tmp", "drupal/core").Return(true, nil)
+		composerService.On("CheckPatchApplies", mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/core/0001-local-patch.patch").Return(false, nil)
+		commandExecutor.On("IsPackageInstalled", mock.Anything, "/tmp", "drupal/core").Return(true, nil)
 		updater := &DefaultUpdater{
 			logger:          logger,
 			commandExecutor: commandExecutor,
@@ -198,7 +199,7 @@ func TestUpdatePatches(t *testing.T) {
 
 		worktree := internal.NewMockWorktree(t)
 
-		commandExecutor.On("IsPackageInstalled", t.Context(), "/tmp", "drupal/core").Return(true, nil)
+		commandExecutor.On("IsPackageInstalled", mock.Anything, "/tmp", "drupal/core").Return(true, nil)
 
 		drupalOrgService.On("FindIssueNumber", "Issue #123456 \"With problems\"").Return("123456", true)
 		drupalOrgService.On("GetIssue", "123456").Return(&Issue{
@@ -208,7 +209,7 @@ func TestUpdatePatches(t *testing.T) {
 			URL:    "https://www.drupal.org/node/123456",
 		}, nil)
 
-		composerService.On("CheckPatchApplies", t.Context(), "drupal/core", "8.8.0", "/tmp/patches/remote/0001-remote.patch").Return(true, nil)
+		composerService.On("CheckPatchApplies", mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/remote/0001-remote.patch").Return(true, nil)
 
 		updater := &DefaultUpdater{
 			logger:          logger,
@@ -249,7 +250,7 @@ func TestUpdatePatches(t *testing.T) {
 		composerService := NewMockComposerService(t)
 		drupalOrgService := NewMockDrupalOrgService(t)
 
-		commandExecutor.On("IsPackageInstalled", t.Context(), "/tmp", "drupal/core").Return(true, nil)
+		commandExecutor.On("IsPackageInstalled", mock.Anything, "/tmp", "drupal/core").Return(true, nil)
 
 		worktree := internal.NewMockWorktree(t)
 		worktree.On("Add", "patches/drupal/123456-111111-alot_of_problems.diff").Return(plumbing.NewHash(""), nil)
@@ -268,8 +269,8 @@ func TestUpdatePatches(t *testing.T) {
 			},
 		}, nil)
 
-		composerService.On("CheckPatchApplies", t.Context(), "drupal/core", "8.8.0", "/tmp/patches/remote/0001-remote.patch").Return(false, nil)
-		composerService.On("CheckPatchApplies", t.Context(), "drupal/core", "8.8.0", "/tmp/patches/drupal/123456-111111-alot_of_problems.diff").Return(true, nil)
+		composerService.On("CheckPatchApplies", mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/remote/0001-remote.patch").Return(false, nil)
+		composerService.On("CheckPatchApplies", mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/drupal/123456-111111-alot_of_problems.diff").Return(true, nil)
 
 		mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
@@ -345,7 +346,7 @@ func TestUpdatePatches(t *testing.T) {
 
 		worktree := internal.NewMockWorktree(t)
 
-		commandExecutor.On("IsPackageInstalled", t.Context(), "/tmp", "drupal/core").Return(true, nil)
+		commandExecutor.On("IsPackageInstalled", mock.Anything, "/tmp", "drupal/core").Return(true, nil)
 
 		drupalOrgService.On("FindIssueNumber", "Issue #123456 \"With problems\"").Return("123456", true)
 		drupalOrgService.On("GetIssue", "123456").Return(&Issue{
@@ -360,8 +361,8 @@ func TestUpdatePatches(t *testing.T) {
 			},
 		}, nil)
 
-		composerService.On("CheckPatchApplies", t.Context(), "drupal/core", "8.8.0", "/tmp/patches/remote/0001-remote.patch").Return(false, nil)
-		composerService.On("CheckPatchApplies", t.Context(), "drupal/core", "8.8.0", "/tmp/patches/drupal/123456-111111-alot_of_problems.diff").Return(false, nil)
+		composerService.On("CheckPatchApplies", mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/remote/0001-remote.patch").Return(false, nil)
+		composerService.On("CheckPatchApplies", mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/drupal/123456-111111-alot_of_problems.diff").Return(false, nil)
 
 		mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
@@ -449,7 +450,7 @@ func TestUpdatePatches(t *testing.T) {
 		worktree := internal.NewMockWorktree(t)
 		worktree.On("Remove", "patches/remote/0001-remote.patch").Return(plumbing.NewHash(""), nil)
 
-		commandExecutor.On("IsPackageInstalled", t.Context(), "/tmp", "drupal/core").Return(true, nil)
+		commandExecutor.On("IsPackageInstalled", mock.Anything, "/tmp", "drupal/core").Return(true, nil)
 
 		drupalOrgService.On("FindIssueNumber", "Issue #123456 \"With problems\"").Return("123456", true)
 		drupalOrgService.On("GetIssue", "123456").Return(&Issue{
@@ -522,9 +523,9 @@ func TestUpdatePatches(t *testing.T) {
 
 		worktree := internal.NewMockWorktree(t)
 
-		commandExecutor.On("IsPackageInstalled", t.Context(), "/tmp", "drupal/core").Return(true, nil)
+		commandExecutor.On("IsPackageInstalled", mock.Anything, "/tmp", "drupal/core").Return(true, nil)
 
-		composerService.On("CheckPatchApplies", t.Context(), "drupal/core", "8.8.0", "/tmp/patches/remote/0001-remote.patch").Return(true, nil)
+		composerService.On("CheckPatchApplies", mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/remote/0001-remote.patch").Return(true, nil)
 
 		drupalOrgService.On("FindIssueNumber", "Issue #123456 \"With problems\"").Return("123456", true)
 		drupalOrgService.On("GetIssue", "123456").Return(&Issue{
@@ -599,8 +600,8 @@ func TestUpdatePatches(t *testing.T) {
 		worktree := internal.NewMockWorktree(t)
 		worktree.On("Remove", "patches/core/0001-local-patch.patch").Return(plumbing.NewHash(""), nil)
 
-		commandExecutor.On("IsPackageInstalled", t.Context(), "/tmp", "drupal/core").Return(true, nil)
-		commandExecutor.On("IsPackageInstalled", t.Context(), "/tmp", "drupal/pathauto").Return(true, nil)
+		commandExecutor.On("IsPackageInstalled", mock.Anything, "/tmp", "drupal/core").Return(true, nil)
+		commandExecutor.On("IsPackageInstalled", mock.Anything, "/tmp", "drupal/pathauto").Return(true, nil)
 
 		updater := &DefaultUpdater{
 			logger:          logger,
@@ -650,7 +651,7 @@ func TestUpdatePatches(t *testing.T) {
 		worktree := internal.NewMockWorktree(t)
 		worktree.On("Remove", "patches/core/0001-local-patch.patch").Return(plumbing.NewHash(""), nil)
 
-		commandExecutor.On("IsPackageInstalled", t.Context(), "/tmp", "drupal/core").Return(false, nil)
+		commandExecutor.On("IsPackageInstalled", mock.Anything, "/tmp", "drupal/core").Return(false, nil)
 
 		updater := &DefaultUpdater{
 			logger:          logger,
@@ -690,11 +691,11 @@ func TestUpdateDrupal(t *testing.T) {
 
 		repositoryService.On("IsSomethingStagedInPath", worktree, "/tmp/config").Return(false, nil)
 
-		settingsService.On("ConfigureDatabase", t.Context(), "/tmp", "site1").Return(nil)
-		settingsService.On("ConfigureDatabase", t.Context(), "/tmp", "site2").Return(nil)
+		settingsService.On("ConfigureDatabase", mock.Anything, "/tmp", "site1").Return(nil)
+		settingsService.On("ConfigureDatabase", mock.Anything, "/tmp", "site2").Return(nil)
 
-		drushService.On("GetUpdateHooks", t.Context(), "/tmp", "site1").Return(map[string]UpdateHook{}, nil)
-		drushService.On("GetUpdateHooks", t.Context(), "/tmp", "site2").Return(map[string]UpdateHook{
+		drushService.On("GetUpdateHooks", mock.Anything, "/tmp", "site1").Return(map[string]UpdateHook{}, nil)
+		drushService.On("GetUpdateHooks", mock.Anything, "/tmp", "site2").Return(map[string]UpdateHook{
 			"pre-update": {
 				Module:      "module",
 				UpdateID:    1,
@@ -702,14 +703,14 @@ func TestUpdateDrupal(t *testing.T) {
 				Type:        "type",
 			},
 		}, nil)
-		commandExecutor.On("UpdateSite", t.Context(), "/tmp", "site1").Return(nil)
-		commandExecutor.On("UpdateSite", t.Context(), "/tmp", "site2").Return(nil)
-		commandExecutor.On("ConfigResave", t.Context(), "/tmp", "site1").Return(nil)
-		commandExecutor.On("ConfigResave", t.Context(), "/tmp", "site2").Return(nil)
-		commandExecutor.On("ExportConfiguration", t.Context(), "/tmp", "site1").Return(nil)
-		commandExecutor.On("ExportConfiguration", t.Context(), "/tmp", "site2").Return(nil)
-		commandExecutor.On("GetConfigSyncDir", t.Context(), "/tmp", "site1", true).Return("/tmp/config", nil)
-		commandExecutor.On("GetConfigSyncDir", t.Context(), "/tmp", "site2", true).Return("/tmp/config", nil)
+		commandExecutor.On("UpdateSite", mock.Anything, "/tmp", "site1").Return(nil)
+		commandExecutor.On("UpdateSite", mock.Anything, "/tmp", "site2").Return(nil)
+		commandExecutor.On("ConfigResave", mock.Anything, "/tmp", "site1").Return(nil)
+		commandExecutor.On("ConfigResave", mock.Anything, "/tmp", "site2").Return(nil)
+		commandExecutor.On("ExportConfiguration", mock.Anything, "/tmp", "site1").Return(nil)
+		commandExecutor.On("ExportConfiguration", mock.Anything, "/tmp", "site2").Return(nil)
+		commandExecutor.On("GetConfigSyncDir", mock.Anything, "/tmp", "site1", true).Return("/tmp/config", nil)
+		commandExecutor.On("GetConfigSyncDir", mock.Anything, "/tmp", "site2", true).Return("/tmp/config", nil)
 
 		worktree.On("Add", "/tmp/config").Return(plumbing.NewHash(""), nil)
 

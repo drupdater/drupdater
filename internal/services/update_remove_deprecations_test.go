@@ -22,9 +22,9 @@ func TestRemoveDeprecations(t *testing.T) {
 	t.Run("Rector is not installed", func(t *testing.T) {
 
 		commandExecutor := utils.NewMockCommandExecutor(t)
-		commandExecutor.On("IsPackageInstalled", t.Context(), "/path/to/repo", "palantirnet/drupal-rector").Return(false, assert.AnError)
-		commandExecutor.On("InstallPackages", t.Context(), "/path/to/repo", "palantirnet/drupal-rector").Return("", nil)
-		commandExecutor.On("RunRector", t.Context(), "/path/to/repo").Return(`{
+		commandExecutor.On("IsPackageInstalled", mock.Anything, "/path/to/repo", "palantirnet/drupal-rector").Return(false, assert.AnError)
+		commandExecutor.On("InstallPackages", mock.Anything, "/path/to/repo", "palantirnet/drupal-rector").Return("", nil)
+		commandExecutor.On("RunRector", mock.Anything, "/path/to/repo").Return(`{
     "totals": {
         "changed_files": 0,
         "errors": 0
@@ -32,7 +32,7 @@ func TestRemoveDeprecations(t *testing.T) {
     "file_diffs": [],
     "changed_files": []
 }`, nil)
-		commandExecutor.On("RemovePackages", t.Context(), "/path/to/repo", "palantirnet/drupal-rector").Return("", nil)
+		commandExecutor.On("RemovePackages", mock.Anything, "/path/to/repo", "palantirnet/drupal-rector").Return("", nil)
 
 		updateRemoveDeprecations := newUpdateRemoveDeprecations(logger, commandExecutor, config)
 		err := updateRemoveDeprecations.Execute(t.Context(), "/path/to/repo", worktree)
@@ -45,8 +45,8 @@ func TestRemoveDeprecations(t *testing.T) {
 
 		commandExecutor := utils.NewMockCommandExecutor(t)
 
-		commandExecutor.On("IsPackageInstalled", t.Context(), "/path/to/repo", "palantirnet/drupal-rector").Return(true, nil)
-		commandExecutor.On("RunRector", t.Context(), "/path/to/repo").Return(`{
+		commandExecutor.On("IsPackageInstalled", mock.Anything, "/path/to/repo", "palantirnet/drupal-rector").Return(true, nil)
+		commandExecutor.On("RunRector", mock.Anything, "/path/to/repo").Return(`{
     "totals": {
         "changed_files": 1,
         "errors": 0
@@ -79,8 +79,8 @@ func TestRemoveDeprecations(t *testing.T) {
 
 		commandExecutor := utils.NewMockCommandExecutor(t)
 
-		commandExecutor.On("IsPackageInstalled", t.Context(), "/path/to/repo", "palantirnet/drupal-rector").Return(true, nil)
-		commandExecutor.On("RunRector", t.Context(), "/path/to/repo").Return(`{
+		commandExecutor.On("IsPackageInstalled", mock.Anything, "/path/to/repo", "palantirnet/drupal-rector").Return(true, nil)
+		commandExecutor.On("RunRector", mock.Anything, "/path/to/repo").Return(`{
     "totals": {
         "changed_files": 0,
         "errors": 0
@@ -99,8 +99,8 @@ func TestRemoveDeprecations(t *testing.T) {
 	t.Run("Command execution fails", func(t *testing.T) {
 		commandExecutor := utils.NewMockCommandExecutor(t)
 
-		commandExecutor.On("IsPackageInstalled", t.Context(), "/path/to/repo", "palantirnet/drupal-rector").Return(true, nil)
-		commandExecutor.On("RunRector", t.Context(), "/path/to/repo").Return("", assert.AnError)
+		commandExecutor.On("IsPackageInstalled", mock.Anything, "/path/to/repo", "palantirnet/drupal-rector").Return(true, nil)
+		commandExecutor.On("RunRector", mock.Anything, "/path/to/repo").Return("", assert.AnError)
 
 		updateRemoveDeprecations := newUpdateRemoveDeprecations(logger, commandExecutor, config)
 		err := updateRemoveDeprecations.Execute(t.Context(), "/path/to/repo", worktree)

@@ -6,6 +6,7 @@ import (
 	"github.com/drupdater/drupdater/internal/utils"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"go.uber.org/zap"
 )
 
@@ -42,7 +43,7 @@ func TestGetUpdateHooks(t *testing.T) {
 				}`
 
 		commandExecutor := utils.NewMockCommandExecutor(t)
-		commandExecutor.On("ExecDrush", t.Context(), "/tmp", "site1", "updatedb-status", "--format=json").Return(data, nil)
+		commandExecutor.On("ExecDrush", mock.Anything, "/tmp", "site1", "updatedb-status", "--format=json").Return(data, nil)
 
 		drush := DefaultDrushService{
 			logger:          logger,
@@ -89,7 +90,7 @@ func TestGetUpdateHooks(t *testing.T) {
 		data := ` [success] No database updates required.`
 
 		commandExecutor := utils.NewMockCommandExecutor(t)
-		commandExecutor.On("ExecDrush", t.Context(), "/tmp", "site1", "updatedb-status", "--format=json").Return(data, nil)
+		commandExecutor.On("ExecDrush", mock.Anything, "/tmp", "site1", "updatedb-status", "--format=json").Return(data, nil)
 
 		drush := DefaultDrushService{
 			logger:          logger,
