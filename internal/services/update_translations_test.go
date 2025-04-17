@@ -24,14 +24,14 @@ func TestUpdateTranslationsEventHandlerWithoutLocaleDeploy(t *testing.T) {
 	worktree := internal.NewMockWorktree(t)
 
 	// Set up expectations
-	mockCommandExecutor.On("IsModuleEnabled", "/tmp", "example.com", "locale_deploy").Return(false, nil)
+	mockCommandExecutor.On("IsModuleEnabled", t.Context(), "/tmp", "example.com", "locale_deploy").Return(false, nil)
 
 	// Verify the results
-	assert.NoError(t, handler.Execute("/tmp", worktree, "example.com"))
+	assert.NoError(t, handler.Execute(t.Context(), "/tmp", worktree, "example.com"))
 
-	mockCommandExecutor.On("IsModuleEnabled", "/tmp", "example.com", "locale_deploy").Return(true, nil)
+	mockCommandExecutor.On("IsModuleEnabled", t.Context(), "/tmp", "example.com", "locale_deploy").Return(true, nil)
 
-	assert.NoError(t, handler.Execute("/tmp", worktree, "example.com"))
+	assert.NoError(t, handler.Execute(t.Context(), "/tmp", worktree, "example.com"))
 
 	mockCommandExecutor.AssertExpectations(t)
 
@@ -49,9 +49,9 @@ func TestUpdateTranslationsEventHandlerWitLocaleDeploy(t *testing.T) {
 	worktree := internal.NewMockWorktree(t)
 
 	// Set up expectations
-	mockCommandExecutor.On("IsModuleEnabled", "/tmp", "example.com", "locale_deploy").Return(true, nil)
-	mockCommandExecutor.On("LocalizeTranslations", "/tmp", "example.com").Return(nil)
-	mockCommandExecutor.On("GetTranslationPath", "/tmp", "example.com", true).Return("translations", nil)
+	mockCommandExecutor.On("IsModuleEnabled", t.Context(), "/tmp", "example.com", "locale_deploy").Return(true, nil)
+	mockCommandExecutor.On("LocalizeTranslations", t.Context(), "/tmp", "example.com").Return(nil)
+	mockCommandExecutor.On("GetTranslationPath", t.Context(), "/tmp", "example.com", true).Return("translations", nil)
 
 	mockRepository.On("IsSomethingStagedInPath", worktree, "translations").Return(true, nil)
 
@@ -60,7 +60,7 @@ func TestUpdateTranslationsEventHandlerWitLocaleDeploy(t *testing.T) {
 	worktree.On("Status").Return(git.Status{}, nil)
 
 	// Verify the results
-	assert.NoError(t, handler.Execute("/tmp", worktree, "example.com"))
+	assert.NoError(t, handler.Execute(t.Context(), "/tmp", worktree, "example.com"))
 
 	mockCommandExecutor.AssertExpectations(t)
 

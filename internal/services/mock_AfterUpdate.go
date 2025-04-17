@@ -3,8 +3,9 @@
 package services
 
 import (
-	internal "github.com/drupdater/drupdater/internal"
+	context "context"
 
+	internal "github.com/drupdater/drupdater/internal"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -21,17 +22,17 @@ func (_m *MockAfterUpdate) EXPECT() *MockAfterUpdate_Expecter {
 	return &MockAfterUpdate_Expecter{mock: &_m.Mock}
 }
 
-// Execute provides a mock function with given fields: path, worktree
-func (_m *MockAfterUpdate) Execute(path string, worktree internal.Worktree) error {
-	ret := _m.Called(path, worktree)
+// Execute provides a mock function with given fields: ctx, path, worktree
+func (_m *MockAfterUpdate) Execute(ctx context.Context, path string, worktree internal.Worktree) error {
+	ret := _m.Called(ctx, path, worktree)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Execute")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, internal.Worktree) error); ok {
-		r0 = rf(path, worktree)
+	if rf, ok := ret.Get(0).(func(context.Context, string, internal.Worktree) error); ok {
+		r0 = rf(ctx, path, worktree)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -45,15 +46,16 @@ type MockAfterUpdate_Execute_Call struct {
 }
 
 // Execute is a helper method to define mock.On call
+//   - ctx context.Context
 //   - path string
 //   - worktree internal.Worktree
-func (_e *MockAfterUpdate_Expecter) Execute(path interface{}, worktree interface{}) *MockAfterUpdate_Execute_Call {
-	return &MockAfterUpdate_Execute_Call{Call: _e.mock.On("Execute", path, worktree)}
+func (_e *MockAfterUpdate_Expecter) Execute(ctx interface{}, path interface{}, worktree interface{}) *MockAfterUpdate_Execute_Call {
+	return &MockAfterUpdate_Execute_Call{Call: _e.mock.On("Execute", ctx, path, worktree)}
 }
 
-func (_c *MockAfterUpdate_Execute_Call) Run(run func(path string, worktree internal.Worktree)) *MockAfterUpdate_Execute_Call {
+func (_c *MockAfterUpdate_Execute_Call) Run(run func(ctx context.Context, path string, worktree internal.Worktree)) *MockAfterUpdate_Execute_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(internal.Worktree))
+		run(args[0].(context.Context), args[1].(string), args[2].(internal.Worktree))
 	})
 	return _c
 }
@@ -63,7 +65,7 @@ func (_c *MockAfterUpdate_Execute_Call) Return(_a0 error) *MockAfterUpdate_Execu
 	return _c
 }
 
-func (_c *MockAfterUpdate_Execute_Call) RunAndReturn(run func(string, internal.Worktree) error) *MockAfterUpdate_Execute_Call {
+func (_c *MockAfterUpdate_Execute_Call) RunAndReturn(run func(context.Context, string, internal.Worktree) error) *MockAfterUpdate_Execute_Call {
 	_c.Call.Return(run)
 	return _c
 }

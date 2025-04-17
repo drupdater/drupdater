@@ -22,7 +22,7 @@
 		},
 		"ghcr.io/devcontainers/features/docker-in-docker:2": {},
 		"ghcr.io/devcontainers/features/go:1": {
-			"version": "1.24.2"
+			"version": "1.24.1"
 		}
 	},
 	"overrideFeatureInstallOrder": [

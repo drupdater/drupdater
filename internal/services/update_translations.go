@@ -1,6 +1,8 @@
 package services
 
 import (
+	"context"
+
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/utils"
 
@@ -22,19 +24,19 @@ func newUpdateTranslations(logger *zap.Logger, commandExecutor utils.CommandExec
 	}
 }
 
-func (h *UpdateTranslations) Execute(path string, worktree internal.Worktree, site string) error {
-	enabled, err := h.commandExecutor.IsModuleEnabled(path, site, "locale_deploy")
+func (h *UpdateTranslations) Execute(ctx context.Context, path string, worktree internal.Worktree, site string) error {
+	enabled, err := h.commandExecutor.IsModuleEnabled(ctx, path, site, "locale_deploy")
 	if !enabled || err != nil {
 		return err
 	}
 
 	h.logger.Info("updating translations")
 
-	if err := h.commandExecutor.LocalizeTranslations(path, site); err != nil {
+	if err := h.commandExecutor.LocalizeTranslations(ctx, path, site); err != nil {
 		return err
 	}
 
-	translationPath, err := h.commandExecutor.GetTranslationPath(path, site, true)
+	translationPath, err := h.commandExecutor.GetTranslationPath(ctx, path, site, true)
 	if err != nil {
 		return err
 	}

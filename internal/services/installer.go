@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"runtime"
 	"slices"
 	"sync"
@@ -11,7 +12,7 @@ import (
 )
 
 type InstallerService interface {
-	InstallDrupal(repositoryURL string, branch string, token string, sites []string) error
+	InstallDrupal(ctx context.Context, repositoryURL string, branch string, token string, sites []string) error
 }
 
 type DefaultInstallerService struct {
@@ -30,7 +31,7 @@ func newDefaultInstallerService(logger *zap.Logger, repository RepositoryService
 	}
 }
 
-func (is *DefaultInstallerService) InstallDrupal(repositoryURL string, branch string, token string, sites []string) error {
+func (is *DefaultInstallerService) InstallDrupal(ctx context.Context, repositoryURL string, branch string, token string, sites []string) error {
 
 	is.logger.Info("cloning repository for site-install", zap.String("repositoryURL", repositoryURL), zap.String("branch", branch))
 	_, _, path, err := is.repository.CloneRepository(repositoryURL, branch, token)
@@ -39,7 +40,7 @@ func (is *DefaultInstallerService) InstallDrupal(repositoryURL string, branch st
 		return err
 	}
 
-	if err = is.commandExecutor.InstallDependencies(path); err != nil {
+	if err = is.commandExecutor.InstallDependencies(ctx, path); err != nil {
 		return err
 	}
 
@@ -57,17 +58,17 @@ func (is *DefaultInstallerService) InstallDrupal(repositoryURL string, branch st
 
 				is.logger.Info("installing site", zap.String("site", site))
 
-				if err = is.settings.ConfigureDatabase(path, site); err != nil {
+				if err = is.settings.ConfigureDatabase(ctx, path, site); err != nil {
 					errChannel <- err
 					return
 				}
 
-				if err = is.settings.RemoveProfile(path, site); err != nil {
+				if err = is.settings.RemoveProfile(ctx, path, site); err != nil {
 					errChannel <- err
 					return
 				}
 
-				if err = is.commandExecutor.InstallSite(path, site); err != nil {
+				if err = is.commandExecutor.InstallSite(ctx, path, site); err != nil {
 					errChannel <- err
 					return
 				}

@@ -2,6 +2,7 @@ package services
 
 import (
 	"bytes"
+	"context"
 	"embed"
 	"fmt"
 	"text/template"
@@ -31,7 +32,7 @@ type SecurityReport struct {
 }
 
 type WorkflowService interface {
-	StartUpdate() error
+	StartUpdate(ctx context.Context) error
 }
 
 type WorkflowBaseService struct {

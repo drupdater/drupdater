@@ -42,14 +42,14 @@ func TestGetUpdateHooks(t *testing.T) {
 				}`
 
 		commandExecutor := utils.NewMockCommandExecutor(t)
-		commandExecutor.On("ExecDrush", "/tmp", "site1", "updatedb-status", "--format=json").Return(data, nil)
+		commandExecutor.On("ExecDrush", t.Context(), "/tmp", "site1", "updatedb-status", "--format=json").Return(data, nil)
 
 		drush := DefaultDrushService{
 			logger:          logger,
 			commandExecutor: commandExecutor,
 		}
 
-		updates, err := drush.GetUpdateHooks("/tmp", "site1")
+		updates, err := drush.GetUpdateHooks(t.Context(), "/tmp", "site1")
 
 		assert.NoError(t, err)
 
@@ -89,14 +89,14 @@ func TestGetUpdateHooks(t *testing.T) {
 		data := ` [success] No database updates required.`
 
 		commandExecutor := utils.NewMockCommandExecutor(t)
-		commandExecutor.On("ExecDrush", "/tmp", "site1", "updatedb-status", "--format=json").Return(data, nil)
+		commandExecutor.On("ExecDrush", t.Context(), "/tmp", "site1", "updatedb-status", "--format=json").Return(data, nil)
 
 		drush := DefaultDrushService{
 			logger:          logger,
 			commandExecutor: commandExecutor,
 		}
 
-		updates, err := drush.GetUpdateHooks("/tmp", "site1")
+		updates, err := drush.GetUpdateHooks(t.Context(), "/tmp", "site1")
 
 		assert.NoError(t, err)
 

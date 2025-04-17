@@ -29,8 +29,9 @@ func TestGetComposerUpdates(t *testing.T) {
 		fs:              fs,
 	}
 
-	commandExecutor.On("UpdateDependencies", "/test", []string{}, []string{}, false, true).Return(logData, nil)
-	changes, err := service.GetComposerUpdates("/test", []string{}, false)
+	ctx := t.Context()
+	commandExecutor.On("UpdateDependencies", t.Context(), "/test", []string{}, []string{}, false, true).Return(logData, nil)
+	changes, err := service.GetComposerUpdates(ctx, "/test", []string{}, false)
 
 	assert.NoError(t, err)
 	assert.Len(t, changes, 5)
@@ -81,14 +82,14 @@ tbachert/spi                                   v1.0.2  requires composer-plugin-
 zaporylie/composer-drupal-optimizations        1.2.0   requires composer-plugin-api (^1.1 || ^2.0)`
 
 		commandExecutor := utils.NewMockCommandExecutor(t)
-		commandExecutor.On("ExecComposer", "/test", "depends", "composer-plugin-api", "--locked").Return(data, nil)
+		commandExecutor.On("ExecComposer", t.Context(), "/test", "depends", "composer-plugin-api", "--locked").Return(data, nil)
 
 		service := &DefaultComposerService{
 			logger:          zap.NewNop(),
 			commandExecutor: commandExecutor,
 		}
 
-		plugins, err := service.GetInstalledPlugins("/test")
+		plugins, err := service.GetInstalledPlugins(t.Context(), "/test")
 
 		assert.NoError(t, err)
 		assert.Equal(t, map[string]interface{}{
@@ -117,14 +118,14 @@ func TestRunComposerAudit(t *testing.T) {
 }`
 
 		commandExecutor := utils.NewMockCommandExecutor(t)
-		commandExecutor.On("ExecComposer", "/test", "audit", "--format=json", "--locked", "--no-plugins").Return(data, nil)
+		commandExecutor.On("ExecComposer", t.Context(), "/test", "audit", "--format=json", "--locked", "--no-plugins").Return(data, nil)
 
 		service := &DefaultComposerService{
 			logger:          zap.NewNop(),
 			commandExecutor: commandExecutor,
 		}
 
-		audit, err := service.RunComposerAudit("/test")
+		audit, err := service.RunComposerAudit(t.Context(), "/test")
 
 		assert.NoError(t, err)
 		assert.Nil(t, audit.Advisories)
@@ -163,14 +164,14 @@ func TestRunComposerAudit(t *testing.T) {
 }`
 
 		commandExecutor := utils.NewMockCommandExecutor(t)
-		commandExecutor.On("ExecComposer", "/test", "audit", "--format=json", "--locked", "--no-plugins").Return(data, nil)
+		commandExecutor.On("ExecComposer", t.Context(), "/test", "audit", "--format=json", "--locked", "--no-plugins").Return(data, nil)
 
 		service := &DefaultComposerService{
 			logger:          zap.NewNop(),
 			commandExecutor: commandExecutor,
 		}
 
-		audit, err := service.RunComposerAudit("/test")
+		audit, err := service.RunComposerAudit(t.Context(), "/test")
 
 		assert.NoError(t, err)
 
@@ -216,7 +217,7 @@ func TestCheckPatchApplies(t *testing.T) {
 
 		fs := afero.NewMemMapFs()
 		commandExecutor := utils.NewMockCommandExecutor(t)
-		commandExecutor.On("InstallPackages", mock.Anything, "drupal/core:1.0.0", "--with-all-dependencies").Return("", nil)
+		commandExecutor.On("InstallPackages", t.Context(), mock.Anything, "drupal/core:1.0.0", "--with-all-dependencies").Return("", nil)
 
 		service := &DefaultComposerService{
 			logger:          zap.NewNop(),
@@ -224,7 +225,7 @@ func TestCheckPatchApplies(t *testing.T) {
 			commandExecutor: commandExecutor,
 		}
 
-		applies, err := service.CheckPatchApplies("drupal/core", "1.0.0", "path/to/patch")
+		applies, err := service.CheckPatchApplies(t.Context(), "drupal/core", "1.0.0", "path/to/patch")
 		assert.NoError(t, err)
 		assert.True(t, applies)
 	})
@@ -233,7 +234,7 @@ func TestCheckPatchApplies(t *testing.T) {
 
 		fs := afero.NewMemMapFs()
 		commandExecutor := utils.NewMockCommandExecutor(t)
-		commandExecutor.On("InstallPackages", mock.Anything, "drupal/core:1.0.0", "--with-all-dependencies").Return("", assert.AnError)
+		commandExecutor.On("InstallPackages", t.Context(), mock.Anything, "drupal/core:1.0.0", "--with-all-dependencies").Return("", assert.AnError)
 
 		service := &DefaultComposerService{
 			logger:          zap.NewNop(),
@@ -241,7 +242,7 @@ func TestCheckPatchApplies(t *testing.T) {
 			commandExecutor: commandExecutor,
 		}
 
-		applies, err := service.CheckPatchApplies("drupal/core", "1.0.0", "path/to/patch")
+		applies, err := service.CheckPatchApplies(t.Context(), "drupal/core", "1.0.0", "path/to/patch")
 		assert.NoError(t, err)
 		assert.False(t, applies)
 	})

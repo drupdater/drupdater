@@ -3,8 +3,9 @@
 package services
 
 import (
-	internal "github.com/drupdater/drupdater/internal"
+	context "context"
 
+	internal "github.com/drupdater/drupdater/internal"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -21,17 +22,17 @@ func (_m *MockAfterSiteUpdate) EXPECT() *MockAfterSiteUpdate_Expecter {
 	return &MockAfterSiteUpdate_Expecter{mock: &_m.Mock}
 }
 
-// Execute provides a mock function with given fields: path, worktree, site
-func (_m *MockAfterSiteUpdate) Execute(path string, worktree internal.Worktree, site string) error {
-	ret := _m.Called(path, worktree, site)
+// Execute provides a mock function with given fields: ctx, path, worktree, site
+func (_m *MockAfterSiteUpdate) Execute(ctx context.Context, path string, worktree internal.Worktree, site string) error {
+	ret := _m.Called(ctx, path, worktree, site)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Execute")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(string, internal.Worktree, string) error); ok {
-		r0 = rf(path, worktree, site)
+	if rf, ok := ret.Get(0).(func(context.Context, string, internal.Worktree, string) error); ok {
+		r0 = rf(ctx, path, worktree, site)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -45,16 +46,17 @@ type MockAfterSiteUpdate_Execute_Call struct {
 }
 
 // Execute is a helper method to define mock.On call
+//   - ctx context.Context
 //   - path string
 //   - worktree internal.Worktree
 //   - site string
-func (_e *MockAfterSiteUpdate_Expecter) Execute(path interface{}, worktree interface{}, site interface{}) *MockAfterSiteUpdate_Execute_Call {
-	return &MockAfterSiteUpdate_Execute_Call{Call: _e.mock.On("Execute", path, worktree, site)}
+func (_e *MockAfterSiteUpdate_Expecter) Execute(ctx interface{}, path interface{}, worktree interface{}, site interface{}) *MockAfterSiteUpdate_Execute_Call {
+	return &MockAfterSiteUpdate_Execute_Call{Call: _e.mock.On("Execute", ctx, path, worktree, site)}
 }
 
-func (_c *MockAfterSiteUpdate_Execute_Call) Run(run func(path string, worktree internal.Worktree, site string)) *MockAfterSiteUpdate_Execute_Call {
+func (_c *MockAfterSiteUpdate_Execute_Call) Run(run func(ctx context.Context, path string, worktree internal.Worktree, site string)) *MockAfterSiteUpdate_Execute_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(internal.Worktree), args[2].(string))
+		run(args[0].(context.Context), args[1].(string), args[2].(internal.Worktree), args[3].(string))
 	})
 	return _c
 }
@@ -64,7 +66,7 @@ func (_c *MockAfterSiteUpdate_Execute_Call) Return(_a0 error) *MockAfterSiteUpda
 	return _c
 }
 
-func (_c *MockAfterSiteUpdate_Execute_Call) RunAndReturn(run func(string, internal.Worktree, string) error) *MockAfterSiteUpdate_Execute_Call {
+func (_c *MockAfterSiteUpdate_Execute_Call) RunAndReturn(run func(context.Context, string, internal.Worktree, string) error) *MockAfterSiteUpdate_Execute_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"crypto/md5"
 	"fmt"
 	"os"
@@ -42,7 +43,7 @@ func newWorkflowDependencyUpdateService(afterUpdate []AfterUpdate, logger *zap.L
 	}
 }
 
-func (ws *WorkflowDependencyUpdateService) StartUpdate() error {
+func (ws *WorkflowDependencyUpdateService) StartUpdate(ctx context.Context) error {
 	ws.logger.Info("starting update workflow")
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -50,10 +51,10 @@ func (ws *WorkflowDependencyUpdateService) StartUpdate() error {
 
 	go func() {
 		defer wg.Done()
-		err := ws.installer.InstallDrupal(ws.config.RepositoryURL, ws.config.Branch, ws.config.Token, ws.config.Sites)
+		err := ws.installer.InstallDrupal(ctx, ws.config.RepositoryURL, ws.config.Branch, ws.config.Token, ws.config.Sites)
 		if err != nil {
 			errChannel <- err
-			ws.logger.Error("failed to install Drupal", zap.Error(err))
+			ws.logger.Sugar().Error(err)
 		}
 	}()
 
@@ -74,12 +75,12 @@ func (ws *WorkflowDependencyUpdateService) StartUpdate() error {
 
 	beforeUpdateCommit, _ := ws.repository.GetHeadCommit(repository)
 	ws.logger.Info("updating dependencies")
-	updateReport, err := ws.updater.UpdateDependencies(path, []string{}, worktree, false)
+	updateReport, err := ws.updater.UpdateDependencies(ctx, path, []string{}, worktree, false)
 	if err != nil {
 		return err
 	}
 
-	table, err := ws.commandExecutor.GenerateDiffTable(path, beforeUpdateCommit.Hash.String(), true)
+	table, err := ws.commandExecutor.GenerateDiffTable(ctx, path, beforeUpdateCommit.Hash.String(), true)
 	if err != nil {
 		return err
 	}
@@ -89,7 +90,7 @@ func (ws *WorkflowDependencyUpdateService) StartUpdate() error {
 		return nil
 	}
 
-	tableForLog, err := ws.commandExecutor.GenerateDiffTable(path, beforeUpdateCommit.Hash.String(), false)
+	tableForLog, err := ws.commandExecutor.GenerateDiffTable(ctx, path, beforeUpdateCommit.Hash.String(), false)
 	if err != nil {
 		return err
 	}
@@ -106,13 +107,13 @@ func (ws *WorkflowDependencyUpdateService) StartUpdate() error {
 		return <-errChannel
 	}
 
-	updateHooks, err := ws.updater.UpdateDrupal(path, worktree, ws.config.Sites)
+	updateHooks, err := ws.updater.UpdateDrupal(ctx, path, worktree, ws.config.Sites)
 	if err != nil {
 		return err
 	}
 
 	for _, au := range ws.afterUpdate {
-		if err := au.Execute(path, worktree); err != nil {
+		if err := au.Execute(ctx, path, worktree); err != nil {
 			ws.logger.Error("failed to execute after update", zap.Error(err))
 			return err
 		}

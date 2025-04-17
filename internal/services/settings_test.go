@@ -24,7 +24,7 @@ func TestIsSqliteModuleEnabled(t *testing.T) {
 	configSyncDir := "/tmp/config/sync"
 	coreExtensionPath := configSyncDir + "/core.extension.yml"
 
-	commandExecutor.On("GetConfigSyncDir", "/tmp", "default", false).Return(configSyncDir, nil)
+	commandExecutor.On("GetConfigSyncDir", t.Context(), "/tmp", "default", false).Return(configSyncDir, nil)
 
 	// Create a temporary directory and file to act as the config sync directory and core.extension.yml
 	if err := os.MkdirAll(configSyncDir, 0755); err != nil {
@@ -50,7 +50,7 @@ profile: thunder
 		t.Fatalf("Failed to write initial content to core.extension.yml: %v", err)
 	}
 
-	enabled, err := settingsService.IsSqliteModuleEnabled(dir, site)
+	enabled, err := settingsService.IsSqliteModuleEnabled(t.Context(), dir, site)
 	if err != nil {
 		t.Fatalf("Failed to check if sqlite module is enabled: %v", err)
 	}
@@ -68,7 +68,7 @@ module:
 		t.Fatalf("Failed to write disabled content to core.extension.yml: %v", err)
 	}
 
-	enabled, err = settingsService.IsSqliteModuleEnabled(dir, site)
+	enabled, err = settingsService.IsSqliteModuleEnabled(t.Context(), dir, site)
 	if err != nil {
 		t.Fatalf("Failed to check if sqlite module is enabled: %v", err)
 	}
@@ -118,10 +118,10 @@ profile: thunder
 		commandExecutor: commandExecutor,
 	}
 
-	commandExecutor.On("GetConfigSyncDir", "/tmp", "default", false).Return("/tmp", nil)
+	commandExecutor.On("GetConfigSyncDir", t.Context(), "/tmp", "default", false).Return("/tmp", nil)
 
 	// Call the function to add the SQLite module
-	if err := settingsService.AddSqliteModule("/tmp", "default"); err != nil {
+	if err := settingsService.AddSqliteModule(t.Context(), "/tmp", "default"); err != nil {
 		t.Fatalf("Failed to add SQLite module: %v", err)
 	}
 
@@ -190,10 +190,10 @@ profile: standard
 		commandExecutor: commandExecutor,
 	}
 
-	commandExecutor.On("GetConfigSyncDir", "/tmp", "default", false).Return("/tmp", nil)
+	commandExecutor.On("GetConfigSyncDir", t.Context(), "/tmp", "default", false).Return("/tmp", nil)
 
 	// Call the function to add the SQLite module
-	if err := settingsService.RemoveProfile("/tmp", "default"); err != nil {
+	if err := settingsService.RemoveProfile(t.Context(), "/tmp", "default"); err != nil {
 		t.Fatalf("Failed to remove profile: %v", err)
 	}
 

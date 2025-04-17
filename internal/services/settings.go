@@ -2,6 +2,7 @@ package services
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,8 +15,8 @@ import (
 )
 
 type SettingsService interface {
-	ConfigureDatabase(dir string, site string) error
-	RemoveProfile(dir string, site string) error
+	ConfigureDatabase(ctx context.Context, dir string, site string) error
+	RemoveProfile(ctx context.Context, dir string, site string) error
 }
 
 type DrupalSettingsService struct {
@@ -30,12 +31,12 @@ func newDrupalSettingsService(logger *zap.Logger, commandExecutor utils.CommandE
 	}
 }
 
-func (ss DrupalSettingsService) ConfigureDatabase(dir string, site string) error {
+func (ss DrupalSettingsService) ConfigureDatabase(ctx context.Context, dir string, site string) error {
 
 	siteLogger := ss.logger.With(zap.String("site", site))
 	siteLogger.Debug("configuring database", zap.String("dir", dir))
 
-	webroot, err := ss.commandExecutor.GetDrupalWebDir(dir)
+	webroot, err := ss.commandExecutor.GetDrupalWebDir(ctx, dir)
 	if err != nil {
 		siteLogger.Error("failed to get Drupal web dir", zap.String("dir", dir), zap.Error(err))
 		return err
@@ -58,10 +59,10 @@ $settings['file_private_path'] = '` + privatesDir + `';
 $settings['hash_salt'] = 'changeme';
 `
 
-	isSqliteEnabled, _ := ss.IsSqliteModuleEnabled(dir, site)
+	isSqliteEnabled, _ := ss.IsSqliteModuleEnabled(ctx, dir, site)
 	if !isSqliteEnabled {
 		siteLogger.Debug("enabling sqlite module")
-		if err := ss.AddSqliteModule(dir, site); err != nil {
+		if err := ss.AddSqliteModule(ctx, dir, site); err != nil {
 			siteLogger.Error("failed to enable sqlite module", zap.Error(err))
 		}
 		settings += `
@@ -94,11 +95,11 @@ if (isset($settings['config_exclude_modules'])) {
 	return nil
 }
 
-func (ss *DrupalSettingsService) IsSqliteModuleEnabled(dir string, site string) (bool, error) {
+func (ss *DrupalSettingsService) IsSqliteModuleEnabled(ctx context.Context, dir string, site string) (bool, error) {
 
 	siteLogger := ss.logger.With(zap.String("site", site))
 
-	configSyncDir, err := ss.commandExecutor.GetConfigSyncDir(dir, site, false)
+	configSyncDir, err := ss.commandExecutor.GetConfigSyncDir(ctx, dir, site, false)
 	if err != nil {
 		return false, err
 	}
@@ -129,11 +130,11 @@ func (ss *DrupalSettingsService) IsSqliteModuleEnabled(dir string, site string) 
 	return false, nil
 }
 
-func (ss *DrupalSettingsService) AddSqliteModule(dir string, site string) error {
+func (ss *DrupalSettingsService) AddSqliteModule(ctx context.Context, dir string, site string) error {
 
 	siteLogger := ss.logger.With(zap.String("site", site))
 
-	configSyncDir, err := ss.commandExecutor.GetConfigSyncDir(dir, site, false)
+	configSyncDir, err := ss.commandExecutor.GetConfigSyncDir(ctx, dir, site, false)
 	if err != nil {
 		return err
 	}
@@ -171,11 +172,11 @@ func (ss *DrupalSettingsService) AddSqliteModule(dir string, site string) error 
 	return nil
 }
 
-func (ss *DrupalSettingsService) RemoveProfile(dir string, site string) error {
+func (ss *DrupalSettingsService) RemoveProfile(ctx context.Context, dir string, site string) error {
 
 	siteLogger := ss.logger.With(zap.String("site", site))
 
-	configSyncDir, err := ss.commandExecutor.GetConfigSyncDir(dir, site, false)
+	configSyncDir, err := ss.commandExecutor.GetConfigSyncDir(ctx, dir, site, false)
 	if err != nil {
 		return err
 	}

@@ -4,7 +4,6 @@ package services
 
 import (
 	internal "github.com/drupdater/drupdater/internal"
-
 	mock "github.com/stretchr/testify/mock"
 
 	object "github.com/go-git/go-git/v5/plumbing/object"

@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/drupdater/drupdater/internal"
@@ -38,7 +39,7 @@ func newUpdateRemoveDeprecations(logger *zap.Logger, commandExecutor utils.Comma
 	}
 }
 
-func (h *UpdateRemoveDeprecations) Execute(path string, worktree internal.Worktree) error {
+func (h *UpdateRemoveDeprecations) Execute(ctx context.Context, path string, worktree internal.Worktree) error {
 	if h.config.SkipRector {
 		h.logger.Debug("rector is disabled, skipping remove deprecations")
 		return nil
@@ -47,22 +48,22 @@ func (h *UpdateRemoveDeprecations) Execute(path string, worktree internal.Worktr
 	h.logger.Info("remove deprecations")
 
 	// Check if rector is installed.
-	installed, _ := h.commandExecutor.IsPackageInstalled(path, "palantirnet/drupal-rector")
+	installed, _ := h.commandExecutor.IsPackageInstalled(ctx, path, "palantirnet/drupal-rector")
 	if !installed {
 		h.logger.Debug("rector is not installed, installing")
-		if _, err := h.commandExecutor.InstallPackages(path, "palantirnet/drupal-rector"); err != nil {
+		if _, err := h.commandExecutor.InstallPackages(ctx, path, "palantirnet/drupal-rector"); err != nil {
 			return err
 		}
 	}
 
-	out, err := h.commandExecutor.RunRector(path)
+	out, err := h.commandExecutor.RunRector(ctx, path)
 	if err != nil {
 		return err
 	}
 
 	if !installed {
 		h.logger.Debug("removing rector")
-		if _, err := h.commandExecutor.RemovePackages(path, "palantirnet/drupal-rector"); err != nil {
+		if _, err := h.commandExecutor.RemovePackages(ctx, path, "palantirnet/drupal-rector"); err != nil {
 			return err
 		}
 	}

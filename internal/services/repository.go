@@ -59,7 +59,7 @@ func (rs *GitRepositoryService) CloneRepository(repository string, branch string
 	})
 
 	if err != nil {
-		return nil, nil, "", err
+		return nil, nil, "", fmt.Errorf("git clone: %w", err)
 	}
 
 	// Set the user name and email for the commit

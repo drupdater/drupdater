@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
 	"regexp"
 	"strings"
@@ -13,10 +14,10 @@ import (
 )
 
 type ComposerService interface {
-	GetComposerUpdates(dir string, packagesToUpdate []string, minimalChanges bool) ([]PackageChange, error)
-	CheckPatchApplies(packageName string, packageVersion string, patchPath string) (bool, error)
-	GetInstalledPlugins(dir string) (map[string]interface{}, error)
-	RunComposerAudit(dir string) (ComposerAudit, error)
+	GetComposerUpdates(ctx context.Context, dir string, packagesToUpdate []string, minimalChanges bool) ([]PackageChange, error)
+	CheckPatchApplies(ctx context.Context, packageName string, packageVersion string, patchPath string) (bool, error)
+	GetInstalledPlugins(ctx context.Context, dir string) (map[string]interface{}, error)
+	RunComposerAudit(ctx context.Context, dir string) (ComposerAudit, error)
 	GetComposerLockHash(dir string) (string, error)
 }
 
@@ -46,9 +47,9 @@ type PackageChange struct {
 	To      string
 }
 
-func (s *DefaultComposerService) GetComposerUpdates(dir string, packagesToUpdate []string, minimalChanges bool) ([]PackageChange, error) {
+func (s *DefaultComposerService) GetComposerUpdates(ctx context.Context, dir string, packagesToUpdate []string, minimalChanges bool) ([]PackageChange, error) {
 	s.logger.Debug("getting outdated packages")
-	log, err := s.commandExecutor.UpdateDependencies(dir, packagesToUpdate, []string{}, minimalChanges, true)
+	log, err := s.commandExecutor.UpdateDependencies(ctx, dir, packagesToUpdate, []string{}, minimalChanges, true)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +134,7 @@ func (s *DefaultComposerService) initTempDir() {
 	s.initErr = afero.WriteFile(s.fs, s.tempDir+"/composer.json", []byte(composerJSON), 0644)
 }
 
-func (s *DefaultComposerService) CheckPatchApplies(packageName string, packageVersion string, patchPath string) (bool, error) {
+func (s *DefaultComposerService) CheckPatchApplies(ctx context.Context, packageName string, packageVersion string, patchPath string) (bool, error) {
 
 	s.initOnce.Do(s.initTempDir)
 	if s.initErr != nil {
@@ -155,16 +156,16 @@ func (s *DefaultComposerService) CheckPatchApplies(packageName string, packageVe
 	}
 
 	// Run composer require in the temporary directory
-	if _, err := s.commandExecutor.InstallPackages(s.tempDir, packageName+":"+packageVersion, "--with-all-dependencies"); err != nil {
+	if _, err := s.commandExecutor.InstallPackages(ctx, s.tempDir, packageName+":"+packageVersion, "--with-all-dependencies"); err != nil {
 		return false, nil
 	}
 
 	return true, nil
 }
 
-func (s *DefaultComposerService) GetInstalledPlugins(dir string) (map[string]interface{}, error) {
+func (s *DefaultComposerService) GetInstalledPlugins(ctx context.Context, dir string) (map[string]interface{}, error) {
 
-	out, err := s.commandExecutor.ExecComposer(dir, "depends", "composer-plugin-api", "--locked")
+	out, err := s.commandExecutor.ExecComposer(ctx, dir, "depends", "composer-plugin-api", "--locked")
 	if err != nil {
 		return nil, err
 	}
@@ -254,11 +255,11 @@ func (c *ComposerAudit) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (s *DefaultComposerService) RunComposerAudit(dir string) (ComposerAudit, error) {
+func (s *DefaultComposerService) RunComposerAudit(ctx context.Context, dir string) (ComposerAudit, error) {
 	s.logger.Debug("running composer audit")
 
 	var composerAudit ComposerAudit
-	out, _ := s.commandExecutor.ExecComposer(dir, "audit", "--format=json", "--locked", "--no-plugins")
+	out, _ := s.commandExecutor.ExecComposer(ctx, dir, "audit", "--format=json", "--locked", "--no-plugins")
 
 	if err := json.Unmarshal([]byte(out), &composerAudit); err != nil {
 		return ComposerAudit{}, err

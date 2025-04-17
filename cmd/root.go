@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/codehosting"
@@ -43,8 +44,8 @@ func newAction(
 	return act
 }
 
-func (act *Action) start(_ context.Context) error {
-	go act.run()
+func (act *Action) start(ctx context.Context) error {
+	go act.run(ctx)
 	return nil
 }
 
@@ -52,9 +53,12 @@ func (act *Action) stop(_ context.Context) error {
 	return nil
 }
 
-func (act *Action) run() {
+func (act *Action) run(ctx context.Context) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	exitCode := 0
-	err := act.workflowService.StartUpdate()
+	err := act.workflowService.StartUpdate(ctx)
 	if err != nil {
 		act.logger.Error("failed to start update", zap.Error(err))
 		exitCode = 1
@@ -79,6 +83,7 @@ func runApp(config internal.Config) {
 				logger, err := zap.NewDevelopment(
 					zap.IncreaseLevel(zap.InfoLevel),
 					zap.WithCaller(false),
+					zap.AddStacktrace(zap.PanicLevel),
 				)
 				if config.Verbose {
 					logger, err = zap.NewDevelopment()
@@ -100,6 +105,7 @@ func runApp(config internal.Config) {
 		),
 		fx.Options(services.Module, utils.Module, codehosting.Module),
 		fx.Invoke(func(*Action) {}),
+		fx.StartTimeout(15*time.Minute),
 	)
 
 	app.Run()

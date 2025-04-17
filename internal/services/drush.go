@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 
@@ -10,7 +11,7 @@ import (
 )
 
 type DrushService interface {
-	GetUpdateHooks(dir string, site string) (map[string]UpdateHook, error)
+	GetUpdateHooks(ctx context.Context, dir string, site string) (map[string]UpdateHook, error)
 }
 
 type DefaultDrushService struct {
@@ -32,9 +33,9 @@ type UpdateHook struct {
 	Type        string      `json:"type"`
 }
 
-func (s *DefaultDrushService) GetUpdateHooks(dir string, site string) (map[string]UpdateHook, error) {
+func (s *DefaultDrushService) GetUpdateHooks(ctx context.Context, dir string, site string) (map[string]UpdateHook, error) {
 	s.logger.Debug("getting update hooks")
-	data, err := s.commandExecutor.ExecDrush(dir, site, "updatedb-status", "--format=json")
+	data, err := s.commandExecutor.ExecDrush(ctx, dir, site, "updatedb-status", "--format=json")
 	if err != nil {
 		return nil, err
 	}

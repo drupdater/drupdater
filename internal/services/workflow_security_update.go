@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"crypto/md5"
 	"fmt"
 	"os"
@@ -42,7 +43,7 @@ func newWorkflowSecurityUpdateService(logger *zap.Logger, installer InstallerSer
 	}
 }
 
-func (ws *WorkflowSecurityUpdateService) StartUpdate() error {
+func (ws *WorkflowSecurityUpdateService) StartUpdate(ctx context.Context) error {
 	ws.logger.Info("starting security update workflow")
 
 	ws.logger.Info("cloning repository for update", zap.String("repositoryURL", ws.config.RepositoryURL), zap.String("branch", ws.config.Branch))
@@ -51,7 +52,7 @@ func (ws *WorkflowSecurityUpdateService) StartUpdate() error {
 		return err
 	}
 
-	beforeUpdateAudit, err := ws.composerService.RunComposerAudit(path)
+	beforeUpdateAudit, err := ws.composerService.RunComposerAudit(ctx, path)
 	if err != nil {
 		return err
 	}
@@ -69,7 +70,7 @@ func (ws *WorkflowSecurityUpdateService) StartUpdate() error {
 
 	go func() {
 		defer wg.Done()
-		err := ws.installer.InstallDrupal(ws.config.RepositoryURL, ws.config.Branch, ws.config.Token, ws.config.Sites)
+		err := ws.installer.InstallDrupal(ctx, ws.config.RepositoryURL, ws.config.Branch, ws.config.Token, ws.config.Sites)
 		if err != nil {
 			errChannel <- err
 			ws.logger.Error("failed to install Drupal", zap.Error(err))
@@ -90,12 +91,12 @@ func (ws *WorkflowSecurityUpdateService) StartUpdate() error {
 		packagesToUpdate = append(packagesToUpdate, "drupal/core-composer-scaffold")
 	}
 	ws.logger.Info("updating dependencies", zap.Strings("packages", packagesToUpdate))
-	updateReport, err := ws.updater.UpdateDependencies(path, packagesToUpdate, worktree, true)
+	updateReport, err := ws.updater.UpdateDependencies(ctx, path, packagesToUpdate, worktree, true)
 	if err != nil {
 		return err
 	}
 
-	table, err := ws.commandExecutor.GenerateDiffTable(path, beforeUpdateCommit.Hash.String(), true)
+	table, err := ws.commandExecutor.GenerateDiffTable(ctx, path, beforeUpdateCommit.Hash.String(), true)
 	if err != nil {
 		return err
 	}
@@ -105,7 +106,7 @@ func (ws *WorkflowSecurityUpdateService) StartUpdate() error {
 		return nil
 	}
 
-	tableForLog, err := ws.commandExecutor.GenerateDiffTable(path, beforeUpdateCommit.Hash.String(), false)
+	tableForLog, err := ws.commandExecutor.GenerateDiffTable(ctx, path, beforeUpdateCommit.Hash.String(), false)
 	if err != nil {
 		return err
 	}
@@ -132,7 +133,7 @@ func (ws *WorkflowSecurityUpdateService) StartUpdate() error {
 		return err
 	}
 
-	afterUpdateAudit, err := ws.composerService.RunComposerAudit(path)
+	afterUpdateAudit, err := ws.composerService.RunComposerAudit(ctx, path)
 	if err != nil {
 		return err
 	}
@@ -142,7 +143,7 @@ func (ws *WorkflowSecurityUpdateService) StartUpdate() error {
 		return <-errChannel
 	}
 
-	updateHooks, err := ws.updater.UpdateDrupal(path, worktree, ws.config.Sites)
+	updateHooks, err := ws.updater.UpdateDrupal(ctx, path, worktree, ws.config.Sites)
 	if err != nil {
 		return err
 	}

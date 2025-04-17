@@ -41,19 +41,19 @@ module:
 	token := "token"
 	sites := []string{"site1", "site2"}
 
-	settingsService.On("ConfigureDatabase", "/tmp", "site1").Return(nil)
-	settingsService.On("ConfigureDatabase", "/tmp", "site2").Return(nil)
-	settingsService.On("RemoveProfile", "/tmp", "site1").Return(nil)
-	settingsService.On("RemoveProfile", "/tmp", "site2").Return(nil)
+	settingsService.On("ConfigureDatabase", t.Context(), "/tmp", "site1").Return(nil)
+	settingsService.On("ConfigureDatabase", t.Context(), "/tmp", "site2").Return(nil)
+	settingsService.On("RemoveProfile", t.Context(), "/tmp", "site1").Return(nil)
+	settingsService.On("RemoveProfile", t.Context(), "/tmp", "site2").Return(nil)
 
 	repositoryService.On("CloneRepository", repositoryURL, branch, token).Return(nil, nil, "/tmp", nil)
 
 	t.Run("Success", func(t *testing.T) {
 		commandExecutor := utils.NewMockCommandExecutor(t)
-		commandExecutor.On("InstallDependencies", "/tmp").Return(nil)
+		commandExecutor.On("InstallDependencies", t.Context(), "/tmp").Return(nil)
 
-		commandExecutor.On("InstallSite", "/tmp", "site1").Return(nil)
-		commandExecutor.On("InstallSite", "/tmp", "site2").Return(nil)
+		commandExecutor.On("InstallSite", t.Context(), "/tmp", "site1").Return(nil)
+		commandExecutor.On("InstallSite", t.Context(), "/tmp", "site2").Return(nil)
 
 		installer := &DefaultInstallerService{
 			logger:          logger,
@@ -61,7 +61,7 @@ module:
 			commandExecutor: commandExecutor,
 			settings:        settingsService,
 		}
-		err = installer.InstallDrupal(repositoryURL, branch, token, sites)
+		err = installer.InstallDrupal(t.Context(), repositoryURL, branch, token, sites)
 		if err != nil {
 			t.Fatalf("Failed to install Drupal: %v", err)
 		}
@@ -71,9 +71,9 @@ module:
 
 	t.Run("Failure", func(t *testing.T) {
 		commandExecutor := utils.NewMockCommandExecutor(t)
-		commandExecutor.On("InstallDependencies", "/tmp").Return(nil)
-		commandExecutor.On("InstallSite", "/tmp", "site1").Return(nil)
-		commandExecutor.On("InstallSite", "/tmp", "site2").Return(errors.New("failed to install site"))
+		commandExecutor.On("InstallDependencies", t.Context(), "/tmp").Return(nil)
+		commandExecutor.On("InstallSite", t.Context(), "/tmp", "site1").Return(nil)
+		commandExecutor.On("InstallSite", t.Context(), "/tmp", "site2").Return(errors.New("failed to install site"))
 
 		installer := &DefaultInstallerService{
 			logger:          logger,
@@ -81,7 +81,7 @@ module:
 			commandExecutor: commandExecutor,
 			settings:        settingsService,
 		}
-		err = installer.InstallDrupal(repositoryURL, branch, token, sites)
+		err = installer.InstallDrupal(t.Context(), repositoryURL, branch, token, sites)
 		if err == nil {
 			t.Fatalf("Expected an error but got nil")
 		}
