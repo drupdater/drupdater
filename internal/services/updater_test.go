@@ -28,7 +28,7 @@ func TestUpdateDependencies(t *testing.T) {
 		commandExecutor.On("GetComposerConfig", "/tmp", "extra.patches").Return("", assert.AnError)
 		commandExecutor.On("GetComposerAllowPlugins", "/tmp").Return(map[string]bool{}, nil)
 		commandExecutor.On("SetComposerConfig", "/tmp", "allow-plugins", "true").Return(nil)
-		commandExecutor.On("UpdateDependencies", "/tmp", []string{}, false, false).Return("", nil)
+		commandExecutor.On("UpdateDependencies", "/tmp", []string{}, []string{}, false, false).Return("", nil)
 		commandExecutor.On("RunComposerNormalize", "/tmp").Return("", nil)
 		commandExecutor.On("SetComposerAllowPlugins", "/tmp", map[string]bool{}).Return(nil)
 
@@ -146,7 +146,6 @@ func TestUpdatePatches(t *testing.T) {
 
 		composerService.On("CheckPatchApplies", "drupal/core", "8.8.0", "/tmp/patches/core/0001-local-patch.patch").Return(false, nil)
 		commandExecutor.On("IsPackageInstalled", "/tmp", "drupal/core").Return(true, nil)
-		commandExecutor.On("InstallPackages", "/tmp", "drupal/core:8.7.0", "--no-install").Return("", nil)
 		updater := &DefaultUpdater{
 			logger:          logger,
 			commandExecutor: commandExecutor,
@@ -346,7 +345,6 @@ func TestUpdatePatches(t *testing.T) {
 
 		worktree := internal.NewMockWorktree(t)
 
-		commandExecutor.On("InstallPackages", "/tmp", "drupal/core:8.7.0", "--no-install").Return("", nil)
 		commandExecutor.On("IsPackageInstalled", "/tmp", "drupal/core").Return(true, nil)
 
 		drupalOrgService.On("FindIssueNumber", "Issue #123456 \"With problems\"").Return("123456", true)

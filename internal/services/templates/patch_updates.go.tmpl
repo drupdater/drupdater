@@ -31,7 +31,7 @@ The following patches were removed as they are no longer needed:
 ⚠️ **Packages Not Updated Due to Patch Conflicts**
 
 {{ range .Conflicts -}}
-- {{ .Package }} was fixed to version {{ .FixedVersion }} because
+- {{ .Package }} was kept at version {{ .FixedVersion }} because
 
   - Description: {{ .PatchDescription }}
   - Patch: `{{ .PatchPath }}`

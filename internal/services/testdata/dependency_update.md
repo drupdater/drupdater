@@ -28,7 +28,7 @@ The following patches were removed as they are no longer needed:
 
 ⚠️ **Packages Not Updated Due to Patch Conflicts**
 
-- package3 was fixed to version 2.0 because
+- package3 was kept at version 2.0 because
 
   - Description: description
   - Patch: `patch3`
