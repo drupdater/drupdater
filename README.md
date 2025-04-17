@@ -2,6 +2,14 @@
 
 Drupdater is a standalone tool for updating Drupal sites. It is designed to streamline the process of updating Drupal core, contributed modules, and configurations. It also provides tools for fixing PHP code style issues and removing deprecated code.
 
+## Table of Contents
+- [Features](#features)
+- [Prerequisites](#prerequisites)
+- [Usage](#usage)
+  - [CI/CD Integration](#cicd-integration)
+- [Configuration](#configuration)
+  - [Environment Variables](#environment-variables)
+
 ## Features
 
 - Update PHP dependencies using Composer.
@@ -13,15 +21,10 @@ Drupdater is a standalone tool for updating Drupal sites. It is designed to stre
 - Remove deprecated code using `drupal-rector`.
 - Multisite support for updating multiple Drupal sites in one merge request.
 
-## Installation
-
-Drupdater is distributed as a Docker image. To use it, ensure you have Docker installed on your system.
-
-### Pull the Docker Image
-
-```bash
-docker pull ghcr.io/drupdater/drupdater-php8.3:latest
-```
+## Prerequisites
+- Your Drupal site must be installable from configuration.
+- Your Drupal site uses GitLab/GitHub for version control.
+- A Drupal.org GitLab access token for patch removal.
 
 ## Usage
 
@@ -32,7 +35,7 @@ Drupdater can be integrated into your CI/CD pipeline or run manually from the co
 Run the following command to update a Drupal site:
 
 ```bash
-docker run --rm ghcr.io/drupdater/drupdater-php8.3:latest <repository_url> <your_token>
+docker run ghcr.io/drupdater/drupdater-php8.3:latest <repository_url> <your_token>
 ```
 
 Replace `<repository_url>` with the URL of your Drupal site's repository and `<your_token>` with your authentication token.
