@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
-	"drupdater/internal"
-	"drupdater/internal/codehosting"
-	"drupdater/internal/utils"
+	"github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/internal/codehosting"
+	"github.com/drupdater/drupdater/internal/utils"
 
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"

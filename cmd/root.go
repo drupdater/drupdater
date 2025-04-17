@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"os"
 
-	"drupdater/internal"
-	"drupdater/internal/codehosting"
-	"drupdater/internal/services"
-	"drupdater/internal/utils"
+	"github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/internal/codehosting"
+	"github.com/drupdater/drupdater/internal/services"
+	"github.com/drupdater/drupdater/internal/utils"
 
 	"github.com/maypok86/otter"
 	"github.com/spf13/cobra"

@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"drupdater/internal/utils"
+	"github.com/drupdater/drupdater/internal/utils"
 
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"

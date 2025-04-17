@@ -1,6 +1,6 @@
 package main
 
-import "drupdater/cmd"
+import "github.com/drupdater/drupdater/cmd"
 
 func main() {
 	cmd.Execute()
