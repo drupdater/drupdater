@@ -48,7 +48,7 @@ type PackageChange struct {
 
 func (s *DefaultComposerService) GetComposerUpdates(dir string, packagesToUpdate []string, minimalChanges bool) ([]PackageChange, error) {
 	s.logger.Debug("getting outdated packages")
-	log, err := s.commandExecutor.UpdateDependencies(dir, packagesToUpdate, minimalChanges, true)
+	log, err := s.commandExecutor.UpdateDependencies(dir, packagesToUpdate, []string{}, minimalChanges, true)
 	if err != nil {
 		return nil, err
 	}

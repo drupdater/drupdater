@@ -1466,9 +1466,9 @@ func (_c *MockCommandExecutor_UpdateComposerLockHash_Call) RunAndReturn(run func
 	return _c
 }
 
-// UpdateDependencies provides a mock function with given fields: dir, packagesToUpdate, minimalChanges, dryRun
-func (_m *MockCommandExecutor) UpdateDependencies(dir string, packagesToUpdate []string, minimalChanges bool, dryRun bool) (string, error) {
-	ret := _m.Called(dir, packagesToUpdate, minimalChanges, dryRun)
+// UpdateDependencies provides a mock function with given fields: dir, packagesToUpdate, packagesToKeep, minimalChanges, dryRun
+func (_m *MockCommandExecutor) UpdateDependencies(dir string, packagesToUpdate []string, packagesToKeep []string, minimalChanges bool, dryRun bool) (string, error) {
+	ret := _m.Called(dir, packagesToUpdate, packagesToKeep, minimalChanges, dryRun)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UpdateDependencies")
@@ -1476,17 +1476,17 @@ func (_m *MockCommandExecutor) UpdateDependencies(dir string, packagesToUpdate [
 
 	var r0 string
 	var r1 error
-	if rf, ok := ret.Get(0).(func(string, []string, bool, bool) (string, error)); ok {
-		return rf(dir, packagesToUpdate, minimalChanges, dryRun)
+	if rf, ok := ret.Get(0).(func(string, []string, []string, bool, bool) (string, error)); ok {
+		return rf(dir, packagesToUpdate, packagesToKeep, minimalChanges, dryRun)
 	}
-	if rf, ok := ret.Get(0).(func(string, []string, bool, bool) string); ok {
-		r0 = rf(dir, packagesToUpdate, minimalChanges, dryRun)
+	if rf, ok := ret.Get(0).(func(string, []string, []string, bool, bool) string); ok {
+		r0 = rf(dir, packagesToUpdate, packagesToKeep, minimalChanges, dryRun)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
 
-	if rf, ok := ret.Get(1).(func(string, []string, bool, bool) error); ok {
-		r1 = rf(dir, packagesToUpdate, minimalChanges, dryRun)
+	if rf, ok := ret.Get(1).(func(string, []string, []string, bool, bool) error); ok {
+		r1 = rf(dir, packagesToUpdate, packagesToKeep, minimalChanges, dryRun)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -1502,15 +1502,16 @@ type MockCommandExecutor_UpdateDependencies_Call struct {
 // UpdateDependencies is a helper method to define mock.On call
 //   - dir string
 //   - packagesToUpdate []string
+//   - packagesToKeep []string
 //   - minimalChanges bool
 //   - dryRun bool
-func (_e *MockCommandExecutor_Expecter) UpdateDependencies(dir interface{}, packagesToUpdate interface{}, minimalChanges interface{}, dryRun interface{}) *MockCommandExecutor_UpdateDependencies_Call {
-	return &MockCommandExecutor_UpdateDependencies_Call{Call: _e.mock.On("UpdateDependencies", dir, packagesToUpdate, minimalChanges, dryRun)}
+func (_e *MockCommandExecutor_Expecter) UpdateDependencies(dir interface{}, packagesToUpdate interface{}, packagesToKeep interface{}, minimalChanges interface{}, dryRun interface{}) *MockCommandExecutor_UpdateDependencies_Call {
+	return &MockCommandExecutor_UpdateDependencies_Call{Call: _e.mock.On("UpdateDependencies", dir, packagesToUpdate, packagesToKeep, minimalChanges, dryRun)}
 }
 
-func (_c *MockCommandExecutor_UpdateDependencies_Call) Run(run func(dir string, packagesToUpdate []string, minimalChanges bool, dryRun bool)) *MockCommandExecutor_UpdateDependencies_Call {
+func (_c *MockCommandExecutor_UpdateDependencies_Call) Run(run func(dir string, packagesToUpdate []string, packagesToKeep []string, minimalChanges bool, dryRun bool)) *MockCommandExecutor_UpdateDependencies_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].([]string), args[2].(bool), args[3].(bool))
+		run(args[0].(string), args[1].([]string), args[2].([]string), args[3].(bool), args[4].(bool))
 	})
 	return _c
 }
@@ -1520,7 +1521,7 @@ func (_c *MockCommandExecutor_UpdateDependencies_Call) Return(_a0 string, _a1 er
 	return _c
 }
 
-func (_c *MockCommandExecutor_UpdateDependencies_Call) RunAndReturn(run func(string, []string, bool, bool) (string, error)) *MockCommandExecutor_UpdateDependencies_Call {
+func (_c *MockCommandExecutor_UpdateDependencies_Call) RunAndReturn(run func(string, []string, []string, bool, bool) (string, error)) *MockCommandExecutor_UpdateDependencies_Call {
 	_c.Call.Return(run)
 	return _c
 }

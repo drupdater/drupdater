@@ -24,7 +24,7 @@ type CommandExecutor interface {
 	ExportConfiguration(dir string, site string) error
 	UpdateSite(dir string, site string) error
 	ConfigResave(dir string, site string) error
-	UpdateDependencies(dir string, packagesToUpdate []string, minimalChanges bool, dryRun bool) (string, error)
+	UpdateDependencies(dir string, packagesToUpdate []string, packagesToKeep []string, minimalChanges bool, dryRun bool) (string, error)
 	IsPackageInstalled(dir string, packageToCheck string) (bool, error)
 	RunRector(dir string) (string, error)
 	GenerateDiffTable(path string, targetBranch string, withLinks bool) (string, error)
@@ -154,11 +154,11 @@ func (e DefaultCommandExecutor) ConfigResave(dir string, site string) error {
 	return err
 }
 
-func (e DefaultCommandExecutor) UpdateDependencies(dir string, packagesToUpdate []string, minimalChanges bool, dryRun bool) (string, error) {
+func (e DefaultCommandExecutor) UpdateDependencies(dir string, packagesToUpdate []string, packagesToKeep []string, minimalChanges bool, dryRun bool) (string, error) {
 	e.logger.Debug("updating dependencies", zap.Strings("packagesToUpdate", packagesToUpdate))
-	args := []string{"update", "--no-interaction", "--no-progress", "--optimize-autoloader", "--with-all-dependencies"}
-	if len(packagesToUpdate) > 0 {
-		args = append(args, packagesToUpdate...)
+	args := append([]string{"update", "--no-interaction", "--no-progress", "--optimize-autoloader", "--with-all-dependencies"}, packagesToUpdate...)
+	for _, packageToKeep := range packagesToKeep {
+		args = append(args, fmt.Sprintf("--with=%s", packageToKeep))
 	}
 	if minimalChanges {
 		args = append(args, "--minimal-changes")
@@ -168,8 +168,7 @@ func (e DefaultCommandExecutor) UpdateDependencies(dir string, packagesToUpdate 
 	} else {
 		args = append(args, "--bump-after-update")
 	}
-	out, err := e.ExecComposer(dir, args...)
-	return out, err
+	return e.ExecComposer(dir, args...)
 }
 
 func (e DefaultCommandExecutor) GetComposerAllowPlugins(dir string) (map[string]bool, error) {

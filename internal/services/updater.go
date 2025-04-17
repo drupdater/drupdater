@@ -164,7 +164,11 @@ func (us *DefaultUpdater) UpdateDependencies(path string, packagesToUpdate []str
 		us.logger.Error("failed to set composer config", zap.Error(err))
 	}
 
-	if _, err = us.commandExecutor.UpdateDependencies(path, packagesToUpdate, minimalChanges, false); err != nil {
+	packagesToKeep := []string{}
+	for _, patchUpdate := range patchUpdates.Conflicts {
+		packagesToKeep = append(packagesToKeep, fmt.Sprintf("%s:%s", patchUpdate.Package, patchUpdate.FixedVersion))
+	}
+	if _, err = us.commandExecutor.UpdateDependencies(path, packagesToUpdate, packagesToKeep, minimalChanges, false); err != nil {
 		return updateReport, err
 	}
 
@@ -448,24 +452,14 @@ func (us *DefaultUpdater) UpdatePatches(path string, worktree internal.Worktree,
 									us.logger.Info("replacing patch", zap.String("package", operation.Package), zap.String("previous patch", patchPath), zap.String("new patch", newPatchPath+"/"+newPatchFile))
 									updates.Updated = append(updates.Updated, UpdatedPatch{Package: operation.Package, PreviousPatchPath: patchPath, NewPatchPath: newPatchPath + "/" + newPatchFile, PatchDescription: description})
 								} else {
-									us.logger.Info("merge request does not apply, locking package", zap.String("package", operation.Package), zap.String("version", operation.To), zap.String("patch", path+"/"+newPatchPath))
-									// notify
+									us.logger.Info("merge request does not apply, keeping current package version", zap.String("package", operation.Package), zap.String("version", operation.To), zap.String("patch", path+"/"+newPatchPath))
 									updates.Conflicts = append(updates.Conflicts, ConflictPatch{Package: operation.Package, FixedVersion: operation.From, PatchPath: patchPath, NewVersion: operation.To, PatchDescription: description})
-									_, err := us.commandExecutor.InstallPackages(path, operation.Package+":"+operation.From, "--no-install")
-									if err != nil {
-										us.logger.Debug("failed to install package", zap.Error(err))
-									}
 								}
 							}
 						} else {
-							// notify
 							// try to get github link from description
-							us.logger.Info("patch does not apply, locking package", zap.String("package", operation.Package), zap.String("version", operation.From), zap.String("patch", patchPath))
+							us.logger.Info("patch does not apply, keeping current package version", zap.String("package", operation.Package), zap.String("version", operation.From), zap.String("patch", patchPath))
 							updates.Conflicts = append(updates.Conflicts, ConflictPatch{Package: operation.Package, FixedVersion: operation.From, PatchPath: patchPath, NewVersion: operation.To, PatchDescription: description})
-							_, err := us.commandExecutor.InstallPackages(path, operation.Package+":"+operation.From, "--no-install")
-							if err != nil {
-								us.logger.Error("failed to install package", zap.Error(err))
-							}
 						}
 					}
 				}

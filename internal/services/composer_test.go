@@ -29,7 +29,7 @@ func TestGetComposerUpdates(t *testing.T) {
 		fs:              fs,
 	}
 
-	commandExecutor.On("UpdateDependencies", "/test", []string{}, false, true).Return(logData, nil)
+	commandExecutor.On("UpdateDependencies", "/test", []string{}, []string{}, false, true).Return(logData, nil)
 	changes, err := service.GetComposerUpdates("/test", []string{}, false)
 
 	assert.NoError(t, err)
