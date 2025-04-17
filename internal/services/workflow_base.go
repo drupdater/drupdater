@@ -3,11 +3,16 @@ package services
 import (
 	"bytes"
 	"context"
+	"crypto/md5"
 	"embed"
 	"fmt"
+	"os"
+	"sync"
 	"text/template"
 
 	"github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/internal/codehosting"
+	"github.com/drupdater/drupdater/internal/utils"
 
 	git "github.com/go-git/go-git/v5"
 	gitConfig "github.com/go-git/go-git/v5/config"
@@ -35,9 +40,47 @@ type WorkflowService interface {
 	StartUpdate(ctx context.Context) error
 }
 
+type WorkflowUpdateResult struct {
+	updateReport DependencyUpdateReport
+	table        string
+}
+
 type WorkflowBaseService struct {
-	logger *zap.Logger
-	config internal.Config
+	logger             *zap.Logger
+	config             internal.Config
+	commandExecutor    utils.CommandExecutor
+	updater            UpdaterService
+	vcsProviderFactory codehosting.VcsProviderFactory
+}
+
+func (ws *WorkflowBaseService) Update(errCh chan error, resultCh chan WorkflowUpdateResult, ctx context.Context, packagesToUpdate []string, minimalChanges bool, path string, worktree internal.Worktree, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	ws.logger.Info("updating dependencies")
+	updateReport, err := ws.updater.UpdateDependencies(ctx, path, packagesToUpdate, worktree, minimalChanges)
+	if err != nil {
+		errCh <- err
+		return
+	}
+
+	table, err := ws.commandExecutor.GenerateDiffTable(ctx, path, ws.config.Branch, true)
+	if err != nil {
+		errCh <- err
+		return
+	}
+
+	if table == "" {
+		ws.logger.Info("no packages were updated, skipping update")
+		errCh <- err
+		return
+	}
+
+	ws.logger.Sugar().Info("composer diff table", fmt.Sprintf("\n%s", table))
+
+	resultCh <- WorkflowUpdateResult{
+		updateReport: updateReport,
+		table:        table,
+	}
 }
 
 func (ws *WorkflowBaseService) PushChanges(repository internal.Repository, updateBranchName string) error {
@@ -75,4 +118,20 @@ func (ws *WorkflowBaseService) GenerateDescription(data interface{}, filename st
 	}
 
 	return output.String(), nil
+}
+
+func (ws *WorkflowBaseService) CreateMergeRequest(title string, description string, updateBranchName string, baseBranch string) (codehosting.MergeRequest, error) {
+	codehostingPlatform := ws.vcsProviderFactory.Create(ws.config.RepositoryURL, ws.config.Token)
+	mr, err := codehostingPlatform.CreateMergeRequest(title, description, updateBranchName, baseBranch)
+	if err != nil {
+		ws.logger.Error("failed to create merge request", zap.Error(err))
+		return codehosting.MergeRequest{}, err
+	}
+	ws.logger.Info("merge request created", zap.String("url", mr.URL))
+	return mr, nil
+}
+
+func (ws *WorkflowBaseService) Cleanup() {
+	tmpDirName := fmt.Sprintf("/tmp/%x", md5.Sum([]byte(ws.config.RepositoryURL)))
+	os.RemoveAll(tmpDirName)
 }

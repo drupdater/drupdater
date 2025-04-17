@@ -8,7 +8,6 @@ import (
 	"github.com/drupdater/drupdater/internal/codehosting"
 	"github.com/drupdater/drupdater/internal/utils"
 
-	object "github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
 	"go.uber.org/zap"
@@ -95,7 +94,6 @@ func TestSecurityUpdateStartUpdate(t *testing.T) {
 
 	installer.On("InstallDrupal", mock.Anything, config.RepositoryURL, config.Branch, config.Token, config.Sites).Return(nil)
 	repositoryService.On("CloneRepository", config.RepositoryURL, config.Branch, config.Token).Return(repository, worktree, "/tmp", nil)
-	repositoryService.On("GetHeadCommit", repository).Return(&object.Commit{}, nil)
 	repositoryService.On("BranchExists", mock.Anything, "security-update-ddd").Return(false, nil)
 
 	updater.On("UpdateDependencies", mock.Anything, "/tmp", []string{"package1"}, mock.Anything, true).Return(DependencyUpdateReport{}, nil)
@@ -106,7 +104,6 @@ func TestSecurityUpdateStartUpdate(t *testing.T) {
 	vcsProvider.On("CreateMergeRequest", mock.Anything, string(fixture), mock.Anything, config.Branch).Return(codehosting.MergeRequest{}, nil)
 	repository.On("Push", mock.Anything).Return(nil)
 	commandExecutor.On("GenerateDiffTable", mock.Anything, mock.Anything, mock.Anything, true).Return("Dummy Table", nil)
-	commandExecutor.On("GenerateDiffTable", mock.Anything, mock.Anything, mock.Anything, false).Return("Dummy Table", nil)
 	composerService.On("RunComposerAudit", mock.Anything, "/tmp").Return(ComposerAudit{
 		Advisories: []Advisory{
 			{CVE: "CVE-1234", Title: "Vul 1", Severity: "high    ", Link: "https://example.com", PackageName: "package1"},
@@ -150,11 +147,9 @@ func TestSecurityUpdateStartUpdateWithDryRun(t *testing.T) {
 	installer.On("InstallDrupal", mock.Anything, config.RepositoryURL, config.Branch, config.Token, config.Sites).Return(nil)
 	repositoryService.On("BranchExists", mock.Anything, "security-update-ddd").Return(false, nil)
 	repositoryService.On("CloneRepository", config.RepositoryURL, config.Branch, config.Token).Return(repository, worktree, "/tmp", nil)
-	repositoryService.On("GetHeadCommit", repository).Return(&object.Commit{}, nil)
 	updater.On("UpdateDependencies", mock.Anything, "/tmp", []string{"package1"}, mock.Anything, true).Return(DependencyUpdateReport{}, nil)
 	updater.On("UpdateDrupal", mock.Anything, "/tmp", mock.Anything, config.Sites).Return(UpdateHooksPerSite{}, nil)
 	commandExecutor.On("GenerateDiffTable", mock.Anything, mock.Anything, mock.Anything, true).Return("foo", nil)
-	commandExecutor.On("GenerateDiffTable", mock.Anything, mock.Anything, mock.Anything, false).Return("foo", nil)
 	composerService.On("RunComposerAudit", mock.Anything, "/tmp").Return(ComposerAudit{
 		Advisories: []Advisory{
 			{CVE: "CVE-1234", Title: "Vul 1", Severity: "high    ", Link: "https://example.com", PackageName: "package1"},

@@ -18,7 +18,7 @@ func TestExecDrush(t *testing.T) {
 	executor := NewCommandExecutor(logger, cache).(DefaultCommandExecutor)
 
 	t.Run("successful execution", func(t *testing.T) {
-		execCommand = func(context context.Context, name string, arg ...string) *exec.Cmd {
+		execCommand = func(_ context.Context, name string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", name}
 			cs = append(cs, arg...)
 			cmd := exec.Command(os.Args[0], cs...)
@@ -33,7 +33,7 @@ func TestExecDrush(t *testing.T) {
 	})
 
 	t.Run("execution failure", func(t *testing.T) {
-		execCommand = func(context context.Context, name string, arg ...string) *exec.Cmd {
+		execCommand = func(_ context.Context, name string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", name}
 			cs = append(cs, arg...)
 			cmd := exec.Command(os.Args[0], cs...)
@@ -54,7 +54,7 @@ func TestExecComposer(t *testing.T) {
 	executor := NewCommandExecutor(logger, cache).(DefaultCommandExecutor)
 
 	t.Run("successful execution", func(t *testing.T) {
-		execCommand = func(context context.Context, name string, arg ...string) *exec.Cmd {
+		execCommand = func(_ context.Context, name string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", name}
 			cs = append(cs, arg...)
 			cmd := exec.Command(os.Args[0], cs...)
@@ -69,7 +69,7 @@ func TestExecComposer(t *testing.T) {
 	})
 
 	t.Run("execution failure", func(t *testing.T) {
-		execCommand = func(context context.Context, name string, arg ...string) *exec.Cmd {
+		execCommand = func(_ context.Context, name string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", name}
 			cs = append(cs, arg...)
 			cmd := exec.Command(os.Args[0], cs...)

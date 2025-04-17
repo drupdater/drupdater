@@ -2,9 +2,7 @@ package services
 
 import (
 	"context"
-	"crypto/md5"
 	"fmt"
-	"os"
 	"sync"
 	"time"
 
@@ -19,43 +17,35 @@ import (
 
 type WorkflowDependencyUpdateService struct {
 	WorkflowBaseService
-	afterUpdate        []AfterUpdate
-	installer          InstallerService
-	updater            UpdaterService
-	repository         RepositoryService
-	vcsProviderFactory codehosting.VcsProviderFactory
-	commandExecutor    utils.CommandExecutor
+	afterUpdate []AfterUpdate
+	installer   InstallerService
+	repository  RepositoryService
 }
 
 func newWorkflowDependencyUpdateService(afterUpdate []AfterUpdate, logger *zap.Logger, installer InstallerService, updater UpdaterService, repository RepositoryService, vcsProviderFactory codehosting.VcsProviderFactory, config internal.Config, commandExecutor utils.CommandExecutor) *WorkflowDependencyUpdateService {
 	return &WorkflowDependencyUpdateService{
 		WorkflowBaseService: WorkflowBaseService{
-			logger: logger,
-			config: config,
+			logger:             logger,
+			config:             config,
+			updater:            updater,
+			commandExecutor:    commandExecutor,
+			vcsProviderFactory: vcsProviderFactory,
 		},
-		afterUpdate:        afterUpdate,
-		installer:          installer,
-		updater:            updater,
-		repository:         repository,
-		vcsProviderFactory: vcsProviderFactory,
-		commandExecutor:    commandExecutor,
+		afterUpdate: afterUpdate,
+		installer:   installer,
+		repository:  repository,
 	}
 }
 
 func (ws *WorkflowDependencyUpdateService) StartUpdate(ctx context.Context) error {
 	ws.logger.Info("starting update workflow")
 
-	type Result struct {
-		updateReport DependencyUpdateReport
-		table        string
-	}
-
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	var wg sync.WaitGroup
 	errCh := make(chan error, 2)
-	resultCh := make(chan Result, 1) // channel for result from one of the goroutines
+	resultCh := make(chan WorkflowUpdateResult, 1) // channel for result from one of the goroutines
 
 	wg.Add(2)
 
@@ -74,44 +64,15 @@ func (ws *WorkflowDependencyUpdateService) StartUpdate(ctx context.Context) erro
 		return err
 	}
 
-	go func() {
-		defer wg.Done()
+	if err := worktree.Checkout(&git.CheckoutOptions{
+		Branch: plumbing.NewBranchReferenceName(updateBranchName),
+		Create: true,
+	}); err != nil {
+		ws.logger.Error("failed to checkout branch", zap.Error(err))
+		return err
+	}
 
-		if err := worktree.Checkout(&git.CheckoutOptions{
-			Branch: plumbing.NewBranchReferenceName(updateBranchName),
-			Create: true,
-		}); err != nil {
-			ws.logger.Error("failed to checkout branch", zap.Error(err))
-			errCh <- err
-			return
-		}
-
-		ws.logger.Info("updating dependencies")
-		updateReport, err := ws.updater.UpdateDependencies(ctx, path, []string{}, worktree, false)
-		if err != nil {
-			errCh <- err
-			return
-		}
-
-		table, err := ws.commandExecutor.GenerateDiffTable(ctx, path, ws.config.Branch, true)
-		if err != nil {
-			errCh <- err
-			return
-		}
-
-		if table == "" {
-			ws.logger.Info("no packages were updated, skipping update")
-			errCh <- err
-			return
-		}
-
-		ws.logger.Sugar().Info("composer diff table", fmt.Sprintf("\n%s", table))
-
-		resultCh <- Result{
-			updateReport: updateReport,
-			table:        table,
-		}
-	}()
+	go ws.Update(errCh, resultCh, ctx, []string{}, false, path, worktree, &wg)
 
 	done := make(chan struct{})
 	go func() {
@@ -119,7 +80,7 @@ func (ws *WorkflowDependencyUpdateService) StartUpdate(ctx context.Context) erro
 		close(done)
 	}()
 
-	var result Result
+	var result WorkflowUpdateResult
 
 	select {
 	case <-done:
@@ -146,40 +107,29 @@ func (ws *WorkflowDependencyUpdateService) StartUpdate(ctx context.Context) erro
 		}
 	}
 
-	data := TemplateData{
-		ComposerDiff:           result.table,
-		DependencyUpdateReport: result.updateReport,
-		UpdateHooks:            updateHooks,
-	}
-
-	description, err := ws.GenerateDescription(data, "dependency_update.go.tmpl")
-	if err != nil {
-		ws.logger.Error("failed to generate description", zap.Error(err))
-		return err
-	}
-
 	if !ws.config.DryRun {
 		if err = ws.PushChanges(repository, updateBranchName); err != nil {
 			return err
 		}
 
-		ws.logger.Debug("creating merge request", zap.String("title", "Drupal Maintenance Updates"), zap.String("description", description), zap.String("sourceBranch", updateBranchName), zap.String("targetBranch", ws.config.Branch))
-		codehostingPlatform := ws.vcsProviderFactory.Create(ws.config.RepositoryURL, ws.config.Token)
-		title := fmt.Sprintf("%s: Drupal Maintenance Updates", time.Now().Format("January 2006"))
-		mr, err := codehostingPlatform.CreateMergeRequest(title, description, updateBranchName, ws.config.Branch)
-		if err != nil {
-			ws.logger.Error("failed to create merge request", zap.Error(err))
-			// remove the branch if the merge request creation failed
-			//worktree.
+		data := TemplateData{
+			ComposerDiff:           result.table,
+			DependencyUpdateReport: result.updateReport,
+			UpdateHooks:            updateHooks,
 		}
-		ws.logger.Info("merge request created", zap.String("url", mr.URL))
+
+		description, err := ws.GenerateDescription(data, "dependency_update.go.tmpl")
+		if err != nil {
+			ws.logger.Error("failed to generate description", zap.Error(err))
+			return err
+		}
+
+		title := fmt.Sprintf("%s: Drupal Maintenance Updates", time.Now().Format("January 2006"))
+		ws.CreateMergeRequest(title, description, updateBranchName, ws.config.Branch)
 	}
 
 	// Clean up the temporary directory
-	defer func() {
-		tmpDirName := fmt.Sprintf("/tmp/%x", md5.Sum([]byte(ws.config.RepositoryURL)))
-		os.RemoveAll(tmpDirName)
-	}()
+	defer ws.Cleanup()
 
 	return nil
 }

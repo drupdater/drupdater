@@ -2,9 +2,7 @@ package services
 
 import (
 	"context"
-	"crypto/md5"
 	"fmt"
-	"os"
 	"slices"
 	"sync"
 	"time"
@@ -20,31 +18,45 @@ import (
 
 type WorkflowSecurityUpdateService struct {
 	WorkflowBaseService
-	installer          InstallerService
-	updater            UpdaterService
-	repository         RepositoryService
-	vcsProviderFactory codehosting.VcsProviderFactory
-	commandExecutor    utils.CommandExecutor
-	composerService    ComposerService
+	installer       InstallerService
+	repository      RepositoryService
+	composerService ComposerService
 }
 
 func newWorkflowSecurityUpdateService(logger *zap.Logger, installer InstallerService, updater UpdaterService, repository RepositoryService, vcsProviderFactory codehosting.VcsProviderFactory, config internal.Config, commandExecutor utils.CommandExecutor, composerService ComposerService) *WorkflowSecurityUpdateService {
 	return &WorkflowSecurityUpdateService{
 		WorkflowBaseService: WorkflowBaseService{
-			logger: logger,
-			config: config,
+			logger:             logger,
+			config:             config,
+			updater:            updater,
+			commandExecutor:    commandExecutor,
+			vcsProviderFactory: vcsProviderFactory,
 		},
-		installer:          installer,
-		updater:            updater,
-		repository:         repository,
-		vcsProviderFactory: vcsProviderFactory,
-		commandExecutor:    commandExecutor,
-		composerService:    composerService,
+		installer:       installer,
+		repository:      repository,
+		composerService: composerService,
 	}
 }
 
 func (ws *WorkflowSecurityUpdateService) StartUpdate(ctx context.Context) error {
 	ws.logger.Info("starting security update workflow")
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	var wg sync.WaitGroup
+	errCh := make(chan error, 2)
+	resultCh := make(chan WorkflowUpdateResult, 1) // channel for result from one of the goroutines
+
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		if err := ws.installer.InstallDrupal(ctx, ws.config.RepositoryURL, ws.config.Branch, ws.config.Token, ws.config.Sites); err != nil {
+			errCh <- err
+			cancel()
+		}
+	}()
 
 	ws.logger.Info("cloning repository for update", zap.String("repositoryURL", ws.config.RepositoryURL), zap.String("branch", ws.config.Branch))
 	repository, worktree, path, err := ws.repository.CloneRepository(ws.config.RepositoryURL, ws.config.Branch, ws.config.Token)
@@ -57,60 +69,38 @@ func (ws *WorkflowSecurityUpdateService) StartUpdate(ctx context.Context) error 
 		return err
 	}
 
-	if len(beforeUpdateAudit.Advisories) == 0 {
+	packagesToUpdate, err := ws.getPackagesToUpdate(ctx, path, beforeUpdateAudit.Advisories)
+	if err != nil {
+		return err
+	}
+
+	if len(packagesToUpdate) == 0 {
 		ws.logger.Info("no security advisories found, skipping security update")
 		return nil
 	}
-	ws.logger.Info("found security advisories", zap.Int("numAdvisories", len(beforeUpdateAudit.Advisories)))
-	ws.logger.Info("advisories", zap.Any("advisories", beforeUpdateAudit.Advisories))
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-	errChannel := make(chan error, 1)
+	go ws.Update(errCh, resultCh, ctx, packagesToUpdate, true, path, worktree, &wg)
 
+	done := make(chan struct{})
 	go func() {
-		defer wg.Done()
-		err := ws.installer.InstallDrupal(ctx, ws.config.RepositoryURL, ws.config.Branch, ws.config.Token, ws.config.Sites)
-		if err != nil {
-			errChannel <- err
-			ws.logger.Error("failed to install Drupal", zap.Error(err))
-		}
+		wg.Wait()
+		close(done)
 	}()
 
-	packagesToUpdate := make([]string, 0)
-	for _, advisory := range beforeUpdateAudit.Advisories {
-		if slices.Contains(packagesToUpdate, advisory.PackageName) {
-			continue
+	var result WorkflowUpdateResult
+
+	select {
+	case <-done:
+		// Both finished, now fetch result
+		select {
+		case result = <-resultCh:
+		default:
 		}
-		packagesToUpdate = append(packagesToUpdate, advisory.PackageName)
-	}
-
-	beforeUpdateCommit, _ := ws.repository.GetHeadCommit(repository)
-	if slices.Contains(packagesToUpdate, "drupal/core") {
-		packagesToUpdate = append(packagesToUpdate, "drupal/core-recommended")
-		packagesToUpdate = append(packagesToUpdate, "drupal/core-composer-scaffold")
-	}
-	ws.logger.Info("updating dependencies", zap.Strings("packages", packagesToUpdate))
-	updateReport, err := ws.updater.UpdateDependencies(ctx, path, packagesToUpdate, worktree, true)
-	if err != nil {
+	case err := <-errCh:
+		ws.logger.Sugar().Error(err)
+		// Optional: exit early or handle further
 		return err
 	}
-
-	table, err := ws.commandExecutor.GenerateDiffTable(ctx, path, beforeUpdateCommit.Hash.String(), true)
-	if err != nil {
-		return err
-	}
-
-	if table == "" {
-		ws.logger.Info("no packages were updated, skipping security update")
-		return nil
-	}
-
-	tableForLog, err := ws.commandExecutor.GenerateDiffTable(ctx, path, beforeUpdateCommit.Hash.String(), false)
-	if err != nil {
-		return err
-	}
-	ws.logger.Sugar().Info("composer diff table", fmt.Sprintf("\n%s", tableForLog))
 
 	composerLockHash, err := ws.composerService.GetComposerLockHash(path)
 	if err != nil {
@@ -138,30 +128,9 @@ func (ws *WorkflowSecurityUpdateService) StartUpdate(ctx context.Context) error 
 		return err
 	}
 
-	wg.Wait()
-	if len(errChannel) > 0 {
-		return <-errChannel
-	}
-
 	updateHooks, err := ws.updater.UpdateDrupal(ctx, path, worktree, ws.config.Sites)
 	if err != nil {
 		return err
-	}
-
-	data := TemplateData{
-		ComposerDiff:           table,
-		DependencyUpdateReport: updateReport,
-		SecurityReport: SecurityReport{
-			FixedAdvisories:       ws.GetFixedAdvisories(beforeUpdateAudit.Advisories, afterUpdateAudit.Advisories),
-			AfterUpdateAdvisories: afterUpdateAudit.Advisories,
-			NumUnresolvedIssues:   len(afterUpdateAudit.Advisories),
-		},
-		UpdateHooks: updateHooks,
-	}
-
-	description, err := ws.GenerateDescription(data, "security_update.go.tmpl")
-	if err != nil {
-		ws.logger.Error("failed to generate description", zap.Error(err))
 	}
 
 	if !ws.config.DryRun {
@@ -169,17 +138,28 @@ func (ws *WorkflowSecurityUpdateService) StartUpdate(ctx context.Context) error 
 			return err
 		}
 
-		codehostingPlatform := ws.vcsProviderFactory.Create(ws.config.RepositoryURL, ws.config.Token)
-		title := fmt.Sprintf("%s: Drupal Security Updates", time.Now().Format("2006-01-02"))
-		mr, err := codehostingPlatform.CreateMergeRequest(title, description, updateBranchName, ws.config.Branch)
-		if err != nil {
-			ws.logger.Error("failed to create merge request", zap.Error(err))
+		data := TemplateData{
+			ComposerDiff:           result.table,
+			DependencyUpdateReport: result.updateReport,
+			SecurityReport: SecurityReport{
+				FixedAdvisories:       ws.GetFixedAdvisories(beforeUpdateAudit.Advisories, afterUpdateAudit.Advisories),
+				AfterUpdateAdvisories: afterUpdateAudit.Advisories,
+				NumUnresolvedIssues:   len(afterUpdateAudit.Advisories),
+			},
+			UpdateHooks: updateHooks,
 		}
-		ws.logger.Info("merge request created", zap.String("url", mr.URL))
+
+		description, err := ws.GenerateDescription(data, "security_update.go.tmpl")
+		if err != nil {
+			ws.logger.Error("failed to generate description", zap.Error(err))
+		}
+
+		title := fmt.Sprintf("%s: Drupal Security Updates", time.Now().Format("2006-01-02"))
+		ws.CreateMergeRequest(title, description, updateBranchName, ws.config.Branch)
 	}
 
-	tmpDirName := fmt.Sprintf("/tmp/%x", md5.Sum([]byte(ws.config.RepositoryURL)))
-	os.RemoveAll(tmpDirName)
+	// Clean up the temporary directory
+	defer ws.Cleanup()
 
 	return nil
 }
@@ -201,4 +181,25 @@ func (ws *WorkflowSecurityUpdateService) GetFixedAdvisories(before []Advisory, a
 	}
 	return fixed
 
+}
+
+func (ws *WorkflowSecurityUpdateService) getPackagesToUpdate(ctx context.Context, path string, advisories []Advisory) ([]string, error) {
+
+	ws.logger.Info("found security advisories", zap.Int("numAdvisories", len(advisories)))
+	ws.logger.Info("advisories", zap.Any("advisories", advisories))
+
+	packagesToUpdate := make([]string, 0)
+	for _, advisory := range advisories {
+		if slices.Contains(packagesToUpdate, advisory.PackageName) {
+			continue
+		}
+		packagesToUpdate = append(packagesToUpdate, advisory.PackageName)
+	}
+
+	if slices.Contains(packagesToUpdate, "drupal/core") {
+		packagesToUpdate = append(packagesToUpdate, "drupal/core-recommended")
+		packagesToUpdate = append(packagesToUpdate, "drupal/core-composer-scaffold")
+	}
+
+	return packagesToUpdate, nil
 }

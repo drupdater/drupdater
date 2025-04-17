@@ -10,14 +10,12 @@ import (
 
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"go.uber.org/zap"
 )
 
 type RepositoryService interface {
 	CloneRepository(repository string, branch string, token string) (internal.Repository, internal.Worktree, string, error)
-	GetHeadCommit(repository internal.Repository) (*object.Commit, error)
 	IsSomethingStagedInPath(worktree internal.Worktree, dir string) bool
 	BranchExists(repository internal.Repository, branch string) (bool, error)
 }
@@ -111,16 +109,6 @@ func (rs *GitRepositoryService) BranchExists(repository internal.Repository, bra
 		}
 	}
 	return false, nil
-}
-
-func (rs *GitRepositoryService) GetHeadCommit(repository internal.Repository) (*object.Commit, error) {
-	head, _ := repository.Head()
-	object, err := repository.CommitObject(head.Hash())
-	if err != nil {
-		return object, err
-	}
-
-	return object, nil
 }
 
 func (rs *GitRepositoryService) IsSomethingStagedInPath(worktree internal.Worktree, dir string) bool {
