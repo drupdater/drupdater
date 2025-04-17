@@ -100,13 +100,16 @@ func TestDownloadComposerFiles(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 
 		jsonString := make([]byte, 0)
-		if r.URL.Path == "/api/v4/projects/test_project/repository/files/composer.json/raw" {
+		switch r.URL.Path {
+		case "/api/v4/projects/test_project/repository/files/composer.json/raw":
 			jsonString = []byte("{}")
 			w.WriteHeader(http.StatusOK)
-		} else if r.URL.Path == "/api/v4/projects/test_project/repository/files/composer.lock/raw" {
+			break
+		case "/api/v4/projects/test_project/repository/files/composer.lock/raw":
 			jsonString = []byte("{}")
 			w.WriteHeader(http.StatusOK)
-		} else {
+			break
+		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
 
