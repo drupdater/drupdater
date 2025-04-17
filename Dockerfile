@@ -1,7 +1,7 @@
 ARG PHP_VERSION=8.3
 
 # Build go binary.
-FROM golang:bookworm AS build
+FROM golang:1.24.2-bookworm AS build
 
 RUN mkdir -p /build/
 
@@ -51,15 +51,3 @@ COPY --from=build /build/drupdater /opt/drupdater/bin
 
 CMD [""]
 ENTRYPOINT ["/opt/drupdater/bin"]
-
-# Development image.
-FROM base AS dev
-
-# Install go.
-RUN dpkgArch="$(dpkg --print-architecture)" && \
-    cd /usr/local && \
-    curl -sSL https://dl.google.com/go/go1.23.4.linux-$dpkgArch.tar.gz -o go1.23.4.linux-$dpkgArch.tar.gz && \
-    rm -rf /usr/local/go && tar -C /usr/local -xzf go1.23.4.linux-$dpkgArch.tar.gz;
-ENV PATH="/usr/local/go/bin:${PATH}"
-RUN go env -w GOCACHE=/go-cache
-RUN go env -w GOMODCACHE=/gomod-cache
