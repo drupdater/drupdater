@@ -79,88 +79,6 @@ func NewWorkflowBaseService(
 	}
 }
 
-func (ws *WorkflowBaseService) Update(errCh chan error, resultCh chan WorkflowUpdateResult, ctx context.Context, packagesToUpdate []string, minimalChanges bool, path string, worktree internal.Worktree, wg *sync.WaitGroup) {
-	defer wg.Done()
-
-	ws.logger.Info("updating dependencies")
-	updateReport, err := ws.updater.UpdateDependencies(ctx, path, packagesToUpdate, worktree, minimalChanges)
-	if err != nil {
-		errCh <- err
-		return
-	}
-
-	table, err := ws.commandExecutor.GenerateDiffTable(ctx, path, ws.config.Branch, true)
-	if err != nil {
-		errCh <- err
-		return
-	}
-
-	if table == "" {
-		ws.logger.Info("no packages were updated, skipping update")
-		errCh <- err
-		return
-	}
-
-	ws.logger.Sugar().Info("composer diff table", fmt.Sprintf("\n%s", table))
-
-	resultCh <- WorkflowUpdateResult{
-		updateReport: updateReport,
-		table:        table,
-	}
-}
-
-func (ws *WorkflowBaseService) PushChanges(repository internal.Repository, updateBranchName string) error {
-	err := repository.Push(&git.PushOptions{
-		RemoteName: "origin",
-		RefSpecs: []gitConfig.RefSpec{
-			gitConfig.RefSpec(fmt.Sprintf("refs/heads/%s:refs/heads/%s", updateBranchName, updateBranchName)),
-		},
-		Auth: &http.BasicAuth{
-			Username: "du", // yes, this can be anything except an empty string
-			Password: ws.config.Token,
-		},
-	})
-
-	if err != nil {
-		ws.logger.Error("failed to push changes", zap.Error(err))
-		return err
-	}
-
-	return nil
-}
-
-func (ws *WorkflowBaseService) GenerateDescription(data interface{}, filename string) (string, error) {
-	tmpl, err := template.ParseFS(templates, "templates/*.go.tmpl")
-	if err != nil {
-		panic(err)
-	}
-
-	var output bytes.Buffer
-
-	err = tmpl.ExecuteTemplate(&output, filename, data)
-	if err != nil {
-		return "", err
-	}
-
-	return output.String(), nil
-}
-
-func (ws *WorkflowBaseService) CreateMergeRequest(title string, description string, updateBranchName string, baseBranch string) (codehosting.MergeRequest, error) {
-	codehostingPlatform := ws.vcsProviderFactory.Create(ws.config.RepositoryURL, ws.config.Token)
-	mr, err := codehostingPlatform.CreateMergeRequest(title, description, updateBranchName, baseBranch)
-	if err != nil {
-		ws.logger.Error("failed to create merge request", zap.Error(err))
-		return codehosting.MergeRequest{}, err
-	}
-	ws.logger.Info("merge request created", zap.String("url", mr.URL))
-	return mr, nil
-}
-
-func (ws *WorkflowBaseService) Cleanup() {
-	tmpDirName := fmt.Sprintf("/tmp/%x", md5.Sum([]byte(ws.config.RepositoryURL)))
-	os.RemoveAll(tmpDirName)
-}
-
 func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, strategy WorkflowStrategy) error {
 	ws.logger.Info("starting update workflow")
 
@@ -187,16 +105,6 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, strategy Workflo
 		return err
 	}
 
-	// Create initial temporary branch
-	tempBranchName := fmt.Sprintf("update-%s", "ss")
-	if err := worktree.Checkout(&git.CheckoutOptions{
-		Branch: plumbing.NewBranchReferenceName(tempBranchName),
-		Create: true,
-	}); err != nil {
-		ws.logger.Error("failed to checkout branch", zap.Error(err))
-		return err
-	}
-
 	// Use strategy to determine what to update
 	packagesToUpdate, minimalChanges, err := strategy.PreUpdate(ctx, path)
 	if err != nil {
@@ -208,7 +116,35 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, strategy Workflo
 		return nil
 	}
 
-	go ws.Update(errCh, resultCh, ctx, packagesToUpdate, minimalChanges, path, worktree, &wg)
+	go func() {
+		defer wg.Done()
+
+		ws.logger.Info("updating dependencies")
+		updateReport, err := ws.updater.UpdateDependencies(ctx, path, packagesToUpdate, worktree, minimalChanges)
+		if err != nil {
+			errCh <- err
+			return
+		}
+
+		table, err := ws.commandExecutor.GenerateDiffTable(ctx, path, ws.config.Branch, true)
+		if err != nil {
+			errCh <- err
+			return
+		}
+
+		if table == "" {
+			ws.logger.Info("no packages were updated, skipping update")
+			errCh <- err
+			return
+		}
+
+		ws.logger.Sugar().Info("composer diff table", fmt.Sprintf("\n%s", table))
+
+		resultCh <- WorkflowUpdateResult{
+			updateReport: updateReport,
+			table:        table,
+		}
+	}()
 
 	done := make(chan struct{})
 	go func() {
@@ -240,7 +176,12 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, strategy Workflo
 	updateBranchName := strategy.GenerateBranchName(composerLockHash)
 
 	// Check if branch already exists
-	if exists, _ := ws.CheckBranchExists(repository, updateBranchName); exists {
+	exists, err := ws.repository.BranchExists(repository, updateBranchName)
+	if err != nil {
+		ws.logger.Error("failed to check if branch exists", zap.Error(err))
+	}
+	if exists {
+		ws.logger.Info("branch already exists", zap.String("branch", updateBranchName))
 		return nil
 	}
 
@@ -297,10 +238,54 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, strategy Workflo
 	return nil
 }
 
-func (b *WorkflowBaseService) CheckBranchExists(repository internal.Repository, branchName string) (bool, error) {
-	exists, err := b.repository.BranchExists(repository, branchName)
-	if exists {
-		b.logger.Info("branch already exists", zap.String("branch", branchName))
+func (ws *WorkflowBaseService) PushChanges(repository internal.Repository, updateBranchName string) error {
+	err := repository.Push(&git.PushOptions{
+		RemoteName: "origin",
+		RefSpecs: []gitConfig.RefSpec{
+			gitConfig.RefSpec(fmt.Sprintf("refs/heads/%s:refs/heads/%s", updateBranchName, updateBranchName)),
+		},
+		Auth: &http.BasicAuth{
+			Username: "du", // yes, this can be anything except an empty string
+			Password: ws.config.Token,
+		},
+	})
+
+	if err != nil {
+		ws.logger.Error("failed to push changes", zap.Error(err))
+		return err
 	}
-	return exists, err
+
+	return nil
+}
+
+func (ws *WorkflowBaseService) GenerateDescription(data interface{}, filename string) (string, error) {
+	tmpl, err := template.ParseFS(templates, "templates/*.go.tmpl")
+	if err != nil {
+		panic(err)
+	}
+
+	var output bytes.Buffer
+
+	err = tmpl.ExecuteTemplate(&output, filename, data)
+	if err != nil {
+		return "", err
+	}
+
+	return output.String(), nil
+}
+
+func (ws *WorkflowBaseService) CreateMergeRequest(title string, description string, updateBranchName string, baseBranch string) (codehosting.MergeRequest, error) {
+	codehostingPlatform := ws.vcsProviderFactory.Create(ws.config.RepositoryURL, ws.config.Token)
+	mr, err := codehostingPlatform.CreateMergeRequest(title, description, updateBranchName, baseBranch)
+	if err != nil {
+		ws.logger.Error("failed to create merge request", zap.Error(err))
+		return codehosting.MergeRequest{}, err
+	}
+	ws.logger.Info("merge request created", zap.String("url", mr.URL))
+	return mr, nil
+}
+
+func (ws *WorkflowBaseService) Cleanup() {
+	tmpDirName := fmt.Sprintf("/tmp/%x", md5.Sum([]byte(ws.config.RepositoryURL)))
+	os.RemoveAll(tmpDirName)
 }

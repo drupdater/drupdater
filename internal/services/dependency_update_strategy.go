@@ -69,5 +69,3 @@ func (s DependencyUpdateStrategy) GetTemplateData(result WorkflowUpdateResult, u
 		UpdateHooks:            updateHooks,
 	}, nil
 }
-
-// CheckBranchExists is not overridden - uses the base implementation

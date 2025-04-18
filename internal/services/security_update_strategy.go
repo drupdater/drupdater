@@ -41,9 +41,20 @@ func (s SecurityUpdateStrategy) PreUpdate(ctx context.Context, path string) ([]s
 		return nil, false, err
 	}
 
-	packagesToUpdate, err := s.getPackagesToUpdate(ctx, path, s.beforeAudit.Advisories)
-	if err != nil {
-		return nil, false, err
+	s.logger.Info("found security advisories", zap.Int("numAdvisories", len(s.beforeAudit.Advisories)))
+	s.logger.Info("advisories", zap.Any("advisories", s.beforeAudit.Advisories))
+
+	packagesToUpdate := make([]string, 0)
+	for _, advisory := range s.beforeAudit.Advisories {
+		if slices.Contains(packagesToUpdate, advisory.PackageName) {
+			continue
+		}
+		packagesToUpdate = append(packagesToUpdate, advisory.PackageName)
+	}
+
+	if slices.Contains(packagesToUpdate, "drupal/core") {
+		packagesToUpdate = append(packagesToUpdate, "drupal/core-recommended")
+		packagesToUpdate = append(packagesToUpdate, "drupal/core-composer-scaffold")
 	}
 
 	// For security updates, we use minimal changes approach
@@ -109,24 +120,4 @@ func (s SecurityUpdateStrategy) GetFixedAdvisories() []Advisory {
 		}
 	}
 	return fixed
-}
-
-func (s SecurityUpdateStrategy) getPackagesToUpdate(ctx context.Context, path string, advisories []Advisory) ([]string, error) {
-	s.logger.Info("found security advisories", zap.Int("numAdvisories", len(advisories)))
-	s.logger.Info("advisories", zap.Any("advisories", advisories))
-
-	packagesToUpdate := make([]string, 0)
-	for _, advisory := range advisories {
-		if slices.Contains(packagesToUpdate, advisory.PackageName) {
-			continue
-		}
-		packagesToUpdate = append(packagesToUpdate, advisory.PackageName)
-	}
-
-	if slices.Contains(packagesToUpdate, "drupal/core") {
-		packagesToUpdate = append(packagesToUpdate, "drupal/core-recommended")
-		packagesToUpdate = append(packagesToUpdate, "drupal/core-composer-scaffold")
-	}
-
-	return packagesToUpdate, nil
 }
