@@ -50,7 +50,7 @@ module:
 	repositoryService.On("CloneRepository", repositoryURL, branch, token).Return(nil, nil, "/tmp", nil)
 
 	t.Run("Success", func(t *testing.T) {
-		commandExecutor := utils.NewMockCommandExecutor(t)
+		drush := utils.NewMockCommandExecutor(t)
 		commandExecutor.On("InstallDependencies", mock.Anything, "/tmp").Return(nil)
 
 		commandExecutor.On("InstallSite", mock.Anything, "/tmp", "site1").Return(nil)

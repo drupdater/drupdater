@@ -137,6 +137,65 @@ func (_c *MockComposerService_CheckIfPatchApplies_Call) RunAndReturn(run func(co
 	return _c
 }
 
+// Diff provides a mock function with given fields: ctx, path, targetBranch, withLinks
+func (_m *MockComposerService) Diff(ctx context.Context, path string, targetBranch string, withLinks bool) (string, error) {
+	ret := _m.Called(ctx, path, targetBranch, withLinks)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Diff")
+	}
+
+	var r0 string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, bool) (string, error)); ok {
+		return rf(ctx, path, targetBranch, withLinks)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, string, bool) string); ok {
+		r0 = rf(ctx, path, targetBranch, withLinks)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, string, bool) error); ok {
+		r1 = rf(ctx, path, targetBranch, withLinks)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockComposerService_Diff_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Diff'
+type MockComposerService_Diff_Call struct {
+	*mock.Call
+}
+
+// Diff is a helper method to define mock.On call
+//   - ctx context.Context
+//   - path string
+//   - targetBranch string
+//   - withLinks bool
+func (_e *MockComposerService_Expecter) Diff(ctx interface{}, path interface{}, targetBranch interface{}, withLinks interface{}) *MockComposerService_Diff_Call {
+	return &MockComposerService_Diff_Call{Call: _e.mock.On("Diff", ctx, path, targetBranch, withLinks)}
+}
+
+func (_c *MockComposerService_Diff_Call) Run(run func(ctx context.Context, path string, targetBranch string, withLinks bool)) *MockComposerService_Diff_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(bool))
+	})
+	return _c
+}
+
+func (_c *MockComposerService_Diff_Call) Return(_a0 string, _a1 error) *MockComposerService_Diff_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockComposerService_Diff_Call) RunAndReturn(run func(context.Context, string, string, bool) (string, error)) *MockComposerService_Diff_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetAllowPlugins provides a mock function with given fields: ctx, dir
 func (_m *MockComposerService) GetAllowPlugins(ctx context.Context, dir string) (map[string]bool, error) {
 	ret := _m.Called(ctx, dir)
@@ -250,6 +309,65 @@ func (_c *MockComposerService_GetConfig_Call) Return(_a0 string, _a1 error) *Moc
 }
 
 func (_c *MockComposerService_GetConfig_Call) RunAndReturn(run func(context.Context, string, string) (string, error)) *MockComposerService_GetConfig_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetCustomCodeDirectories provides a mock function with given fields: ctx, dir
+func (_m *MockComposerService) GetCustomCodeDirectories(ctx context.Context, dir string) ([]string, error) {
+	ret := _m.Called(ctx, dir)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetCustomCodeDirectories")
+	}
+
+	var r0 []string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) ([]string, error)); ok {
+		return rf(ctx, dir)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) []string); ok {
+		r0 = rf(ctx, dir)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, dir)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockComposerService_GetCustomCodeDirectories_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetCustomCodeDirectories'
+type MockComposerService_GetCustomCodeDirectories_Call struct {
+	*mock.Call
+}
+
+// GetCustomCodeDirectories is a helper method to define mock.On call
+//   - ctx context.Context
+//   - dir string
+func (_e *MockComposerService_Expecter) GetCustomCodeDirectories(ctx interface{}, dir interface{}) *MockComposerService_GetCustomCodeDirectories_Call {
+	return &MockComposerService_GetCustomCodeDirectories_Call{Call: _e.mock.On("GetCustomCodeDirectories", ctx, dir)}
+}
+
+func (_c *MockComposerService_GetCustomCodeDirectories_Call) Run(run func(ctx context.Context, dir string)) *MockComposerService_GetCustomCodeDirectories_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockComposerService_GetCustomCodeDirectories_Call) Return(_a0 []string, _a1 error) *MockComposerService_GetCustomCodeDirectories_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockComposerService_GetCustomCodeDirectories_Call) RunAndReturn(run func(context.Context, string) ([]string, error)) *MockComposerService_GetCustomCodeDirectories_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -948,6 +1066,53 @@ func (_c *MockComposerService_Update_Call) Return(_a0 string, _a1 error) *MockCo
 }
 
 func (_c *MockComposerService_Update_Call) RunAndReturn(run func(context.Context, string, []string, []string, bool, bool) (string, error)) *MockComposerService_Update_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpdateLockHash provides a mock function with given fields: ctx, dir
+func (_m *MockComposerService) UpdateLockHash(ctx context.Context, dir string) error {
+	ret := _m.Called(ctx, dir)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateLockHash")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = rf(ctx, dir)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockComposerService_UpdateLockHash_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateLockHash'
+type MockComposerService_UpdateLockHash_Call struct {
+	*mock.Call
+}
+
+// UpdateLockHash is a helper method to define mock.On call
+//   - ctx context.Context
+//   - dir string
+func (_e *MockComposerService_Expecter) UpdateLockHash(ctx interface{}, dir interface{}) *MockComposerService_UpdateLockHash_Call {
+	return &MockComposerService_UpdateLockHash_Call{Call: _e.mock.On("UpdateLockHash", ctx, dir)}
+}
+
+func (_c *MockComposerService_UpdateLockHash_Call) Run(run func(ctx context.Context, dir string)) *MockComposerService_UpdateLockHash_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockComposerService_UpdateLockHash_Call) Return(_a0 error) *MockComposerService_UpdateLockHash_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockComposerService_UpdateLockHash_Call) RunAndReturn(run func(context.Context, string) error) *MockComposerService_UpdateLockHash_Call {
 	_c.Call.Return(run)
 	return _c
 }

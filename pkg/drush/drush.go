@@ -13,6 +13,8 @@ import (
 	"go.uber.org/zap"
 )
 
+var execCommand = exec.CommandContext
+
 // DrushService interface for executing commands
 type DrushService interface {
 	ExecDrush(ctx context.Context, dir string, site string, args ...string) (string, error)
@@ -41,8 +43,6 @@ func NewDefaultDrushService(logger *zap.Logger, cache otter.Cache[string, string
 		fs:     afero.NewOsFs(),
 	}
 }
-
-var execCommand = exec.CommandContext
 
 func (e DefaultDrushService) ExecDrush(ctx context.Context, dir string, site string, args ...string) (string, error) {
 	command := execCommand(ctx, "composer", append([]string{"exec", "--", "drush"}, args...)...)
@@ -145,6 +145,8 @@ func (s DefaultDrushService) GetUpdateHooks(ctx context.Context, dir string, sit
 	if err != nil {
 		return nil, err
 	}
+
+	fmt.Println("data", data)
 
 	if strings.Contains(data, "No database updates required") {
 		return nil, nil

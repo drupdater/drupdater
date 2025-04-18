@@ -7,10 +7,8 @@ import (
 	"os/exec"
 	"testing"
 
-	"github.com/drupdater/drupdater/internal/utils"
 	"github.com/maypok86/otter"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
 )
@@ -83,8 +81,14 @@ func TestGetUpdateHooks(t *testing.T) {
 					}
 				}`
 
-		commandExecutor := utils.NewMockCommandExecutor(t)
-		commandExecutor.On("ExecDrush", mock.Anything, "/tmp", "site1", "updatedb-status", "--format=json").Return(data, nil)
+		execCommand = func(_ context.Context, name string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", data}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_RAW=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
 
 		drush := DefaultDrushService{
 			logger: logger,
@@ -129,8 +133,14 @@ func TestGetUpdateHooks(t *testing.T) {
 	t.Run("No updates", func(t *testing.T) {
 		data := ` [success] No database updates required.`
 
-		commandExecutor := utils.NewMockCommandExecutor(t)
-		commandExecutor.On("ExecDrush", mock.Anything, "/tmp", "site1", "updatedb-status", "--format=json").Return(data, nil)
+		execCommand = func(_ context.Context, name string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", data}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
 
 		drush := DefaultDrushService{
 			logger: logger,
@@ -155,6 +165,10 @@ func TestHelperProcess(*testing.T) {
 	}
 	if os.Getenv("GO_HELPER_PROCESS_ERROR") == "1" {
 		os.Exit(1)
+	}
+	if os.Getenv("GO_HELPER_PROCESS_RAW") == "1" {
+		fmt.Fprintf(os.Stdout, "%v\n", os.Args[3])
+		os.Exit(0)
 	}
 	fmt.Fprintf(os.Stdout, "%v\n", os.Args[3:])
 	os.Exit(0)
