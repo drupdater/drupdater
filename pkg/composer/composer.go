@@ -4,12 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"regexp"
 	"strings"
 	"sync"
-
-	"github.com/drupdater/drupdater/internal/utils"
+	"unicode/utf8"
 
 	"github.com/spf13/afero"
 	"go.uber.org/zap"
@@ -24,6 +24,7 @@ type ComposerService interface {
 	Remove(ctx context.Context, dir string, packages ...string) (string, error)
 	Audit(ctx context.Context, dir string) (ComposerAudit, error)
 	Normalize(ctx context.Context, dir string) (string, error)
+	Diff(ctx context.Context, path string, targetBranch string, withLinks bool) (string, error)
 
 	GetInstalledPackageVersion(ctx context.Context, dir string, packageName string) (string, error)
 	GetAllowPlugins(ctx context.Context, dir string) (map[string]bool, error)
@@ -36,6 +37,8 @@ type ComposerService interface {
 	GetInstalledPlugins(ctx context.Context, dir string) (map[string]interface{}, error)
 	IsPackageInstalled(ctx context.Context, dir string, packageToCheck string) (bool, error)
 	GetLockHash(dir string) (string, error)
+	UpdateLockHash(ctx context.Context, dir string) error
+	GetCustomCodeDirectories(ctx context.Context, dir string) ([]string, error)
 }
 
 type DefaultComposerService struct {
@@ -47,7 +50,7 @@ type DefaultComposerService struct {
 	initErr  error
 }
 
-func NewDefaultComposerService(logger *zap.Logger, commandExecutor utils.CommandExecutor) *DefaultComposerService {
+func NewDefaultComposerService(logger *zap.Logger) *DefaultComposerService {
 	return &DefaultComposerService{
 		fs:     afero.NewOsFs(),
 		logger: logger,
@@ -60,8 +63,6 @@ func (s *DefaultComposerService) execComposer(ctx context.Context, dir string, a
 
 	out, err := command.CombinedOutput()
 	output := strings.TrimSuffix(string(out), "\n")
-
-	//	fmt.Printf("Composer output: %s\n", output)
 
 	s.logger.Debug("executing composer", zap.String("dir", dir), zap.Strings("args", args), zap.String("output", output))
 
@@ -194,6 +195,29 @@ func (c *ComposerAudit) UnmarshalJSON(data []byte) error {
 func (s *DefaultComposerService) Normalize(ctx context.Context, dir string) (string, error) {
 	s.logger.Debug("running composer normalize")
 	return s.execComposer(ctx, dir, "normalize")
+}
+
+func (s *DefaultComposerService) Diff(ctx context.Context, dir string, targetBranch string, withLinks bool) (string, error) {
+	s.logger.Debug("generating diff table")
+	args := []string{"diff", targetBranch}
+	if withLinks {
+		args = append(args, "--with-links")
+	}
+
+	out, err := s.execComposer(ctx, dir, args...)
+	if err != nil {
+		return "", err
+	}
+
+	if withLinks {
+		// If table is too long, Github/Gitlab will not accept it. So we use the version without the links.
+		tableCharCount := utf8.RuneCountInString(out)
+		if tableCharCount > 63000 {
+			return s.Diff(ctx, dir, targetBranch, false)
+		}
+	}
+
+	return out, err
 }
 
 func (s *DefaultComposerService) GetInstalledPackageVersion(ctx context.Context, dir string, packageName string) (string, error) {
@@ -422,4 +446,29 @@ func (s *DefaultComposerService) GetLockHash(dir string) (string, error) {
 	s.logger.Debug("composer lock hash", zap.String("hash", composerLock.ContentHash))
 
 	return composerLock.ContentHash, nil
+}
+
+func (s *DefaultComposerService) UpdateLockHash(ctx context.Context, dir string) error {
+	s.logger.Debug("updating composer lock hash")
+	_, err := s.execComposer(ctx, dir, "update", "--lock", "--no-install")
+	return err
+}
+
+func (s *DefaultComposerService) GetCustomCodeDirectories(ctx context.Context, dir string) ([]string, error) {
+	webroot, err := s.GetConfig(ctx, dir, "extra.drupal-scaffold.locations.web-root")
+	if err != nil {
+		s.logger.Error("failed to get Drupal web dir", zap.String("dir", dir), zap.Error(err))
+		return nil, err
+	}
+	webroot = strings.TrimSuffix(webroot, "/")
+
+	possibleDirectories := []string{webroot + "/modules/custom", webroot + "/themes/custom", webroot + "/profiles/custom"}
+	var customCodeDirectories []string
+	for _, possibleDirectory := range possibleDirectories {
+		if _, err := s.fs.Stat(dir + "/" + possibleDirectory); os.IsNotExist(err) {
+			continue
+		}
+		customCodeDirectories = append(customCodeDirectories, possibleDirectory)
+	}
+	return customCodeDirectories, nil
 }

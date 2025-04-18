@@ -12,6 +12,45 @@ import (
 	"go.uber.org/zap"
 )
 
+func TestExecComposer(t *testing.T) {
+
+	// Create an instance of DefaultComposerService
+	service := &DefaultComposerService{
+		logger: zap.NewNop(),
+	}
+
+	t.Run("successful execution", func(t *testing.T) {
+		execCommand = func(_ context.Context, name string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", name}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+
+		output, err := service.execComposer(t.Context(), "/tmp", "update")
+		assert.NoError(t, err)
+		assert.Equal(t, "composer", output)
+	})
+
+	t.Run("execution failure", func(t *testing.T) {
+		execCommand = func(_ context.Context, name string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", name}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+
+		output, err := service.execComposer(t.Context(), "/tmp", "update")
+		assert.Error(t, err)
+		assert.Equal(t, "", output)
+	})
+
+}
+
 func TestGetComposerUpdates(t *testing.T) {
 
 	logData := `- Removing behat/mink-selenium2-driver (v1.7.0)

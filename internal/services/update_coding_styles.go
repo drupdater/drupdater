@@ -8,18 +8,18 @@ import (
 	"text/template"
 
 	"github.com/drupdater/drupdater/internal"
-	"github.com/drupdater/drupdater/internal/utils"
 	"github.com/drupdater/drupdater/pkg/composer"
+	"github.com/drupdater/drupdater/pkg/phpcs"
 
 	"github.com/go-git/go-git/v5"
 	"go.uber.org/zap"
 )
 
 type UpdateCodingStyles struct {
-	logger          *zap.Logger
-	commandExecutor utils.CommandExecutor
-	config          internal.Config
-	composer        composer.ComposerService
+	logger   *zap.Logger
+	phpcs    phpcs.PhpCsService
+	config   internal.Config
+	composer composer.ComposerService
 }
 
 type PHPCSReturn struct {
@@ -43,12 +43,12 @@ type PHPCSReturn struct {
 	} `json:"totals"`
 }
 
-func newUpdateCodingStyles(logger *zap.Logger, commandExecutor utils.CommandExecutor, config internal.Config, composer composer.ComposerService) *UpdateCodingStyles {
+func newUpdateCodingStyles(logger *zap.Logger, phpcs phpcs.PhpCsService, config internal.Config, composer composer.ComposerService) *UpdateCodingStyles {
 	return &UpdateCodingStyles{
-		logger:          logger,
-		commandExecutor: commandExecutor,
-		config:          config,
-		composer:        composer,
+		logger:   logger,
+		phpcs:    phpcs,
+		config:   config,
+		composer: composer,
 	}
 }
 
@@ -88,7 +88,7 @@ func (h *UpdateCodingStyles) Execute(ctx context.Context, path string, worktree 
 		}
 	}
 
-	out, err := h.commandExecutor.RunPHPCS(ctx, path)
+	out, err := h.phpcs.Run(ctx, path)
 	if err != nil {
 		h.logger.Error("failed to run phpcs", zap.Error(err))
 		return err
@@ -104,7 +104,7 @@ func (h *UpdateCodingStyles) Execute(ctx context.Context, path string, worktree 
 		return nil
 	}
 
-	err = h.commandExecutor.RunPHPCBF(ctx, path)
+	err = h.phpcs.RunCBF(ctx, path)
 	if err != nil {
 		h.logger.Debug("remaining issues", zap.Error(err))
 	}
@@ -167,7 +167,7 @@ func (h *UpdateCodingStyles) CreatePHPCSConfig(ctx context.Context, path string,
 		Version: majorVersion,
 	}
 
-	data.Files, err = h.commandExecutor.GetCustomCodeDirectories(ctx, path)
+	data.Files, err = h.composer.GetCustomCodeDirectories(ctx, path)
 	if err != nil {
 		return false, err
 	}

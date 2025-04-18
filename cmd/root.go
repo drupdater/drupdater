@@ -9,7 +9,6 @@ import (
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/codehosting"
 	"github.com/drupdater/drupdater/internal/services"
-	"github.com/drupdater/drupdater/internal/utils"
 	"github.com/drupdater/drupdater/pkg"
 
 	"github.com/maypok86/otter"
@@ -105,7 +104,7 @@ func runApp(config internal.Config) {
 				return newAction(lc, sh, logger, workflowService, dependencyUpdateService)
 			},
 		),
-		fx.Options(services.Module, utils.Module, codehosting.Module, pkg.Module),
+		fx.Options(services.Module, codehosting.Module, pkg.Module),
 		fx.Invoke(func(*Action) {}),
 		fx.StartTimeout(15*time.Minute),
 	)

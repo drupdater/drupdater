@@ -50,8 +50,4 @@ var Module = fx.Provide(
 		newDefaultDrupalOrgService,
 		fx.As(new(DrupalOrgService)),
 	),
-	fx.Annotate(
-		newDefaultDrushService,
-		fx.As(new(DrushService)),
-	),
 )

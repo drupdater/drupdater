@@ -12,7 +12,6 @@ import (
 
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/codehosting"
-	"github.com/drupdater/drupdater/internal/utils"
 	"github.com/drupdater/drupdater/pkg/composer"
 
 	git "github.com/go-git/go-git/v5"
@@ -50,18 +49,16 @@ type WorkflowUpdateResult struct {
 type WorkflowBaseService struct {
 	logger             *zap.Logger
 	config             internal.Config
-	commandExecutor    utils.CommandExecutor
 	updater            UpdaterService
 	vcsProviderFactory codehosting.VcsProviderFactory
 	repository         RepositoryService
 	installer          InstallerService
-	composerService    composer.ComposerService
+	composer           composer.ComposerService
 }
 
 func NewWorkflowBaseService(
 	logger *zap.Logger,
 	config internal.Config,
-	commandExecutor utils.CommandExecutor,
 	updater UpdaterService,
 	vcsProviderFactory codehosting.VcsProviderFactory,
 	repository RepositoryService,
@@ -71,12 +68,11 @@ func NewWorkflowBaseService(
 	return &WorkflowBaseService{
 		logger:             logger,
 		config:             config,
-		commandExecutor:    commandExecutor,
 		updater:            updater,
 		vcsProviderFactory: vcsProviderFactory,
 		repository:         repository,
 		installer:          installer,
-		composerService:    composerService,
+		composer:           composerService,
 	}
 }
 
@@ -127,7 +123,7 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, strategy Workflo
 			return
 		}
 
-		table, err := ws.commandExecutor.GenerateDiffTable(ctx, path, ws.config.Branch, true)
+		table, err := ws.composer.Diff(ctx, path, ws.config.Branch, true)
 		if err != nil {
 			errCh <- err
 			return
@@ -168,7 +164,7 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, strategy Workflo
 	}
 
 	// Get composer lock hash for branch name
-	composerLockHash, err := ws.composerService.GetLockHash(path)
+	composerLockHash, err := ws.composer.GetLockHash(path)
 	if err != nil {
 		return err
 	}

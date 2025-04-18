@@ -5,18 +5,18 @@ import (
 	"encoding/json"
 
 	"github.com/drupdater/drupdater/internal"
-	"github.com/drupdater/drupdater/internal/utils"
 	"github.com/drupdater/drupdater/pkg/composer"
+	"github.com/drupdater/drupdater/pkg/rector"
 
 	"github.com/go-git/go-git/v5"
 	"go.uber.org/zap"
 )
 
 type UpdateRemoveDeprecations struct {
-	logger          *zap.Logger
-	commandExecutor utils.CommandExecutor
-	config          internal.Config
-	composer        composer.ComposerService
+	logger   *zap.Logger
+	rector   rector.RectorService
+	config   internal.Config
+	composer composer.ComposerService
 }
 
 type RectorReturn struct {
@@ -33,12 +33,12 @@ type RectorReturn struct {
 	ChangedFiles []string `json:"changed_files"`
 }
 
-func newUpdateRemoveDeprecations(logger *zap.Logger, commandExecutor utils.CommandExecutor, config internal.Config, composer composer.ComposerService) *UpdateRemoveDeprecations {
+func newUpdateRemoveDeprecations(logger *zap.Logger, rector rector.RectorService, config internal.Config, composer composer.ComposerService) *UpdateRemoveDeprecations {
 	return &UpdateRemoveDeprecations{
-		logger:          logger,
-		commandExecutor: commandExecutor,
-		config:          config,
-		composer:        composer,
+		logger:   logger,
+		rector:   rector,
+		config:   config,
+		composer: composer,
 	}
 }
 
@@ -59,7 +59,12 @@ func (h *UpdateRemoveDeprecations) Execute(ctx context.Context, path string, wor
 		}
 	}
 
-	out, err := h.commandExecutor.RunRector(ctx, path)
+	customCodeDirectories, err := h.composer.GetCustomCodeDirectories(ctx, path)
+	if err != nil {
+		return err
+	}
+
+	out, err := h.rector.Run(ctx, path, customCodeDirectories)
 	if err != nil {
 		return err
 	}

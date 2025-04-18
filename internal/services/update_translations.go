@@ -4,39 +4,39 @@ import (
 	"context"
 
 	"github.com/drupdater/drupdater/internal"
-	"github.com/drupdater/drupdater/internal/utils"
+	"github.com/drupdater/drupdater/pkg/drush"
 
 	git "github.com/go-git/go-git/v5"
 	"go.uber.org/zap"
 )
 
 type UpdateTranslations struct {
-	logger          *zap.Logger
-	commandExecutor utils.CommandExecutor
-	repository      RepositoryService
+	logger     *zap.Logger
+	drush      drush.DrushService
+	repository RepositoryService
 }
 
-func newUpdateTranslations(logger *zap.Logger, commandExecutor utils.CommandExecutor, repository RepositoryService) *UpdateTranslations {
+func newUpdateTranslations(logger *zap.Logger, drush drush.DrushService, repository RepositoryService) *UpdateTranslations {
 	return &UpdateTranslations{
-		logger:          logger,
-		commandExecutor: commandExecutor,
-		repository:      repository,
+		logger:     logger,
+		drush:      drush,
+		repository: repository,
 	}
 }
 
 func (h *UpdateTranslations) Execute(ctx context.Context, path string, worktree internal.Worktree, site string) error {
-	enabled, err := h.commandExecutor.IsModuleEnabled(ctx, path, site, "locale_deploy")
+	enabled, err := h.drush.IsModuleEnabled(ctx, path, site, "locale_deploy")
 	if !enabled || err != nil {
 		return err
 	}
 
 	h.logger.Info("updating translations")
 
-	if err := h.commandExecutor.LocalizeTranslations(ctx, path, site); err != nil {
+	if err := h.drush.LocalizeTranslations(ctx, path, site); err != nil {
 		return err
 	}
 
-	translationPath, err := h.commandExecutor.GetTranslationPath(ctx, path, site, true)
+	translationPath, err := h.drush.GetTranslationPath(ctx, path, site, true)
 	if err != nil {
 		return err
 	}

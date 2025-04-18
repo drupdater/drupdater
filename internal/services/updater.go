@@ -15,8 +15,8 @@ import (
 	"sync"
 
 	"github.com/drupdater/drupdater/internal"
-	"github.com/drupdater/drupdater/internal/utils"
 	"github.com/drupdater/drupdater/pkg/composer"
+	"github.com/drupdater/drupdater/pkg/drush"
 
 	gitlab "gitlab.com/gitlab-org/api/client-go"
 
@@ -77,7 +77,6 @@ type UpdaterService interface {
 
 type DefaultUpdater struct {
 	logger          *zap.Logger
-	commandExecutor utils.CommandExecutor
 	settings        SettingsService
 	repository      RepositoryService
 	afterSiteUpdate []AfterSiteUpdate
@@ -85,10 +84,10 @@ type DefaultUpdater struct {
 	composer        composer.ComposerService
 	drupalOrg       DrupalOrgService
 	gitlab          *gitlab.Client
-	drush           DrushService
+	drush           drush.DrushService
 }
 
-func newDefaultUpdater(afterSiteUpdate []AfterSiteUpdate, logger *zap.Logger, commandExecutor utils.CommandExecutor, settings SettingsService, repository RepositoryService, config internal.Config, composer composer.ComposerService, drupalOrg DrupalOrgService, drush DrushService) *DefaultUpdater {
+func newDefaultUpdater(afterSiteUpdate []AfterSiteUpdate, logger *zap.Logger, settings SettingsService, repository RepositoryService, config internal.Config, composer composer.ComposerService, drupalOrg DrupalOrgService, drush drush.DrushService) *DefaultUpdater {
 
 	drupalOrgGitlab, err := gitlab.NewClient(os.Getenv("DRUPALCODE_ACCESS_TOKEN"), gitlab.WithBaseURL("https://git.drupalcode.org/api/v4"))
 	if err != nil {
@@ -97,7 +96,6 @@ func newDefaultUpdater(afterSiteUpdate []AfterSiteUpdate, logger *zap.Logger, co
 
 	return &DefaultUpdater{
 		logger:          logger,
-		commandExecutor: commandExecutor,
 		settings:        settings,
 		repository:      repository,
 		afterSiteUpdate: afterSiteUpdate,
@@ -141,7 +139,7 @@ func (us *DefaultUpdater) UpdateDependencies(ctx context.Context, path string, p
 			us.logger.Error("failed to set composer config", zap.Error(err))
 		}
 
-		err = us.commandExecutor.UpdateComposerLockHash(ctx, path)
+		err = us.composer.UpdateLockHash(ctx, path)
 		if err != nil {
 			us.logger.Error("failed to update composer lock hash", zap.Error(err))
 		}
@@ -205,7 +203,7 @@ func (us *DefaultUpdater) UpdateDependencies(ctx context.Context, path string, p
 	return updateReport, nil
 }
 
-type UpdateHooksPerSite map[string]map[string]UpdateHook
+type UpdateHooksPerSite map[string]map[string]drush.UpdateHook
 
 func (us *DefaultUpdater) UpdateDrupal(ctx context.Context, path string, worktree internal.Worktree, sites []string) (UpdateHooksPerSite, error) {
 
@@ -214,7 +212,7 @@ func (us *DefaultUpdater) UpdateDrupal(ctx context.Context, path string, worktre
 
 	type Result struct {
 		Site        string
-		UpdateHooks map[string]UpdateHook
+		UpdateHooks map[string]drush.UpdateHook
 		err         error
 	}
 
@@ -242,12 +240,12 @@ func (us *DefaultUpdater) UpdateDrupal(ctx context.Context, path string, worktre
 					return
 				}
 
-				if err := us.commandExecutor.UpdateSite(ctx, path, site); err != nil {
+				if err := us.drush.UpdateSite(ctx, path, site); err != nil {
 					resultChannel <- Result{err: err}
 					return
 				}
 
-				if err := us.commandExecutor.ConfigResave(ctx, path, site); err != nil {
+				if err := us.drush.ConfigResave(ctx, path, site); err != nil {
 					resultChannel <- Result{err: err}
 					return
 				}
@@ -502,11 +500,11 @@ func (us *DefaultUpdater) ExportConfiguration(ctx context.Context, worktree inte
 
 	siteLogger := us.logger.With(zap.String("site", site))
 
-	if err := us.commandExecutor.ExportConfiguration(ctx, dir, site); err != nil {
+	if err := us.drush.ExportConfiguration(ctx, dir, site); err != nil {
 		return err
 	}
 
-	configPath, err := us.commandExecutor.GetConfigSyncDir(ctx, dir, site, true)
+	configPath, err := us.drush.GetConfigSyncDir(ctx, dir, site, true)
 	if err != nil {
 		return err
 	}

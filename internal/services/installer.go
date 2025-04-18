@@ -6,8 +6,8 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/drupdater/drupdater/internal/utils"
 	"github.com/drupdater/drupdater/pkg/composer"
+	"github.com/drupdater/drupdater/pkg/drush"
 
 	"go.uber.org/zap"
 )
@@ -17,20 +17,20 @@ type InstallerService interface {
 }
 
 type DefaultInstallerService struct {
-	logger          *zap.Logger
-	repository      RepositoryService
-	commandExecutor utils.CommandExecutor
-	settings        SettingsService
-	composer        composer.ComposerService
+	logger     *zap.Logger
+	repository RepositoryService
+	drush      drush.DrushService
+	settings   SettingsService
+	composer   composer.ComposerService
 }
 
-func newDefaultInstallerService(logger *zap.Logger, repository RepositoryService, commandExecutor utils.CommandExecutor, settings SettingsService, composer composer.ComposerService) *DefaultInstallerService {
+func newDefaultInstallerService(logger *zap.Logger, repository RepositoryService, drush drush.DrushService, settings SettingsService, composer composer.ComposerService) *DefaultInstallerService {
 	return &DefaultInstallerService{
-		logger:          logger,
-		repository:      repository,
-		commandExecutor: commandExecutor,
-		settings:        settings,
-		composer:        composer,
+		logger:     logger,
+		repository: repository,
+		drush:      drush,
+		settings:   settings,
+		composer:   composer,
 	}
 }
 
@@ -71,7 +71,7 @@ func (is *DefaultInstallerService) InstallDrupal(ctx context.Context, repository
 					return
 				}
 
-				if err = is.commandExecutor.InstallSite(ctx, path, site); err != nil {
+				if err = is.drush.InstallSite(ctx, path, site); err != nil {
 					errChannel <- err
 					return
 				}

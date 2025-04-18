@@ -8,7 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/drupdater/drupdater/internal/utils"
+	"github.com/drupdater/drupdater/pkg/composer"
+	"github.com/drupdater/drupdater/pkg/drush"
 
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
@@ -20,14 +21,16 @@ type SettingsService interface {
 }
 
 type DrupalSettingsService struct {
-	logger          *zap.Logger
-	commandExecutor utils.CommandExecutor
+	logger   *zap.Logger
+	drush    drush.DrushService
+	composer composer.ComposerService
 }
 
-func newDrupalSettingsService(logger *zap.Logger, commandExecutor utils.CommandExecutor) *DrupalSettingsService {
+func newDrupalSettingsService(logger *zap.Logger, drush drush.DrushService, composer composer.ComposerService) *DrupalSettingsService {
 	return &DrupalSettingsService{
-		logger:          logger,
-		commandExecutor: commandExecutor,
+		logger:   logger,
+		drush:    drush,
+		composer: composer,
 	}
 }
 
@@ -36,11 +39,12 @@ func (ss DrupalSettingsService) ConfigureDatabase(ctx context.Context, dir strin
 	siteLogger := ss.logger.With(zap.String("site", site))
 	siteLogger.Debug("configuring database", zap.String("dir", dir))
 
-	webroot, err := ss.commandExecutor.GetDrupalWebDir(ctx, dir)
+	webroot, err := ss.composer.GetConfig(ctx, dir, "extra.drupal-scaffold.locations.web-root")
 	if err != nil {
 		siteLogger.Error("failed to get Drupal web dir", zap.String("dir", dir), zap.Error(err))
 		return err
 	}
+	webroot = strings.TrimSuffix(webroot, "/")
 
 	sqliteFile, _ := filepath.Abs(fmt.Sprintf("%s/../%s.sqlite", dir, site))
 	privatesDir, _ := filepath.Abs(fmt.Sprintf("%s/../private/%s", dir, site))
@@ -99,7 +103,7 @@ func (ss *DrupalSettingsService) IsSqliteModuleEnabled(ctx context.Context, dir 
 
 	siteLogger := ss.logger.With(zap.String("site", site))
 
-	configSyncDir, err := ss.commandExecutor.GetConfigSyncDir(ctx, dir, site, false)
+	configSyncDir, err := ss.drush.GetConfigSyncDir(ctx, dir, site, false)
 	if err != nil {
 		return false, err
 	}
@@ -134,7 +138,7 @@ func (ss *DrupalSettingsService) AddSqliteModule(ctx context.Context, dir string
 
 	siteLogger := ss.logger.With(zap.String("site", site))
 
-	configSyncDir, err := ss.commandExecutor.GetConfigSyncDir(ctx, dir, site, false)
+	configSyncDir, err := ss.drush.GetConfigSyncDir(ctx, dir, site, false)
 	if err != nil {
 		return err
 	}
@@ -176,7 +180,7 @@ func (ss *DrupalSettingsService) RemoveProfile(ctx context.Context, dir string, 
 
 	siteLogger := ss.logger.With(zap.String("site", site))
 
-	configSyncDir, err := ss.commandExecutor.GetConfigSyncDir(ctx, dir, site, false)
+	configSyncDir, err := ss.drush.GetConfigSyncDir(ctx, dir, site, false)
 	if err != nil {
 		return err
 	}
