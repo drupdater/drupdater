@@ -25,8 +25,8 @@ func NewSecurityUpdateStrategy(
 	logger *zap.Logger,
 	config internal.Config,
 	composerService composer.ComposerService,
-) SecurityUpdateStrategy {
-	return SecurityUpdateStrategy{
+) *SecurityUpdateStrategy {
+	return &SecurityUpdateStrategy{
 		logger:   logger,
 		config:   config,
 		current:  time.Now(),
@@ -34,7 +34,7 @@ func NewSecurityUpdateStrategy(
 	}
 }
 
-func (s SecurityUpdateStrategy) PreUpdate(ctx context.Context, path string) ([]string, bool, error) {
+func (s *SecurityUpdateStrategy) PreUpdate(ctx context.Context, path string) ([]string, bool, error) {
 	var err error
 
 	s.beforeAudit, err = s.composer.Audit(ctx, path)
@@ -62,7 +62,7 @@ func (s SecurityUpdateStrategy) PreUpdate(ctx context.Context, path string) ([]s
 	return packagesToUpdate, true, nil
 }
 
-func (s SecurityUpdateStrategy) ShouldContinue(packagesToUpdate []string) bool {
+func (s *SecurityUpdateStrategy) ShouldContinue(packagesToUpdate []string) bool {
 	if len(packagesToUpdate) == 0 {
 		s.logger.Info("no security advisories found, skipping security update")
 		return false
@@ -70,7 +70,7 @@ func (s SecurityUpdateStrategy) ShouldContinue(packagesToUpdate []string) bool {
 	return true
 }
 
-func (s SecurityUpdateStrategy) PostUpdate(ctx context.Context, path string, worktree internal.Worktree, result WorkflowUpdateResult) error {
+func (s *SecurityUpdateStrategy) PostUpdate(ctx context.Context, path string, worktree internal.Worktree, result WorkflowUpdateResult) error {
 	var err error
 
 	s.afterAudit, err = s.composer.Audit(ctx, path)
@@ -81,7 +81,7 @@ func (s SecurityUpdateStrategy) PostUpdate(ctx context.Context, path string, wor
 	return nil
 }
 
-func (s SecurityUpdateStrategy) GenerateBranchName(path string) string {
+func (s *SecurityUpdateStrategy) GenerateBranchName(path string) string {
 	// Get composer lock hash for branch name
 	composerLockHash, err := s.composer.GetLockHash(path)
 	if err != nil {
@@ -90,14 +90,13 @@ func (s SecurityUpdateStrategy) GenerateBranchName(path string) string {
 	return fmt.Sprintf("security-update-%s", composerLockHash)
 }
 
-func (s SecurityUpdateStrategy) GeneratePRDetails() (string, string) {
+func (s *SecurityUpdateStrategy) GeneratePRDetails() (string, string) {
 	title := fmt.Sprintf("%s: Drupal Security Updates", s.current.Format("2006-01-02"))
 	templateName := "security_update.go.tmpl"
 	return title, templateName
 }
 
-func (s SecurityUpdateStrategy) GetTemplateData(result WorkflowUpdateResult, updateHooks UpdateHooksPerSite) (TemplateData, error) {
-
+func (s *SecurityUpdateStrategy) GetTemplateData(result WorkflowUpdateResult, updateHooks UpdateHooksPerSite) (TemplateData, error) {
 	return TemplateData{
 		ComposerDiff:           result.table,
 		DependencyUpdateReport: result.updateReport,
@@ -110,7 +109,7 @@ func (s SecurityUpdateStrategy) GetTemplateData(result WorkflowUpdateResult, upd
 	}, nil
 }
 
-func (s SecurityUpdateStrategy) GetFixedAdvisories() []composer.Advisory {
+func (s *SecurityUpdateStrategy) GetFixedAdvisories() []composer.Advisory {
 	// Get advisories from before that are not present in after
 	var fixed = make([]composer.Advisory, 0)
 	for _, beforeAdvisory := range s.beforeAudit.Advisories {

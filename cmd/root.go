@@ -97,7 +97,7 @@ func runApp(config internal.Config) {
 			func() internal.Config {
 				return config
 			},
-			func(lc fx.Lifecycle, sh fx.Shutdowner, logger *zap.Logger, workflowService services.WorkflowService, dependencyUpdateService services.DependencyUpdateStrategy, securityUpdateService services.SecurityUpdateStrategy) *Action {
+			func(lc fx.Lifecycle, sh fx.Shutdowner, logger *zap.Logger, workflowService services.WorkflowService, dependencyUpdateService *services.DependencyUpdateStrategy, securityUpdateService *services.SecurityUpdateStrategy) *Action {
 				if config.Security {
 					return newAction(lc, sh, logger, workflowService, securityUpdateService)
 				}
