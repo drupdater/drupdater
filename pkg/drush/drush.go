@@ -146,8 +146,6 @@ func (e CLI) GetUpdateHooks(ctx context.Context, dir string, site string) (map[s
 		return nil, err
 	}
 
-	fmt.Println("data", data)
-
 	if strings.Contains(data, "No database updates required") {
 		return nil, nil
 	}

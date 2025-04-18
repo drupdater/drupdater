@@ -113,6 +113,8 @@ func (s *CLI) Audit(ctx context.Context, dir string) (Audit, error) {
 		s.logger.Debug("composer audit returned error", zap.Error(err))
 	}
 
+	s.logger.Sugar().Info(out)
+
 	if err := json.Unmarshal([]byte(out), &composerAudit); err != nil {
 		return Audit{}, fmt.Errorf("failed to parse composer audit output: %w, output: %s", err, out)
 	}

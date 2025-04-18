@@ -42,9 +42,6 @@ func (s *SecurityUpdateStrategy) PreUpdate(ctx context.Context, path string) ([]
 		return nil, false, err
 	}
 
-	s.logger.Info("found security advisories", zap.Int("numAdvisories", len(s.beforeAudit.Advisories)))
-	s.logger.Info("advisories", zap.Any("advisories", s.beforeAudit.Advisories))
-
 	packagesToUpdate := make([]string, 0)
 	for _, advisory := range s.beforeAudit.Advisories {
 		if slices.Contains(packagesToUpdate, advisory.PackageName) {
