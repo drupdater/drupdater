@@ -13,63 +13,64 @@ import (
 	"go.uber.org/zap"
 )
 
-/*
-	func TestGetFixedAdvisories(t *testing.T) {
-		ws := &SecurityUpdateStrategy{}
-
-		tests := []struct {
-			name     string
-			before   []composer.Advisory
-			after    []composer.Advisory
-			expected []composer.Advisory
-		}{
-			{
-				name: "No advisories fixed",
-				before: []composer.Advisory{
-					{CVE: "CVE-1234", Title: "Vulnerability 1"},
-					{CVE: "CVE-5678", Title: "Vulnerability 2"},
-				},
-				after: []composer.Advisory{
-					{CVE: "CVE-1234", Title: "Vulnerability 1"},
-					{CVE: "CVE-5678", Title: "Vulnerability 2"},
-				},
-				expected: []composer.Advisory{},
+func TestGetFixedAdvisories(t *testing.T) {
+	tests := []struct {
+		name     string
+		before   []composer.Advisory
+		after    []composer.Advisory
+		expected []composer.Advisory
+	}{
+		{
+			name: "No advisories fixed",
+			before: []composer.Advisory{
+				{CVE: "CVE-1234", Title: "Vulnerability 1"},
+				{CVE: "CVE-5678", Title: "Vulnerability 2"},
 			},
-			{
-				name: "Some advisories fixed",
-				before: []composer.Advisory{
-					{CVE: "CVE-1234", Title: "Vulnerability 1"},
-					{CVE: "CVE-5678", Title: "Vulnerability 2"},
-				},
-				after: []composer.Advisory{
-					{CVE: "CVE-1234", Title: "Vulnerability 1"},
-				},
-				expected: []composer.Advisory{
-					{CVE: "CVE-5678", Title: "Vulnerability 2"},
-				},
+			after: []composer.Advisory{
+				{CVE: "CVE-1234", Title: "Vulnerability 1"},
+				{CVE: "CVE-5678", Title: "Vulnerability 2"},
 			},
-			{
-				name: "All advisories fixed",
-				before: []composer.Advisory{
-					{CVE: "CVE-1234", Title: "Vulnerability 1"},
-					{CVE: "CVE-5678", Title: "Vulnerability 2"},
-				},
-				after: []composer.Advisory{},
-				expected: []composer.Advisory{
-					{CVE: "CVE-1234", Title: "Vulnerability 1"},
-					{CVE: "CVE-5678", Title: "Vulnerability 2"},
-				},
+			expected: []composer.Advisory{},
+		},
+		{
+			name: "Some advisories fixed",
+			before: []composer.Advisory{
+				{CVE: "CVE-1234", Title: "Vulnerability 1"},
+				{CVE: "CVE-5678", Title: "Vulnerability 2"},
 			},
-		}
-
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-				actual := ws.GetFixedAdvisories(tt.before, tt.after)
-				assert.Equal(t, tt.expected, actual)
-			})
-		}
+			after: []composer.Advisory{
+				{CVE: "CVE-1234", Title: "Vulnerability 1"},
+			},
+			expected: []composer.Advisory{
+				{CVE: "CVE-5678", Title: "Vulnerability 2"},
+			},
+		},
+		{
+			name: "All advisories fixed",
+			before: []composer.Advisory{
+				{CVE: "CVE-1234", Title: "Vulnerability 1"},
+				{CVE: "CVE-5678", Title: "Vulnerability 2"},
+			},
+			after: []composer.Advisory{},
+			expected: []composer.Advisory{
+				{CVE: "CVE-1234", Title: "Vulnerability 1"},
+				{CVE: "CVE-5678", Title: "Vulnerability 2"},
+			},
+		},
 	}
-*/
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ws := &SecurityUpdateStrategy{
+				beforeAudit: composer.Audit{Advisories: tt.before},
+				afterAudit:  composer.Audit{Advisories: tt.after},
+			}
+			actual := ws.GetFixedAdvisories()
+			assert.Equal(t, tt.expected, actual)
+		})
+	}
+}
+
 func TestSecurityUpdateStartUpdate(t *testing.T) {
 	logger := zap.NewNop()
 	installer := NewMockInstallerService(t)
