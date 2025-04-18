@@ -12,7 +12,7 @@ type WorkflowStrategy interface {
 	PreUpdate(ctx context.Context, path string) ([]string, bool, error)
 
 	// PostUpdate performs actions after the dependency update
-	PostUpdate(ctx context.Context, path string, worktree internal.Worktree, result WorkflowUpdateResult) error
+	PostUpdate(ctx context.Context, path string, worktree internal.Worktree) error
 
 	// GenerateBranchName creates a unique branch name for the updates
 	GenerateBranchName(path string) string

@@ -37,7 +37,7 @@ module:
 	settingsService := NewMockSettingsService(t)
 	repositoryService := NewMockRepositoryService(t)
 	logger := zap.NewNop()
-	composerService := composer.NewMockComposerService(t)
+	composerService := composer.NewMockRunner(t)
 
 	repositoryURL := "https://example.com/repo.git"
 	branch := "main"
@@ -52,7 +52,7 @@ module:
 	repositoryService.On("CloneRepository", repositoryURL, branch, token).Return(nil, nil, "/tmp", nil)
 
 	t.Run("Success", func(t *testing.T) {
-		drush := drush.NewMockDrushService(t)
+		drush := drush.NewMockRunner(t)
 		composerService.On("Install", mock.Anything, "/tmp").Return(nil)
 
 		drush.On("InstallSite", mock.Anything, "/tmp", "site1").Return(nil)
@@ -74,7 +74,7 @@ module:
 	})
 
 	t.Run("Failure", func(t *testing.T) {
-		drush := drush.NewMockDrushService(t)
+		drush := drush.NewMockRunner(t)
 		composerService.On("Install", mock.Anything, "/tmp").Return(nil)
 		drush.On("InstallSite", mock.Anything, "/tmp", "site1").Return(nil)
 		drush.On("InstallSite", mock.Anything, "/tmp", "site2").Return(errors.New("failed to install site"))

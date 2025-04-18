@@ -22,11 +22,11 @@ type SettingsService interface {
 
 type DrupalSettingsService struct {
 	logger   *zap.Logger
-	drush    drush.DrushService
-	composer composer.ComposerService
+	drush    drush.Runner
+	composer composer.Runner
 }
 
-func newDrupalSettingsService(logger *zap.Logger, drush drush.DrushService, composer composer.ComposerService) *DrupalSettingsService {
+func newDrupalSettingsService(logger *zap.Logger, drush drush.Runner, composer composer.Runner) *DrupalSettingsService {
 	return &DrupalSettingsService{
 		logger:   logger,
 		drush:    drush,

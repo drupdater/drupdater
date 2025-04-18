@@ -15,7 +15,7 @@ import (
 func TestExecComposer(t *testing.T) {
 
 	// Create an instance of DefaultComposerService
-	service := &DefaultComposerService{
+	service := &CLI{
 		logger: zap.NewNop(),
 	}
 
@@ -62,12 +62,12 @@ func TestGetComposerUpdates(t *testing.T) {
 	fs := afero.NewMemMapFs()
 
 	// Create an instance of DefaultComposerService
-	service := &DefaultComposerService{
+	service := &CLI{
 		logger: zap.NewNop(),
 		fs:     fs,
 	}
 
-	execCommand = func(_ context.Context, name string, arg ...string) *exec.Cmd {
+	execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
 		cs := []string{"-test.run=TestHelperProcess", "--", logData}
 		cs = append(cs, arg...)
 		cmd := exec.Command(os.Args[0], cs...)
@@ -123,7 +123,7 @@ phpstan/extension-installer                    1.4.3   requires composer-plugin-
 tbachert/spi                                   v1.0.2  requires composer-plugin-api (^2.0)
 zaporylie/composer-drupal-optimizations        1.2.0   requires composer-plugin-api (^1.1 || ^2.0)`
 
-		execCommand = func(_ context.Context, name string, arg ...string) *exec.Cmd {
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", data}
 			cs = append(cs, arg...)
 			cmd := exec.Command(os.Args[0], cs...)
@@ -132,7 +132,7 @@ zaporylie/composer-drupal-optimizations        1.2.0   requires composer-plugin-
 		}
 		defer func() { execCommand = exec.CommandContext }()
 
-		service := &DefaultComposerService{
+		service := &CLI{
 			logger: zap.NewNop(),
 		}
 
@@ -164,11 +164,11 @@ func TestRunComposerAudit(t *testing.T) {
     "abandoned": []
 }`
 
-		service := &DefaultComposerService{
+		service := &CLI{
 			logger: zap.NewNop(),
 		}
 
-		execCommand = func(_ context.Context, name string, arg ...string) *exec.Cmd {
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", data}
 			cs = append(cs, arg...)
 			cmd := exec.Command(os.Args[0], cs...)
@@ -215,7 +215,7 @@ func TestRunComposerAudit(t *testing.T) {
 	   	    }
 	   	}`
 
-		execCommand = func(_ context.Context, name string, arg ...string) *exec.Cmd {
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", data}
 			cs = append(cs, arg...)
 			cmd := exec.Command(os.Args[0], cs...)
@@ -224,7 +224,7 @@ func TestRunComposerAudit(t *testing.T) {
 		}
 		defer func() { execCommand = exec.CommandContext }()
 
-		service := &DefaultComposerService{
+		service := &CLI{
 			logger: zap.NewNop(),
 		}
 
@@ -258,7 +258,7 @@ func TestGetComposerLockHash(t *testing.T) {
 	err := afero.WriteFile(fs, "/test/composer.lock", []byte(data), 0644)
 	assert.NoError(t, err)
 
-	service := &DefaultComposerService{
+	service := &CLI{
 		logger: zap.NewNop(),
 		fs:     fs,
 	}
@@ -286,7 +286,7 @@ Package operations: 58 installs, 0 updates, 0 removals
 Generating autoload files
 Using version ^11.1 for drupal/core`
 
-		execCommand = func(_ context.Context, name string, arg ...string) *exec.Cmd {
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", out}
 			cs = append(cs, arg...)
 			cmd := exec.Command(os.Args[0], cs...)
@@ -295,7 +295,7 @@ Using version ^11.1 for drupal/core`
 		}
 		defer func() { execCommand = exec.CommandContext }()
 
-		service := &DefaultComposerService{
+		service := &CLI{
 			logger: zap.NewNop(),
 			fs:     fs,
 		}
@@ -309,12 +309,12 @@ Using version ^11.1 for drupal/core`
 
 		fs := afero.NewOsFs()
 
-		service := &DefaultComposerService{
+		service := &CLI{
 			logger: zap.NewNop(),
 			fs:     fs,
 		}
 
-		execCommand = func(_ context.Context, name string, arg ...string) *exec.Cmd {
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--"}
 			cs = append(cs, arg...)
 			cmd := exec.Command(os.Args[0], cs...)

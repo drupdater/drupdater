@@ -27,7 +27,7 @@ func TestGetIssue(t *testing.T) {
 
 	// Create service instance with mock server URL
 	logger := zaptest.NewLogger(t)
-	service := &DefaultDrupalOrgService{
+	service := &HTTPClient{
 		DrupalOrgBaseURL: mockServer.URL,
 		logger:           logger,
 	}
@@ -54,7 +54,7 @@ func TestGetIssue_Failure(t *testing.T) {
 
 	// Create service instance with mock server URL
 	logger := zaptest.NewLogger(t)
-	service := &DefaultDrupalOrgService{
+	service := &HTTPClient{
 		DrupalOrgBaseURL: mockServer.URL,
 		logger:           logger,
 	}
@@ -70,7 +70,7 @@ func TestGetIssue_Failure(t *testing.T) {
 
 func TestFindIssueNumber(t *testing.T) {
 	// Create an instance of DefaultDrupalOrgService
-	service := &DefaultDrupalOrgService{}
+	service := &HTTPClient{}
 
 	// Define test cases
 	testCases := []struct {

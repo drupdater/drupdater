@@ -30,17 +30,17 @@ func NewDependencyUpdateStrategy(
 	}
 }
 
-func (s *DependencyUpdateStrategy) PreUpdate(ctx context.Context, path string) ([]string, bool, error) {
+func (s *DependencyUpdateStrategy) PreUpdate(_ context.Context, _ string) ([]string, bool, error) {
 	// For regular dependency updates, we update all packages and don't use minimal changes
 	return []string{}, false, nil
 }
 
-func (s *DependencyUpdateStrategy) ShouldContinue(packagesToUpdate []string) bool {
+func (s *DependencyUpdateStrategy) ShouldContinue(_ []string) bool {
 	// Dependency updates always continue regardless of packages to update
 	return true
 }
 
-func (s *DependencyUpdateStrategy) PostUpdate(ctx context.Context, path string, worktree internal.Worktree, result WorkflowUpdateResult) error {
+func (s *DependencyUpdateStrategy) PostUpdate(ctx context.Context, path string, worktree internal.Worktree) error {
 	// Execute all after update hooks
 	for _, au := range s.afterUpdate {
 		if err := au.Execute(ctx, path, worktree); err != nil {
@@ -52,7 +52,7 @@ func (s *DependencyUpdateStrategy) PostUpdate(ctx context.Context, path string, 
 	return nil
 }
 
-func (s *DependencyUpdateStrategy) GenerateBranchName(composerLockHash string) string {
+func (s *DependencyUpdateStrategy) GenerateBranchName(_ string) string {
 	return fmt.Sprintf("update-%s", s.current.Format("20060102150405"))
 }
 

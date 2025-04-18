@@ -82,13 +82,13 @@ type DefaultUpdater struct {
 	repository      RepositoryService
 	afterSiteUpdate []AfterSiteUpdate
 	config          internal.Config
-	composer        composer.ComposerService
-	drupalOrg       drupalorg.DrupalOrgService
+	composer        composer.Runner
+	drupalOrg       drupalorg.Client
 	gitlab          *gitlab.Client
-	drush           drush.DrushService
+	drush           drush.Runner
 }
 
-func newDefaultUpdater(afterSiteUpdate []AfterSiteUpdate, logger *zap.Logger, settings SettingsService, repository RepositoryService, config internal.Config, composer composer.ComposerService, drupalOrg drupalorg.DrupalOrgService, drush drush.DrushService) *DefaultUpdater {
+func newDefaultUpdater(afterSiteUpdate []AfterSiteUpdate, logger *zap.Logger, settings SettingsService, repository RepositoryService, config internal.Config, composer composer.Runner, drupalOrg drupalorg.Client, drush drush.Runner) *DefaultUpdater {
 
 	drupalOrgGitlab, err := gitlab.NewClient(os.Getenv("DRUPALCODE_ACCESS_TOKEN"), gitlab.WithBaseURL("https://git.drupalcode.org/api/v4"))
 	if err != nil {

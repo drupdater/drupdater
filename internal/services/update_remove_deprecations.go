@@ -14,9 +14,9 @@ import (
 
 type UpdateRemoveDeprecations struct {
 	logger   *zap.Logger
-	rector   rector.RectorService
+	rector   rector.Runner
 	config   internal.Config
-	composer composer.ComposerService
+	composer composer.Runner
 }
 
 type RectorReturn struct {
@@ -33,7 +33,7 @@ type RectorReturn struct {
 	ChangedFiles []string `json:"changed_files"`
 }
 
-func newUpdateRemoveDeprecations(logger *zap.Logger, rector rector.RectorService, config internal.Config, composer composer.ComposerService) *UpdateRemoveDeprecations {
+func newUpdateRemoveDeprecations(logger *zap.Logger, rector rector.Runner, config internal.Config, composer composer.Runner) *UpdateRemoveDeprecations {
 	return &UpdateRemoveDeprecations{
 		logger:   logger,
 		rector:   rector,

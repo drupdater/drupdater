@@ -17,12 +17,12 @@ import (
 
 var execCommand = exec.CommandContext
 
-type ComposerService interface {
+type Runner interface {
 	Update(ctx context.Context, dir string, packagesToUpdate []string, packagesToKeep []string, minimalChanges bool, dryRun bool) (string, error)
 	Install(ctx context.Context, dir string) error
 	Require(ctx context.Context, dir string, args ...string) (string, error)
 	Remove(ctx context.Context, dir string, packages ...string) (string, error)
-	Audit(ctx context.Context, dir string) (ComposerAudit, error)
+	Audit(ctx context.Context, dir string) (Audit, error)
 	Normalize(ctx context.Context, dir string) (string, error)
 	Diff(ctx context.Context, path string, targetBranch string, withLinks bool) (string, error)
 
@@ -41,7 +41,7 @@ type ComposerService interface {
 	GetCustomCodeDirectories(ctx context.Context, dir string) ([]string, error)
 }
 
-type DefaultComposerService struct {
+type CLI struct {
 	fs     afero.Fs
 	logger *zap.Logger
 
@@ -50,14 +50,14 @@ type DefaultComposerService struct {
 	initErr  error
 }
 
-func NewDefaultComposerService(logger *zap.Logger) *DefaultComposerService {
-	return &DefaultComposerService{
+func NewCLI(logger *zap.Logger) *CLI {
+	return &CLI{
 		fs:     afero.NewOsFs(),
 		logger: logger,
 	}
 }
 
-func (s *DefaultComposerService) execComposer(ctx context.Context, dir string, args ...string) (string, error) {
+func (s *CLI) execComposer(ctx context.Context, dir string, args ...string) (string, error) {
 	command := execCommand(ctx, "composer", args...)
 	command.Dir = dir
 
@@ -69,7 +69,7 @@ func (s *DefaultComposerService) execComposer(ctx context.Context, dir string, a
 	return output, err
 }
 
-func (s *DefaultComposerService) Update(ctx context.Context, dir string, packages []string, packagesToKeep []string, minimalChanges bool, dryRun bool) (string, error) {
+func (s *CLI) Update(ctx context.Context, dir string, packages []string, packagesToKeep []string, minimalChanges bool, dryRun bool) (string, error) {
 	s.logger.Debug("composer update", zap.Strings("packages", packages))
 	args := append([]string{"update", "--no-interaction", "--no-progress", "--optimize-autoloader", "--with-all-dependencies", "--no-ansi"}, packages...)
 	for _, packageToKeep := range packagesToKeep {
@@ -86,7 +86,7 @@ func (s *DefaultComposerService) Update(ctx context.Context, dir string, package
 	return s.execComposer(ctx, dir, args...)
 }
 
-func (s *DefaultComposerService) Install(ctx context.Context, dir string) error {
+func (s *CLI) Install(ctx context.Context, dir string) error {
 	s.logger.Debug("composer install")
 	out, err := s.execComposer(ctx, dir, "install", "--no-interaction", "--no-progress", "--optimize-autoloader")
 	if err != nil {
@@ -95,18 +95,18 @@ func (s *DefaultComposerService) Install(ctx context.Context, dir string) error 
 	return err
 }
 
-func (s *DefaultComposerService) Require(ctx context.Context, dir string, args ...string) (string, error) {
+func (s *CLI) Require(ctx context.Context, dir string, args ...string) (string, error) {
 	return s.execComposer(ctx, dir, append([]string{"require"}, args...)...)
 }
 
-func (s *DefaultComposerService) Remove(ctx context.Context, dir string, packages ...string) (string, error) {
+func (s *CLI) Remove(ctx context.Context, dir string, packages ...string) (string, error) {
 	return s.execComposer(ctx, dir, append([]string{"remove"}, packages...)...)
 }
 
-func (s *DefaultComposerService) Audit(ctx context.Context, dir string) (ComposerAudit, error) {
+func (s *CLI) Audit(ctx context.Context, dir string) (Audit, error) {
 	s.logger.Debug("running composer audit")
 
-	var composerAudit ComposerAudit
+	var composerAudit Audit
 	out, err := s.execComposer(ctx, dir, "audit", "--format=json", "--locked", "--no-plugins")
 	if err != nil {
 		// Some errors are expected for audit and don't affect the parsing
@@ -114,7 +114,7 @@ func (s *DefaultComposerService) Audit(ctx context.Context, dir string) (Compose
 	}
 
 	if err := json.Unmarshal([]byte(out), &composerAudit); err != nil {
-		return ComposerAudit{}, fmt.Errorf("failed to parse composer audit output: %w, output: %s", err, out)
+		return Audit{}, fmt.Errorf("failed to parse composer audit output: %w, output: %s", err, out)
 	}
 
 	return composerAudit, nil
@@ -142,13 +142,13 @@ type Advisory struct {
 // AdvisoriesMap represents the advisories mapping where keys are package names.
 type AdvisoriesMap map[string]json.RawMessage
 
-// ComposerAudit represents the flattened list of advisories.
-type ComposerAudit struct {
+// Audit represents the flattened list of advisories.
+type Audit struct {
 	Advisories []Advisory `json:"advisories"`
 }
 
 // UnmarshalJSON flattens nested advisories into a single list.
-func (c *ComposerAudit) UnmarshalJSON(data []byte) error {
+func (c *Audit) UnmarshalJSON(data []byte) error {
 	// Temporary map to parse nested structure
 	var raw map[string]interface{}
 	if err := json.Unmarshal(data, &raw); err != nil {
@@ -192,12 +192,12 @@ func (c *ComposerAudit) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (s *DefaultComposerService) Normalize(ctx context.Context, dir string) (string, error) {
+func (s *CLI) Normalize(ctx context.Context, dir string) (string, error) {
 	s.logger.Debug("running composer normalize")
 	return s.execComposer(ctx, dir, "normalize")
 }
 
-func (s *DefaultComposerService) Diff(ctx context.Context, dir string, targetBranch string, withLinks bool) (string, error) {
+func (s *CLI) Diff(ctx context.Context, dir string, targetBranch string, withLinks bool) (string, error) {
 	s.logger.Debug("generating diff table")
 	args := []string{"diff", targetBranch}
 	if withLinks {
@@ -220,7 +220,7 @@ func (s *DefaultComposerService) Diff(ctx context.Context, dir string, targetBra
 	return out, err
 }
 
-func (s *DefaultComposerService) GetInstalledPackageVersion(ctx context.Context, dir string, packageName string) (string, error) {
+func (s *CLI) GetInstalledPackageVersion(ctx context.Context, dir string, packageName string) (string, error) {
 	s.logger.Debug("getting installed package version")
 	out, err := s.execComposer(ctx, dir, "show", packageName, "--locked", "--no-ansi", "--format=json")
 	if err != nil {
@@ -238,7 +238,7 @@ func (s *DefaultComposerService) GetInstalledPackageVersion(ctx context.Context,
 	return composerShow.Versions[0], nil
 }
 
-func (s *DefaultComposerService) GetAllowPlugins(ctx context.Context, dir string) (map[string]bool, error) {
+func (s *CLI) GetAllowPlugins(ctx context.Context, dir string) (map[string]bool, error) {
 	allowPluginsJSON, err := s.GetConfig(ctx, dir, "allow-plugins")
 	if err != nil {
 		s.logger.Error("failed to set composer config", zap.Error(err))
@@ -254,7 +254,7 @@ func (s *DefaultComposerService) GetAllowPlugins(ctx context.Context, dir string
 	return allowPlugins, nil
 }
 
-func (s *DefaultComposerService) SetAllowPlugins(ctx context.Context, dir string, plugins map[string]bool) error {
+func (s *CLI) SetAllowPlugins(ctx context.Context, dir string, plugins map[string]bool) error {
 	for key, value := range plugins {
 		err := s.SetConfig(ctx, dir, "allow-plugins."+key, fmt.Sprintf("%t", value))
 		if err != nil {
@@ -264,13 +264,13 @@ func (s *DefaultComposerService) SetAllowPlugins(ctx context.Context, dir string
 	return nil
 }
 
-func (s *DefaultComposerService) GetConfig(ctx context.Context, dir string, key string) (string, error) {
+func (s *CLI) GetConfig(ctx context.Context, dir string, key string) (string, error) {
 	s.logger.Debug("getting composer config", zap.String("key", key))
 	//ctx = context.Background()
 	return s.execComposer(ctx, dir, "config", "--json", key)
 }
 
-func (s *DefaultComposerService) SetConfig(ctx context.Context, dir string, key string, value string) error {
+func (s *CLI) SetConfig(ctx context.Context, dir string, key string, value string) error {
 	s.logger.Debug("setting composer config", zap.String("key", key), zap.String("value", value))
 	_, err := s.execComposer(ctx, dir, "config", "--json", key, value)
 	return err
@@ -284,7 +284,7 @@ type PackageChange struct {
 	To      string
 }
 
-func (s *DefaultComposerService) ListPendingUpdates(ctx context.Context, dir string, packagesToUpdate []string, minimalChanges bool) ([]PackageChange, error) {
+func (s *CLI) ListPendingUpdates(ctx context.Context, dir string, packagesToUpdate []string, minimalChanges bool) ([]PackageChange, error) {
 	s.logger.Debug("getting outdated packages")
 	log, err := s.Update(ctx, dir, packagesToUpdate, []string{}, minimalChanges, true)
 	if err != nil {
@@ -342,7 +342,7 @@ func (s *DefaultComposerService) ListPendingUpdates(ctx context.Context, dir str
 	return changes, nil
 }
 
-func (s *DefaultComposerService) initTempDir() {
+func (s *CLI) initTempDir() {
 	s.tempDir, s.initErr = afero.TempDir(s.fs, "", "composer-service")
 
 	// Create a composer.json file
@@ -371,7 +371,7 @@ func (s *DefaultComposerService) initTempDir() {
 	s.initErr = afero.WriteFile(s.fs, s.tempDir+"/composer.json", []byte(composerJSON), 0644)
 }
 
-func (s *DefaultComposerService) CheckIfPatchApplies(ctx context.Context, packageName string, packageVersion string, patchPath string) (bool, error) {
+func (s *CLI) CheckIfPatchApplies(ctx context.Context, packageName string, packageVersion string, patchPath string) (bool, error) {
 
 	s.initOnce.Do(s.initTempDir)
 	if s.initErr != nil {
@@ -400,7 +400,7 @@ func (s *DefaultComposerService) CheckIfPatchApplies(ctx context.Context, packag
 	return true, nil
 }
 
-func (s *DefaultComposerService) GetInstalledPlugins(ctx context.Context, dir string) (map[string]interface{}, error) {
+func (s *CLI) GetInstalledPlugins(ctx context.Context, dir string) (map[string]interface{}, error) {
 
 	out, err := s.execComposer(ctx, dir, "depends", "composer-plugin-api", "--locked")
 	if err != nil {
@@ -420,7 +420,7 @@ func (s *DefaultComposerService) GetInstalledPlugins(ctx context.Context, dir st
 	return packages, nil
 }
 
-func (s *DefaultComposerService) IsPackageInstalled(ctx context.Context, dir string, packageToCheck string) (bool, error) {
+func (s *CLI) IsPackageInstalled(ctx context.Context, dir string, packageToCheck string) (bool, error) {
 	_, err := s.execComposer(ctx, dir, "show", "--locked", packageToCheck)
 	if err != nil {
 		return false, err
@@ -428,7 +428,7 @@ func (s *DefaultComposerService) IsPackageInstalled(ctx context.Context, dir str
 	return true, nil
 }
 
-func (s *DefaultComposerService) GetLockHash(dir string) (string, error) {
+func (s *CLI) GetLockHash(dir string) (string, error) {
 	s.logger.Debug("getting composer lock hash")
 	file, err := s.fs.Open(dir + "/composer.lock")
 	if err != nil {
@@ -448,13 +448,13 @@ func (s *DefaultComposerService) GetLockHash(dir string) (string, error) {
 	return composerLock.ContentHash, nil
 }
 
-func (s *DefaultComposerService) UpdateLockHash(ctx context.Context, dir string) error {
+func (s *CLI) UpdateLockHash(ctx context.Context, dir string) error {
 	s.logger.Debug("updating composer lock hash")
 	_, err := s.execComposer(ctx, dir, "update", "--lock", "--no-install")
 	return err
 }
 
-func (s *DefaultComposerService) GetCustomCodeDirectories(ctx context.Context, dir string) ([]string, error) {
+func (s *CLI) GetCustomCodeDirectories(ctx context.Context, dir string) ([]string, error) {
 	webroot, err := s.GetConfig(ctx, dir, "extra.drupal-scaffold.locations.web-root")
 	if err != nil {
 		s.logger.Error("failed to get Drupal web dir", zap.String("dir", dir), zap.Error(err))

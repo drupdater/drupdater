@@ -11,23 +11,23 @@ import (
 
 var execCommand = exec.CommandContext
 
-type RectorService interface {
+type Runner interface {
 	Run(ctx context.Context, dir string, customCodeDirectories []string) (string, error)
 }
 
-type DefaultRectorService struct {
+type CLI struct {
 	fs     afero.Fs
 	logger *zap.Logger
 }
 
-func NewDefaultRectorService(logger *zap.Logger) *DefaultRectorService {
-	return &DefaultRectorService{
+func NewCLI(logger *zap.Logger) *CLI {
+	return &CLI{
 		fs:     afero.NewOsFs(),
 		logger: logger,
 	}
 }
 
-func (s *DefaultRectorService) execComposer(ctx context.Context, dir string, args ...string) (string, error) {
+func (s *CLI) execComposer(ctx context.Context, dir string, args ...string) (string, error) {
 	command := execCommand(ctx, "composer", args...)
 	command.Dir = dir
 
@@ -39,7 +39,7 @@ func (s *DefaultRectorService) execComposer(ctx context.Context, dir string, arg
 	return output, err
 }
 
-func (s *DefaultRectorService) Run(ctx context.Context, dir string, customCodeDirectories []string) (string, error) {
+func (s *CLI) Run(ctx context.Context, dir string, customCodeDirectories []string) (string, error) {
 	s.logger.Debug("remove deprecations")
 
 	if len(customCodeDirectories) == 0 {

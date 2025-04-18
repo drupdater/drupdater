@@ -17,9 +17,9 @@ import (
 
 type UpdateCodingStyles struct {
 	logger   *zap.Logger
-	phpcs    phpcs.PhpCsService
+	phpcs    phpcs.Runner
 	config   internal.Config
-	composer composer.ComposerService
+	composer composer.Runner
 }
 
 type PHPCSReturn struct {
@@ -43,7 +43,7 @@ type PHPCSReturn struct {
 	} `json:"totals"`
 }
 
-func newUpdateCodingStyles(logger *zap.Logger, phpcs phpcs.PhpCsService, config internal.Config, composer composer.ComposerService) *UpdateCodingStyles {
+func newUpdateCodingStyles(logger *zap.Logger, phpcs phpcs.Runner, config internal.Config, composer composer.Runner) *UpdateCodingStyles {
 	return &UpdateCodingStyles{
 		logger:   logger,
 		phpcs:    phpcs,

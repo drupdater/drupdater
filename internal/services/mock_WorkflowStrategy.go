@@ -22,9 +22,9 @@ func (_m *MockWorkflowStrategy) EXPECT() *MockWorkflowStrategy_Expecter {
 	return &MockWorkflowStrategy_Expecter{mock: &_m.Mock}
 }
 
-// GenerateBranchName provides a mock function with given fields: composerLockHash
-func (_m *MockWorkflowStrategy) GenerateBranchName(composerLockHash string) string {
-	ret := _m.Called(composerLockHash)
+// GenerateBranchName provides a mock function with given fields: path
+func (_m *MockWorkflowStrategy) GenerateBranchName(path string) string {
+	ret := _m.Called(path)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GenerateBranchName")
@@ -32,7 +32,7 @@ func (_m *MockWorkflowStrategy) GenerateBranchName(composerLockHash string) stri
 
 	var r0 string
 	if rf, ok := ret.Get(0).(func(string) string); ok {
-		r0 = rf(composerLockHash)
+		r0 = rf(path)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
@@ -46,12 +46,12 @@ type MockWorkflowStrategy_GenerateBranchName_Call struct {
 }
 
 // GenerateBranchName is a helper method to define mock.On call
-//   - composerLockHash string
-func (_e *MockWorkflowStrategy_Expecter) GenerateBranchName(composerLockHash interface{}) *MockWorkflowStrategy_GenerateBranchName_Call {
-	return &MockWorkflowStrategy_GenerateBranchName_Call{Call: _e.mock.On("GenerateBranchName", composerLockHash)}
+//   - path string
+func (_e *MockWorkflowStrategy_Expecter) GenerateBranchName(path interface{}) *MockWorkflowStrategy_GenerateBranchName_Call {
+	return &MockWorkflowStrategy_GenerateBranchName_Call{Call: _e.mock.On("GenerateBranchName", path)}
 }
 
-func (_c *MockWorkflowStrategy_GenerateBranchName_Call) Run(run func(composerLockHash string)) *MockWorkflowStrategy_GenerateBranchName_Call {
+func (_c *MockWorkflowStrategy_GenerateBranchName_Call) Run(run func(path string)) *MockWorkflowStrategy_GenerateBranchName_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(string))
 	})
@@ -180,17 +180,17 @@ func (_c *MockWorkflowStrategy_GetTemplateData_Call) RunAndReturn(run func(Workf
 	return _c
 }
 
-// PostUpdate provides a mock function with given fields: ctx, path, worktree, result
-func (_m *MockWorkflowStrategy) PostUpdate(ctx context.Context, path string, worktree internal.Worktree, result WorkflowUpdateResult) error {
-	ret := _m.Called(ctx, path, worktree, result)
+// PostUpdate provides a mock function with given fields: ctx, path, worktree
+func (_m *MockWorkflowStrategy) PostUpdate(ctx context.Context, path string, worktree internal.Worktree) error {
+	ret := _m.Called(ctx, path, worktree)
 
 	if len(ret) == 0 {
 		panic("no return value specified for PostUpdate")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, internal.Worktree, WorkflowUpdateResult) error); ok {
-		r0 = rf(ctx, path, worktree, result)
+	if rf, ok := ret.Get(0).(func(context.Context, string, internal.Worktree) error); ok {
+		r0 = rf(ctx, path, worktree)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -207,14 +207,13 @@ type MockWorkflowStrategy_PostUpdate_Call struct {
 //   - ctx context.Context
 //   - path string
 //   - worktree internal.Worktree
-//   - result WorkflowUpdateResult
-func (_e *MockWorkflowStrategy_Expecter) PostUpdate(ctx interface{}, path interface{}, worktree interface{}, result interface{}) *MockWorkflowStrategy_PostUpdate_Call {
-	return &MockWorkflowStrategy_PostUpdate_Call{Call: _e.mock.On("PostUpdate", ctx, path, worktree, result)}
+func (_e *MockWorkflowStrategy_Expecter) PostUpdate(ctx interface{}, path interface{}, worktree interface{}) *MockWorkflowStrategy_PostUpdate_Call {
+	return &MockWorkflowStrategy_PostUpdate_Call{Call: _e.mock.On("PostUpdate", ctx, path, worktree)}
 }
 
-func (_c *MockWorkflowStrategy_PostUpdate_Call) Run(run func(ctx context.Context, path string, worktree internal.Worktree, result WorkflowUpdateResult)) *MockWorkflowStrategy_PostUpdate_Call {
+func (_c *MockWorkflowStrategy_PostUpdate_Call) Run(run func(ctx context.Context, path string, worktree internal.Worktree)) *MockWorkflowStrategy_PostUpdate_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(internal.Worktree), args[3].(WorkflowUpdateResult))
+		run(args[0].(context.Context), args[1].(string), args[2].(internal.Worktree))
 	})
 	return _c
 }
@@ -224,7 +223,7 @@ func (_c *MockWorkflowStrategy_PostUpdate_Call) Return(_a0 error) *MockWorkflowS
 	return _c
 }
 
-func (_c *MockWorkflowStrategy_PostUpdate_Call) RunAndReturn(run func(context.Context, string, internal.Worktree, WorkflowUpdateResult) error) *MockWorkflowStrategy_PostUpdate_Call {
+func (_c *MockWorkflowStrategy_PostUpdate_Call) RunAndReturn(run func(context.Context, string, internal.Worktree) error) *MockWorkflowStrategy_PostUpdate_Call {
 	_c.Call.Return(run)
 	return _c
 }

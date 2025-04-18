@@ -12,11 +12,11 @@ import (
 
 type UpdateTranslations struct {
 	logger     *zap.Logger
-	drush      drush.DrushService
+	drush      drush.Runner
 	repository RepositoryService
 }
 
-func newUpdateTranslations(logger *zap.Logger, drush drush.DrushService, repository RepositoryService) *UpdateTranslations {
+func newUpdateTranslations(logger *zap.Logger, drush drush.Runner, repository RepositoryService) *UpdateTranslations {
 	return &UpdateTranslations{
 		logger:     logger,
 		drush:      drush,

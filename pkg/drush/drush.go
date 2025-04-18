@@ -15,8 +15,8 @@ import (
 
 var execCommand = exec.CommandContext
 
-// DrushService interface for executing commands
-type DrushService interface {
+// Runner interface for executing commands
+type Runner interface {
 	ExecDrush(ctx context.Context, dir string, site string, args ...string) (string, error)
 	InstallSite(ctx context.Context, dir string, site string) error
 	GetConfigSyncDir(ctx context.Context, dir string, site string, relative bool) (string, error)
@@ -29,22 +29,22 @@ type DrushService interface {
 	GetUpdateHooks(ctx context.Context, dir string, site string) (map[string]UpdateHook, error)
 }
 
-// DefaultDrushService is the default implementation of CommandExecutor
-type DefaultDrushService struct {
+// CLI is the default implementation of CommandExecutor
+type CLI struct {
 	logger *zap.Logger
 	cache  otter.Cache[string, string]
 	fs     afero.Fs
 }
 
-func NewDefaultDrushService(logger *zap.Logger, cache otter.Cache[string, string]) DrushService {
-	return DefaultDrushService{
+func NewCLI(logger *zap.Logger, cache otter.Cache[string, string]) Runner {
+	return CLI{
 		logger: logger,
 		cache:  cache,
 		fs:     afero.NewOsFs(),
 	}
 }
 
-func (e DefaultDrushService) ExecDrush(ctx context.Context, dir string, site string, args ...string) (string, error) {
+func (e CLI) ExecDrush(ctx context.Context, dir string, site string, args ...string) (string, error) {
 	command := execCommand(ctx, "composer", append([]string{"exec", "--", "drush"}, args...)...)
 	command.Dir = dir
 	// os.Environ() preserves the current environment variables
@@ -59,14 +59,14 @@ func (e DefaultDrushService) ExecDrush(ctx context.Context, dir string, site str
 	return output, err
 }
 
-func (e DefaultDrushService) InstallSite(ctx context.Context, dir string, site string) error {
+func (e CLI) InstallSite(ctx context.Context, dir string, site string) error {
 	e.logger.Debug("installing site")
 	_, err := e.ExecDrush(ctx, dir, site, "--existing-config", "--yes", "site:install", "--sites-subdir="+site)
 
 	return err
 }
 
-func (e DefaultDrushService) GetConfigSyncDir(ctx context.Context, dir string, site string, relative bool) (string, error) {
+func (e CLI) GetConfigSyncDir(ctx context.Context, dir string, site string, relative bool) (string, error) {
 	cacheKey := fmt.Sprintf("config-sync-dir_%s_%s_%t", dir, site, relative)
 	value, ok := e.cache.Get(cacheKey)
 	if ok {
@@ -83,37 +83,37 @@ func (e DefaultDrushService) GetConfigSyncDir(ctx context.Context, dir string, s
 	return configSyncDir, nil
 }
 
-func (e DefaultDrushService) ExportConfiguration(ctx context.Context, dir string, site string) error {
+func (e CLI) ExportConfiguration(ctx context.Context, dir string, site string) error {
 	e.logger.Debug("exporting configuration")
 	_, err := e.ExecDrush(ctx, dir, site, "config:export", "--yes")
 	return err
 }
 
-func (e DefaultDrushService) UpdateSite(ctx context.Context, dir string, site string) error {
+func (e CLI) UpdateSite(ctx context.Context, dir string, site string) error {
 	e.logger.Debug("updating site")
 	_, err := e.ExecDrush(ctx, dir, site, "updatedb", "--yes", "-vvv")
 	return err
 }
 
-func (e DefaultDrushService) ConfigResave(ctx context.Context, dir string, site string) error {
+func (e CLI) ConfigResave(ctx context.Context, dir string, site string) error {
 	e.logger.Debug("config resave")
 	_, err := e.ExecDrush(ctx, dir, site, "php:script", "/opt/drupdater/config-resave.php")
 	return err
 }
 
-func (e DefaultDrushService) IsModuleEnabled(ctx context.Context, dir string, site string, module string) (bool, error) {
+func (e CLI) IsModuleEnabled(ctx context.Context, dir string, site string, module string) (bool, error) {
 	e.logger.Debug("checking if module is enabled")
 	out, err := e.ExecDrush(ctx, dir, site, "pm:list", "--status=enabled", "--field=name", "--filter="+module)
 	return out == module, err
 }
 
-func (e DefaultDrushService) LocalizeTranslations(ctx context.Context, dir string, site string) error {
+func (e CLI) LocalizeTranslations(ctx context.Context, dir string, site string) error {
 	e.logger.Debug("localizing translations")
 	_, err := e.ExecDrush(ctx, dir, site, "locale-deploy:localize-translations")
 	return err
 }
 
-func (e DefaultDrushService) GetTranslationPath(ctx context.Context, dir string, site string, relative bool) (string, error) {
+func (e CLI) GetTranslationPath(ctx context.Context, dir string, site string, relative bool) (string, error) {
 	cacheKey := fmt.Sprintf("translation-path_%s_%s_%t", dir, site, relative)
 	value, ok := e.cache.Get(cacheKey)
 	if ok {
@@ -139,9 +139,9 @@ type UpdateHook struct {
 	Type        string      `json:"type"`
 }
 
-func (s DefaultDrushService) GetUpdateHooks(ctx context.Context, dir string, site string) (map[string]UpdateHook, error) {
-	s.logger.Debug("getting update hooks")
-	data, err := s.ExecDrush(ctx, dir, site, "updatedb-status", "--format=json")
+func (e CLI) GetUpdateHooks(ctx context.Context, dir string, site string) (map[string]UpdateHook, error) {
+	e.logger.Debug("getting update hooks")
+	data, err := e.ExecDrush(ctx, dir, site, "updatedb-status", "--format=json")
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +154,7 @@ func (s DefaultDrushService) GetUpdateHooks(ctx context.Context, dir string, sit
 
 	var updates map[string]UpdateHook
 	if err := json.Unmarshal([]byte(data), &updates); err != nil {
-		s.logger.Error("failed to unmarshal update hooks", zap.Error(err))
+		e.logger.Error("failed to unmarshal update hooks", zap.Error(err))
 		return nil, err
 	}
 

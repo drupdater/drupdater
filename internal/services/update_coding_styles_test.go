@@ -24,10 +24,10 @@ func TestCodingStyles(t *testing.T) {
 			return false
 		}
 
-		phpcs := phpcs.NewMockPhpCsService(t)
+		phpcs := phpcs.NewMockRunner(t)
 		phpcs.On("Run", mock.Anything, "/tmp").Return(`{"totals":{"errors":0,"warnings":0,"fixable":0},"files":{}}`, nil)
 
-		composer := composer.NewMockComposerService(t)
+		composer := composer.NewMockRunner(t)
 		composer.On("IsPackageInstalled", mock.Anything, "/tmp", "drupal/coder").Return(true, nil)
 		composer.On("GetCustomCodeDirectories", mock.Anything, "/tmp").Return([]string{"web/modules/custom", "web/themes/custom"}, nil)
 		composer.On("GetInstalledPackageVersion", mock.Anything, "/tmp", "drupal/core").Return("9.2.1", nil)
@@ -48,10 +48,10 @@ func TestCodingStyles(t *testing.T) {
 			return true
 		}
 
-		phpcs := phpcs.NewMockPhpCsService(t)
+		phpcs := phpcs.NewMockRunner(t)
 		phpcs.On("Run", mock.Anything, "/tmp").Return(`{"totals":{"errors":0,"warnings":0,"fixable":0},"files":{}}`, nil)
 
-		composer := composer.NewMockComposerService(t)
+		composer := composer.NewMockRunner(t)
 		composer.On("IsPackageInstalled", mock.Anything, "/tmp", "drupal/coder").Return(false, nil)
 		composer.On("Require", mock.Anything, "/tmp", "--dev", "drupal/coder").Return("", nil)
 
@@ -71,10 +71,10 @@ func TestCodingStyles(t *testing.T) {
 			return true
 		}
 
-		phpcs := phpcs.NewMockPhpCsService(t)
+		phpcs := phpcs.NewMockRunner(t)
 		phpcs.On("Run", mock.Anything, "/path/to/repo").Return(`{"totals":{"errors":0,"warnings":0,"fixable":0},"files":{}}`, nil)
 
-		composer := composer.NewMockComposerService(t)
+		composer := composer.NewMockRunner(t)
 		composer.On("IsPackageInstalled", mock.Anything, "/path/to/repo", "drupal/coder").Return(true, nil)
 
 		updateCodingStyles := newUpdateCodingStyles(logger, phpcs, internal.Config{SkipCBF: false}, composer)
@@ -90,11 +90,11 @@ func TestCodingStyles(t *testing.T) {
 			return true
 		}
 
-		phpcs := phpcs.NewMockPhpCsService(t)
+		phpcs := phpcs.NewMockRunner(t)
 		phpcs.On("Run", mock.Anything, "/path/to/repo").Return(`{"totals":{"errors":0,"warnings":1,"fixable":1},"files":{"file1.php":{"errors":0,"warnings":1,"messages":[{"message":"message","source":"source","severity":1,"fixable":true,"type":"type","line":1,"column":1}]}}}`, nil)
 		phpcs.On("RunCBF", mock.Anything, "/path/to/repo").Return(nil)
 
-		composer := composer.NewMockComposerService(t)
+		composer := composer.NewMockRunner(t)
 		composer.On("IsPackageInstalled", mock.Anything, "/path/to/repo", "drupal/coder").Return(true, nil)
 
 		worktree.On("Add", "file1.php").Return(plumbing.NewHash(""), nil)
@@ -114,10 +114,10 @@ func TestCodingStyles(t *testing.T) {
 			return true
 		}
 
-		phpcs := phpcs.NewMockPhpCsService(t)
+		phpcs := phpcs.NewMockRunner(t)
 		phpcs.On("Run", mock.Anything, "/path/to/repo").Return(`{"totals":{"errors":0,"warnings":1,"fixable":1},"files":{"file1.php":{"errors":0,"warnings":1,"messages":[{"message":"message","source":"source","severity":1,"fixable":true,"type":"type","line":1,"column":1}]}}}`, assert.AnError)
 
-		composer := composer.NewMockComposerService(t)
+		composer := composer.NewMockRunner(t)
 		composer.On("IsPackageInstalled", mock.Anything, "/path/to/repo", "drupal/coder").Return(true, nil)
 
 		updateCodingStyles := newUpdateCodingStyles(logger, phpcs, internal.Config{SkipCBF: false}, composer)

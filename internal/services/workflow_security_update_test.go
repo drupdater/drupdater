@@ -79,7 +79,7 @@ func TestSecurityUpdateStartUpdate(t *testing.T) {
 	vcsProvider := codehosting.NewMockPlatform(t)
 	repository := internal.NewMockRepository(t)
 
-	composerService := composer.NewMockComposerService(t)
+	composerService := composer.NewMockRunner(t)
 	config := internal.Config{
 		RepositoryURL: "https://example.com/repo.git",
 		Branch:        "main",
@@ -106,7 +106,7 @@ func TestSecurityUpdateStartUpdate(t *testing.T) {
 	vcsProvider.On("CreateMergeRequest", mock.Anything, string(fixture), mock.Anything, config.Branch).Return(codehosting.MergeRequest{}, nil)
 	repository.On("Push", mock.Anything).Return(nil)
 	composerService.On("Diff", mock.Anything, mock.Anything, mock.Anything, true).Return("Dummy Table", nil)
-	composerService.On("Audit", mock.Anything, "/tmp").Return(composer.ComposerAudit{
+	composerService.On("Audit", mock.Anything, "/tmp").Return(composer.Audit{
 		Advisories: []composer.Advisory{
 			{CVE: "CVE-1234", Title: "Vul 1", Severity: "high    ", Link: "https://example.com", PackageName: "package1"},
 			{CVE: "CVE-5678", Title: "Vul 2", Severity: "high    ", Link: "https://example.com", PackageName: "package1"},
@@ -133,7 +133,7 @@ func TestSecurityUpdateStartUpdateWithDryRun(t *testing.T) {
 	vcsProvider := codehosting.NewMockPlatform(t)
 	repository := internal.NewMockRepository(t)
 
-	composerService := composer.NewMockComposerService(t)
+	composerService := composer.NewMockRunner(t)
 	config := internal.Config{
 		RepositoryURL: "https://example.com/repo.git",
 		Branch:        "main",
@@ -152,7 +152,7 @@ func TestSecurityUpdateStartUpdateWithDryRun(t *testing.T) {
 	updater.On("UpdateDependencies", mock.Anything, "/tmp", []string{"package1"}, mock.Anything, true).Return(DependencyUpdateReport{}, nil)
 	updater.On("UpdateDrupal", mock.Anything, "/tmp", mock.Anything, config.Sites).Return(UpdateHooksPerSite{}, nil)
 	composerService.On("Diff", mock.Anything, mock.Anything, mock.Anything, true).Return("foo", nil)
-	composerService.On("Audit", mock.Anything, "/tmp").Return(composer.ComposerAudit{
+	composerService.On("Audit", mock.Anything, "/tmp").Return(composer.Audit{
 		Advisories: []composer.Advisory{
 			{CVE: "CVE-1234", Title: "Vul 1", Severity: "high    ", Link: "https://example.com", PackageName: "package1"},
 			{CVE: "CVE-5678", Title: "Vul 2", Severity: "high    ", Link: "https://example.com", PackageName: "package1"},

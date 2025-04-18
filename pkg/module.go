@@ -11,23 +11,23 @@ import (
 
 var Module = fx.Provide(
 	fx.Annotate(
-		composer.NewDefaultComposerService,
-		fx.As(new(composer.ComposerService)),
+		composer.NewCLI,
+		fx.As(new(composer.Runner)),
 	),
 	fx.Annotate(
-		phpcs.NewDefaultPhpCsService,
-		fx.As(new(phpcs.PhpCsService)),
+		phpcs.NewCLI,
+		fx.As(new(phpcs.Runner)),
 	),
 	fx.Annotate(
-		rector.NewDefaultRectorService,
-		fx.As(new(rector.RectorService)),
+		rector.NewCLI,
+		fx.As(new(rector.Runner)),
 	),
 	fx.Annotate(
-		drush.NewDefaultDrushService,
-		fx.As(new(drush.DrushService)),
+		drush.NewCLI,
+		fx.As(new(drush.Runner)),
 	),
 	fx.Annotate(
-		drupalorg.NewDefaultDrupalOrgService,
-		fx.As(new(drupalorg.DrupalOrgService)),
+		drupalorg.NewHTTPClient,
+		fx.As(new(drupalorg.Client)),
 	),
 )

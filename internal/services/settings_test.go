@@ -13,7 +13,7 @@ import (
 
 func TestIsSqliteModuleEnabled(t *testing.T) {
 	logger := zap.NewNop()
-	drush := drush.NewMockDrushService(t)
+	drush := drush.NewMockRunner(t)
 
 	settingsService := &DrupalSettingsService{
 		logger: logger,
@@ -112,7 +112,7 @@ profile: thunder
 	}
 
 	logger := zap.NewNop()
-	drush := drush.NewMockDrushService(t)
+	drush := drush.NewMockRunner(t)
 
 	settingsService := &DrupalSettingsService{
 		logger: logger,
@@ -184,7 +184,7 @@ profile: standard
 	}
 
 	logger := zap.NewNop()
-	drush := drush.NewMockDrushService(t)
+	drush := drush.NewMockRunner(t)
 
 	settingsService := &DrupalSettingsService{
 		logger: logger,

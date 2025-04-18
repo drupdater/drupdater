@@ -16,15 +16,15 @@ type SecurityUpdateStrategy struct {
 	logger      *zap.Logger
 	config      internal.Config
 	current     time.Time
-	composer    composer.ComposerService
-	beforeAudit composer.ComposerAudit
-	afterAudit  composer.ComposerAudit
+	composer    composer.Runner
+	beforeAudit composer.Audit
+	afterAudit  composer.Audit
 }
 
 func NewSecurityUpdateStrategy(
 	logger *zap.Logger,
 	config internal.Config,
-	composerService composer.ComposerService,
+	composerService composer.Runner,
 ) *SecurityUpdateStrategy {
 	return &SecurityUpdateStrategy{
 		logger:   logger,
@@ -70,7 +70,7 @@ func (s *SecurityUpdateStrategy) ShouldContinue(packagesToUpdate []string) bool 
 	return true
 }
 
-func (s *SecurityUpdateStrategy) PostUpdate(ctx context.Context, path string, worktree internal.Worktree, result WorkflowUpdateResult) error {
+func (s *SecurityUpdateStrategy) PostUpdate(ctx context.Context, path string, _ internal.Worktree) error {
 	var err error
 
 	s.afterAudit, err = s.composer.Audit(ctx, path)

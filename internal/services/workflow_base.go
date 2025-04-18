@@ -53,7 +53,7 @@ type WorkflowBaseService struct {
 	vcsProviderFactory codehosting.VcsProviderFactory
 	repository         RepositoryService
 	installer          InstallerService
-	composer           composer.ComposerService
+	composer           composer.Runner
 }
 
 func NewWorkflowBaseService(
@@ -63,7 +63,7 @@ func NewWorkflowBaseService(
 	vcsProviderFactory codehosting.VcsProviderFactory,
 	repository RepositoryService,
 	installer InstallerService,
-	composerService composer.ComposerService,
+	composerService composer.Runner,
 ) *WorkflowBaseService {
 	return &WorkflowBaseService{
 		logger:             logger,
@@ -188,7 +188,7 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, strategy Workflo
 	}
 
 	// Run post-update actions from strategy
-	if err := strategy.PostUpdate(ctx, path, worktree, result); err != nil {
+	if err := strategy.PostUpdate(ctx, path, worktree); err != nil {
 		return err
 	}
 
@@ -220,7 +220,10 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, strategy Workflo
 			return err
 		}
 
-		ws.CreateMergeRequest(title, description, updateBranchName, ws.config.Branch)
+		if _, err := ws.CreateMergeRequest(title, description, updateBranchName, ws.config.Branch); err != nil {
+			ws.logger.Error("failed to create merge request", zap.Error(err))
+			return err
+		}
 	}
 
 	// Clean up the temporary directory

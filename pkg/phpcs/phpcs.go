@@ -11,24 +11,24 @@ import (
 
 var execCommand = exec.CommandContext
 
-type PhpCsService interface {
+type Runner interface {
 	Run(ctx context.Context, dir string) (string, error)
 	RunCBF(ctx context.Context, dir string) error
 }
 
-type DefaultPhpCsService struct {
+type CLI struct {
 	fs     afero.Fs
 	logger *zap.Logger
 }
 
-func NewDefaultPhpCsService(logger *zap.Logger) *DefaultPhpCsService {
-	return &DefaultPhpCsService{
+func NewCLI(logger *zap.Logger) *CLI {
+	return &CLI{
 		fs:     afero.NewOsFs(),
 		logger: logger,
 	}
 }
 
-func (s *DefaultPhpCsService) execComposer(ctx context.Context, dir string, args ...string) (string, error) {
+func (s *CLI) execComposer(ctx context.Context, dir string, args ...string) (string, error) {
 	command := execCommand(ctx, "composer", args...)
 	command.Dir = dir
 
@@ -40,12 +40,12 @@ func (s *DefaultPhpCsService) execComposer(ctx context.Context, dir string, args
 	return output, err
 }
 
-func (s *DefaultPhpCsService) Run(ctx context.Context, dir string) (string, error) {
+func (s *CLI) Run(ctx context.Context, dir string) (string, error) {
 	s.logger.Debug("running phpcs")
 	return s.execComposer(ctx, dir, "exec", "--", "phpcs", "--report=json", "-q", "--runtime-set", "ignore_errors_on_exit", "1", "--runtime-set", "ignore_warnings_on_exit", "1")
 }
 
-func (s *DefaultPhpCsService) RunCBF(ctx context.Context, dir string) error {
+func (s *CLI) RunCBF(ctx context.Context, dir string) error {
 	s.logger.Debug("running phpcbf")
 	_, err := s.execComposer(ctx, dir, "exec", "--", "phpcbf")
 	return err

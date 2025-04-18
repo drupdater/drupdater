@@ -15,7 +15,7 @@ import (
 
 func TestUpdateTranslationsEventHandlerWithoutLocaleDeploy(t *testing.T) {
 	// Create mocks
-	mockDrush := drush.NewMockDrushService(t)
+	mockDrush := drush.NewMockRunner(t)
 	mockRepository := NewMockRepositoryService(t)
 	logger := zap.NewNop()
 
@@ -35,7 +35,7 @@ func TestUpdateTranslationsEventHandlerWithoutLocaleDeploy(t *testing.T) {
 
 func TestUpdateTranslationsEventHandlerWitLocaleDeploy(t *testing.T) {
 	// Create mocks
-	mockDrush := drush.NewMockDrushService(t)
+	mockDrush := drush.NewMockRunner(t)
 	mockRepository := NewMockRepositoryService(t)
 	logger := zap.NewNop()
 

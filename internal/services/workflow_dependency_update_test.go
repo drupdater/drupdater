@@ -22,7 +22,7 @@ func TestStartUpdate(t *testing.T) {
 	vcsProviderFactory := codehosting.NewMockVcsProviderFactory(t)
 	vcsProvider := codehosting.NewMockPlatform(t)
 	repository := internal.NewMockRepository(t)
-	composer := composer.NewMockComposerService(t)
+	composer := composer.NewMockRunner(t)
 
 	config := internal.Config{
 		RepositoryURL: "https://example.com/repo.git",
@@ -119,7 +119,7 @@ func TestStartUpdateWithDryRun(t *testing.T) {
 	vcsProviderFactory := codehosting.NewMockVcsProviderFactory(t)
 	vcsProvider := codehosting.NewMockPlatform(t)
 	repository := internal.NewMockRepository(t)
-	composer := composer.NewMockComposerService(t)
+	composer := composer.NewMockRunner(t)
 
 	config := internal.Config{
 		RepositoryURL: "https://example.com/repo.git",

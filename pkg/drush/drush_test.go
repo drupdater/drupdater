@@ -16,7 +16,7 @@ import (
 func TestExecDrush(t *testing.T) {
 	logger := zaptest.NewLogger(t)
 	cache, _ := otter.MustBuilder[string, string](100).Build()
-	executor := NewDefaultDrushService(logger, cache).(DefaultDrushService)
+	executor := NewCLI(logger, cache).(CLI)
 
 	t.Run("successful execution", func(t *testing.T) {
 		execCommand = func(_ context.Context, name string, arg ...string) *exec.Cmd {
@@ -81,7 +81,7 @@ func TestGetUpdateHooks(t *testing.T) {
 					}
 				}`
 
-		execCommand = func(_ context.Context, name string, arg ...string) *exec.Cmd {
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", data}
 			cs = append(cs, arg...)
 			cmd := exec.Command(os.Args[0], cs...)
@@ -90,7 +90,7 @@ func TestGetUpdateHooks(t *testing.T) {
 		}
 		defer func() { execCommand = exec.CommandContext }()
 
-		drush := DefaultDrushService{
+		drush := CLI{
 			logger: logger,
 		}
 
@@ -133,7 +133,7 @@ func TestGetUpdateHooks(t *testing.T) {
 	t.Run("No updates", func(t *testing.T) {
 		data := ` [success] No database updates required.`
 
-		execCommand = func(_ context.Context, name string, arg ...string) *exec.Cmd {
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", data}
 			cs = append(cs, arg...)
 			cmd := exec.Command(os.Args[0], cs...)
@@ -142,7 +142,7 @@ func TestGetUpdateHooks(t *testing.T) {
 		}
 		defer func() { execCommand = exec.CommandContext }()
 
-		drush := DefaultDrushService{
+		drush := CLI{
 			logger: logger,
 		}
 

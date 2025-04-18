@@ -19,12 +19,12 @@ type InstallerService interface {
 type DefaultInstallerService struct {
 	logger     *zap.Logger
 	repository RepositoryService
-	drush      drush.DrushService
+	drush      drush.Runner
 	settings   SettingsService
-	composer   composer.ComposerService
+	composer   composer.Runner
 }
 
-func newDefaultInstallerService(logger *zap.Logger, repository RepositoryService, drush drush.DrushService, settings SettingsService, composer composer.ComposerService) *DefaultInstallerService {
+func newDefaultInstallerService(logger *zap.Logger, repository RepositoryService, drush drush.Runner, settings SettingsService, composer composer.Runner) *DefaultInstallerService {
 	return &DefaultInstallerService{
 		logger:     logger,
 		repository: repository,

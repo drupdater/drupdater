@@ -21,12 +21,12 @@ func TestRemoveDeprecations(t *testing.T) {
 	}
 
 	t.Run("Rector is not installed", func(t *testing.T) {
-		composer := composer.NewMockComposerService(t)
+		composer := composer.NewMockRunner(t)
 		composer.On("IsPackageInstalled", mock.Anything, "/path/to/repo", "palantirnet/drupal-rector").Return(false, assert.AnError)
 		composer.On("Require", mock.Anything, "/path/to/repo", "palantirnet/drupal-rector").Return("", nil)
 		composer.On("GetCustomCodeDirectories", mock.Anything, "/path/to/repo").Return([]string{"web/modules/custom"}, nil)
 
-		rector := rector.NewMockRectorService(t)
+		rector := rector.NewMockRunner(t)
 		rector.On("Run", mock.Anything, "/path/to/repo", []string{"web/modules/custom"}).Return(`{
     "totals": {
         "changed_files": 0,
@@ -46,11 +46,11 @@ func TestRemoveDeprecations(t *testing.T) {
 	})
 
 	t.Run("Rector is installed and command executed successfully with one fix", func(t *testing.T) {
-		composer := composer.NewMockComposerService(t)
+		composer := composer.NewMockRunner(t)
 		composer.On("IsPackageInstalled", mock.Anything, "/path/to/repo", "palantirnet/drupal-rector").Return(true, nil)
 		composer.On("GetCustomCodeDirectories", mock.Anything, "/path/to/repo").Return([]string{"web/modules/custom"}, nil)
 
-		rector := rector.NewMockRectorService(t)
+		rector := rector.NewMockRunner(t)
 		rector.On("Run", mock.Anything, "/path/to/repo", []string{"web/modules/custom"}).Return(`{
     "totals": {
         "changed_files": 1,
@@ -82,11 +82,11 @@ func TestRemoveDeprecations(t *testing.T) {
 	})
 
 	t.Run("Rector is installed and command executed successfully without fix", func(t *testing.T) {
-		composer := composer.NewMockComposerService(t)
+		composer := composer.NewMockRunner(t)
 		composer.On("IsPackageInstalled", mock.Anything, "/path/to/repo", "palantirnet/drupal-rector").Return(true, nil)
 		composer.On("GetCustomCodeDirectories", mock.Anything, "/path/to/repo").Return([]string{"web/modules/custom"}, nil)
 
-		rector := rector.NewMockRectorService(t)
+		rector := rector.NewMockRunner(t)
 		rector.On("Run", mock.Anything, "/path/to/repo", []string{"web/modules/custom"}).Return(`{
     "totals": {
         "changed_files": 0,
@@ -105,11 +105,11 @@ func TestRemoveDeprecations(t *testing.T) {
 	})
 
 	t.Run("Command execution fails", func(t *testing.T) {
-		composer := composer.NewMockComposerService(t)
+		composer := composer.NewMockRunner(t)
 		composer.On("IsPackageInstalled", mock.Anything, "/path/to/repo", "palantirnet/drupal-rector").Return(true, nil)
 		composer.On("GetCustomCodeDirectories", mock.Anything, "/path/to/repo").Return([]string{"web/modules/custom"}, nil)
 
-		rector := rector.NewMockRectorService(t)
+		rector := rector.NewMockRunner(t)
 		rector.On("Run", mock.Anything, "/path/to/repo", []string{"web/modules/custom"}).Return("", assert.AnError)
 
 		updateRemoveDeprecations := newUpdateRemoveDeprecations(logger, rector, config, composer)
