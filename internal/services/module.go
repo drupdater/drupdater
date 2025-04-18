@@ -47,10 +47,6 @@ var Module = fx.Provide(
 		fx.As(new(WorkflowService)),
 	),
 	fx.Annotate(
-		NewDefaultComposerService,
-		fx.As(new(ComposerService)),
-	),
-	fx.Annotate(
 		newDefaultDrupalOrgService,
 		fx.As(new(DrupalOrgService)),
 	),

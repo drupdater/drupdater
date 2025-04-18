@@ -13,6 +13,7 @@ import (
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/codehosting"
 	"github.com/drupdater/drupdater/internal/utils"
+	"github.com/drupdater/drupdater/pkg/composer"
 
 	git "github.com/go-git/go-git/v5"
 	gitConfig "github.com/go-git/go-git/v5/config"
@@ -32,8 +33,8 @@ type TemplateData struct {
 }
 
 type SecurityReport struct {
-	FixedAdvisories       []Advisory
-	AfterUpdateAdvisories []Advisory
+	FixedAdvisories       []composer.Advisory
+	AfterUpdateAdvisories []composer.Advisory
 	NumUnresolvedIssues   int
 }
 
@@ -54,7 +55,7 @@ type WorkflowBaseService struct {
 	vcsProviderFactory codehosting.VcsProviderFactory
 	repository         RepositoryService
 	installer          InstallerService
-	composerService    ComposerService
+	composerService    composer.ComposerService
 }
 
 func NewWorkflowBaseService(
@@ -65,7 +66,7 @@ func NewWorkflowBaseService(
 	vcsProviderFactory codehosting.VcsProviderFactory,
 	repository RepositoryService,
 	installer InstallerService,
-	composerService ComposerService,
+	composerService composer.ComposerService,
 ) *WorkflowBaseService {
 	return &WorkflowBaseService{
 		logger:             logger,
@@ -167,7 +168,7 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, strategy Workflo
 	}
 
 	// Get composer lock hash for branch name
-	composerLockHash, err := ws.composerService.GetComposerLockHash(path)
+	composerLockHash, err := ws.composerService.GetLockHash(path)
 	if err != nil {
 		return err
 	}

@@ -2,7 +2,6 @@ package utils
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -19,32 +18,21 @@ import (
 type CommandExecutor interface {
 	ExecDrush(ctx context.Context, dir string, site string, args ...string) (string, error)
 	ExecComposer(ctx context.Context, dir string, args ...string) (string, error)
-	InstallDependencies(ctx context.Context, dir string) error
 	InstallSite(ctx context.Context, dir string, site string) error
 	GetDrupalWebDir(ctx context.Context, dir string) (string, error)
 	GetConfigSyncDir(ctx context.Context, dir string, site string, relative bool) (string, error)
 	ExportConfiguration(ctx context.Context, dir string, site string) error
 	UpdateSite(ctx context.Context, dir string, site string) error
 	ConfigResave(ctx context.Context, dir string, site string) error
-	UpdateDependencies(ctx context.Context, dir string, packagesToUpdate []string, packagesToKeep []string, minimalChanges bool, dryRun bool) (string, error)
-	IsPackageInstalled(ctx context.Context, dir string, packageToCheck string) (bool, error)
 	RunRector(ctx context.Context, dir string) (string, error)
 	GenerateDiffTable(ctx context.Context, path string, targetBranch string, withLinks bool) (string, error)
 	IsModuleEnabled(ctx context.Context, dir string, site string, module string) (bool, error)
 	LocalizeTranslations(ctx context.Context, dir string, site string) error
 	GetTranslationPath(ctx context.Context, dir string, site string, relative bool) (string, error)
-	GetComposerConfig(ctx context.Context, dir string, key string) (string, error)
-	SetComposerConfig(ctx context.Context, dir string, key string, value string) error
 	UpdateComposerLockHash(ctx context.Context, dir string) error
 	RunPHPCBF(ctx context.Context, dir string) error
 	RunPHPCS(ctx context.Context, dir string) (string, error)
-	InstallPackages(ctx context.Context, dir string, args ...string) (string, error)
-	RemovePackages(ctx context.Context, dir string, packages ...string) (string, error)
-	GetInstalledPackageVersion(ctx context.Context, dir string, packageName string) (string, error)
 	GetCustomCodeDirectories(ctx context.Context, dir string) ([]string, error)
-	GetComposerAllowPlugins(ctx context.Context, dir string) (map[string]bool, error)
-	SetComposerAllowPlugins(ctx context.Context, dir string, plugins map[string]bool) error
-	RunComposerNormalize(ctx context.Context, dir string) (string, error)
 }
 
 // DefaultCommandExecutor is the default implementation of CommandExecutor
@@ -89,15 +77,6 @@ func (e DefaultCommandExecutor) ExecComposer(ctx context.Context, dir string, ar
 	e.logger.Debug("executing composer", zap.String("dir", dir), zap.Strings("args", args), zap.String("output", output))
 
 	return output, err
-}
-
-func (e DefaultCommandExecutor) InstallDependencies(ctx context.Context, dir string) error {
-	e.logger.Debug("installing dependencies")
-	out, err := e.ExecComposer(ctx, dir, "install", "--no-interaction", "--no-progress", "--optimize-autoloader")
-	if err != nil {
-		return fmt.Errorf("failed to install dependencies: %w, output: %s", err, out)
-	}
-	return err
 }
 
 func (e DefaultCommandExecutor) InstallSite(ctx context.Context, dir string, site string) error {
@@ -156,65 +135,6 @@ func (e DefaultCommandExecutor) ConfigResave(ctx context.Context, dir string, si
 	e.logger.Debug("config resave")
 	_, err := e.ExecDrush(ctx, dir, site, "php:script", "/opt/drupdater/config-resave.php")
 	return err
-}
-
-func (e DefaultCommandExecutor) UpdateDependencies(ctx context.Context, dir string, packagesToUpdate []string, packagesToKeep []string, minimalChanges bool, dryRun bool) (string, error) {
-	e.logger.Debug("updating dependencies", zap.Strings("packagesToUpdate", packagesToUpdate))
-	args := append([]string{"update", "--no-interaction", "--no-progress", "--optimize-autoloader", "--with-all-dependencies", "--no-ansi"}, packagesToUpdate...)
-	for _, packageToKeep := range packagesToKeep {
-		args = append(args, fmt.Sprintf("--with=%s", packageToKeep))
-	}
-	if minimalChanges {
-		args = append(args, "--minimal-changes")
-	}
-	if dryRun {
-		args = append(args, "--dry-run")
-	} else {
-		args = append(args, "--bump-after-update")
-	}
-	return e.ExecComposer(ctx, dir, args...)
-}
-
-func (e DefaultCommandExecutor) GetComposerAllowPlugins(ctx context.Context, dir string) (map[string]bool, error) {
-	allowPluginsJSON, err := e.GetComposerConfig(ctx, dir, "allow-plugins")
-	if err != nil {
-		e.logger.Error("failed to set composer config", zap.Error(err))
-	}
-
-	var allowPlugins map[string]bool
-
-	err = json.Unmarshal([]byte(allowPluginsJSON), &allowPlugins)
-	if err != nil {
-		return nil, err
-	}
-
-	return allowPlugins, nil
-}
-
-func (e DefaultCommandExecutor) SetComposerAllowPlugins(ctx context.Context, dir string, plugins map[string]bool) error {
-	for key, value := range plugins {
-		err := e.SetComposerConfig(ctx, dir, "allow-plugins."+key, fmt.Sprintf("%t", value))
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (e DefaultCommandExecutor) IsPackageInstalled(ctx context.Context, dir string, packageToCheck string) (bool, error) {
-	_, err := e.ExecComposer(ctx, dir, "show", "--locked", packageToCheck)
-	if err != nil {
-		return false, err
-	}
-	return true, nil
-}
-
-func (e DefaultCommandExecutor) InstallPackages(ctx context.Context, dir string, args ...string) (string, error) {
-	return e.ExecComposer(ctx, dir, append([]string{"require"}, args...)...)
-}
-
-func (e DefaultCommandExecutor) RemovePackages(ctx context.Context, dir string, packages ...string) (string, error) {
-	return e.ExecComposer(ctx, dir, append([]string{"remove"}, packages...)...)
 }
 
 func (e DefaultCommandExecutor) RunRector(ctx context.Context, dir string) (string, error) {
@@ -297,36 +217,6 @@ func (e DefaultCommandExecutor) GetTranslationPath(ctx context.Context, dir stri
 	return translationPath, nil
 }
 
-func (e DefaultCommandExecutor) GetComposerConfig(ctx context.Context, dir string, key string) (string, error) {
-	e.logger.Debug("getting composer config", zap.String("key", key))
-	//ctx = context.Background()
-	return e.ExecComposer(ctx, dir, "config", "--json", key)
-}
-
-func (e DefaultCommandExecutor) SetComposerConfig(ctx context.Context, dir string, key string, value string) error {
-	e.logger.Debug("setting composer config", zap.String("key", key), zap.String("value", value))
-	_, err := e.ExecComposer(ctx, dir, "config", "--json", key, value)
-	return err
-}
-
-func (e DefaultCommandExecutor) GetInstalledPackageVersion(ctx context.Context, dir string, packageName string) (string, error) {
-	e.logger.Debug("getting installed package version")
-	out, err := e.ExecComposer(ctx, dir, "show", packageName, "--locked", "--no-ansi", "--format=json")
-	if err != nil {
-		return "", err
-	}
-
-	var composerShow struct {
-		Versions []string `json:"versions"`
-	}
-
-	if err := json.Unmarshal([]byte(out), &composerShow); err != nil {
-		return "", err
-	}
-
-	return composerShow.Versions[0], nil
-}
-
 func (e DefaultCommandExecutor) UpdateComposerLockHash(ctx context.Context, dir string) error {
 	e.logger.Debug("updating composer lock hash")
 	_, err := e.ExecComposer(ctx, dir, "update", "--lock", "--no-install")
@@ -336,11 +226,6 @@ func (e DefaultCommandExecutor) UpdateComposerLockHash(ctx context.Context, dir 
 func (e DefaultCommandExecutor) RunPHPCS(ctx context.Context, dir string) (string, error) {
 	e.logger.Debug("running phpcs")
 	return e.ExecComposer(ctx, dir, "exec", "--", "phpcs", "--report=json", "-q", "--runtime-set", "ignore_errors_on_exit", "1", "--runtime-set", "ignore_warnings_on_exit", "1")
-}
-
-func (e DefaultCommandExecutor) RunComposerNormalize(ctx context.Context, dir string) (string, error) {
-	e.logger.Debug("running composer normalize")
-	return e.ExecComposer(ctx, dir, "normalize")
 }
 
 func (e DefaultCommandExecutor) RunPHPCBF(ctx context.Context, dir string) error {

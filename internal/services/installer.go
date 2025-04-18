@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/drupdater/drupdater/internal/utils"
+	"github.com/drupdater/drupdater/pkg/composer"
 
 	"go.uber.org/zap"
 )
@@ -20,14 +21,16 @@ type DefaultInstallerService struct {
 	repository      RepositoryService
 	commandExecutor utils.CommandExecutor
 	settings        SettingsService
+	composer        composer.ComposerService
 }
 
-func newDefaultInstallerService(logger *zap.Logger, repository RepositoryService, commandExecutor utils.CommandExecutor, settings SettingsService) *DefaultInstallerService {
+func newDefaultInstallerService(logger *zap.Logger, repository RepositoryService, commandExecutor utils.CommandExecutor, settings SettingsService, composer composer.ComposerService) *DefaultInstallerService {
 	return &DefaultInstallerService{
 		logger:          logger,
 		repository:      repository,
 		commandExecutor: commandExecutor,
 		settings:        settings,
+		composer:        composer,
 	}
 }
 
@@ -40,7 +43,7 @@ func (is *DefaultInstallerService) InstallDrupal(ctx context.Context, repository
 		return err
 	}
 
-	if err = is.commandExecutor.InstallDependencies(ctx, path); err != nil {
+	if err = is.composer.Install(ctx, path); err != nil {
 		return err
 	}
 

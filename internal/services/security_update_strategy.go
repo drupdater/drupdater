@@ -7,36 +7,37 @@ import (
 	"time"
 
 	"github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/pkg/composer"
 	"go.uber.org/zap"
 )
 
 // SecurityUpdateStrategy implements the security update workflow
 type SecurityUpdateStrategy struct {
-	logger          *zap.Logger
-	config          internal.Config
-	current         time.Time
-	composerService ComposerService
-	beforeAudit     ComposerAudit
-	afterAudit      ComposerAudit
+	logger      *zap.Logger
+	config      internal.Config
+	current     time.Time
+	composer    composer.ComposerService
+	beforeAudit composer.ComposerAudit
+	afterAudit  composer.ComposerAudit
 }
 
 func NewSecurityUpdateStrategy(
 	logger *zap.Logger,
 	config internal.Config,
-	composerService ComposerService,
+	composerService composer.ComposerService,
 ) SecurityUpdateStrategy {
 	return SecurityUpdateStrategy{
-		logger:          logger,
-		config:          config,
-		current:         time.Now(),
-		composerService: composerService,
+		logger:   logger,
+		config:   config,
+		current:  time.Now(),
+		composer: composerService,
 	}
 }
 
 func (s SecurityUpdateStrategy) PreUpdate(ctx context.Context, path string) ([]string, bool, error) {
 	var err error
 
-	s.beforeAudit, err = s.composerService.RunComposerAudit(ctx, path)
+	s.beforeAudit, err = s.composer.Audit(ctx, path)
 	if err != nil {
 		return nil, false, err
 	}
@@ -72,7 +73,7 @@ func (s SecurityUpdateStrategy) ShouldContinue(packagesToUpdate []string) bool {
 func (s SecurityUpdateStrategy) PostUpdate(ctx context.Context, path string, worktree internal.Worktree, result WorkflowUpdateResult) error {
 	var err error
 
-	s.afterAudit, err = s.composerService.RunComposerAudit(ctx, path)
+	s.afterAudit, err = s.composer.Audit(ctx, path)
 	if err != nil {
 		return err
 	}
@@ -104,9 +105,9 @@ func (s SecurityUpdateStrategy) GetTemplateData(result WorkflowUpdateResult, upd
 	}, nil
 }
 
-func (s SecurityUpdateStrategy) GetFixedAdvisories() []Advisory {
+func (s SecurityUpdateStrategy) GetFixedAdvisories() []composer.Advisory {
 	// Get advisories from before that are not present in after
-	var fixed = make([]Advisory, 0)
+	var fixed = make([]composer.Advisory, 0)
 	for _, beforeAdvisory := range s.beforeAudit.Advisories {
 		found := false
 		for _, afterAdvisory := range s.afterAudit.Advisories {

@@ -5,7 +5,10 @@ package services
 import (
 	context "context"
 
+	composer "github.com/drupdater/drupdater/pkg/composer"
+
 	internal "github.com/drupdater/drupdater/internal"
+
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -144,7 +147,7 @@ func (_c *MockUpdaterService_UpdateDrupal_Call) RunAndReturn(run func(context.Co
 }
 
 // UpdatePatches provides a mock function with given fields: ctx, path, worktree, operations, patches
-func (_m *MockUpdaterService) UpdatePatches(ctx context.Context, path string, worktree internal.Worktree, operations []PackageChange, patches map[string]map[string]string) (PatchUpdates, map[string]map[string]string) {
+func (_m *MockUpdaterService) UpdatePatches(ctx context.Context, path string, worktree internal.Worktree, operations []composer.PackageChange, patches map[string]map[string]string) (PatchUpdates, map[string]map[string]string) {
 	ret := _m.Called(ctx, path, worktree, operations, patches)
 
 	if len(ret) == 0 {
@@ -153,16 +156,16 @@ func (_m *MockUpdaterService) UpdatePatches(ctx context.Context, path string, wo
 
 	var r0 PatchUpdates
 	var r1 map[string]map[string]string
-	if rf, ok := ret.Get(0).(func(context.Context, string, internal.Worktree, []PackageChange, map[string]map[string]string) (PatchUpdates, map[string]map[string]string)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, internal.Worktree, []composer.PackageChange, map[string]map[string]string) (PatchUpdates, map[string]map[string]string)); ok {
 		return rf(ctx, path, worktree, operations, patches)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, internal.Worktree, []PackageChange, map[string]map[string]string) PatchUpdates); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string, internal.Worktree, []composer.PackageChange, map[string]map[string]string) PatchUpdates); ok {
 		r0 = rf(ctx, path, worktree, operations, patches)
 	} else {
 		r0 = ret.Get(0).(PatchUpdates)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, internal.Worktree, []PackageChange, map[string]map[string]string) map[string]map[string]string); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, string, internal.Worktree, []composer.PackageChange, map[string]map[string]string) map[string]map[string]string); ok {
 		r1 = rf(ctx, path, worktree, operations, patches)
 	} else {
 		if ret.Get(1) != nil {
@@ -182,15 +185,15 @@ type MockUpdaterService_UpdatePatches_Call struct {
 //   - ctx context.Context
 //   - path string
 //   - worktree internal.Worktree
-//   - operations []PackageChange
+//   - operations []composer.PackageChange
 //   - patches map[string]map[string]string
 func (_e *MockUpdaterService_Expecter) UpdatePatches(ctx interface{}, path interface{}, worktree interface{}, operations interface{}, patches interface{}) *MockUpdaterService_UpdatePatches_Call {
 	return &MockUpdaterService_UpdatePatches_Call{Call: _e.mock.On("UpdatePatches", ctx, path, worktree, operations, patches)}
 }
 
-func (_c *MockUpdaterService_UpdatePatches_Call) Run(run func(ctx context.Context, path string, worktree internal.Worktree, operations []PackageChange, patches map[string]map[string]string)) *MockUpdaterService_UpdatePatches_Call {
+func (_c *MockUpdaterService_UpdatePatches_Call) Run(run func(ctx context.Context, path string, worktree internal.Worktree, operations []composer.PackageChange, patches map[string]map[string]string)) *MockUpdaterService_UpdatePatches_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(internal.Worktree), args[3].([]PackageChange), args[4].(map[string]map[string]string))
+		run(args[0].(context.Context), args[1].(string), args[2].(internal.Worktree), args[3].([]composer.PackageChange), args[4].(map[string]map[string]string))
 	})
 	return _c
 }
@@ -200,7 +203,7 @@ func (_c *MockUpdaterService_UpdatePatches_Call) Return(_a0 PatchUpdates, _a1 ma
 	return _c
 }
 
-func (_c *MockUpdaterService_UpdatePatches_Call) RunAndReturn(run func(context.Context, string, internal.Worktree, []PackageChange, map[string]map[string]string) (PatchUpdates, map[string]map[string]string)) *MockUpdaterService_UpdatePatches_Call {
+func (_c *MockUpdaterService_UpdatePatches_Call) RunAndReturn(run func(context.Context, string, internal.Worktree, []composer.PackageChange, map[string]map[string]string) (PatchUpdates, map[string]map[string]string)) *MockUpdaterService_UpdatePatches_Call {
 	_c.Call.Return(run)
 	return _c
 }

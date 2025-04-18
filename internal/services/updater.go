@@ -16,6 +16,7 @@ import (
 
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/utils"
+	"github.com/drupdater/drupdater/pkg/composer"
 
 	gitlab "gitlab.com/gitlab-org/api/client-go"
 
@@ -71,7 +72,7 @@ type ConflictPatch struct {
 type UpdaterService interface {
 	UpdateDependencies(ctx context.Context, path string, packagesToUpdate []string, worktree internal.Worktree, minimalChanges bool) (DependencyUpdateReport, error)
 	UpdateDrupal(ctx context.Context, path string, worktree internal.Worktree, sites []string) (UpdateHooksPerSite, error)
-	UpdatePatches(ctx context.Context, path string, worktree internal.Worktree, operations []PackageChange, patches map[string]map[string]string) (PatchUpdates, map[string]map[string]string)
+	UpdatePatches(ctx context.Context, path string, worktree internal.Worktree, operations []composer.PackageChange, patches map[string]map[string]string) (PatchUpdates, map[string]map[string]string)
 }
 
 type DefaultUpdater struct {
@@ -81,13 +82,13 @@ type DefaultUpdater struct {
 	repository      RepositoryService
 	afterSiteUpdate []AfterSiteUpdate
 	config          internal.Config
-	composer        ComposerService
+	composer        composer.ComposerService
 	drupalOrg       DrupalOrgService
 	gitlab          *gitlab.Client
 	drush           DrushService
 }
 
-func newDefaultUpdater(afterSiteUpdate []AfterSiteUpdate, logger *zap.Logger, commandExecutor utils.CommandExecutor, settings SettingsService, repository RepositoryService, config internal.Config, composer ComposerService, drupalOrg DrupalOrgService, drush DrushService) *DefaultUpdater {
+func newDefaultUpdater(afterSiteUpdate []AfterSiteUpdate, logger *zap.Logger, commandExecutor utils.CommandExecutor, settings SettingsService, repository RepositoryService, config internal.Config, composer composer.ComposerService, drupalOrg DrupalOrgService, drush DrushService) *DefaultUpdater {
 
 	drupalOrgGitlab, err := gitlab.NewClient(os.Getenv("DRUPALCODE_ACCESS_TOKEN"), gitlab.WithBaseURL("https://git.drupalcode.org/api/v4"))
 	if err != nil {
@@ -112,7 +113,7 @@ func (us *DefaultUpdater) UpdateDependencies(ctx context.Context, path string, p
 	var updateReport DependencyUpdateReport
 
 	patches := make(map[string]map[string]string)
-	patchesString, err := us.commandExecutor.GetComposerConfig(ctx, path, "extra.patches")
+	patchesString, err := us.composer.GetConfig(ctx, path, "extra.patches")
 	if err != nil {
 		us.logger.Debug("extra.patches not defined")
 		patchesString = "{}"
@@ -122,7 +123,7 @@ func (us *DefaultUpdater) UpdateDependencies(ctx context.Context, path string, p
 		us.logger.Error("failed to unmarshal patches", zap.Error(err))
 	}
 
-	operations, err := us.composer.GetComposerUpdates(ctx, path, packagesToUpdate, minimalChanges)
+	operations, err := us.composer.ListPendingUpdates(ctx, path, packagesToUpdate, minimalChanges)
 	if err != nil {
 		us.logger.Error("failed to get composer updates", zap.Error(err))
 		return updateReport, err
@@ -135,7 +136,7 @@ func (us *DefaultUpdater) UpdateDependencies(ctx context.Context, path string, p
 		if err != nil {
 			us.logger.Error("failed to marshal patches", zap.Error(err))
 		}
-		err = us.commandExecutor.SetComposerConfig(ctx, path, "extra.patches", string(jsonString))
+		err = us.composer.SetConfig(ctx, path, "extra.patches", string(jsonString))
 		if err != nil {
 			us.logger.Error("failed to set composer config", zap.Error(err))
 		}
@@ -154,13 +155,13 @@ func (us *DefaultUpdater) UpdateDependencies(ctx context.Context, path string, p
 		}
 	}
 
-	allowPlugins, err := us.commandExecutor.GetComposerAllowPlugins(ctx, path)
+	allowPlugins, err := us.composer.GetAllowPlugins(ctx, path)
 	if err != nil {
 		us.logger.Error("failed to get composer allow plugins", zap.Error(err))
 	}
 
 	// Allow all plugins during update
-	err = us.commandExecutor.SetComposerConfig(ctx, path, "allow-plugins", "true")
+	err = us.composer.SetConfig(ctx, path, "allow-plugins", "true")
 	if err != nil {
 		us.logger.Error("failed to set composer config", zap.Error(err))
 	}
@@ -169,7 +170,7 @@ func (us *DefaultUpdater) UpdateDependencies(ctx context.Context, path string, p
 	for _, patchUpdate := range patchUpdates.Conflicts {
 		packagesToKeep = append(packagesToKeep, fmt.Sprintf("%s:%s", patchUpdate.Package, patchUpdate.FixedVersion))
 	}
-	if _, err = us.commandExecutor.UpdateDependencies(ctx, path, packagesToUpdate, packagesToKeep, minimalChanges, false); err != nil {
+	if _, err = us.composer.Update(ctx, path, packagesToUpdate, packagesToKeep, minimalChanges, false); err != nil {
 		return updateReport, err
 	}
 
@@ -185,11 +186,11 @@ func (us *DefaultUpdater) UpdateDependencies(ctx context.Context, path string, p
 			updateReport.AddedAllowPlugins = append(updateReport.AddedAllowPlugins, key)
 		}
 	}
-	if err := us.commandExecutor.SetComposerAllowPlugins(ctx, path, allowPlugins); err != nil {
+	if err := us.composer.SetAllowPlugins(ctx, path, allowPlugins); err != nil {
 		return updateReport, err
 	}
 
-	if _, err := us.commandExecutor.RunComposerNormalize(ctx, path); err != nil {
+	if _, err := us.composer.Normalize(ctx, path); err != nil {
 		us.logger.Debug("failed to run composer normalize", zap.Error(err))
 	}
 
@@ -285,14 +286,14 @@ func (us *DefaultUpdater) UpdateDrupal(ctx context.Context, path string, worktre
 	return updateHooksPerSite, nil
 }
 
-func (us *DefaultUpdater) UpdatePatches(ctx context.Context, path string, worktree internal.Worktree, operations []PackageChange, patches map[string]map[string]string) (PatchUpdates, map[string]map[string]string) {
+func (us *DefaultUpdater) UpdatePatches(ctx context.Context, path string, worktree internal.Worktree, operations []composer.PackageChange, patches map[string]map[string]string) (PatchUpdates, map[string]map[string]string) {
 
 	updates := PatchUpdates{}
 	us.logger.Debug("composer patches", zap.Any("patches", patches))
 
 	// Remove patches for packages that are no longer installed
 	for packageName := range patches {
-		if installed, _ := us.commandExecutor.IsPackageInstalled(ctx, path, packageName); !installed {
+		if installed, _ := us.composer.IsPackageInstalled(ctx, path, packageName); !installed {
 			for description, patchPath := range patches[packageName] {
 				_, err := url.ParseRequestURI(patchPath)
 				if err != nil {
@@ -377,7 +378,7 @@ func (us *DefaultUpdater) UpdatePatches(ctx context.Context, path string, worktr
 						absolutePath = path + "/" + patchPath
 					}
 
-					if ok, err := us.composer.CheckPatchApplies(ctx, operation.Package, operation.To, absolutePath); err != nil {
+					if ok, err := us.composer.CheckIfPatchApplies(ctx, operation.Package, operation.To, absolutePath); err != nil {
 						us.logger.Debug("failed to check if patch applies", zap.Error(err))
 					} else if ok {
 						us.logger.Debug("patch applies", zap.String("package", operation.Package), zap.String("version", operation.To), zap.String("patch", patchPath))
@@ -434,7 +435,7 @@ func (us *DefaultUpdater) UpdatePatches(ctx context.Context, path string, worktr
 									us.logger.Debug("failed to download patch", zap.Error(err))
 								}
 
-								if ok, err := us.composer.CheckPatchApplies(ctx, operation.Package, operation.To, path+"/"+newPatchPath+"/"+newPatchFile); err != nil {
+								if ok, err := us.composer.CheckIfPatchApplies(ctx, operation.Package, operation.To, path+"/"+newPatchPath+"/"+newPatchFile); err != nil {
 									us.logger.Debug("failed to check if patch applies", zap.Error(err))
 								} else if ok {
 									if !externalPatch {

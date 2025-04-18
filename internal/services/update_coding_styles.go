@@ -9,6 +9,7 @@ import (
 
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/utils"
+	"github.com/drupdater/drupdater/pkg/composer"
 
 	"github.com/go-git/go-git/v5"
 	"go.uber.org/zap"
@@ -18,6 +19,7 @@ type UpdateCodingStyles struct {
 	logger          *zap.Logger
 	commandExecutor utils.CommandExecutor
 	config          internal.Config
+	composer        composer.ComposerService
 }
 
 type PHPCSReturn struct {
@@ -41,11 +43,12 @@ type PHPCSReturn struct {
 	} `json:"totals"`
 }
 
-func newUpdateCodingStyles(logger *zap.Logger, commandExecutor utils.CommandExecutor, config internal.Config) *UpdateCodingStyles {
+func newUpdateCodingStyles(logger *zap.Logger, commandExecutor utils.CommandExecutor, config internal.Config, composer composer.ComposerService) *UpdateCodingStyles {
 	return &UpdateCodingStyles{
 		logger:          logger,
 		commandExecutor: commandExecutor,
 		config:          config,
+		composer:        composer,
 	}
 }
 
@@ -79,7 +82,7 @@ func (h *UpdateCodingStyles) Execute(ctx context.Context, path string, worktree 
 		}
 	}
 
-	if installed, _ := h.commandExecutor.IsPackageInstalled(ctx, path, "drupal/coder"); !installed {
+	if installed, _ := h.composer.IsPackageInstalled(ctx, path, "drupal/coder"); !installed {
 		if err := h.InstallCoder(ctx, path, worktree); err != nil {
 			return err
 		}
@@ -153,7 +156,7 @@ func (h *UpdateCodingStyles) CreatePHPCSConfig(ctx context.Context, path string,
 		panic(err)
 	}
 
-	drupalVersion, _ := h.commandExecutor.GetInstalledPackageVersion(ctx, path, "drupal/core")
+	drupalVersion, _ := h.composer.GetInstalledPackageVersion(ctx, path, "drupal/core")
 	majorVersion := strings.Split(drupalVersion, ".")[0]
 
 	data := struct {
@@ -196,7 +199,7 @@ func (h *UpdateCodingStyles) CreatePHPCSConfig(ctx context.Context, path string,
 
 func (h *UpdateCodingStyles) InstallCoder(ctx context.Context, path string, worktree internal.Worktree) error {
 	h.logger.Debug("drupal/coder is not installed, installing")
-	if _, err := h.commandExecutor.InstallPackages(ctx, path, "--dev", "drupal/coder"); err != nil {
+	if _, err := h.composer.Require(ctx, path, "--dev", "drupal/coder"); err != nil {
 		return err
 	}
 
