@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/drupdater/drupdater/internal"
-	"github.com/drupdater/drupdater/internal/utils"
+	"github.com/drupdater/drupdater/pkg/drush"
 
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -15,44 +15,39 @@ import (
 
 func TestUpdateTranslationsEventHandlerWithoutLocaleDeploy(t *testing.T) {
 	// Create mocks
-	mockCommandExecutor := utils.NewMockCommandExecutor(t)
+	mockDrush := drush.NewMockDrushService(t)
 	mockRepository := NewMockRepositoryService(t)
 	logger := zap.NewNop()
 
 	// Create an instance of UpdateTranslationsEventHandler with mocked dependencies
-	handler := newUpdateTranslations(logger, mockCommandExecutor, mockRepository)
+	handler := newUpdateTranslations(logger, mockDrush, mockRepository)
 
 	worktree := internal.NewMockWorktree(t)
 
 	// Set up expectations
-	mockCommandExecutor.On("IsModuleEnabled", mock.Anything, "/tmp", "example.com", "locale_deploy").Return(false, nil)
+	mockDrush.On("IsModuleEnabled", mock.Anything, "/tmp", "example.com", "locale_deploy").Return(false, nil)
 
 	// Verify the results
 	assert.NoError(t, handler.Execute(t.Context(), "/tmp", worktree, "example.com"))
 
-	mockCommandExecutor.On("IsModuleEnabled", mock.Anything, "/tmp", "example.com", "locale_deploy").Return(true, nil)
-
-	assert.NoError(t, handler.Execute(t.Context(), "/tmp", worktree, "example.com"))
-
-	mockCommandExecutor.AssertExpectations(t)
-
+	mockDrush.AssertExpectations(t)
 }
 
 func TestUpdateTranslationsEventHandlerWitLocaleDeploy(t *testing.T) {
 	// Create mocks
-	mockCommandExecutor := utils.NewMockCommandExecutor(t)
+	mockDrush := drush.NewMockDrushService(t)
 	mockRepository := NewMockRepositoryService(t)
 	logger := zap.NewNop()
 
 	// Create an instance of UpdateTranslationsEventHandler with mocked dependencies
-	handler := newUpdateTranslations(logger, mockCommandExecutor, mockRepository)
+	handler := newUpdateTranslations(logger, mockDrush, mockRepository)
 
 	worktree := internal.NewMockWorktree(t)
 
 	// Set up expectations
-	mockCommandExecutor.On("IsModuleEnabled", mock.Anything, "/tmp", "example.com", "locale_deploy").Return(true, nil)
-	mockCommandExecutor.On("LocalizeTranslations", mock.Anything, "/tmp", "example.com").Return(nil)
-	mockCommandExecutor.On("GetTranslationPath", mock.Anything, "/tmp", "example.com", true).Return("translations", nil)
+	mockDrush.On("IsModuleEnabled", mock.Anything, "/tmp", "example.com", "locale_deploy").Return(true, nil)
+	mockDrush.On("LocalizeTranslations", mock.Anything, "/tmp", "example.com").Return(nil)
+	mockDrush.On("GetTranslationPath", mock.Anything, "/tmp", "example.com", true).Return("translations", nil)
 
 	mockRepository.On("IsSomethingStagedInPath", worktree, "translations").Return(true, nil)
 
@@ -63,6 +58,7 @@ func TestUpdateTranslationsEventHandlerWitLocaleDeploy(t *testing.T) {
 	// Verify the results
 	assert.NoError(t, handler.Execute(t.Context(), "/tmp", worktree, "example.com"))
 
-	mockCommandExecutor.AssertExpectations(t)
-
+	mockDrush.AssertExpectations(t)
+	mockRepository.AssertExpectations(t)
+	worktree.AssertExpectations(t)
 }

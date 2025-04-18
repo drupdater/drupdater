@@ -163,14 +163,8 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, strategy Workflo
 		return err
 	}
 
-	// Get composer lock hash for branch name
-	composerLockHash, err := ws.composer.GetLockHash(path)
-	if err != nil {
-		return err
-	}
-
 	// Get branch name from strategy
-	updateBranchName := strategy.GenerateBranchName(composerLockHash)
+	updateBranchName := strategy.GenerateBranchName(path)
 
 	// Check if branch already exists
 	exists, err := ws.repository.BranchExists(repository, updateBranchName)

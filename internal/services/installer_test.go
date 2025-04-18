@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/drush"
 	"github.com/stretchr/testify/mock"
 
@@ -36,6 +37,7 @@ module:
 	settingsService := NewMockSettingsService(t)
 	repositoryService := NewMockRepositoryService(t)
 	logger := zap.NewNop()
+	composerService := composer.NewMockComposerService(t)
 
 	repositoryURL := "https://example.com/repo.git"
 	branch := "main"
@@ -51,7 +53,7 @@ module:
 
 	t.Run("Success", func(t *testing.T) {
 		drush := drush.NewMockDrushService(t)
-		drush.On("InstallDependencies", mock.Anything, "/tmp").Return(nil)
+		composerService.On("Install", mock.Anything, "/tmp").Return(nil)
 
 		drush.On("InstallSite", mock.Anything, "/tmp", "site1").Return(nil)
 		drush.On("InstallSite", mock.Anything, "/tmp", "site2").Return(nil)
@@ -61,6 +63,7 @@ module:
 			repository: repositoryService,
 			drush:      drush,
 			settings:   settingsService,
+			composer:   composerService,
 		}
 		err = installer.InstallDrupal(t.Context(), repositoryURL, branch, token, sites)
 		if err != nil {
@@ -72,7 +75,7 @@ module:
 
 	t.Run("Failure", func(t *testing.T) {
 		drush := drush.NewMockDrushService(t)
-		drush.On("InstallDependencies", mock.Anything, "/tmp").Return(nil)
+		composerService.On("Install", mock.Anything, "/tmp").Return(nil)
 		drush.On("InstallSite", mock.Anything, "/tmp", "site1").Return(nil)
 		drush.On("InstallSite", mock.Anything, "/tmp", "site2").Return(errors.New("failed to install site"))
 
@@ -81,6 +84,7 @@ module:
 			repository: repositoryService,
 			drush:      drush,
 			settings:   settingsService,
+			composer:   composerService,
 		}
 		err = installer.InstallDrupal(t.Context(), repositoryURL, branch, token, sites)
 		if err == nil {

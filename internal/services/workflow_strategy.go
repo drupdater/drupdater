@@ -15,7 +15,7 @@ type WorkflowStrategy interface {
 	PostUpdate(ctx context.Context, path string, worktree internal.Worktree, result WorkflowUpdateResult) error
 
 	// GenerateBranchName creates a unique branch name for the updates
-	GenerateBranchName(composerLockHash string) string
+	GenerateBranchName(path string) string
 
 	// GeneratePRDetails generates PR title and template name for description
 	GeneratePRDetails() (string, string)

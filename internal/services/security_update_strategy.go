@@ -81,7 +81,12 @@ func (s SecurityUpdateStrategy) PostUpdate(ctx context.Context, path string, wor
 	return nil
 }
 
-func (s SecurityUpdateStrategy) GenerateBranchName(composerLockHash string) string {
+func (s SecurityUpdateStrategy) GenerateBranchName(path string) string {
+	// Get composer lock hash for branch name
+	composerLockHash, err := s.composer.GetLockHash(path)
+	if err != nil {
+		return ""
+	}
 	return fmt.Sprintf("security-update-%s", composerLockHash)
 }
 
