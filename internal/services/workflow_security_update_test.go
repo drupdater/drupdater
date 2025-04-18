@@ -6,56 +6,53 @@ import (
 
 	internal "github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/codehosting"
-	"github.com/drupdater/drupdater/internal/utils"
+	"github.com/drupdater/drupdater/pkg/composer"
 
-	object "github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
 	"go.uber.org/zap"
 )
 
 func TestGetFixedAdvisories(t *testing.T) {
-	ws := &WorkflowSecurityUpdateService{}
-
 	tests := []struct {
 		name     string
-		before   []Advisory
-		after    []Advisory
-		expected []Advisory
+		before   []composer.Advisory
+		after    []composer.Advisory
+		expected []composer.Advisory
 	}{
 		{
 			name: "No advisories fixed",
-			before: []Advisory{
+			before: []composer.Advisory{
 				{CVE: "CVE-1234", Title: "Vulnerability 1"},
 				{CVE: "CVE-5678", Title: "Vulnerability 2"},
 			},
-			after: []Advisory{
+			after: []composer.Advisory{
 				{CVE: "CVE-1234", Title: "Vulnerability 1"},
 				{CVE: "CVE-5678", Title: "Vulnerability 2"},
 			},
-			expected: []Advisory{},
+			expected: []composer.Advisory{},
 		},
 		{
 			name: "Some advisories fixed",
-			before: []Advisory{
+			before: []composer.Advisory{
 				{CVE: "CVE-1234", Title: "Vulnerability 1"},
 				{CVE: "CVE-5678", Title: "Vulnerability 2"},
 			},
-			after: []Advisory{
+			after: []composer.Advisory{
 				{CVE: "CVE-1234", Title: "Vulnerability 1"},
 			},
-			expected: []Advisory{
+			expected: []composer.Advisory{
 				{CVE: "CVE-5678", Title: "Vulnerability 2"},
 			},
 		},
 		{
 			name: "All advisories fixed",
-			before: []Advisory{
+			before: []composer.Advisory{
 				{CVE: "CVE-1234", Title: "Vulnerability 1"},
 				{CVE: "CVE-5678", Title: "Vulnerability 2"},
 			},
-			after: []Advisory{},
-			expected: []Advisory{
+			after: []composer.Advisory{},
+			expected: []composer.Advisory{
 				{CVE: "CVE-1234", Title: "Vulnerability 1"},
 				{CVE: "CVE-5678", Title: "Vulnerability 2"},
 			},
@@ -64,7 +61,11 @@ func TestGetFixedAdvisories(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			actual := ws.GetFixedAdvisories(tt.before, tt.after)
+			ws := &SecurityUpdateStrategy{
+				beforeAudit: composer.Audit{Advisories: tt.before},
+				afterAudit:  composer.Audit{Advisories: tt.after},
+			}
+			actual := ws.GetFixedAdvisories()
 			assert.Equal(t, tt.expected, actual)
 		})
 	}
@@ -78,8 +79,8 @@ func TestSecurityUpdateStartUpdate(t *testing.T) {
 	vcsProviderFactory := codehosting.NewMockVcsProviderFactory(t)
 	vcsProvider := codehosting.NewMockPlatform(t)
 	repository := internal.NewMockRepository(t)
-	commandExecutor := utils.NewMockCommandExecutor(t)
-	composerService := NewMockComposerService(t)
+
+	composerService := composer.NewMockRunner(t)
 	config := internal.Config{
 		RepositoryURL: "https://example.com/repo.git",
 		Branch:        "main",
@@ -88,34 +89,33 @@ func TestSecurityUpdateStartUpdate(t *testing.T) {
 		DryRun:        false,
 	}
 
-	workflowService := newWorkflowSecurityUpdateService(logger, installer, updater, repositoryService, vcsProviderFactory, config, commandExecutor, composerService)
+	strategy := NewSecurityUpdateStrategy(logger, config, composerService)
+	workflowService := NewWorkflowBaseService(logger, config, updater, vcsProviderFactory, repositoryService, installer, composerService)
 
 	worktree := internal.NewMockWorktree(t)
 	worktree.On("Checkout", mock.Anything).Return(nil)
 
-	installer.On("InstallDrupal", config.RepositoryURL, config.Branch, config.Token, config.Sites).Return(nil)
+	installer.On("InstallDrupal", mock.Anything, config.RepositoryURL, config.Branch, config.Token, config.Sites).Return(nil)
 	repositoryService.On("CloneRepository", config.RepositoryURL, config.Branch, config.Token).Return(repository, worktree, "/tmp", nil)
-	repositoryService.On("GetHeadCommit", repository).Return(&object.Commit{}, nil)
 	repositoryService.On("BranchExists", mock.Anything, "security-update-ddd").Return(false, nil)
 
-	updater.On("UpdateDependencies", "/tmp", []string{"package1"}, mock.Anything, true).Return(DependencyUpdateReport{}, nil)
-	updater.On("UpdateDrupal", "/tmp", mock.Anything, config.Sites).Return(UpdateHooksPerSite{}, nil)
+	updater.On("UpdateDependencies", mock.Anything, "/tmp", []string{"package1"}, mock.Anything, true).Return(DependencyUpdateReport{}, nil)
+	updater.On("UpdateDrupal", mock.Anything, "/tmp", mock.Anything, config.Sites).Return(UpdateHooksPerSite{}, nil)
 	vcsProviderFactory.On("Create", "https://example.com/repo.git", "token").Return(vcsProvider)
 
 	fixture, _ := os.ReadFile("testdata/security_update.md")
 	vcsProvider.On("CreateMergeRequest", mock.Anything, string(fixture), mock.Anything, config.Branch).Return(codehosting.MergeRequest{}, nil)
 	repository.On("Push", mock.Anything).Return(nil)
-	commandExecutor.On("GenerateDiffTable", mock.Anything, mock.Anything, true).Return("Dummy Table", nil)
-	commandExecutor.On("GenerateDiffTable", mock.Anything, mock.Anything, false).Return("Dummy Table", nil)
-	composerService.On("RunComposerAudit", "/tmp").Return(ComposerAudit{
-		Advisories: []Advisory{
+	composerService.On("Diff", mock.Anything, mock.Anything, mock.Anything, true).Return("Dummy Table", nil)
+	composerService.On("Audit", mock.Anything, "/tmp").Return(composer.Audit{
+		Advisories: []composer.Advisory{
 			{CVE: "CVE-1234", Title: "Vul 1", Severity: "high    ", Link: "https://example.com", PackageName: "package1"},
 			{CVE: "CVE-5678", Title: "Vul 2", Severity: "high    ", Link: "https://example.com", PackageName: "package1"},
 		},
 	}, nil)
-	composerService.On("GetComposerLockHash", "/tmp").Return("ddd", nil)
+	composerService.On("GetLockHash", "/tmp").Return("ddd", nil)
 
-	err := workflowService.StartUpdate()
+	err := workflowService.StartUpdate(t.Context(), strategy)
 
 	assert.NoError(t, err)
 	installer.AssertExpectations(t)
@@ -133,8 +133,8 @@ func TestSecurityUpdateStartUpdateWithDryRun(t *testing.T) {
 	vcsProviderFactory := codehosting.NewMockVcsProviderFactory(t)
 	vcsProvider := codehosting.NewMockPlatform(t)
 	repository := internal.NewMockRepository(t)
-	commandExecutor := utils.NewMockCommandExecutor(t)
-	composerService := NewMockComposerService(t)
+
+	composerService := composer.NewMockRunner(t)
 	config := internal.Config{
 		RepositoryURL: "https://example.com/repo.git",
 		Branch:        "main",
@@ -142,28 +142,26 @@ func TestSecurityUpdateStartUpdateWithDryRun(t *testing.T) {
 		Sites:         []string{"site1", "site2"},
 		DryRun:        true,
 	}
-
-	workflowService := newWorkflowSecurityUpdateService(logger, installer, updater, repositoryService, vcsProviderFactory, config, commandExecutor, composerService)
+	strategy := NewSecurityUpdateStrategy(logger, config, composerService)
+	workflowService := NewWorkflowBaseService(logger, config, updater, vcsProviderFactory, repositoryService, installer, composerService)
 
 	worktree := internal.NewMockWorktree(t)
 	worktree.On("Checkout", mock.Anything).Return(nil)
-	installer.On("InstallDrupal", config.RepositoryURL, config.Branch, config.Token, config.Sites).Return(nil)
+	installer.On("InstallDrupal", mock.Anything, config.RepositoryURL, config.Branch, config.Token, config.Sites).Return(nil)
 	repositoryService.On("BranchExists", mock.Anything, "security-update-ddd").Return(false, nil)
 	repositoryService.On("CloneRepository", config.RepositoryURL, config.Branch, config.Token).Return(repository, worktree, "/tmp", nil)
-	repositoryService.On("GetHeadCommit", repository).Return(&object.Commit{}, nil)
-	updater.On("UpdateDependencies", "/tmp", []string{"package1"}, mock.Anything, true).Return(DependencyUpdateReport{}, nil)
-	updater.On("UpdateDrupal", "/tmp", mock.Anything, config.Sites).Return(UpdateHooksPerSite{}, nil)
-	commandExecutor.On("GenerateDiffTable", mock.Anything, mock.Anything, true).Return("foo", nil)
-	commandExecutor.On("GenerateDiffTable", mock.Anything, mock.Anything, false).Return("foo", nil)
-	composerService.On("RunComposerAudit", "/tmp").Return(ComposerAudit{
-		Advisories: []Advisory{
+	updater.On("UpdateDependencies", mock.Anything, "/tmp", []string{"package1"}, mock.Anything, true).Return(DependencyUpdateReport{}, nil)
+	updater.On("UpdateDrupal", mock.Anything, "/tmp", mock.Anything, config.Sites).Return(UpdateHooksPerSite{}, nil)
+	composerService.On("Diff", mock.Anything, mock.Anything, mock.Anything, true).Return("foo", nil)
+	composerService.On("Audit", mock.Anything, "/tmp").Return(composer.Audit{
+		Advisories: []composer.Advisory{
 			{CVE: "CVE-1234", Title: "Vul 1", Severity: "high    ", Link: "https://example.com", PackageName: "package1"},
 			{CVE: "CVE-5678", Title: "Vul 2", Severity: "high    ", Link: "https://example.com", PackageName: "package1"},
 		},
 	}, nil)
-	composerService.On("GetComposerLockHash", "/tmp").Return("ddd", nil)
+	composerService.On("GetLockHash", "/tmp").Return("ddd", nil)
 
-	err := workflowService.StartUpdate()
+	err := workflowService.StartUpdate(t.Context(), strategy)
 
 	assert.NoError(t, err)
 	installer.AssertExpectations(t)

@@ -1,4 +1,4 @@
-package services
+package drupalorg
 
 import (
 	"encoding/json"
@@ -8,9 +8,21 @@ import (
 	"go.uber.org/zap"
 )
 
-type DrupalOrgService interface {
+type Client interface {
 	GetIssue(issueID string) (*Issue, error)
 	FindIssueNumber(text string) (string, bool)
+}
+
+type HTTPClient struct {
+	DrupalOrgBaseURL string
+	logger           *zap.Logger
+}
+
+func NewHTTPClient(logger *zap.Logger) *HTTPClient {
+	return &HTTPClient{
+		DrupalOrgBaseURL: "https://www.drupal.org",
+		logger:           logger,
+	}
 }
 
 type Issue struct {
@@ -23,19 +35,7 @@ type Issue struct {
 	} `json:"field_project"`
 }
 
-type DefaultDrupalOrgService struct {
-	DrupalOrgBaseURL string
-	logger           *zap.Logger
-}
-
-func newDefaultDrupalOrgService(logger *zap.Logger) *DefaultDrupalOrgService {
-	return &DefaultDrupalOrgService{
-		DrupalOrgBaseURL: "https://www.drupal.org",
-		logger:           logger,
-	}
-}
-
-func (s *DefaultDrupalOrgService) GetIssue(issueID string) (*Issue, error) {
+func (s *HTTPClient) GetIssue(issueID string) (*Issue, error) {
 	resp, err := http.Get(s.DrupalOrgBaseURL + "/api-d7/node/" + issueID + ".json")
 	if err != nil {
 		s.logger.Error("failed to make request", zap.Error(err))
@@ -52,7 +52,7 @@ func (s *DefaultDrupalOrgService) GetIssue(issueID string) (*Issue, error) {
 	return &apiResp, nil
 }
 
-func (s *DefaultDrupalOrgService) FindIssueNumber(text string) (string, bool) {
+func (s *HTTPClient) FindIssueNumber(text string) (string, bool) {
 	// Define a regex pattern to match issue numbers
 	re := regexp.MustCompile(`(\d{6,})`)
 

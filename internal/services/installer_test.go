@@ -5,7 +5,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/drupdater/drupdater/internal/utils"
+	"github.com/drupdater/drupdater/pkg/composer"
+	"github.com/drupdater/drupdater/pkg/drush"
+	"github.com/stretchr/testify/mock"
 
 	"go.uber.org/zap"
 )
@@ -35,58 +37,61 @@ module:
 	settingsService := NewMockSettingsService(t)
 	repositoryService := NewMockRepositoryService(t)
 	logger := zap.NewNop()
+	composerService := composer.NewMockRunner(t)
 
 	repositoryURL := "https://example.com/repo.git"
 	branch := "main"
 	token := "token"
 	sites := []string{"site1", "site2"}
 
-	settingsService.On("ConfigureDatabase", "/tmp", "site1").Return(nil)
-	settingsService.On("ConfigureDatabase", "/tmp", "site2").Return(nil)
-	settingsService.On("RemoveProfile", "/tmp", "site1").Return(nil)
-	settingsService.On("RemoveProfile", "/tmp", "site2").Return(nil)
+	settingsService.On("ConfigureDatabase", mock.Anything, "/tmp", "site1").Return(nil)
+	settingsService.On("ConfigureDatabase", mock.Anything, "/tmp", "site2").Return(nil)
+	settingsService.On("RemoveProfile", mock.Anything, "/tmp", "site1").Return(nil)
+	settingsService.On("RemoveProfile", mock.Anything, "/tmp", "site2").Return(nil)
 
 	repositoryService.On("CloneRepository", repositoryURL, branch, token).Return(nil, nil, "/tmp", nil)
 
 	t.Run("Success", func(t *testing.T) {
-		commandExecutor := utils.NewMockCommandExecutor(t)
-		commandExecutor.On("InstallDependencies", "/tmp").Return(nil)
+		drush := drush.NewMockRunner(t)
+		composerService.On("Install", mock.Anything, "/tmp").Return(nil)
 
-		commandExecutor.On("InstallSite", "/tmp", "site1").Return(nil)
-		commandExecutor.On("InstallSite", "/tmp", "site2").Return(nil)
+		drush.On("InstallSite", mock.Anything, "/tmp", "site1").Return(nil)
+		drush.On("InstallSite", mock.Anything, "/tmp", "site2").Return(nil)
 
 		installer := &DefaultInstallerService{
-			logger:          logger,
-			repository:      repositoryService,
-			commandExecutor: commandExecutor,
-			settings:        settingsService,
+			logger:     logger,
+			repository: repositoryService,
+			drush:      drush,
+			settings:   settingsService,
+			composer:   composerService,
 		}
-		err = installer.InstallDrupal(repositoryURL, branch, token, sites)
+		err = installer.InstallDrupal(t.Context(), repositoryURL, branch, token, sites)
 		if err != nil {
 			t.Fatalf("Failed to install Drupal: %v", err)
 		}
 
-		commandExecutor.AssertExpectations(t)
+		drush.AssertExpectations(t)
 	})
 
 	t.Run("Failure", func(t *testing.T) {
-		commandExecutor := utils.NewMockCommandExecutor(t)
-		commandExecutor.On("InstallDependencies", "/tmp").Return(nil)
-		commandExecutor.On("InstallSite", "/tmp", "site1").Return(nil)
-		commandExecutor.On("InstallSite", "/tmp", "site2").Return(errors.New("failed to install site"))
+		drush := drush.NewMockRunner(t)
+		composerService.On("Install", mock.Anything, "/tmp").Return(nil)
+		drush.On("InstallSite", mock.Anything, "/tmp", "site1").Return(nil)
+		drush.On("InstallSite", mock.Anything, "/tmp", "site2").Return(errors.New("failed to install site"))
 
 		installer := &DefaultInstallerService{
-			logger:          logger,
-			repository:      repositoryService,
-			commandExecutor: commandExecutor,
-			settings:        settingsService,
+			logger:     logger,
+			repository: repositoryService,
+			drush:      drush,
+			settings:   settingsService,
+			composer:   composerService,
 		}
-		err = installer.InstallDrupal(repositoryURL, branch, token, sites)
+		err = installer.InstallDrupal(t.Context(), repositoryURL, branch, token, sites)
 		if err == nil {
 			t.Fatalf("Expected an error but got nil")
 		}
 
-		commandExecutor.AssertExpectations(t)
+		drush.AssertExpectations(t)
 	})
 
 	repositoryService.AssertExpectations(t)

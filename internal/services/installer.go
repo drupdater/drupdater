@@ -1,36 +1,40 @@
 package services
 
 import (
+	"context"
 	"runtime"
 	"slices"
 	"sync"
 
-	"github.com/drupdater/drupdater/internal/utils"
+	"github.com/drupdater/drupdater/pkg/composer"
+	"github.com/drupdater/drupdater/pkg/drush"
 
 	"go.uber.org/zap"
 )
 
 type InstallerService interface {
-	InstallDrupal(repositoryURL string, branch string, token string, sites []string) error
+	InstallDrupal(ctx context.Context, repositoryURL string, branch string, token string, sites []string) error
 }
 
 type DefaultInstallerService struct {
-	logger          *zap.Logger
-	repository      RepositoryService
-	commandExecutor utils.CommandExecutor
-	settings        SettingsService
+	logger     *zap.Logger
+	repository RepositoryService
+	drush      drush.Runner
+	settings   SettingsService
+	composer   composer.Runner
 }
 
-func newDefaultInstallerService(logger *zap.Logger, repository RepositoryService, commandExecutor utils.CommandExecutor, settings SettingsService) *DefaultInstallerService {
+func newDefaultInstallerService(logger *zap.Logger, repository RepositoryService, drush drush.Runner, settings SettingsService, composer composer.Runner) *DefaultInstallerService {
 	return &DefaultInstallerService{
-		logger:          logger,
-		repository:      repository,
-		commandExecutor: commandExecutor,
-		settings:        settings,
+		logger:     logger,
+		repository: repository,
+		drush:      drush,
+		settings:   settings,
+		composer:   composer,
 	}
 }
 
-func (is *DefaultInstallerService) InstallDrupal(repositoryURL string, branch string, token string, sites []string) error {
+func (is *DefaultInstallerService) InstallDrupal(ctx context.Context, repositoryURL string, branch string, token string, sites []string) error {
 
 	is.logger.Info("cloning repository for site-install", zap.String("repositoryURL", repositoryURL), zap.String("branch", branch))
 	_, _, path, err := is.repository.CloneRepository(repositoryURL, branch, token)
@@ -39,7 +43,7 @@ func (is *DefaultInstallerService) InstallDrupal(repositoryURL string, branch st
 		return err
 	}
 
-	if err = is.commandExecutor.InstallDependencies(path); err != nil {
+	if err = is.composer.Install(ctx, path); err != nil {
 		return err
 	}
 
@@ -57,17 +61,17 @@ func (is *DefaultInstallerService) InstallDrupal(repositoryURL string, branch st
 
 				is.logger.Info("installing site", zap.String("site", site))
 
-				if err = is.settings.ConfigureDatabase(path, site); err != nil {
+				if err = is.settings.ConfigureDatabase(ctx, path, site); err != nil {
 					errChannel <- err
 					return
 				}
 
-				if err = is.settings.RemoveProfile(path, site); err != nil {
+				if err = is.settings.RemoveProfile(ctx, path, site); err != nil {
 					errChannel <- err
 					return
 				}
 
-				if err = is.commandExecutor.InstallSite(path, site); err != nil {
+				if err = is.drush.InstallSite(ctx, path, site); err != nil {
 					errChannel <- err
 					return
 				}

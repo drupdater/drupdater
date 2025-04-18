@@ -4,7 +4,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/drupdater/drupdater/internal/utils"
+	"github.com/drupdater/drupdater/pkg/drush"
+	"github.com/stretchr/testify/mock"
 
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
@@ -12,11 +13,11 @@ import (
 
 func TestIsSqliteModuleEnabled(t *testing.T) {
 	logger := zap.NewNop()
-	commandExecutor := utils.NewMockCommandExecutor(t)
+	drush := drush.NewMockRunner(t)
 
 	settingsService := &DrupalSettingsService{
-		logger:          logger,
-		commandExecutor: commandExecutor,
+		logger: logger,
+		drush:  drush,
 	}
 
 	dir := "/tmp"
@@ -24,7 +25,7 @@ func TestIsSqliteModuleEnabled(t *testing.T) {
 	configSyncDir := "/tmp/config/sync"
 	coreExtensionPath := configSyncDir + "/core.extension.yml"
 
-	commandExecutor.On("GetConfigSyncDir", "/tmp", "default", false).Return(configSyncDir, nil)
+	drush.On("GetConfigSyncDir", mock.Anything, "/tmp", "default", false).Return(configSyncDir, nil)
 
 	// Create a temporary directory and file to act as the config sync directory and core.extension.yml
 	if err := os.MkdirAll(configSyncDir, 0755); err != nil {
@@ -50,7 +51,7 @@ profile: thunder
 		t.Fatalf("Failed to write initial content to core.extension.yml: %v", err)
 	}
 
-	enabled, err := settingsService.IsSqliteModuleEnabled(dir, site)
+	enabled, err := settingsService.IsSqliteModuleEnabled(t.Context(), dir, site)
 	if err != nil {
 		t.Fatalf("Failed to check if sqlite module is enabled: %v", err)
 	}
@@ -68,7 +69,7 @@ module:
 		t.Fatalf("Failed to write disabled content to core.extension.yml: %v", err)
 	}
 
-	enabled, err = settingsService.IsSqliteModuleEnabled(dir, site)
+	enabled, err = settingsService.IsSqliteModuleEnabled(t.Context(), dir, site)
 	if err != nil {
 		t.Fatalf("Failed to check if sqlite module is enabled: %v", err)
 	}
@@ -77,7 +78,7 @@ module:
 		t.Fatalf("Expected sqlite module to be disabled, but it was enabled")
 	}
 
-	commandExecutor.AssertExpectations(t)
+	drush.AssertExpectations(t)
 }
 
 func TestAddSqliteModule(t *testing.T) {
@@ -111,17 +112,17 @@ profile: thunder
 	}
 
 	logger := zap.NewNop()
-	commandExecutor := utils.NewMockCommandExecutor(t)
+	drush := drush.NewMockRunner(t)
 
 	settingsService := &DrupalSettingsService{
-		logger:          logger,
-		commandExecutor: commandExecutor,
+		logger: logger,
+		drush:  drush,
 	}
 
-	commandExecutor.On("GetConfigSyncDir", "/tmp", "default", false).Return("/tmp", nil)
+	drush.On("GetConfigSyncDir", mock.Anything, "/tmp", "default", false).Return("/tmp", nil)
 
 	// Call the function to add the SQLite module
-	if err := settingsService.AddSqliteModule("/tmp", "default"); err != nil {
+	if err := settingsService.AddSqliteModule(t.Context(), "/tmp", "default"); err != nil {
 		t.Fatalf("Failed to add SQLite module: %v", err)
 	}
 
@@ -183,17 +184,17 @@ profile: standard
 	}
 
 	logger := zap.NewNop()
-	commandExecutor := utils.NewMockCommandExecutor(t)
+	drush := drush.NewMockRunner(t)
 
 	settingsService := &DrupalSettingsService{
-		logger:          logger,
-		commandExecutor: commandExecutor,
+		logger: logger,
+		drush:  drush,
 	}
 
-	commandExecutor.On("GetConfigSyncDir", "/tmp", "default", false).Return("/tmp", nil)
+	drush.On("GetConfigSyncDir", mock.Anything, "/tmp", "default", false).Return("/tmp", nil)
 
 	// Call the function to add the SQLite module
-	if err := settingsService.RemoveProfile("/tmp", "default"); err != nil {
+	if err := settingsService.RemoveProfile(t.Context(), "/tmp", "default"); err != nil {
 		t.Fatalf("Failed to remove profile: %v", err)
 	}
 
@@ -218,5 +219,5 @@ theme:
 		t.Fatalf("Expected content: %s, got: %s", expectedContent, updatedContent)
 	}
 
-	commandExecutor.AssertExpectations(t)
+	drush.AssertExpectations(t)
 }

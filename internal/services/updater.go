@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,7 +15,9 @@ import (
 	"sync"
 
 	"github.com/drupdater/drupdater/internal"
-	"github.com/drupdater/drupdater/internal/utils"
+	"github.com/drupdater/drupdater/pkg/composer"
+	"github.com/drupdater/drupdater/pkg/drupalorg"
+	"github.com/drupdater/drupdater/pkg/drush"
 
 	gitlab "gitlab.com/gitlab-org/api/client-go"
 
@@ -23,11 +26,11 @@ import (
 )
 
 type AfterSiteUpdate interface {
-	Execute(path string, worktree internal.Worktree, site string) error
+	Execute(ctx context.Context, path string, worktree internal.Worktree, site string) error
 }
 
 type AfterUpdate interface {
-	Execute(path string, worktree internal.Worktree) error
+	Execute(ctx context.Context, path string, worktree internal.Worktree) error
 }
 
 type DependencyUpdateReport struct {
@@ -68,25 +71,24 @@ type ConflictPatch struct {
 }
 
 type UpdaterService interface {
-	UpdateDependencies(path string, packagesToUpdate []string, worktree internal.Worktree, minimalChanges bool) (DependencyUpdateReport, error)
-	UpdateDrupal(path string, worktree internal.Worktree, sites []string) (UpdateHooksPerSite, error)
-	UpdatePatches(path string, worktree internal.Worktree, operations []PackageChange, patches map[string]map[string]string) (PatchUpdates, map[string]map[string]string)
+	UpdateDependencies(ctx context.Context, path string, packagesToUpdate []string, worktree internal.Worktree, minimalChanges bool) (DependencyUpdateReport, error)
+	UpdateDrupal(ctx context.Context, path string, worktree internal.Worktree, sites []string) (UpdateHooksPerSite, error)
+	UpdatePatches(ctx context.Context, path string, worktree internal.Worktree, operations []composer.PackageChange, patches map[string]map[string]string) (PatchUpdates, map[string]map[string]string)
 }
 
 type DefaultUpdater struct {
 	logger          *zap.Logger
-	commandExecutor utils.CommandExecutor
 	settings        SettingsService
 	repository      RepositoryService
 	afterSiteUpdate []AfterSiteUpdate
 	config          internal.Config
-	composer        ComposerService
-	drupalOrg       DrupalOrgService
+	composer        composer.Runner
+	drupalOrg       drupalorg.Client
 	gitlab          *gitlab.Client
-	drush           DrushService
+	drush           drush.Runner
 }
 
-func newDefaultUpdater(afterSiteUpdate []AfterSiteUpdate, logger *zap.Logger, commandExecutor utils.CommandExecutor, settings SettingsService, repository RepositoryService, config internal.Config, composer ComposerService, drupalOrg DrupalOrgService, drush DrushService) *DefaultUpdater {
+func newDefaultUpdater(afterSiteUpdate []AfterSiteUpdate, logger *zap.Logger, settings SettingsService, repository RepositoryService, config internal.Config, composer composer.Runner, drupalOrg drupalorg.Client, drush drush.Runner) *DefaultUpdater {
 
 	drupalOrgGitlab, err := gitlab.NewClient(os.Getenv("DRUPALCODE_ACCESS_TOKEN"), gitlab.WithBaseURL("https://git.drupalcode.org/api/v4"))
 	if err != nil {
@@ -95,7 +97,6 @@ func newDefaultUpdater(afterSiteUpdate []AfterSiteUpdate, logger *zap.Logger, co
 
 	return &DefaultUpdater{
 		logger:          logger,
-		commandExecutor: commandExecutor,
 		settings:        settings,
 		repository:      repository,
 		afterSiteUpdate: afterSiteUpdate,
@@ -107,11 +108,11 @@ func newDefaultUpdater(afterSiteUpdate []AfterSiteUpdate, logger *zap.Logger, co
 	}
 }
 
-func (us *DefaultUpdater) UpdateDependencies(path string, packagesToUpdate []string, worktree internal.Worktree, minimalChanges bool) (DependencyUpdateReport, error) {
+func (us *DefaultUpdater) UpdateDependencies(ctx context.Context, path string, packagesToUpdate []string, worktree internal.Worktree, minimalChanges bool) (DependencyUpdateReport, error) {
 	var updateReport DependencyUpdateReport
 
 	patches := make(map[string]map[string]string)
-	patchesString, err := us.commandExecutor.GetComposerConfig(path, "extra.patches")
+	patchesString, err := us.composer.GetConfig(ctx, path, "extra.patches")
 	if err != nil {
 		us.logger.Debug("extra.patches not defined")
 		patchesString = "{}"
@@ -121,12 +122,12 @@ func (us *DefaultUpdater) UpdateDependencies(path string, packagesToUpdate []str
 		us.logger.Error("failed to unmarshal patches", zap.Error(err))
 	}
 
-	operations, err := us.composer.GetComposerUpdates(path, packagesToUpdate, minimalChanges)
+	operations, err := us.composer.ListPendingUpdates(ctx, path, packagesToUpdate, minimalChanges)
 	if err != nil {
 		us.logger.Error("failed to get composer updates", zap.Error(err))
 		return updateReport, err
 	}
-	patchUpdates, newPatches := us.UpdatePatches(path, worktree, operations, patches)
+	patchUpdates, newPatches := us.UpdatePatches(ctx, path, worktree, operations, patches)
 	updateReport.PatchUpdates = patchUpdates
 	if updateReport.PatchUpdates.Changes() {
 		// get patches json string
@@ -134,12 +135,12 @@ func (us *DefaultUpdater) UpdateDependencies(path string, packagesToUpdate []str
 		if err != nil {
 			us.logger.Error("failed to marshal patches", zap.Error(err))
 		}
-		err = us.commandExecutor.SetComposerConfig(path, "extra.patches", string(jsonString))
+		err = us.composer.SetConfig(ctx, path, "extra.patches", string(jsonString))
 		if err != nil {
 			us.logger.Error("failed to set composer config", zap.Error(err))
 		}
 
-		err = us.commandExecutor.UpdateComposerLockHash(path)
+		err = us.composer.UpdateLockHash(ctx, path)
 		if err != nil {
 			us.logger.Error("failed to update composer lock hash", zap.Error(err))
 		}
@@ -153,13 +154,13 @@ func (us *DefaultUpdater) UpdateDependencies(path string, packagesToUpdate []str
 		}
 	}
 
-	allowPlugins, err := us.commandExecutor.GetComposerAllowPlugins(path)
+	allowPlugins, err := us.composer.GetAllowPlugins(ctx, path)
 	if err != nil {
 		us.logger.Error("failed to get composer allow plugins", zap.Error(err))
 	}
 
 	// Allow all plugins during update
-	err = us.commandExecutor.SetComposerConfig(path, "allow-plugins", "true")
+	err = us.composer.SetConfig(ctx, path, "allow-plugins", "true")
 	if err != nil {
 		us.logger.Error("failed to set composer config", zap.Error(err))
 	}
@@ -168,11 +169,11 @@ func (us *DefaultUpdater) UpdateDependencies(path string, packagesToUpdate []str
 	for _, patchUpdate := range patchUpdates.Conflicts {
 		packagesToKeep = append(packagesToKeep, fmt.Sprintf("%s:%s", patchUpdate.Package, patchUpdate.FixedVersion))
 	}
-	if _, err = us.commandExecutor.UpdateDependencies(path, packagesToUpdate, packagesToKeep, minimalChanges, false); err != nil {
+	if _, err = us.composer.Update(ctx, path, packagesToUpdate, packagesToKeep, minimalChanges, false); err != nil {
 		return updateReport, err
 	}
 
-	allPlugins, err := us.composer.GetInstalledPlugins(path)
+	allPlugins, err := us.composer.GetInstalledPlugins(ctx, path)
 	if err != nil {
 		return updateReport, err
 	}
@@ -184,11 +185,11 @@ func (us *DefaultUpdater) UpdateDependencies(path string, packagesToUpdate []str
 			updateReport.AddedAllowPlugins = append(updateReport.AddedAllowPlugins, key)
 		}
 	}
-	if err := us.commandExecutor.SetComposerAllowPlugins(path, allowPlugins); err != nil {
+	if err := us.composer.SetAllowPlugins(ctx, path, allowPlugins); err != nil {
 		return updateReport, err
 	}
 
-	if _, err := us.commandExecutor.RunComposerNormalize(path); err != nil {
+	if _, err := us.composer.Normalize(ctx, path); err != nil {
 		us.logger.Debug("failed to run composer normalize", zap.Error(err))
 	}
 
@@ -203,16 +204,16 @@ func (us *DefaultUpdater) UpdateDependencies(path string, packagesToUpdate []str
 	return updateReport, nil
 }
 
-type UpdateHooksPerSite map[string]map[string]UpdateHook
+type UpdateHooksPerSite map[string]map[string]drush.UpdateHook
 
-func (us *DefaultUpdater) UpdateDrupal(path string, worktree internal.Worktree, sites []string) (UpdateHooksPerSite, error) {
+func (us *DefaultUpdater) UpdateDrupal(ctx context.Context, path string, worktree internal.Worktree, sites []string) (UpdateHooksPerSite, error) {
 
 	var wg sync.WaitGroup
 	updateHooksPerSite := UpdateHooksPerSite{}
 
 	type Result struct {
 		Site        string
-		UpdateHooks map[string]UpdateHook
+		UpdateHooks map[string]drush.UpdateHook
 		err         error
 	}
 
@@ -228,37 +229,37 @@ func (us *DefaultUpdater) UpdateDrupal(path string, worktree internal.Worktree, 
 
 				us.logger.Info("updating site", zap.String("site", site))
 
-				if err := us.settings.ConfigureDatabase(path, site); err != nil {
+				if err := us.settings.ConfigureDatabase(ctx, path, site); err != nil {
 					resultChannel <- Result{err: err}
 					return
 				}
 
-				hooks, err := us.drush.GetUpdateHooks(path, site)
+				hooks, err := us.drush.GetUpdateHooks(ctx, path, site)
 				us.logger.Debug("update hooks", zap.Any("hooks", hooks))
 				if err != nil {
 					resultChannel <- Result{err: err}
 					return
 				}
 
-				if err := us.commandExecutor.UpdateSite(path, site); err != nil {
+				if err := us.drush.UpdateSite(ctx, path, site); err != nil {
 					resultChannel <- Result{err: err}
 					return
 				}
 
-				if err := us.commandExecutor.ConfigResave(path, site); err != nil {
+				if err := us.drush.ConfigResave(ctx, path, site); err != nil {
 					resultChannel <- Result{err: err}
 					return
 				}
 
 				for _, asu := range us.afterSiteUpdate {
-					if err := asu.Execute(path, worktree, site); err != nil {
+					if err := asu.Execute(ctx, path, worktree, site); err != nil {
 						resultChannel <- Result{err: err}
 						return
 					}
 				}
 
 				us.logger.Info("export configuration", zap.String("site", site))
-				if err := us.ExportConfiguration(worktree, path, site); err != nil {
+				if err := us.ExportConfiguration(ctx, worktree, path, site); err != nil {
 					resultChannel <- Result{err: err}
 					return
 				}
@@ -284,14 +285,14 @@ func (us *DefaultUpdater) UpdateDrupal(path string, worktree internal.Worktree, 
 	return updateHooksPerSite, nil
 }
 
-func (us *DefaultUpdater) UpdatePatches(path string, worktree internal.Worktree, operations []PackageChange, patches map[string]map[string]string) (PatchUpdates, map[string]map[string]string) {
+func (us *DefaultUpdater) UpdatePatches(ctx context.Context, path string, worktree internal.Worktree, operations []composer.PackageChange, patches map[string]map[string]string) (PatchUpdates, map[string]map[string]string) {
 
 	updates := PatchUpdates{}
 	us.logger.Debug("composer patches", zap.Any("patches", patches))
 
 	// Remove patches for packages that are no longer installed
 	for packageName := range patches {
-		if installed, _ := us.commandExecutor.IsPackageInstalled(path, packageName); !installed {
+		if installed, _ := us.composer.IsPackageInstalled(ctx, path, packageName); !installed {
 			for description, patchPath := range patches[packageName] {
 				_, err := url.ParseRequestURI(patchPath)
 				if err != nil {
@@ -376,7 +377,7 @@ func (us *DefaultUpdater) UpdatePatches(path string, worktree internal.Worktree,
 						absolutePath = path + "/" + patchPath
 					}
 
-					if ok, err := us.composer.CheckPatchApplies(operation.Package, operation.To, absolutePath); err != nil {
+					if ok, err := us.composer.CheckIfPatchApplies(ctx, operation.Package, operation.To, absolutePath); err != nil {
 						us.logger.Debug("failed to check if patch applies", zap.Error(err))
 					} else if ok {
 						us.logger.Debug("patch applies", zap.String("package", operation.Package), zap.String("version", operation.To), zap.String("patch", patchPath))
@@ -433,7 +434,7 @@ func (us *DefaultUpdater) UpdatePatches(path string, worktree internal.Worktree,
 									us.logger.Debug("failed to download patch", zap.Error(err))
 								}
 
-								if ok, err := us.composer.CheckPatchApplies(operation.Package, operation.To, path+"/"+newPatchPath+"/"+newPatchFile); err != nil {
+								if ok, err := us.composer.CheckIfPatchApplies(ctx, operation.Package, operation.To, path+"/"+newPatchPath+"/"+newPatchFile); err != nil {
 									us.logger.Debug("failed to check if patch applies", zap.Error(err))
 								} else if ok {
 									if !externalPatch {
@@ -496,15 +497,15 @@ func (us *DefaultUpdater) cleanURLString(s string) string {
 	return re.ReplaceAllString(s, "")
 }
 
-func (us *DefaultUpdater) ExportConfiguration(worktree internal.Worktree, dir string, site string) error {
+func (us *DefaultUpdater) ExportConfiguration(ctx context.Context, worktree internal.Worktree, dir string, site string) error {
 
 	siteLogger := us.logger.With(zap.String("site", site))
 
-	if err := us.commandExecutor.ExportConfiguration(dir, site); err != nil {
+	if err := us.drush.ExportConfiguration(ctx, dir, site); err != nil {
 		return err
 	}
 
-	configPath, err := us.commandExecutor.GetConfigSyncDir(dir, site, true)
+	configPath, err := us.drush.GetConfigSyncDir(ctx, dir, site, true)
 	if err != nil {
 		return err
 	}

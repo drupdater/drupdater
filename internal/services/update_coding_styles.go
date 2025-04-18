@@ -1,22 +1,25 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"strings"
 	"text/template"
 
 	"github.com/drupdater/drupdater/internal"
-	"github.com/drupdater/drupdater/internal/utils"
+	"github.com/drupdater/drupdater/pkg/composer"
+	"github.com/drupdater/drupdater/pkg/phpcs"
 
 	"github.com/go-git/go-git/v5"
 	"go.uber.org/zap"
 )
 
 type UpdateCodingStyles struct {
-	logger          *zap.Logger
-	commandExecutor utils.CommandExecutor
-	config          internal.Config
+	logger   *zap.Logger
+	phpcs    phpcs.Runner
+	config   internal.Config
+	composer composer.Runner
 }
 
 type PHPCSReturn struct {
@@ -40,11 +43,12 @@ type PHPCSReturn struct {
 	} `json:"totals"`
 }
 
-func newUpdateCodingStyles(logger *zap.Logger, commandExecutor utils.CommandExecutor, config internal.Config) *UpdateCodingStyles {
+func newUpdateCodingStyles(logger *zap.Logger, phpcs phpcs.Runner, config internal.Config, composer composer.Runner) *UpdateCodingStyles {
 	return &UpdateCodingStyles{
-		logger:          logger,
-		commandExecutor: commandExecutor,
-		config:          config,
+		logger:   logger,
+		phpcs:    phpcs,
+		config:   config,
+		composer: composer,
 	}
 }
 
@@ -58,7 +62,7 @@ var fileExists = func(path string) bool {
 	return true
 }
 
-func (h *UpdateCodingStyles) Execute(path string, worktree internal.Worktree) error {
+func (h *UpdateCodingStyles) Execute(ctx context.Context, path string, worktree internal.Worktree) error {
 
 	if h.config.SkipCBF {
 		h.logger.Debug("skipping coding styles update")
@@ -68,7 +72,7 @@ func (h *UpdateCodingStyles) Execute(path string, worktree internal.Worktree) er
 	h.logger.Info("updating coding styles")
 
 	if !fileExists(path) {
-		created, err := h.CreatePHPCSConfig(path, worktree)
+		created, err := h.CreatePHPCSConfig(ctx, path, worktree)
 		if err != nil {
 			return err
 		}
@@ -78,13 +82,13 @@ func (h *UpdateCodingStyles) Execute(path string, worktree internal.Worktree) er
 		}
 	}
 
-	if installed, _ := h.commandExecutor.IsPackageInstalled(path, "drupal/coder"); !installed {
-		if err := h.InstallCoder(path, worktree); err != nil {
+	if installed, _ := h.composer.IsPackageInstalled(ctx, path, "drupal/coder"); !installed {
+		if err := h.InstallCoder(ctx, path, worktree); err != nil {
 			return err
 		}
 	}
 
-	out, err := h.commandExecutor.RunPHPCS(path)
+	out, err := h.phpcs.Run(ctx, path)
 	if err != nil {
 		h.logger.Error("failed to run phpcs", zap.Error(err))
 		return err
@@ -100,7 +104,7 @@ func (h *UpdateCodingStyles) Execute(path string, worktree internal.Worktree) er
 		return nil
 	}
 
-	err = h.commandExecutor.RunPHPCBF(path)
+	err = h.phpcs.RunCBF(ctx, path)
 	if err != nil {
 		h.logger.Debug("remaining issues", zap.Error(err))
 	}
@@ -124,7 +128,7 @@ func (h *UpdateCodingStyles) Execute(path string, worktree internal.Worktree) er
 	return err
 }
 
-func (h *UpdateCodingStyles) CreatePHPCSConfig(path string, worktree internal.Worktree) (bool, error) {
+func (h *UpdateCodingStyles) CreatePHPCSConfig(ctx context.Context, path string, worktree internal.Worktree) (bool, error) {
 	h.logger.Debug("no phpcs.xml or phpcs.xml.dist file found, creating phpcs.xml")
 
 	phpcsTemplate := `<?xml version="1.0" encoding="UTF-8"?>
@@ -152,7 +156,7 @@ func (h *UpdateCodingStyles) CreatePHPCSConfig(path string, worktree internal.Wo
 		panic(err)
 	}
 
-	drupalVersion, _ := h.commandExecutor.GetInstalledPackageVersion(path, "drupal/core")
+	drupalVersion, _ := h.composer.GetInstalledPackageVersion(ctx, path, "drupal/core")
 	majorVersion := strings.Split(drupalVersion, ".")[0]
 
 	data := struct {
@@ -163,7 +167,7 @@ func (h *UpdateCodingStyles) CreatePHPCSConfig(path string, worktree internal.Wo
 		Version: majorVersion,
 	}
 
-	data.Files, err = h.commandExecutor.GetCustomCodeDirectories(path)
+	data.Files, err = h.composer.GetCustomCodeDirectories(ctx, path)
 	if err != nil {
 		return false, err
 	}
@@ -193,9 +197,9 @@ func (h *UpdateCodingStyles) CreatePHPCSConfig(path string, worktree internal.Wo
 	return true, nil
 }
 
-func (h *UpdateCodingStyles) InstallCoder(path string, worktree internal.Worktree) error {
+func (h *UpdateCodingStyles) InstallCoder(ctx context.Context, path string, worktree internal.Worktree) error {
 	h.logger.Debug("drupal/coder is not installed, installing")
-	if _, err := h.commandExecutor.InstallPackages(path, "--dev", "drupal/coder"); err != nil {
+	if _, err := h.composer.Require(ctx, path, "--dev", "drupal/coder"); err != nil {
 		return err
 	}
 

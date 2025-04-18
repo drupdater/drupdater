@@ -4,7 +4,8 @@ import (
 	"testing"
 
 	internal "github.com/drupdater/drupdater/internal"
-	"github.com/drupdater/drupdater/internal/utils"
+	"github.com/drupdater/drupdater/pkg/composer"
+	"github.com/drupdater/drupdater/pkg/rector"
 
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/stretchr/testify/assert"
@@ -20,11 +21,13 @@ func TestRemoveDeprecations(t *testing.T) {
 	}
 
 	t.Run("Rector is not installed", func(t *testing.T) {
+		composer := composer.NewMockRunner(t)
+		composer.On("IsPackageInstalled", mock.Anything, "/path/to/repo", "palantirnet/drupal-rector").Return(false, assert.AnError)
+		composer.On("Require", mock.Anything, "/path/to/repo", "palantirnet/drupal-rector").Return("", nil)
+		composer.On("GetCustomCodeDirectories", mock.Anything, "/path/to/repo").Return([]string{"web/modules/custom"}, nil)
 
-		commandExecutor := utils.NewMockCommandExecutor(t)
-		commandExecutor.On("IsPackageInstalled", "/path/to/repo", "palantirnet/drupal-rector").Return(false, assert.AnError)
-		commandExecutor.On("InstallPackages", "/path/to/repo", "palantirnet/drupal-rector").Return("", nil)
-		commandExecutor.On("RunRector", "/path/to/repo").Return(`{
+		rector := rector.NewMockRunner(t)
+		rector.On("Run", mock.Anything, "/path/to/repo", []string{"web/modules/custom"}).Return(`{
     "totals": {
         "changed_files": 0,
         "errors": 0
@@ -32,21 +35,23 @@ func TestRemoveDeprecations(t *testing.T) {
     "file_diffs": [],
     "changed_files": []
 }`, nil)
-		commandExecutor.On("RemovePackages", "/path/to/repo", "palantirnet/drupal-rector").Return("", nil)
+		composer.On("Remove", mock.Anything, "/path/to/repo", "palantirnet/drupal-rector").Return("", nil)
 
-		updateRemoveDeprecations := newUpdateRemoveDeprecations(logger, commandExecutor, config)
-		err := updateRemoveDeprecations.Execute("/path/to/repo", worktree)
+		updateRemoveDeprecations := newUpdateRemoveDeprecations(logger, rector, config, composer)
+		err := updateRemoveDeprecations.Execute(t.Context(), "/path/to/repo", worktree)
 		assert.NoError(t, err)
-		commandExecutor.AssertExpectations(t)
+		composer.AssertExpectations(t)
+		rector.AssertExpectations(t)
 		worktree.AssertExpectations(t)
 	})
 
 	t.Run("Rector is installed and command executed successfully with one fix", func(t *testing.T) {
+		composer := composer.NewMockRunner(t)
+		composer.On("IsPackageInstalled", mock.Anything, "/path/to/repo", "palantirnet/drupal-rector").Return(true, nil)
+		composer.On("GetCustomCodeDirectories", mock.Anything, "/path/to/repo").Return([]string{"web/modules/custom"}, nil)
 
-		commandExecutor := utils.NewMockCommandExecutor(t)
-
-		commandExecutor.On("IsPackageInstalled", "/path/to/repo", "palantirnet/drupal-rector").Return(true, nil)
-		commandExecutor.On("RunRector", "/path/to/repo").Return(`{
+		rector := rector.NewMockRunner(t)
+		rector.On("Run", mock.Anything, "/path/to/repo", []string{"web/modules/custom"}).Return(`{
     "totals": {
         "changed_files": 1,
         "errors": 0
@@ -68,19 +73,21 @@ func TestRemoveDeprecations(t *testing.T) {
 		worktree.On("Add", "tests/Drupal/FunctionalJavascriptTests/ThunderOrgTestHomePageTest.php").Return(plumbing.NewHash(""), nil)
 		worktree.On("Commit", "Remove deprecations", mock.Anything).Return(plumbing.NewHash(""), nil)
 
-		updateRemoveDeprecations := newUpdateRemoveDeprecations(logger, commandExecutor, config)
-		err := updateRemoveDeprecations.Execute("/path/to/repo", worktree)
+		updateRemoveDeprecations := newUpdateRemoveDeprecations(logger, rector, config, composer)
+		err := updateRemoveDeprecations.Execute(t.Context(), "/path/to/repo", worktree)
 		assert.NoError(t, err)
-		commandExecutor.AssertExpectations(t)
+		composer.AssertExpectations(t)
+		rector.AssertExpectations(t)
 		worktree.AssertExpectations(t)
 	})
 
 	t.Run("Rector is installed and command executed successfully without fix", func(t *testing.T) {
+		composer := composer.NewMockRunner(t)
+		composer.On("IsPackageInstalled", mock.Anything, "/path/to/repo", "palantirnet/drupal-rector").Return(true, nil)
+		composer.On("GetCustomCodeDirectories", mock.Anything, "/path/to/repo").Return([]string{"web/modules/custom"}, nil)
 
-		commandExecutor := utils.NewMockCommandExecutor(t)
-
-		commandExecutor.On("IsPackageInstalled", "/path/to/repo", "palantirnet/drupal-rector").Return(true, nil)
-		commandExecutor.On("RunRector", "/path/to/repo").Return(`{
+		rector := rector.NewMockRunner(t)
+		rector.On("Run", mock.Anything, "/path/to/repo", []string{"web/modules/custom"}).Return(`{
     "totals": {
         "changed_files": 0,
         "errors": 0
@@ -89,23 +96,27 @@ func TestRemoveDeprecations(t *testing.T) {
     "changed_files": []
 }`, nil)
 
-		updateRemoveDeprecations := newUpdateRemoveDeprecations(logger, commandExecutor, config)
-		err := updateRemoveDeprecations.Execute("/path/to/repo", worktree)
+		updateRemoveDeprecations := newUpdateRemoveDeprecations(logger, rector, config, composer)
+		err := updateRemoveDeprecations.Execute(t.Context(), "/path/to/repo", worktree)
 		assert.NoError(t, err)
-		commandExecutor.AssertExpectations(t)
+		composer.AssertExpectations(t)
+		rector.AssertExpectations(t)
 		worktree.AssertExpectations(t)
 	})
 
 	t.Run("Command execution fails", func(t *testing.T) {
-		commandExecutor := utils.NewMockCommandExecutor(t)
+		composer := composer.NewMockRunner(t)
+		composer.On("IsPackageInstalled", mock.Anything, "/path/to/repo", "palantirnet/drupal-rector").Return(true, nil)
+		composer.On("GetCustomCodeDirectories", mock.Anything, "/path/to/repo").Return([]string{"web/modules/custom"}, nil)
 
-		commandExecutor.On("IsPackageInstalled", "/path/to/repo", "palantirnet/drupal-rector").Return(true, nil)
-		commandExecutor.On("RunRector", "/path/to/repo").Return("", assert.AnError)
+		rector := rector.NewMockRunner(t)
+		rector.On("Run", mock.Anything, "/path/to/repo", []string{"web/modules/custom"}).Return("", assert.AnError)
 
-		updateRemoveDeprecations := newUpdateRemoveDeprecations(logger, commandExecutor, config)
-		err := updateRemoveDeprecations.Execute("/path/to/repo", worktree)
+		updateRemoveDeprecations := newUpdateRemoveDeprecations(logger, rector, config, composer)
+		err := updateRemoveDeprecations.Execute(t.Context(), "/path/to/repo", worktree)
 		assert.Error(t, err)
-		commandExecutor.AssertExpectations(t)
+		composer.AssertExpectations(t)
+		rector.AssertExpectations(t)
 	})
 
 }

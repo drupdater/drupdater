@@ -1,19 +1,22 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/drupdater/drupdater/internal"
-	"github.com/drupdater/drupdater/internal/utils"
+	"github.com/drupdater/drupdater/pkg/composer"
+	"github.com/drupdater/drupdater/pkg/rector"
 
 	"github.com/go-git/go-git/v5"
 	"go.uber.org/zap"
 )
 
 type UpdateRemoveDeprecations struct {
-	logger          *zap.Logger
-	commandExecutor utils.CommandExecutor
-	config          internal.Config
+	logger   *zap.Logger
+	rector   rector.Runner
+	config   internal.Config
+	composer composer.Runner
 }
 
 type RectorReturn struct {
@@ -30,15 +33,16 @@ type RectorReturn struct {
 	ChangedFiles []string `json:"changed_files"`
 }
 
-func newUpdateRemoveDeprecations(logger *zap.Logger, commandExecutor utils.CommandExecutor, config internal.Config) *UpdateRemoveDeprecations {
+func newUpdateRemoveDeprecations(logger *zap.Logger, rector rector.Runner, config internal.Config, composer composer.Runner) *UpdateRemoveDeprecations {
 	return &UpdateRemoveDeprecations{
-		logger:          logger,
-		commandExecutor: commandExecutor,
-		config:          config,
+		logger:   logger,
+		rector:   rector,
+		config:   config,
+		composer: composer,
 	}
 }
 
-func (h *UpdateRemoveDeprecations) Execute(path string, worktree internal.Worktree) error {
+func (h *UpdateRemoveDeprecations) Execute(ctx context.Context, path string, worktree internal.Worktree) error {
 	if h.config.SkipRector {
 		h.logger.Debug("rector is disabled, skipping remove deprecations")
 		return nil
@@ -47,22 +51,27 @@ func (h *UpdateRemoveDeprecations) Execute(path string, worktree internal.Worktr
 	h.logger.Info("remove deprecations")
 
 	// Check if rector is installed.
-	installed, _ := h.commandExecutor.IsPackageInstalled(path, "palantirnet/drupal-rector")
+	installed, _ := h.composer.IsPackageInstalled(ctx, path, "palantirnet/drupal-rector")
 	if !installed {
 		h.logger.Debug("rector is not installed, installing")
-		if _, err := h.commandExecutor.InstallPackages(path, "palantirnet/drupal-rector"); err != nil {
+		if _, err := h.composer.Require(ctx, path, "palantirnet/drupal-rector"); err != nil {
 			return err
 		}
 	}
 
-	out, err := h.commandExecutor.RunRector(path)
+	customCodeDirectories, err := h.composer.GetCustomCodeDirectories(ctx, path)
+	if err != nil {
+		return err
+	}
+
+	out, err := h.rector.Run(ctx, path, customCodeDirectories)
 	if err != nil {
 		return err
 	}
 
 	if !installed {
 		h.logger.Debug("removing rector")
-		if _, err := h.commandExecutor.RemovePackages(path, "palantirnet/drupal-rector"); err != nil {
+		if _, err := h.composer.Remove(ctx, path, "palantirnet/drupal-rector"); err != nil {
 			return err
 		}
 	}

@@ -1,6 +1,8 @@
 package services
 
-import "go.uber.org/fx"
+import (
+	"go.uber.org/fx"
+)
 
 var Module = fx.Provide(
 	fx.Annotate(
@@ -36,20 +38,14 @@ var Module = fx.Provide(
 		fx.As(new(RepositoryService)),
 	),
 	fx.Annotate(
-		newWorkflowDependencyUpdateService,
+		NewDependencyUpdateStrategy,
 		fx.ParamTags(`group:"updater_after_update"`),
 	),
-	newWorkflowSecurityUpdateService,
 	fx.Annotate(
-		NewDefaultComposerService,
-		fx.As(new(ComposerService)),
+		NewSecurityUpdateStrategy,
 	),
 	fx.Annotate(
-		newDefaultDrupalOrgService,
-		fx.As(new(DrupalOrgService)),
-	),
-	fx.Annotate(
-		newDefaultDrushService,
-		fx.As(new(DrushService)),
+		NewWorkflowBaseService,
+		fx.As(new(WorkflowService)),
 	),
 )
