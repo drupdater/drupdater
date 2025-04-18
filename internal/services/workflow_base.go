@@ -16,6 +16,7 @@ import (
 
 	git "github.com/go-git/go-git/v5"
 	gitConfig "github.com/go-git/go-git/v5/config"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"go.uber.org/zap"
 )
@@ -37,7 +38,7 @@ type SecurityReport struct {
 }
 
 type WorkflowService interface {
-	StartUpdate(ctx context.Context) error
+	StartUpdate(ctx context.Context, strategy WorkflowStrategy) error
 }
 
 type WorkflowUpdateResult struct {
@@ -51,6 +52,31 @@ type WorkflowBaseService struct {
 	commandExecutor    utils.CommandExecutor
 	updater            UpdaterService
 	vcsProviderFactory codehosting.VcsProviderFactory
+	repository         RepositoryService
+	installer          InstallerService
+	composerService    ComposerService
+}
+
+func NewWorkflowBaseService(
+	logger *zap.Logger,
+	config internal.Config,
+	commandExecutor utils.CommandExecutor,
+	updater UpdaterService,
+	vcsProviderFactory codehosting.VcsProviderFactory,
+	repository RepositoryService,
+	installer InstallerService,
+	composerService ComposerService,
+) *WorkflowBaseService {
+	return &WorkflowBaseService{
+		logger:             logger,
+		config:             config,
+		commandExecutor:    commandExecutor,
+		updater:            updater,
+		vcsProviderFactory: vcsProviderFactory,
+		repository:         repository,
+		installer:          installer,
+		composerService:    composerService,
+	}
 }
 
 func (ws *WorkflowBaseService) Update(errCh chan error, resultCh chan WorkflowUpdateResult, ctx context.Context, packagesToUpdate []string, minimalChanges bool, path string, worktree internal.Worktree, wg *sync.WaitGroup) {
@@ -104,7 +130,6 @@ func (ws *WorkflowBaseService) PushChanges(repository internal.Repository, updat
 }
 
 func (ws *WorkflowBaseService) GenerateDescription(data interface{}, filename string) (string, error) {
-
 	tmpl, err := template.ParseFS(templates, "templates/*.go.tmpl")
 	if err != nil {
 		panic(err)
@@ -134,4 +159,148 @@ func (ws *WorkflowBaseService) CreateMergeRequest(title string, description stri
 func (ws *WorkflowBaseService) Cleanup() {
 	tmpDirName := fmt.Sprintf("/tmp/%x", md5.Sum([]byte(ws.config.RepositoryURL)))
 	os.RemoveAll(tmpDirName)
+}
+
+func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, strategy WorkflowStrategy) error {
+	ws.logger.Info("starting update workflow")
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	var wg sync.WaitGroup
+	errCh := make(chan error, 2)
+	resultCh := make(chan WorkflowUpdateResult, 1)
+
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		if err := ws.installer.InstallDrupal(ctx, ws.config.RepositoryURL, ws.config.Branch, ws.config.Token, ws.config.Sites); err != nil {
+			errCh <- err
+			cancel()
+		}
+	}()
+
+	ws.logger.Info("cloning repository for update", zap.String("repositoryURL", ws.config.RepositoryURL), zap.String("branch", ws.config.Branch))
+	repository, worktree, path, err := ws.repository.CloneRepository(ws.config.RepositoryURL, ws.config.Branch, ws.config.Token)
+	if err != nil {
+		return err
+	}
+
+	// Create initial temporary branch
+	tempBranchName := fmt.Sprintf("update-%s", "ss")
+	if err := worktree.Checkout(&git.CheckoutOptions{
+		Branch: plumbing.NewBranchReferenceName(tempBranchName),
+		Create: true,
+	}); err != nil {
+		ws.logger.Error("failed to checkout branch", zap.Error(err))
+		return err
+	}
+
+	// Use strategy to determine what to update
+	packagesToUpdate, minimalChanges, err := strategy.PreUpdate(ctx, path)
+	if err != nil {
+		return err
+	}
+
+	// Check if we should continue with the update
+	if !strategy.ShouldContinue(packagesToUpdate) {
+		return nil
+	}
+
+	go ws.Update(errCh, resultCh, ctx, packagesToUpdate, minimalChanges, path, worktree, &wg)
+
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	var result WorkflowUpdateResult
+
+	select {
+	case <-done:
+		// Both finished, now fetch result
+		select {
+		case result = <-resultCh:
+		default:
+		}
+	case err := <-errCh:
+		ws.logger.Sugar().Error(err)
+		return err
+	}
+
+	// Get composer lock hash for branch name
+	composerLockHash, err := ws.composerService.GetComposerLockHash(path)
+	if err != nil {
+		return err
+	}
+
+	// Get branch name from strategy
+	updateBranchName := strategy.GenerateBranchName(composerLockHash)
+
+	// Check if branch already exists
+	if exists, _ := ws.CheckBranchExists(repository, updateBranchName); exists {
+		return nil
+	}
+
+	// Create final branch for changes
+	if err := worktree.Checkout(&git.CheckoutOptions{
+		Branch: plumbing.NewBranchReferenceName(updateBranchName),
+		Create: true,
+		Force:  false,
+		Keep:   true,
+	}); err != nil {
+		ws.logger.Error("failed to checkout branch", zap.Error(err))
+		return err
+	}
+
+	// Run post-update actions from strategy
+	if err := strategy.PostUpdate(ctx, path, worktree, result); err != nil {
+		return err
+	}
+
+	// Update Drupal hooks
+	updateHooks, err := ws.updater.UpdateDrupal(ctx, path, worktree, ws.config.Sites)
+	if err != nil {
+		return err
+	}
+
+	if !ws.config.DryRun {
+		if err = ws.PushChanges(repository, updateBranchName); err != nil {
+			return err
+		}
+
+		// Use strategy to get PR details
+		title, templateName := strategy.GeneratePRDetails()
+
+		// Get template data from strategy
+		data, err := strategy.GetTemplateData(result, updateHooks)
+		if err != nil {
+			ws.logger.Error("failed to get template data", zap.Error(err))
+			return err
+		}
+
+		// Generate description and create MR
+		description, err := ws.GenerateDescription(data, templateName)
+		if err != nil {
+			ws.logger.Error("failed to generate description", zap.Error(err))
+			return err
+		}
+
+		ws.CreateMergeRequest(title, description, updateBranchName, ws.config.Branch)
+	}
+
+	// Clean up the temporary directory
+	defer ws.Cleanup()
+
+	return nil
+}
+
+func (b *WorkflowBaseService) CheckBranchExists(repository internal.Repository, branchName string) (bool, error) {
+	exists, err := b.repository.BranchExists(repository, branchName)
+	if exists {
+		b.logger.Info("branch already exists", zap.String("branch", branchName))
+	}
+	return exists, err
 }

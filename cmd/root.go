@@ -19,9 +19,10 @@ import (
 )
 
 type Action struct {
-	sh              fx.Shutdowner
-	logger          *zap.Logger
-	workflowService services.WorkflowService
+	sh               fx.Shutdowner
+	logger           *zap.Logger
+	workflowService  services.WorkflowService
+	workflowStrategy services.WorkflowStrategy
 }
 
 func newAction(
@@ -29,11 +30,13 @@ func newAction(
 	sh fx.Shutdowner,
 	logger *zap.Logger,
 	workflowService services.WorkflowService,
+	workflowStrategy services.WorkflowStrategy,
 ) *Action {
 	act := &Action{
-		sh:              sh,
-		logger:          logger,
-		workflowService: workflowService,
+		sh:               sh,
+		logger:           logger,
+		workflowService:  workflowService,
+		workflowStrategy: workflowStrategy,
 	}
 
 	lc.Append(fx.Hook{
@@ -56,7 +59,7 @@ func (act *Action) stop(_ context.Context) error {
 func (act *Action) run(ctx context.Context) {
 
 	exitCode := 0
-	err := act.workflowService.StartUpdate(ctx)
+	err := act.workflowService.StartUpdate(ctx, act.workflowStrategy)
 	if err != nil {
 		act.logger.Error("failed to start update", zap.Error(err))
 		exitCode = 1
@@ -94,11 +97,11 @@ func runApp(config internal.Config) {
 			func() internal.Config {
 				return config
 			},
-			func(lc fx.Lifecycle, sh fx.Shutdowner, logger *zap.Logger, dependencyUpdateService *services.WorkflowDependencyUpdateService, securityUpdateService *services.WorkflowSecurityUpdateService) *Action {
+			func(lc fx.Lifecycle, sh fx.Shutdowner, logger *zap.Logger, workflowService services.WorkflowService, dependencyUpdateService services.DependencyUpdateStrategy, securityUpdateService services.SecurityUpdateStrategy) *Action {
 				if config.Security {
-					return newAction(lc, sh, logger, securityUpdateService)
+					return newAction(lc, sh, logger, workflowService, securityUpdateService)
 				}
-				return newAction(lc, sh, logger, dependencyUpdateService)
+				return newAction(lc, sh, logger, workflowService, dependencyUpdateService)
 			},
 		),
 		fx.Options(services.Module, utils.Module, codehosting.Module),

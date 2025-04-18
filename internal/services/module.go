@@ -36,10 +36,16 @@ var Module = fx.Provide(
 		fx.As(new(RepositoryService)),
 	),
 	fx.Annotate(
-		newWorkflowDependencyUpdateService,
+		NewDependencyUpdateStrategy,
 		fx.ParamTags(`group:"updater_after_update"`),
 	),
-	newWorkflowSecurityUpdateService,
+	fx.Annotate(
+		NewSecurityUpdateStrategy,
+	),
+	fx.Annotate(
+		NewWorkflowBaseService,
+		fx.As(new(WorkflowService)),
+	),
 	fx.Annotate(
 		NewDefaultComposerService,
 		fx.As(new(ComposerService)),
