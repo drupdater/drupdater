@@ -1,4 +1,4 @@
-package services
+package drupalorg
 
 import (
 	"encoding/json"
@@ -28,7 +28,7 @@ type DefaultDrupalOrgService struct {
 	logger           *zap.Logger
 }
 
-func newDefaultDrupalOrgService(logger *zap.Logger) *DefaultDrupalOrgService {
+func NewDefaultDrupalOrgService(logger *zap.Logger) *DefaultDrupalOrgService {
 	return &DefaultDrupalOrgService{
 		DrupalOrgBaseURL: "https://www.drupal.org",
 		logger:           logger,

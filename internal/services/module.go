@@ -1,6 +1,8 @@
 package services
 
-import "go.uber.org/fx"
+import (
+	"go.uber.org/fx"
+)
 
 var Module = fx.Provide(
 	fx.Annotate(
@@ -45,9 +47,5 @@ var Module = fx.Provide(
 	fx.Annotate(
 		NewWorkflowBaseService,
 		fx.As(new(WorkflowService)),
-	),
-	fx.Annotate(
-		newDefaultDrupalOrgService,
-		fx.As(new(DrupalOrgService)),
 	),
 )

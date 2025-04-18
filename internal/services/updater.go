@@ -16,6 +16,7 @@ import (
 
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/pkg/composer"
+	"github.com/drupdater/drupdater/pkg/drupalorg"
 	"github.com/drupdater/drupdater/pkg/drush"
 
 	gitlab "gitlab.com/gitlab-org/api/client-go"
@@ -82,12 +83,12 @@ type DefaultUpdater struct {
 	afterSiteUpdate []AfterSiteUpdate
 	config          internal.Config
 	composer        composer.ComposerService
-	drupalOrg       DrupalOrgService
+	drupalOrg       drupalorg.DrupalOrgService
 	gitlab          *gitlab.Client
 	drush           drush.DrushService
 }
 
-func newDefaultUpdater(afterSiteUpdate []AfterSiteUpdate, logger *zap.Logger, settings SettingsService, repository RepositoryService, config internal.Config, composer composer.ComposerService, drupalOrg DrupalOrgService, drush drush.DrushService) *DefaultUpdater {
+func newDefaultUpdater(afterSiteUpdate []AfterSiteUpdate, logger *zap.Logger, settings SettingsService, repository RepositoryService, config internal.Config, composer composer.ComposerService, drupalOrg drupalorg.DrupalOrgService, drush drush.DrushService) *DefaultUpdater {
 
 	drupalOrgGitlab, err := gitlab.NewClient(os.Getenv("DRUPALCODE_ACCESS_TOKEN"), gitlab.WithBaseURL("https://git.drupalcode.org/api/v4"))
 	if err != nil {

@@ -1,4 +1,4 @@
-package services
+package drupalorg
 
 import (
 	"net/http"

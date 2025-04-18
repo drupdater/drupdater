@@ -2,6 +2,7 @@ package pkg
 
 import (
 	"github.com/drupdater/drupdater/pkg/composer"
+	"github.com/drupdater/drupdater/pkg/drupalorg"
 	"github.com/drupdater/drupdater/pkg/drush"
 	"github.com/drupdater/drupdater/pkg/phpcs"
 	"github.com/drupdater/drupdater/pkg/rector"
@@ -24,5 +25,9 @@ var Module = fx.Provide(
 	fx.Annotate(
 		drush.NewDefaultDrushService,
 		fx.As(new(drush.DrushService)),
+	),
+	fx.Annotate(
+		drupalorg.NewDefaultDrupalOrgService,
+		fx.As(new(drupalorg.DrupalOrgService)),
 	),
 )
