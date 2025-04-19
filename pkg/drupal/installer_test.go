@@ -1,11 +1,10 @@
-package services
+package drupal
 
 import (
 	"errors"
 	"os"
 	"testing"
 
-	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/drush"
 	"github.com/stretchr/testify/mock"
 
@@ -35,13 +34,8 @@ module:
 	}
 
 	settingsService := NewMockSettingsService(t)
-	repositoryService := NewMockRepositoryService(t)
 	logger := zap.NewNop()
-	composerService := composer.NewMockRunner(t)
 
-	repositoryURL := "https://example.com/repo.git"
-	branch := "main"
-	token := "token"
 	sites := []string{"site1", "site2"}
 
 	settingsService.On("ConfigureDatabase", mock.Anything, "/tmp", "site1").Return(nil)
@@ -49,23 +43,18 @@ module:
 	settingsService.On("RemoveProfile", mock.Anything, "/tmp", "site1").Return(nil)
 	settingsService.On("RemoveProfile", mock.Anything, "/tmp", "site2").Return(nil)
 
-	repositoryService.On("CloneRepository", repositoryURL, branch, token).Return(nil, nil, "/tmp", nil)
-
 	t.Run("Success", func(t *testing.T) {
 		drush := drush.NewMockRunner(t)
-		composerService.On("Install", mock.Anything, "/tmp").Return(nil)
 
 		drush.On("InstallSite", mock.Anything, "/tmp", "site1").Return(nil)
 		drush.On("InstallSite", mock.Anything, "/tmp", "site2").Return(nil)
 
 		installer := &DefaultInstallerService{
-			logger:     logger,
-			repository: repositoryService,
-			drush:      drush,
-			settings:   settingsService,
-			composer:   composerService,
+			logger:   logger,
+			drush:    drush,
+			settings: settingsService,
 		}
-		err = installer.InstallDrupal(t.Context(), repositoryURL, branch, token, sites)
+		err = installer.InstallDrupal(t.Context(), "/tmp", sites)
 		if err != nil {
 			t.Fatalf("Failed to install Drupal: %v", err)
 		}
@@ -75,18 +64,15 @@ module:
 
 	t.Run("Failure", func(t *testing.T) {
 		drush := drush.NewMockRunner(t)
-		composerService.On("Install", mock.Anything, "/tmp").Return(nil)
 		drush.On("InstallSite", mock.Anything, "/tmp", "site1").Return(nil)
 		drush.On("InstallSite", mock.Anything, "/tmp", "site2").Return(errors.New("failed to install site"))
 
 		installer := &DefaultInstallerService{
-			logger:     logger,
-			repository: repositoryService,
-			drush:      drush,
-			settings:   settingsService,
-			composer:   composerService,
+			logger:   logger,
+			drush:    drush,
+			settings: settingsService,
 		}
-		err = installer.InstallDrupal(t.Context(), repositoryURL, branch, token, sites)
+		err = installer.InstallDrupal(t.Context(), "/tmp", sites)
 		if err == nil {
 			t.Fatalf("Expected an error but got nil")
 		}
@@ -94,6 +80,5 @@ module:
 		drush.AssertExpectations(t)
 	})
 
-	repositoryService.AssertExpectations(t)
 	settingsService.AssertExpectations(t)
 }

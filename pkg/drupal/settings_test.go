@@ -1,4 +1,4 @@
-package services
+package drupal
 
 import (
 	"os"
@@ -15,7 +15,7 @@ func TestIsSqliteModuleEnabled(t *testing.T) {
 	logger := zap.NewNop()
 	drush := drush.NewMockRunner(t)
 
-	settingsService := &DrupalSettingsService{
+	settingsService := &DefaultSettingsService{
 		logger: logger,
 		drush:  drush,
 	}
@@ -114,7 +114,7 @@ profile: thunder
 	logger := zap.NewNop()
 	drush := drush.NewMockRunner(t)
 
-	settingsService := &DrupalSettingsService{
+	settingsService := &DefaultSettingsService{
 		logger: logger,
 		drush:  drush,
 	}
@@ -186,7 +186,7 @@ profile: standard
 	logger := zap.NewNop()
 	drush := drush.NewMockRunner(t)
 
-	settingsService := &DrupalSettingsService{
+	settingsService := &DefaultSettingsService{
 		logger: logger,
 		drush:  drush,
 	}

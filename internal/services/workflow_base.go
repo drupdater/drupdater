@@ -13,6 +13,7 @@ import (
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/codehosting"
 	"github.com/drupdater/drupdater/pkg/composer"
+	"github.com/drupdater/drupdater/pkg/drupal"
 
 	git "github.com/go-git/go-git/v5"
 	gitConfig "github.com/go-git/go-git/v5/config"
@@ -52,7 +53,7 @@ type WorkflowBaseService struct {
 	updater            UpdaterService
 	vcsProviderFactory codehosting.VcsProviderFactory
 	repository         RepositoryService
-	installer          InstallerService
+	installer          drupal.InstallerService
 	composer           composer.Runner
 }
 
@@ -62,7 +63,7 @@ func NewWorkflowBaseService(
 	updater UpdaterService,
 	vcsProviderFactory codehosting.VcsProviderFactory,
 	repository RepositoryService,
-	installer InstallerService,
+	installer drupal.InstallerService,
 	composerService composer.Runner,
 ) *WorkflowBaseService {
 	return &WorkflowBaseService{
@@ -90,7 +91,19 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, strategy Workflo
 
 	go func() {
 		defer wg.Done()
-		if err := ws.installer.InstallDrupal(ctx, ws.config.RepositoryURL, ws.config.Branch, ws.config.Token, ws.config.Sites); err != nil {
+
+		ws.logger.Info("cloning repository for site-install", zap.String("repositoryURL", ws.config.RepositoryURL), zap.String("branch", ws.config.Branch))
+		_, _, path, err := ws.repository.CloneRepository(ws.config.RepositoryURL, ws.config.Branch, ws.config.Token)
+		if err != nil {
+			ws.logger.Error("failed to clone repository", zap.String("repositoryURL", ws.config.RepositoryURL), zap.String("branch", ws.config.Branch), zap.Error(err))
+			errCh <- err
+		}
+
+		if err = ws.composer.Install(ctx, path); err != nil {
+			errCh <- err
+		}
+
+		if err := ws.installer.InstallDrupal(ctx, path, ws.config.Sites); err != nil {
 			errCh <- err
 			cancel()
 		}

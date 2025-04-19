@@ -7,6 +7,7 @@ import (
 	internal "github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/codehosting"
 	"github.com/drupdater/drupdater/pkg/composer"
+	"github.com/drupdater/drupdater/pkg/drupal"
 
 	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
@@ -73,7 +74,7 @@ func TestGetFixedAdvisories(t *testing.T) {
 
 func TestSecurityUpdateStartUpdate(t *testing.T) {
 	logger := zap.NewNop()
-	installer := NewMockInstallerService(t)
+	installer := drupal.NewMockInstallerService(t)
 	updater := NewMockUpdaterService(t)
 	repositoryService := NewMockRepositoryService(t)
 	vcsProviderFactory := codehosting.NewMockVcsProviderFactory(t)
@@ -95,7 +96,7 @@ func TestSecurityUpdateStartUpdate(t *testing.T) {
 	worktree := internal.NewMockWorktree(t)
 	worktree.On("Checkout", mock.Anything).Return(nil)
 
-	installer.On("InstallDrupal", mock.Anything, config.RepositoryURL, config.Branch, config.Token, config.Sites).Return(nil)
+	installer.On("InstallDrupal", mock.Anything, "/tmp", config.Sites).Return(nil)
 	repositoryService.On("CloneRepository", config.RepositoryURL, config.Branch, config.Token).Return(repository, worktree, "/tmp", nil)
 	repositoryService.On("BranchExists", mock.Anything, "security-update-ddd").Return(false, nil)
 
@@ -114,6 +115,7 @@ func TestSecurityUpdateStartUpdate(t *testing.T) {
 		},
 	}, nil)
 	composerService.On("GetLockHash", "/tmp").Return("ddd", nil)
+	composerService.On("Install", mock.Anything, "/tmp").Return(nil)
 
 	err := workflowService.StartUpdate(t.Context(), strategy)
 
@@ -127,7 +129,7 @@ func TestSecurityUpdateStartUpdate(t *testing.T) {
 
 func TestSecurityUpdateStartUpdateWithDryRun(t *testing.T) {
 	logger := zap.NewNop()
-	installer := NewMockInstallerService(t)
+	installer := drupal.NewMockInstallerService(t)
 	updater := NewMockUpdaterService(t)
 	repositoryService := NewMockRepositoryService(t)
 	vcsProviderFactory := codehosting.NewMockVcsProviderFactory(t)
@@ -147,7 +149,7 @@ func TestSecurityUpdateStartUpdateWithDryRun(t *testing.T) {
 
 	worktree := internal.NewMockWorktree(t)
 	worktree.On("Checkout", mock.Anything).Return(nil)
-	installer.On("InstallDrupal", mock.Anything, config.RepositoryURL, config.Branch, config.Token, config.Sites).Return(nil)
+	installer.On("InstallDrupal", mock.Anything, "/tmp", config.Sites).Return(nil)
 	repositoryService.On("BranchExists", mock.Anything, "security-update-ddd").Return(false, nil)
 	repositoryService.On("CloneRepository", config.RepositoryURL, config.Branch, config.Token).Return(repository, worktree, "/tmp", nil)
 	updater.On("UpdateDependencies", mock.Anything, "/tmp", []string{"package1"}, mock.Anything, true).Return(DependencyUpdateReport{}, nil)
@@ -160,6 +162,7 @@ func TestSecurityUpdateStartUpdateWithDryRun(t *testing.T) {
 		},
 	}, nil)
 	composerService.On("GetLockHash", "/tmp").Return("ddd", nil)
+	composerService.On("Install", mock.Anything, "/tmp").Return(nil)
 
 	err := workflowService.StartUpdate(t.Context(), strategy)
 

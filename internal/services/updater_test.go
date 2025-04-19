@@ -8,6 +8,7 @@ import (
 
 	internal "github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/pkg/composer"
+	"github.com/drupdater/drupdater/pkg/drupal"
 	"github.com/drupdater/drupdater/pkg/drupalorg"
 	"github.com/drupdater/drupdater/pkg/drush"
 
@@ -65,7 +66,7 @@ func TestExportConfiguration(t *testing.T) {
 	worktree.On("Add", "/tmp").Return(plumbing.NewHash(""), nil)
 	worktree.On("Commit", "Update configuration site1", &git.CommitOptions{}).Return(plumbing.NewHash(""), nil)
 
-	settingsService := NewMockSettingsService(t)
+	settingsService := drupal.NewMockSettingsService(t)
 
 	repositoryService := NewMockRepositoryService(t)
 	repositoryService.On("IsSomethingStagedInPath", worktree, "/tmp").Return(true, nil)
@@ -678,7 +679,7 @@ func TestUpdateDrupal(t *testing.T) {
 	t.Run("Update drupal", func(t *testing.T) {
 
 		worktree := internal.NewMockWorktree(t)
-		settingsService := NewMockSettingsService(t)
+		settingsService := drupal.NewMockSettingsService(t)
 		repositoryService := NewMockRepositoryService(t)
 		drushService := drush.NewMockRunner(t)
 

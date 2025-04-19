@@ -5,7 +5,6 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/spf13/afero"
 	"go.uber.org/zap"
 )
 
@@ -17,13 +16,11 @@ type Runner interface {
 }
 
 type CLI struct {
-	fs     afero.Fs
 	logger *zap.Logger
 }
 
 func NewCLI(logger *zap.Logger) *CLI {
 	return &CLI{
-		fs:     afero.NewOsFs(),
 		logger: logger,
 	}
 }

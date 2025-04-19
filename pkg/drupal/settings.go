@@ -1,4 +1,4 @@
-package services
+package drupal
 
 import (
 	"bufio"
@@ -20,21 +20,21 @@ type SettingsService interface {
 	RemoveProfile(ctx context.Context, dir string, site string) error
 }
 
-type DrupalSettingsService struct {
+type DefaultSettingsService struct {
 	logger   *zap.Logger
 	drush    drush.Runner
 	composer composer.Runner
 }
 
-func newDrupalSettingsService(logger *zap.Logger, drush drush.Runner, composer composer.Runner) *DrupalSettingsService {
-	return &DrupalSettingsService{
+func NewDefaultSettingsService(logger *zap.Logger, drush drush.Runner, composer composer.Runner) *DefaultSettingsService {
+	return &DefaultSettingsService{
 		logger:   logger,
 		drush:    drush,
 		composer: composer,
 	}
 }
 
-func (ss DrupalSettingsService) ConfigureDatabase(ctx context.Context, dir string, site string) error {
+func (ss *DefaultSettingsService) ConfigureDatabase(ctx context.Context, dir string, site string) error {
 
 	siteLogger := ss.logger.With(zap.String("site", site))
 	siteLogger.Debug("configuring database", zap.String("dir", dir))
@@ -99,7 +99,7 @@ if (isset($settings['config_exclude_modules'])) {
 	return nil
 }
 
-func (ss *DrupalSettingsService) IsSqliteModuleEnabled(ctx context.Context, dir string, site string) (bool, error) {
+func (ss *DefaultSettingsService) IsSqliteModuleEnabled(ctx context.Context, dir string, site string) (bool, error) {
 
 	siteLogger := ss.logger.With(zap.String("site", site))
 
@@ -134,7 +134,7 @@ func (ss *DrupalSettingsService) IsSqliteModuleEnabled(ctx context.Context, dir 
 	return false, nil
 }
 
-func (ss *DrupalSettingsService) AddSqliteModule(ctx context.Context, dir string, site string) error {
+func (ss *DefaultSettingsService) AddSqliteModule(ctx context.Context, dir string, site string) error {
 
 	siteLogger := ss.logger.With(zap.String("site", site))
 
@@ -176,7 +176,7 @@ func (ss *DrupalSettingsService) AddSqliteModule(ctx context.Context, dir string
 	return nil
 }
 
-func (ss *DrupalSettingsService) RemoveProfile(ctx context.Context, dir string, site string) error {
+func (ss *DefaultSettingsService) RemoveProfile(ctx context.Context, dir string, site string) error {
 
 	siteLogger := ss.logger.With(zap.String("site", site))
 
