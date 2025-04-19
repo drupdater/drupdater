@@ -10,6 +10,7 @@ import (
 
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/drush"
+	"github.com/spf13/afero"
 
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
@@ -24,6 +25,7 @@ type DefaultSettingsService struct {
 	logger   *zap.Logger
 	drush    drush.Runner
 	composer composer.Runner
+	fs       afero.Fs
 }
 
 func NewDefaultSettingsService(logger *zap.Logger, drush drush.Runner, composer composer.Runner) *DefaultSettingsService {
@@ -31,6 +33,7 @@ func NewDefaultSettingsService(logger *zap.Logger, drush drush.Runner, composer 
 		logger:   logger,
 		drush:    drush,
 		composer: composer,
+		fs:       afero.NewOsFs(),
 	}
 }
 
@@ -63,10 +66,10 @@ $settings['file_private_path'] = '` + privatesDir + `';
 $settings['hash_salt'] = 'changeme';
 `
 
-	isSqliteEnabled, _ := ss.IsSqliteModuleEnabled(ctx, dir, site)
+	isSqliteEnabled, _ := ss.isSqliteModuleEnabled(ctx, dir, site)
 	if !isSqliteEnabled {
 		siteLogger.Debug("enabling sqlite module")
-		if err := ss.AddSqliteModule(ctx, dir, site); err != nil {
+		if err := ss.addSqliteModule(ctx, dir, site); err != nil {
 			siteLogger.Error("failed to enable sqlite module", zap.Error(err))
 		}
 		settings += `
@@ -81,7 +84,7 @@ if (isset($settings['config_exclude_modules'])) {
 	siteLogger.Debug("writing settings", zap.String("path", settingsPath), zap.String("settings", settings))
 
 	// If the file doesn't exist, create it, or append to the file
-	f, err := os.OpenFile(settingsPath, os.O_APPEND|os.O_WRONLY, 0644)
+	f, err := ss.fs.OpenFile(settingsPath, os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		siteLogger.Error("failed to open settings file", zap.Error(err))
 		return err
@@ -99,8 +102,7 @@ if (isset($settings['config_exclude_modules'])) {
 	return nil
 }
 
-func (ss *DefaultSettingsService) IsSqliteModuleEnabled(ctx context.Context, dir string, site string) (bool, error) {
-
+func (ss *DefaultSettingsService) isSqliteModuleEnabled(ctx context.Context, dir string, site string) (bool, error) {
 	siteLogger := ss.logger.With(zap.String("site", site))
 
 	configSyncDir, err := ss.drush.GetConfigSyncDir(ctx, dir, site, false)
@@ -111,7 +113,7 @@ func (ss *DefaultSettingsService) IsSqliteModuleEnabled(ctx context.Context, dir
 	siteLogger.Debug("checking if sqlite module is enabled", zap.String("path", coreExtensionPath))
 
 	// Read the existing YAML file
-	file, err := os.ReadFile(coreExtensionPath)
+	file, err := afero.ReadFile(ss.fs, coreExtensionPath)
 	if err != nil {
 		siteLogger.Error("failed to read core extension file", zap.Error(err))
 		return false, err
@@ -134,7 +136,7 @@ func (ss *DefaultSettingsService) IsSqliteModuleEnabled(ctx context.Context, dir
 	return false, nil
 }
 
-func (ss *DefaultSettingsService) AddSqliteModule(ctx context.Context, dir string, site string) error {
+func (ss *DefaultSettingsService) addSqliteModule(ctx context.Context, dir string, site string) error {
 
 	siteLogger := ss.logger.With(zap.String("site", site))
 
@@ -144,7 +146,7 @@ func (ss *DefaultSettingsService) AddSqliteModule(ctx context.Context, dir strin
 	}
 	coreExtensionPath := configSyncDir + "/core.extension.yml"
 	// Read the existing YAML file
-	file, err := os.ReadFile(coreExtensionPath)
+	file, err := afero.ReadFile(ss.fs, coreExtensionPath)
 	if err != nil {
 		siteLogger.Error("failed to read core extension file", zap.Error(err))
 		return err
@@ -167,7 +169,7 @@ func (ss *DefaultSettingsService) AddSqliteModule(ctx context.Context, dir strin
 	}
 
 	// Write the updated config back to the file
-	if err := os.WriteFile(coreExtensionPath, updatedConfig, 0644); err != nil {
+	if err := afero.WriteFile(ss.fs, coreExtensionPath, updatedConfig, 0644); err != nil {
 		siteLogger.Error("failed to write updated core extension file", zap.Error(err))
 		return err
 	}
@@ -177,7 +179,6 @@ func (ss *DefaultSettingsService) AddSqliteModule(ctx context.Context, dir strin
 }
 
 func (ss *DefaultSettingsService) RemoveProfile(ctx context.Context, dir string, site string) error {
-
 	siteLogger := ss.logger.With(zap.String("site", site))
 
 	configSyncDir, err := ss.drush.GetConfigSyncDir(ctx, dir, site, false)
@@ -187,7 +188,7 @@ func (ss *DefaultSettingsService) RemoveProfile(ctx context.Context, dir string,
 	coreExtensionPath := configSyncDir + "/core.extension.yml"
 
 	// Open the file for reading
-	fileToRead, err := os.Open(coreExtensionPath)
+	fileToRead, err := ss.fs.Open(coreExtensionPath)
 	if err != nil {
 		siteLogger.Error("Error opening file:", zap.Error(err))
 		return err
@@ -214,7 +215,7 @@ func (ss *DefaultSettingsService) RemoveProfile(ctx context.Context, dir string,
 	}
 
 	// Rewrite the file without the target line
-	file, err := os.Create(coreExtensionPath)
+	file, err := ss.fs.Create(coreExtensionPath)
 	if err != nil {
 		siteLogger.Error("Error creating file:", zap.Error(err))
 		return err
@@ -230,7 +231,8 @@ func (ss *DefaultSettingsService) RemoveProfile(ctx context.Context, dir string,
 		}
 	}
 	if err := writer.Flush(); err != nil {
-		fmt.Println("Error flushing to file:", err)
+		siteLogger.Error("Error flushing to file:", zap.Error(err))
+		return err
 	}
 
 	return nil
