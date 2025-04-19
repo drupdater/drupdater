@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/maypok86/otter"
-	"github.com/spf13/afero"
 	"go.uber.org/zap"
 )
 
@@ -17,7 +16,6 @@ var execCommand = exec.CommandContext
 
 // Runner interface for executing commands
 type Runner interface {
-	ExecDrush(ctx context.Context, dir string, site string, args ...string) (string, error)
 	InstallSite(ctx context.Context, dir string, site string) error
 	GetConfigSyncDir(ctx context.Context, dir string, site string, relative bool) (string, error)
 	ExportConfiguration(ctx context.Context, dir string, site string) error
@@ -33,18 +31,16 @@ type Runner interface {
 type CLI struct {
 	logger *zap.Logger
 	cache  otter.Cache[string, string]
-	fs     afero.Fs
 }
 
 func NewCLI(logger *zap.Logger, cache otter.Cache[string, string]) Runner {
 	return CLI{
 		logger: logger,
 		cache:  cache,
-		fs:     afero.NewOsFs(),
 	}
 }
 
-func (e CLI) ExecDrush(ctx context.Context, dir string, site string, args ...string) (string, error) {
+func (e CLI) execDrush(ctx context.Context, dir string, site string, args ...string) (string, error) {
 	command := execCommand(ctx, "composer", append([]string{"exec", "--", "drush"}, args...)...)
 	command.Dir = dir
 	// os.Environ() preserves the current environment variables
@@ -61,7 +57,7 @@ func (e CLI) ExecDrush(ctx context.Context, dir string, site string, args ...str
 
 func (e CLI) InstallSite(ctx context.Context, dir string, site string) error {
 	e.logger.Debug("installing site")
-	_, err := e.ExecDrush(ctx, dir, site, "--existing-config", "--yes", "site:install", "--sites-subdir="+site)
+	_, err := e.execDrush(ctx, dir, site, "--existing-config", "--yes", "site:install", "--sites-subdir="+site)
 
 	return err
 }
@@ -72,7 +68,7 @@ func (e CLI) GetConfigSyncDir(ctx context.Context, dir string, site string, rela
 	if ok {
 		return value, nil
 	}
-	configSyncDir, err := e.ExecDrush(ctx, dir, site, "ev", "print realpath(\\Drupal\\Core\\Site\\Settings::get('config_sync_directory'))")
+	configSyncDir, err := e.execDrush(ctx, dir, site, "ev", "print realpath(\\Drupal\\Core\\Site\\Settings::get('config_sync_directory'))")
 	if err != nil {
 		return "", err
 	}
@@ -85,31 +81,31 @@ func (e CLI) GetConfigSyncDir(ctx context.Context, dir string, site string, rela
 
 func (e CLI) ExportConfiguration(ctx context.Context, dir string, site string) error {
 	e.logger.Debug("exporting configuration")
-	_, err := e.ExecDrush(ctx, dir, site, "config:export", "--yes")
+	_, err := e.execDrush(ctx, dir, site, "config:export", "--yes")
 	return err
 }
 
 func (e CLI) UpdateSite(ctx context.Context, dir string, site string) error {
 	e.logger.Debug("updating site")
-	_, err := e.ExecDrush(ctx, dir, site, "updatedb", "--yes", "-vvv")
+	_, err := e.execDrush(ctx, dir, site, "updatedb", "--yes", "-vvv")
 	return err
 }
 
 func (e CLI) ConfigResave(ctx context.Context, dir string, site string) error {
 	e.logger.Debug("config resave")
-	_, err := e.ExecDrush(ctx, dir, site, "php:script", "/opt/drupdater/config-resave.php")
+	_, err := e.execDrush(ctx, dir, site, "php:script", "/opt/drupdater/config-resave.php")
 	return err
 }
 
 func (e CLI) IsModuleEnabled(ctx context.Context, dir string, site string, module string) (bool, error) {
 	e.logger.Debug("checking if module is enabled")
-	out, err := e.ExecDrush(ctx, dir, site, "pm:list", "--status=enabled", "--field=name", "--filter="+module)
+	out, err := e.execDrush(ctx, dir, site, "pm:list", "--status=enabled", "--field=name", "--filter="+module)
 	return out == module, err
 }
 
 func (e CLI) LocalizeTranslations(ctx context.Context, dir string, site string) error {
 	e.logger.Debug("localizing translations")
-	_, err := e.ExecDrush(ctx, dir, site, "locale-deploy:localize-translations")
+	_, err := e.execDrush(ctx, dir, site, "locale-deploy:localize-translations")
 	return err
 }
 
@@ -119,7 +115,7 @@ func (e CLI) GetTranslationPath(ctx context.Context, dir string, site string, re
 	if ok {
 		return value, nil
 	}
-	translationPath, err := e.ExecDrush(ctx, dir, site, "ev", "print realpath(\\Drupal::config('locale.settings')->get('translation.path'))")
+	translationPath, err := e.execDrush(ctx, dir, site, "ev", "print realpath(\\Drupal::config('locale.settings')->get('translation.path'))")
 	if err != nil {
 		return "", err
 	}
@@ -141,7 +137,7 @@ type UpdateHook struct {
 
 func (e CLI) GetUpdateHooks(ctx context.Context, dir string, site string) (map[string]UpdateHook, error) {
 	e.logger.Debug("getting update hooks")
-	data, err := e.ExecDrush(ctx, dir, site, "updatedb-status", "--format=json")
+	data, err := e.execDrush(ctx, dir, site, "updatedb-status", "--format=json")
 	if err != nil {
 		return nil, err
 	}

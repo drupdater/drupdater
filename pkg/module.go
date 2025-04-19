@@ -2,6 +2,7 @@ package pkg
 
 import (
 	"github.com/drupdater/drupdater/pkg/composer"
+	"github.com/drupdater/drupdater/pkg/drupal"
 	"github.com/drupdater/drupdater/pkg/drupalorg"
 	"github.com/drupdater/drupdater/pkg/drush"
 	"github.com/drupdater/drupdater/pkg/phpcs"
@@ -29,5 +30,13 @@ var Module = fx.Provide(
 	fx.Annotate(
 		drupalorg.NewHTTPClient,
 		fx.As(new(drupalorg.Client)),
+	),
+	fx.Annotate(
+		drupal.NewDefaultInstallerService,
+		fx.As(new(drupal.InstallerService)),
+	),
+	fx.Annotate(
+		drupal.NewDefaultSettingsService,
+		fx.As(new(drupal.SettingsService)),
 	),
 )

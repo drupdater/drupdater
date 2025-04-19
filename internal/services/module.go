@@ -6,10 +6,6 @@ import (
 
 var Module = fx.Provide(
 	fx.Annotate(
-		newDrupalSettingsService,
-		fx.As(new(SettingsService)),
-	),
-	fx.Annotate(
 		newUpdateTranslations,
 		fx.As(new(AfterSiteUpdate)),
 		fx.ResultTags(`group:"updater_after_site_update"`),
@@ -28,10 +24,6 @@ var Module = fx.Provide(
 		newDefaultUpdater,
 		fx.As(new(UpdaterService)),
 		fx.ParamTags(`group:"updater_after_site_update"`),
-	),
-	fx.Annotate(
-		newDefaultInstallerService,
-		fx.As(new(InstallerService)),
 	),
 	fx.Annotate(
 		NewGitRepositoryService,
