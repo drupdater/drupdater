@@ -4,11 +4,11 @@ import (
 	"os"
 	"testing"
 
-	internal "github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/codehosting"
-	"github.com/drupdater/drupdater/pkg/composer"
+	composer "github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/drupal"
-
+	drush "github.com/drupdater/drupdater/pkg/drush"
 	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
 	"go.uber.org/zap"
@@ -96,12 +96,14 @@ func TestSecurityUpdateStartUpdate(t *testing.T) {
 	worktree := internal.NewMockWorktree(t)
 	worktree.On("Checkout", mock.Anything).Return(nil)
 
-	installer.On("InstallDrupal", mock.Anything, "/tmp", config.Sites).Return(nil)
+	installer.On("InstallDrupal", mock.Anything, "/tmp", "site1").Return(nil)
+	installer.On("InstallDrupal", mock.Anything, "/tmp", "site2").Return(nil)
 	repositoryService.On("CloneRepository", config.RepositoryURL, config.Branch, config.Token).Return(repository, worktree, "/tmp", nil)
 	repositoryService.On("BranchExists", mock.Anything, "security-update-ddd").Return(false, nil)
 
 	updater.On("UpdateDependencies", mock.Anything, "/tmp", []string{"package1"}, mock.Anything, true).Return(DependencyUpdateReport{}, nil)
-	updater.On("UpdateDrupal", mock.Anything, "/tmp", mock.Anything, config.Sites).Return(UpdateHooksPerSite{}, nil)
+	updater.On("UpdateDrupal", mock.Anything, "/tmp", mock.Anything, "site1").Return(map[string]drush.UpdateHook{}, nil)
+	updater.On("UpdateDrupal", mock.Anything, "/tmp", mock.Anything, "site2").Return(map[string]drush.UpdateHook{}, nil)
 	vcsProviderFactory.On("Create", "https://example.com/repo.git", "token").Return(vcsProvider)
 
 	fixture, _ := os.ReadFile("testdata/security_update.md")
@@ -149,11 +151,13 @@ func TestSecurityUpdateStartUpdateWithDryRun(t *testing.T) {
 
 	worktree := internal.NewMockWorktree(t)
 	worktree.On("Checkout", mock.Anything).Return(nil)
-	installer.On("InstallDrupal", mock.Anything, "/tmp", config.Sites).Return(nil)
+	installer.On("InstallDrupal", mock.Anything, "/tmp", "site1").Return(nil)
+	installer.On("InstallDrupal", mock.Anything, "/tmp", "site2").Return(nil)
 	repositoryService.On("BranchExists", mock.Anything, "security-update-ddd").Return(false, nil)
 	repositoryService.On("CloneRepository", config.RepositoryURL, config.Branch, config.Token).Return(repository, worktree, "/tmp", nil)
 	updater.On("UpdateDependencies", mock.Anything, "/tmp", []string{"package1"}, mock.Anything, true).Return(DependencyUpdateReport{}, nil)
-	updater.On("UpdateDrupal", mock.Anything, "/tmp", mock.Anything, config.Sites).Return(UpdateHooksPerSite{}, nil)
+	updater.On("UpdateDrupal", mock.Anything, "/tmp", mock.Anything, "site1").Return(map[string]drush.UpdateHook{}, nil)
+	updater.On("UpdateDrupal", mock.Anything, "/tmp", mock.Anything, "site2").Return(map[string]drush.UpdateHook{}, nil)
 	composerService.On("Diff", mock.Anything, mock.Anything, mock.Anything, true).Return("foo", nil)
 	composerService.On("Audit", mock.Anything, "/tmp").Return(composer.Audit{
 		Advisories: []composer.Advisory{

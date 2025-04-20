@@ -9,10 +9,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
-	"runtime"
-	"slices"
 	"strings"
-	"sync"
 
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/pkg/composer"
@@ -73,7 +70,7 @@ type ConflictPatch struct {
 
 type UpdaterService interface {
 	UpdateDependencies(ctx context.Context, path string, packagesToUpdate []string, worktree internal.Worktree, minimalChanges bool) (DependencyUpdateReport, error)
-	UpdateDrupal(ctx context.Context, path string, worktree internal.Worktree, sites []string) (UpdateHooksPerSite, error)
+	UpdateDrupal(ctx context.Context, path string, worktree internal.Worktree, site string) (map[string]drush.UpdateHook, error)
 	UpdatePatches(ctx context.Context, path string, worktree internal.Worktree, operations []composer.PackageChange, patches map[string]map[string]string) (PatchUpdates, map[string]map[string]string)
 }
 
@@ -207,10 +204,7 @@ func (us *DefaultUpdater) UpdateDependencies(ctx context.Context, path string, p
 
 type UpdateHooksPerSite map[string]map[string]drush.UpdateHook
 
-func (us *DefaultUpdater) UpdateDrupal(ctx context.Context, path string, worktree internal.Worktree, sites []string) (UpdateHooksPerSite, error) {
-
-	var wg sync.WaitGroup
-	updateHooksPerSite := UpdateHooksPerSite{}
+func (us *DefaultUpdater) UpdateDrupal(ctx context.Context, path string, worktree internal.Worktree, site string) (map[string]drush.UpdateHook, error) {
 
 	type Result struct {
 		Site        string
@@ -218,72 +212,43 @@ func (us *DefaultUpdater) UpdateDrupal(ctx context.Context, path string, worktre
 		err         error
 	}
 
-	for chunk := range slices.Chunk(sites, runtime.NumCPU()) {
-		resultChannel := make(chan Result, len(sites))
+	us.logger.Info("updating site", zap.String("site", site))
 
-		for _, site := range chunk {
+	if err := us.settings.ConfigureDatabase(ctx, path, site); err != nil {
+		return nil, err
+	}
 
-			wg.Add(1)
+	hooks, err := us.drush.GetUpdateHooks(ctx, path, site)
+	us.logger.Debug("update hooks", zap.Any("hooks", hooks))
+	if err != nil {
+		return nil, err
 
-			go func(site string) {
-				defer wg.Done()
+	}
 
-				us.logger.Info("updating site", zap.String("site", site))
+	if err := us.drush.UpdateSite(ctx, path, site); err != nil {
+		return nil, err
 
-				if err := us.settings.ConfigureDatabase(ctx, path, site); err != nil {
-					resultChannel <- Result{err: err}
-					return
-				}
+	}
 
-				hooks, err := us.drush.GetUpdateHooks(ctx, path, site)
-				us.logger.Debug("update hooks", zap.Any("hooks", hooks))
-				if err != nil {
-					resultChannel <- Result{err: err}
-					return
-				}
+	if err := us.drush.ConfigResave(ctx, path, site); err != nil {
+		return nil, err
 
-				if err := us.drush.UpdateSite(ctx, path, site); err != nil {
-					resultChannel <- Result{err: err}
-					return
-				}
+	}
 
-				if err := us.drush.ConfigResave(ctx, path, site); err != nil {
-					resultChannel <- Result{err: err}
-					return
-				}
+	for _, asu := range us.afterSiteUpdate {
+		if err := asu.Execute(ctx, path, worktree, site); err != nil {
+			return nil, err
 
-				for _, asu := range us.afterSiteUpdate {
-					if err := asu.Execute(ctx, path, worktree, site); err != nil {
-						resultChannel <- Result{err: err}
-						return
-					}
-				}
-
-				us.logger.Info("export configuration", zap.String("site", site))
-				if err := us.ExportConfiguration(ctx, worktree, path, site); err != nil {
-					resultChannel <- Result{err: err}
-					return
-				}
-
-				resultChannel <- Result{Site: site, UpdateHooks: hooks, err: nil}
-			}(site)
-		}
-
-		wg.Wait()
-
-		close(resultChannel)
-
-		for result := range resultChannel {
-			if result.err != nil {
-				return nil, result.err
-			}
-			if len(result.UpdateHooks) != 0 {
-				updateHooksPerSite[result.Site] = result.UpdateHooks
-			}
 		}
 	}
 
-	return updateHooksPerSite, nil
+	us.logger.Info("export configuration", zap.String("site", site))
+	if err := us.ExportConfiguration(ctx, worktree, path, site); err != nil {
+		return nil, err
+
+	}
+
+	return hooks, nil
 }
 
 func (us *DefaultUpdater) UpdatePatches(ctx context.Context, path string, worktree internal.Worktree, operations []composer.PackageChange, patches map[string]map[string]string) (PatchUpdates, map[string]map[string]string) {

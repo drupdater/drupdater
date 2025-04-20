@@ -2,9 +2,6 @@ package drupal
 
 import (
 	"context"
-	"runtime"
-	"slices"
-	"sync"
 
 	"github.com/drupdater/drupdater/pkg/drush"
 
@@ -12,7 +9,7 @@ import (
 )
 
 type InstallerService interface {
-	InstallDrupal(ctx context.Context, path string, sites []string) error
+	InstallDrupal(ctx context.Context, path string, site string) error
 }
 
 type DefaultInstallerService struct {
@@ -29,48 +26,21 @@ func NewDefaultInstallerService(logger *zap.Logger, drush drush.Runner, settings
 	}
 }
 
-func (is *DefaultInstallerService) InstallDrupal(ctx context.Context, path string, sites []string) error {
+func (is *DefaultInstallerService) InstallDrupal(ctx context.Context, path string, site string) error {
 
-	var wg sync.WaitGroup
+	is.logger.Info("installing site", zap.String("site", site))
 
-	maxProcs := runtime.NumCPU() - 1 // Leave one CPU free for the composer update process.
-	for chunk := range slices.Chunk(sites, maxProcs) {
-		errChannel := make(chan error, len(chunk))
+	if err := is.settings.ConfigureDatabase(ctx, path, site); err != nil {
+		return err
+	}
 
-		for _, site := range chunk {
-			wg.Add(1)
+	if err := is.settings.RemoveProfile(ctx, path, site); err != nil {
+		return err
 
-			go func(site string) {
-				defer wg.Done()
+	}
 
-				is.logger.Info("installing site", zap.String("site", site))
-
-				if err := is.settings.ConfigureDatabase(ctx, path, site); err != nil {
-					errChannel <- err
-					return
-				}
-
-				if err := is.settings.RemoveProfile(ctx, path, site); err != nil {
-					errChannel <- err
-					return
-				}
-
-				if err := is.drush.InstallSite(ctx, path, site); err != nil {
-					errChannel <- err
-					return
-				}
-
-			}(site)
-		}
-		wg.Wait()
-
-		close(errChannel)
-
-		for err := range errChannel {
-			if err != nil {
-				return err
-			}
-		}
+	if err := is.drush.InstallSite(ctx, path, site); err != nil {
+		return err
 	}
 
 	return nil

@@ -14,6 +14,7 @@ import (
 	"github.com/drupdater/drupdater/internal/codehosting"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/drupal"
+	"github.com/drupdater/drupdater/pkg/drush"
 
 	git "github.com/go-git/go-git/v5"
 	gitConfig "github.com/go-git/go-git/v5/config"
@@ -25,19 +26,6 @@ import (
 //go:embed templates
 var templates embed.FS
 
-type TemplateData struct {
-	ComposerDiff           string
-	DependencyUpdateReport DependencyUpdateReport
-	SecurityReport         SecurityReport
-	UpdateHooks            UpdateHooksPerSite
-}
-
-type SecurityReport struct {
-	FixedAdvisories       []composer.Advisory
-	AfterUpdateAdvisories []composer.Advisory
-	NumUnresolvedIssues   int
-}
-
 type WorkflowService interface {
 	StartUpdate(ctx context.Context, strategy WorkflowStrategy) error
 }
@@ -45,6 +33,14 @@ type WorkflowService interface {
 type WorkflowUpdateResult struct {
 	updateReport DependencyUpdateReport
 	table        string
+}
+
+type SharedUpdate struct {
+	Path                 string
+	Worktree             internal.Worktree
+	Repository           internal.Repository
+	WorkflowUpdateResult WorkflowUpdateResult
+	updateBranchName     string
 }
 
 type WorkflowBaseService struct {
@@ -80,103 +76,202 @@ func NewWorkflowBaseService(
 func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, strategy WorkflowStrategy) error {
 	ws.logger.Info("starting update workflow")
 
-	ctx, cancel := context.WithCancel(ctx)
+	// Clean up the temporary directory
+	defer ws.Cleanup()
+
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	var wg sync.WaitGroup
-	errCh := make(chan error, 2)
-	resultCh := make(chan WorkflowUpdateResult, 1)
+	errCh := make(chan error, len(ws.config.Sites)*2+2) // site installs + site updates + installCode + updateCode
 
-	wg.Add(2)
+	// Channels to coordinate
+	installCodeDone := make(chan string, 1) // carries installPath
+	installSiteDone := make(map[string]chan struct{})
 
+	for _, site := range ws.config.Sites {
+		installSiteDone[site] = make(chan struct{})
+	}
+
+	var sharedUpdate SharedUpdate
+	var updateDone = make(chan struct{})
+	var siteReports sync.Map // map[string]UpdateReport
+
+	// 1. Run installCode()
+	wg.Add(1)
 	go func() {
 		defer wg.Done()
 
-		ws.logger.Info("cloning repository for site-install", zap.String("repositoryURL", ws.config.RepositoryURL), zap.String("branch", ws.config.Branch))
-		_, _, path, err := ws.repository.CloneRepository(ws.config.RepositoryURL, ws.config.Branch, ws.config.Token)
+		path, err := ws.installCode(ctx)
 		if err != nil {
-			ws.logger.Error("failed to clone repository", zap.String("repositoryURL", ws.config.RepositoryURL), zap.String("branch", ws.config.Branch), zap.Error(err))
-			errCh <- err
-		}
-
-		if err = ws.composer.Install(ctx, path); err != nil {
-			errCh <- err
-		}
-
-		if err := ws.installer.InstallDrupal(ctx, path, ws.config.Sites); err != nil {
 			errCh <- err
 			cancel()
+			return
 		}
+
+		// Broadcast path to all waiting goroutines
+		installPath := path
+		installCodeDone <- installPath
 	}()
 
-	ws.logger.Info("cloning repository for update", zap.String("repositoryURL", ws.config.RepositoryURL), zap.String("branch", ws.config.Branch))
-	repository, worktree, path, err := ws.repository.CloneRepository(ws.config.RepositoryURL, ws.config.Branch, ws.config.Token)
-	if err != nil {
-		return err
+	// 2. Run installSite(site) after installCode
+	for _, site := range ws.config.Sites {
+		wg.Add(1)
+		go func(site string) {
+			defer wg.Done()
+
+			select {
+			case installPath := <-installCodeDone:
+				// Put the path back for other goroutines
+				installCodeDone <- installPath
+
+				if err := ws.installer.InstallDrupal(ctx, installPath, site); err != nil {
+					errCh <- err
+					cancel()
+					return
+				}
+				close(installSiteDone[site])
+			case <-ctx.Done():
+				return
+			}
+		}(site)
 	}
 
-	// Use strategy to determine what to update
-	packagesToUpdate, minimalChanges, err := strategy.PreUpdate(ctx, path)
-	if err != nil {
-		return err
-	}
-
-	// Check if we should continue with the update
-	if !strategy.ShouldContinue(packagesToUpdate) {
-		return nil
-	}
-
+	// 3. Run updateSharedCode() in parallel
+	wg.Add(1)
 	go func() {
 		defer wg.Done()
-
-		ws.logger.Info("updating dependencies")
-		updateReport, err := ws.updater.UpdateDependencies(ctx, path, packagesToUpdate, worktree, minimalChanges)
+		var err error
+		update, err := ws.updateSharedCode(ctx, strategy)
 		if err != nil {
 			errCh <- err
+			cancel()
 			return
 		}
 
-		table, err := ws.composer.Diff(ctx, path, ws.config.Branch, true)
-		if err != nil {
-			errCh <- err
-			return
-		}
-
-		if table == "" {
-			ws.logger.Info("no packages were updated, skipping update")
-			errCh <- err
-			return
-		}
-
-		ws.logger.Sugar().Info("composer diff table", fmt.Sprintf("\n%s", table))
-
-		resultCh <- WorkflowUpdateResult{
-			updateReport: updateReport,
-			table:        table,
-		}
+		// Simply assign the update to sharedUpdate - no need for mutex
+		// since all readers will wait for updateDone channel before accessing
+		sharedUpdate = update
+		close(updateDone)
 	}()
 
+	// 4. Run updateSite(site) after installSite + updateSharedCode
+	for _, site := range ws.config.Sites {
+		wg.Add(1)
+		go func(site string) {
+			defer wg.Done()
+
+			// Wait for install to finish
+			select {
+			case <-installSiteDone[site]:
+			case <-ctx.Done():
+				return
+			}
+
+			// Wait for shared update to be ready
+			select {
+			case <-updateDone:
+			case <-ctx.Done():
+				return
+			}
+
+			// Update Drupal hooks
+			updateHooks, err := ws.updater.UpdateDrupal(ctx, sharedUpdate.Path, sharedUpdate.Worktree, site)
+			if err != nil {
+				errCh <- err
+				cancel()
+				return
+			}
+
+			siteReports.Store(site, updateHooks)
+
+		}(site)
+	}
+
+	// 5. Wait for all routines
 	done := make(chan struct{})
 	go func() {
 		wg.Wait()
 		close(done)
 	}()
 
-	var result WorkflowUpdateResult
-
 	select {
 	case <-done:
-		// Both finished, now fetch result
-		select {
-		case result = <-resultCh:
-		default:
+
+		if !ws.config.DryRun {
+
+			finalReports := make(UpdateHooksPerSite)
+			siteReports.Range(func(key, value any) bool {
+				site := key.(string)
+				report := value.(map[string]drush.UpdateHook)
+				finalReports[site] = report
+				return true
+			})
+
+			ws.publishWork(sharedUpdate.Repository, sharedUpdate.updateBranchName, strategy, sharedUpdate.WorkflowUpdateResult, finalReports)
 		}
+		return nil
 	case err := <-errCh:
-		ws.logger.Sugar().Error(err)
 		return err
 	}
+}
 
-	// Get branch name from strategy
+func (ws *WorkflowBaseService) installCode(ctx context.Context) (string, error) {
+	ws.logger.Info("cloning repository for site-install", zap.String("repositoryURL", ws.config.RepositoryURL), zap.String("branch", ws.config.Branch))
+	_, _, path, err := ws.repository.CloneRepository(ws.config.RepositoryURL, ws.config.Branch, ws.config.Token)
+	if err != nil {
+		ws.logger.Error("failed to clone repository", zap.String("repositoryURL", ws.config.RepositoryURL), zap.String("branch", ws.config.Branch), zap.Error(err))
+		return "", err
+	}
+
+	if err = ws.composer.Install(ctx, path); err != nil {
+		return "", err
+	}
+
+	return path, nil
+}
+
+func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context, strategy WorkflowStrategy) (SharedUpdate, error) {
+	ws.logger.Info("cloning repository for update", zap.String("repositoryURL", ws.config.RepositoryURL), zap.String("branch", ws.config.Branch))
+	repository, worktree, path, err := ws.repository.CloneRepository(ws.config.RepositoryURL, ws.config.Branch, ws.config.Token)
+	if err != nil {
+		return SharedUpdate{}, err
+	}
+
+	// Use strategy to determine what to update
+	packagesToUpdate, minimalChanges, err := strategy.PreUpdate(ctx, path)
+	if err != nil {
+
+		return SharedUpdate{}, err
+	}
+
+	// Check if we should continue with the update
+	if !strategy.ShouldContinue(packagesToUpdate) {
+
+		return SharedUpdate{}, err
+	}
+
+	ws.logger.Info("updating dependencies")
+	updateReport, err := ws.updater.UpdateDependencies(ctx, path, packagesToUpdate, worktree, minimalChanges)
+	if err != nil {
+
+		return SharedUpdate{}, err
+	}
+
+	table, err := ws.composer.Diff(ctx, path, ws.config.Branch, true)
+	if err != nil {
+
+		return SharedUpdate{}, err
+	}
+
+	if table == "" {
+		ws.logger.Info("no packages were updated, skipping update")
+
+		return SharedUpdate{}, err
+	}
+
+	ws.logger.Sugar().Info("composer diff table", fmt.Sprintf("\n%s", table))
+
 	updateBranchName := strategy.GenerateBranchName(path)
 
 	// Check if branch already exists
@@ -186,7 +281,8 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, strategy Workflo
 	}
 	if exists {
 		ws.logger.Info("branch already exists", zap.String("branch", updateBranchName))
-		return nil
+
+		return SharedUpdate{}, err
 	}
 
 	// Create final branch for changes
@@ -197,55 +293,27 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, strategy Workflo
 		Keep:   true,
 	}); err != nil {
 		ws.logger.Error("failed to checkout branch", zap.Error(err))
-		return err
+
+		return SharedUpdate{}, err
 	}
 
 	// Run post-update actions from strategy
 	if err := strategy.PostUpdate(ctx, path, worktree); err != nil {
-		return err
+
+		return SharedUpdate{}, err
 	}
 
-	// Update Drupal hooks
-	updateHooks, err := ws.updater.UpdateDrupal(ctx, path, worktree, ws.config.Sites)
-	if err != nil {
-		return err
+	sharedUpdate := SharedUpdate{
+		Path:                 path,
+		Worktree:             worktree,
+		WorkflowUpdateResult: WorkflowUpdateResult{updateReport: updateReport, table: table},
+		Repository:           repository,
+		updateBranchName:     updateBranchName,
 	}
-
-	if !ws.config.DryRun {
-		if err = ws.PushChanges(repository, updateBranchName); err != nil {
-			return err
-		}
-
-		// Use strategy to get PR details
-		title, templateName := strategy.GeneratePRDetails()
-
-		// Get template data from strategy
-		data, err := strategy.GetTemplateData(result, updateHooks)
-		if err != nil {
-			ws.logger.Error("failed to get template data", zap.Error(err))
-			return err
-		}
-
-		// Generate description and create MR
-		description, err := ws.GenerateDescription(data, templateName)
-		if err != nil {
-			ws.logger.Error("failed to generate description", zap.Error(err))
-			return err
-		}
-
-		if _, err := ws.CreateMergeRequest(title, description, updateBranchName, ws.config.Branch); err != nil {
-			ws.logger.Error("failed to create merge request", zap.Error(err))
-			return err
-		}
-	}
-
-	// Clean up the temporary directory
-	defer ws.Cleanup()
-
-	return nil
+	return sharedUpdate, nil
 }
 
-func (ws *WorkflowBaseService) PushChanges(repository internal.Repository, updateBranchName string) error {
+func (ws *WorkflowBaseService) publishWork(repository internal.Repository, updateBranchName string, strategy WorkflowStrategy, result WorkflowUpdateResult, updateHooks UpdateHooksPerSite) error {
 	err := repository.Push(&git.PushOptions{
 		RemoteName: "origin",
 		RefSpecs: []gitConfig.RefSpec{
@@ -261,6 +329,31 @@ func (ws *WorkflowBaseService) PushChanges(repository internal.Repository, updat
 		ws.logger.Error("failed to push changes", zap.Error(err))
 		return err
 	}
+
+	// Use strategy to get PR details
+	title, templateName := strategy.GeneratePRDetails()
+
+	// Get template data from strategy
+	data, err := strategy.GetTemplateData(result, updateHooks)
+	if err != nil {
+		ws.logger.Error("failed to get template data", zap.Error(err))
+		return err
+	}
+
+	// Generate description and create MR
+	description, err := ws.GenerateDescription(data, templateName)
+	if err != nil {
+		ws.logger.Error("failed to generate description", zap.Error(err))
+		return err
+	}
+
+	codehostingPlatform := ws.vcsProviderFactory.Create(ws.config.RepositoryURL, ws.config.Token)
+	mr, err := codehostingPlatform.CreateMergeRequest(title, description, updateBranchName, ws.config.Branch)
+	if err != nil {
+		ws.logger.Error("failed to create merge request", zap.Error(err))
+		return err
+	}
+	ws.logger.Info("merge request created", zap.String("url", mr.URL))
 
 	return nil
 }
@@ -279,17 +372,6 @@ func (ws *WorkflowBaseService) GenerateDescription(data interface{}, filename st
 	}
 
 	return output.String(), nil
-}
-
-func (ws *WorkflowBaseService) CreateMergeRequest(title string, description string, updateBranchName string, baseBranch string) (codehosting.MergeRequest, error) {
-	codehostingPlatform := ws.vcsProviderFactory.Create(ws.config.RepositoryURL, ws.config.Token)
-	mr, err := codehostingPlatform.CreateMergeRequest(title, description, updateBranchName, baseBranch)
-	if err != nil {
-		ws.logger.Error("failed to create merge request", zap.Error(err))
-		return codehosting.MergeRequest{}, err
-	}
-	ws.logger.Info("merge request created", zap.String("url", mr.URL))
-	return mr, nil
 }
 
 func (ws *WorkflowBaseService) Cleanup() {

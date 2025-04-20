@@ -21,17 +21,17 @@ func (_m *MockInstallerService) EXPECT() *MockInstallerService_Expecter {
 	return &MockInstallerService_Expecter{mock: &_m.Mock}
 }
 
-// InstallDrupal provides a mock function with given fields: ctx, path, sites
-func (_m *MockInstallerService) InstallDrupal(ctx context.Context, path string, sites []string) error {
-	ret := _m.Called(ctx, path, sites)
+// InstallDrupal provides a mock function with given fields: ctx, path, site
+func (_m *MockInstallerService) InstallDrupal(ctx context.Context, path string, site string) error {
+	ret := _m.Called(ctx, path, site)
 
 	if len(ret) == 0 {
 		panic("no return value specified for InstallDrupal")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, []string) error); ok {
-		r0 = rf(ctx, path, sites)
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = rf(ctx, path, site)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -47,14 +47,14 @@ type MockInstallerService_InstallDrupal_Call struct {
 // InstallDrupal is a helper method to define mock.On call
 //   - ctx context.Context
 //   - path string
-//   - sites []string
-func (_e *MockInstallerService_Expecter) InstallDrupal(ctx interface{}, path interface{}, sites interface{}) *MockInstallerService_InstallDrupal_Call {
-	return &MockInstallerService_InstallDrupal_Call{Call: _e.mock.On("InstallDrupal", ctx, path, sites)}
+//   - site string
+func (_e *MockInstallerService_Expecter) InstallDrupal(ctx interface{}, path interface{}, site interface{}) *MockInstallerService_InstallDrupal_Call {
+	return &MockInstallerService_InstallDrupal_Call{Call: _e.mock.On("InstallDrupal", ctx, path, site)}
 }
 
-func (_c *MockInstallerService_InstallDrupal_Call) Run(run func(ctx context.Context, path string, sites []string)) *MockInstallerService_InstallDrupal_Call {
+func (_c *MockInstallerService_InstallDrupal_Call) Run(run func(ctx context.Context, path string, site string)) *MockInstallerService_InstallDrupal_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].([]string))
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
 	})
 	return _c
 }
@@ -64,7 +64,7 @@ func (_c *MockInstallerService_InstallDrupal_Call) Return(_a0 error) *MockInstal
 	return _c
 }
 
-func (_c *MockInstallerService_InstallDrupal_Call) RunAndReturn(run func(context.Context, string, []string) error) *MockInstallerService_InstallDrupal_Call {
+func (_c *MockInstallerService_InstallDrupal_Call) RunAndReturn(run func(context.Context, string, string) error) *MockInstallerService_InstallDrupal_Call {
 	_c.Call.Return(run)
 	return _c
 }

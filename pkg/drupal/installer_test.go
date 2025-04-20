@@ -36,25 +36,20 @@ module:
 	settingsService := NewMockSettingsService(t)
 	logger := zap.NewNop()
 
-	sites := []string{"site1", "site2"}
-
 	settingsService.On("ConfigureDatabase", mock.Anything, "/tmp", "site1").Return(nil)
-	settingsService.On("ConfigureDatabase", mock.Anything, "/tmp", "site2").Return(nil)
 	settingsService.On("RemoveProfile", mock.Anything, "/tmp", "site1").Return(nil)
-	settingsService.On("RemoveProfile", mock.Anything, "/tmp", "site2").Return(nil)
 
 	t.Run("Success", func(t *testing.T) {
 		drush := drush.NewMockRunner(t)
 
 		drush.On("InstallSite", mock.Anything, "/tmp", "site1").Return(nil)
-		drush.On("InstallSite", mock.Anything, "/tmp", "site2").Return(nil)
 
 		installer := &DefaultInstallerService{
 			logger:   logger,
 			drush:    drush,
 			settings: settingsService,
 		}
-		err = installer.InstallDrupal(t.Context(), "/tmp", sites)
+		err = installer.InstallDrupal(t.Context(), "/tmp", "site1")
 		if err != nil {
 			t.Fatalf("Failed to install Drupal: %v", err)
 		}
@@ -64,15 +59,14 @@ module:
 
 	t.Run("Failure", func(t *testing.T) {
 		drush := drush.NewMockRunner(t)
-		drush.On("InstallSite", mock.Anything, "/tmp", "site1").Return(nil)
-		drush.On("InstallSite", mock.Anything, "/tmp", "site2").Return(errors.New("failed to install site"))
+		drush.On("InstallSite", mock.Anything, "/tmp", "site1").Return(errors.New("failed to install site"))
 
 		installer := &DefaultInstallerService{
 			logger:   logger,
 			drush:    drush,
 			settings: settingsService,
 		}
-		err = installer.InstallDrupal(t.Context(), "/tmp", sites)
+		err = installer.InstallDrupal(t.Context(), "/tmp", "site1")
 		if err == nil {
 			t.Fatalf("Expected an error but got nil")
 		}
