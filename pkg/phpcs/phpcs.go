@@ -2,6 +2,7 @@ package phpcs
 
 import (
 	"context"
+	"encoding/json"
 	"os/exec"
 	"strings"
 
@@ -11,7 +12,7 @@ import (
 var execCommand = exec.CommandContext
 
 type Runner interface {
-	Run(ctx context.Context, dir string) (string, error)
+	Run(ctx context.Context, dir string) (ReturnOutput, error)
 	RunCBF(ctx context.Context, dir string) error
 }
 
@@ -37,9 +38,44 @@ func (s *CLI) execComposer(ctx context.Context, dir string, args ...string) (str
 	return output, err
 }
 
-func (s *CLI) Run(ctx context.Context, dir string) (string, error) {
+type ReturnOutput struct {
+	Files  map[string]ReturnOutputFile `json:"files"`
+	Totals ReturnOutputTotals          `json:"totals"`
+}
+
+type ReturnOutputFile struct {
+	Errors   int                       `json:"errors"`
+	Warnings int                       `json:"warnings"`
+	Messages []ReturnOutputFileMessage `json:"messages"`
+}
+
+type ReturnOutputFileMessage struct {
+	Message  string `json:"message"`
+	Source   string `json:"source"`
+	Severity int    `json:"severity"`
+	Fixable  bool   `json:"fixable"`
+	Type     string `json:"type"`
+	Line     int    `json:"line"`
+	Column   int    `json:"column"`
+}
+type ReturnOutputTotals struct {
+	Errors   int `json:"errors"`
+	Warnings int `json:"warnings"`
+	Fixable  int `json:"fixable"`
+}
+
+func (s *CLI) Run(ctx context.Context, dir string) (ReturnOutput, error) {
 	s.logger.Debug("running phpcs")
-	return s.execComposer(ctx, dir, "exec", "--", "phpcs", "--report=json", "-q", "--runtime-set", "ignore_errors_on_exit", "1", "--runtime-set", "ignore_warnings_on_exit", "1")
+	out, err := s.execComposer(ctx, dir, "exec", "--", "phpcs", "--report=json", "-q", "--runtime-set", "ignore_errors_on_exit", "1", "--runtime-set", "ignore_warnings_on_exit", "1")
+	if err != nil {
+		return ReturnOutput{}, err
+	}
+	var codingStyleUpdateResult ReturnOutput
+	if err := json.Unmarshal([]byte(out), &codingStyleUpdateResult); err != nil {
+		return ReturnOutput{}, err
+	}
+	return codingStyleUpdateResult, nil
+
 }
 
 func (s *CLI) RunCBF(ctx context.Context, dir string) error {

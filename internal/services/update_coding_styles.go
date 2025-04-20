@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"encoding/json"
 	"os"
 	"strings"
 	"text/template"
@@ -20,27 +19,6 @@ type UpdateCodingStyles struct {
 	phpcs    phpcs.Runner
 	config   internal.Config
 	composer composer.Runner
-}
-
-type PHPCSReturn struct {
-	Files map[string]struct {
-		Errors   int `json:"errors"`
-		Warnings int `json:"warnings"`
-		Messages []struct {
-			Message  string `json:"message"`
-			Source   string `json:"source"`
-			Severity int    `json:"severity"`
-			Fixable  bool   `json:"fixable"`
-			Type     string `json:"type"`
-			Line     int    `json:"line"`
-			Column   int    `json:"column"`
-		} `json:"messages"`
-	} `json:"files"`
-	Totals struct {
-		Errors   int `json:"errors"`
-		Warnings int `json:"warnings"`
-		Fixable  int `json:"fixable"`
-	} `json:"totals"`
 }
 
 func newUpdateCodingStyles(logger *zap.Logger, phpcs phpcs.Runner, config internal.Config, composer composer.Runner) *UpdateCodingStyles {
@@ -88,14 +66,9 @@ func (h *UpdateCodingStyles) Execute(ctx context.Context, path string, worktree 
 		}
 	}
 
-	out, err := h.phpcs.Run(ctx, path)
+	codingStyleUpdateResult, err := h.phpcs.Run(ctx, path)
 	if err != nil {
 		h.logger.Error("failed to run phpcs", zap.Error(err))
-		return err
-	}
-
-	var codingStyleUpdateResult PHPCSReturn
-	if err := json.Unmarshal([]byte(out), &codingStyleUpdateResult); err != nil {
 		return err
 	}
 

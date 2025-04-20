@@ -24,8 +24,15 @@ func TestCodingStyles(t *testing.T) {
 			return false
 		}
 
-		phpcs := phpcs.NewMockRunner(t)
-		phpcs.On("Run", mock.Anything, "/tmp").Return(`{"totals":{"errors":0,"warnings":0,"fixable":0},"files":{}}`, nil)
+		runner := phpcs.NewMockRunner(t)
+		runner.On("Run", mock.Anything, "/tmp").Return(phpcs.ReturnOutput{
+			Totals: phpcs.ReturnOutputTotals{
+				Errors:   0,
+				Warnings: 0,
+				Fixable:  0,
+			},
+			Files: map[string]phpcs.ReturnOutputFile{},
+		}, nil)
 
 		composer := composer.NewMockRunner(t)
 		composer.On("IsPackageInstalled", mock.Anything, "/tmp", "drupal/coder").Return(true, nil)
@@ -35,10 +42,10 @@ func TestCodingStyles(t *testing.T) {
 		worktree.On("Add", "phpcs.xml").Return(plumbing.NewHash(""), nil)
 		worktree.On("Commit", "Add PHPCS config", &git.CommitOptions{}).Return(plumbing.NewHash(""), nil)
 
-		updateCodingStyles := newUpdateCodingStyles(logger, phpcs, internal.Config{SkipCBF: false}, composer)
+		updateCodingStyles := newUpdateCodingStyles(logger, runner, internal.Config{SkipCBF: false}, composer)
 		err := updateCodingStyles.Execute(t.Context(), "/tmp", worktree)
 		assert.NoError(t, err)
-		phpcs.AssertExpectations(t)
+		runner.AssertExpectations(t)
 		composer.AssertExpectations(t)
 	})
 
@@ -48,8 +55,15 @@ func TestCodingStyles(t *testing.T) {
 			return true
 		}
 
-		phpcs := phpcs.NewMockRunner(t)
-		phpcs.On("Run", mock.Anything, "/tmp").Return(`{"totals":{"errors":0,"warnings":0,"fixable":0},"files":{}}`, nil)
+		runner := phpcs.NewMockRunner(t)
+		runner.On("Run", mock.Anything, "/tmp").Return(phpcs.ReturnOutput{
+			Totals: phpcs.ReturnOutputTotals{
+				Errors:   0,
+				Warnings: 0,
+				Fixable:  0,
+			},
+			Files: map[string]phpcs.ReturnOutputFile{},
+		}, nil)
 
 		composer := composer.NewMockRunner(t)
 		composer.On("IsPackageInstalled", mock.Anything, "/tmp", "drupal/coder").Return(false, nil)
@@ -58,10 +72,10 @@ func TestCodingStyles(t *testing.T) {
 		worktree.On("AddGlob", "composer.*").Return(nil)
 		worktree.On("Commit", "Install drupal/coder", &git.CommitOptions{}).Return(plumbing.NewHash(""), nil)
 
-		updateCodingStyles := newUpdateCodingStyles(logger, phpcs, internal.Config{SkipCBF: false}, composer)
+		updateCodingStyles := newUpdateCodingStyles(logger, runner, internal.Config{SkipCBF: false}, composer)
 		err := updateCodingStyles.Execute(t.Context(), "/tmp", worktree)
 		assert.NoError(t, err)
-		phpcs.AssertExpectations(t)
+		runner.AssertExpectations(t)
 		composer.AssertExpectations(t)
 	})
 
@@ -71,16 +85,22 @@ func TestCodingStyles(t *testing.T) {
 			return true
 		}
 
-		phpcs := phpcs.NewMockRunner(t)
-		phpcs.On("Run", mock.Anything, "/path/to/repo").Return(`{"totals":{"errors":0,"warnings":0,"fixable":0},"files":{}}`, nil)
-
+		runner := phpcs.NewMockRunner(t)
+		runner.On("Run", mock.Anything, "/path/to/repo").Return(phpcs.ReturnOutput{
+			Totals: phpcs.ReturnOutputTotals{
+				Errors:   0,
+				Warnings: 0,
+				Fixable:  0,
+			},
+			Files: map[string]phpcs.ReturnOutputFile{},
+		}, nil)
 		composer := composer.NewMockRunner(t)
 		composer.On("IsPackageInstalled", mock.Anything, "/path/to/repo", "drupal/coder").Return(true, nil)
 
-		updateCodingStyles := newUpdateCodingStyles(logger, phpcs, internal.Config{SkipCBF: false}, composer)
+		updateCodingStyles := newUpdateCodingStyles(logger, runner, internal.Config{SkipCBF: false}, composer)
 		err := updateCodingStyles.Execute(t.Context(), "/path/to/repo", worktree)
 		assert.NoError(t, err)
-		phpcs.AssertExpectations(t)
+		runner.AssertExpectations(t)
 		composer.AssertExpectations(t)
 	})
 
@@ -90,9 +110,32 @@ func TestCodingStyles(t *testing.T) {
 			return true
 		}
 
-		phpcs := phpcs.NewMockRunner(t)
-		phpcs.On("Run", mock.Anything, "/path/to/repo").Return(`{"totals":{"errors":0,"warnings":1,"fixable":1},"files":{"file1.php":{"errors":0,"warnings":1,"messages":[{"message":"message","source":"source","severity":1,"fixable":true,"type":"type","line":1,"column":1}]}}}`, nil)
-		phpcs.On("RunCBF", mock.Anything, "/path/to/repo").Return(nil)
+		runner := phpcs.NewMockRunner(t)
+		runner.On("Run", mock.Anything, "/path/to/repo").Return(phpcs.ReturnOutput{
+			Totals: phpcs.ReturnOutputTotals{
+				Errors:   0,
+				Warnings: 1,
+				Fixable:  1,
+			},
+			Files: map[string]phpcs.ReturnOutputFile{
+				"file1.php": {
+					Errors:   0,
+					Warnings: 1,
+					Messages: []phpcs.ReturnOutputFileMessage{
+						{
+							Message:  "message",
+							Source:   "source",
+							Severity: 1,
+							Fixable:  true,
+							Type:     "type",
+							Line:     1,
+							Column:   1,
+						},
+					},
+				},
+			},
+		}, nil)
+		runner.On("RunCBF", mock.Anything, "/path/to/repo").Return(nil)
 
 		composer := composer.NewMockRunner(t)
 		composer.On("IsPackageInstalled", mock.Anything, "/path/to/repo", "drupal/coder").Return(true, nil)
@@ -100,11 +143,11 @@ func TestCodingStyles(t *testing.T) {
 		worktree.On("Add", "file1.php").Return(plumbing.NewHash(""), nil)
 		worktree.On("Commit", "Update coding styles", &git.CommitOptions{}).Return(plumbing.NewHash(""), nil)
 
-		updateCodingStyles := newUpdateCodingStyles(logger, phpcs, internal.Config{SkipCBF: false}, composer)
+		updateCodingStyles := newUpdateCodingStyles(logger, runner, internal.Config{SkipCBF: false}, composer)
 		err := updateCodingStyles.Execute(t.Context(), "/path/to/repo", worktree)
 
 		assert.NoError(t, err)
-		phpcs.AssertExpectations(t)
+		runner.AssertExpectations(t)
 		composer.AssertExpectations(t)
 	})
 
@@ -114,17 +157,40 @@ func TestCodingStyles(t *testing.T) {
 			return true
 		}
 
-		phpcs := phpcs.NewMockRunner(t)
-		phpcs.On("Run", mock.Anything, "/path/to/repo").Return(`{"totals":{"errors":0,"warnings":1,"fixable":1},"files":{"file1.php":{"errors":0,"warnings":1,"messages":[{"message":"message","source":"source","severity":1,"fixable":true,"type":"type","line":1,"column":1}]}}}`, assert.AnError)
+		runner := phpcs.NewMockRunner(t)
+		runner.On("Run", mock.Anything, "/path/to/repo").Return(phpcs.ReturnOutput{
+			Totals: phpcs.ReturnOutputTotals{
+				Errors:   0,
+				Warnings: 1,
+				Fixable:  1,
+			},
+			Files: map[string]phpcs.ReturnOutputFile{
+				"file1.php": {
+					Errors:   0,
+					Warnings: 1,
+					Messages: []phpcs.ReturnOutputFileMessage{
+						{
+							Message:  "message",
+							Source:   "source",
+							Severity: 1,
+							Fixable:  true,
+							Type:     "type",
+							Line:     1,
+							Column:   1,
+						},
+					},
+				},
+			},
+		}, assert.AnError)
 
 		composer := composer.NewMockRunner(t)
 		composer.On("IsPackageInstalled", mock.Anything, "/path/to/repo", "drupal/coder").Return(true, nil)
 
-		updateCodingStyles := newUpdateCodingStyles(logger, phpcs, internal.Config{SkipCBF: false}, composer)
+		updateCodingStyles := newUpdateCodingStyles(logger, runner, internal.Config{SkipCBF: false}, composer)
 		err := updateCodingStyles.Execute(t.Context(), "/path/to/repo", worktree)
 
 		assert.Error(t, err)
-		phpcs.AssertExpectations(t)
+		runner.AssertExpectations(t)
 		composer.AssertExpectations(t)
 	})
 
