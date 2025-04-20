@@ -34,7 +34,6 @@ func TestIsSqliteModuleEnabled(t *testing.T) {
 	if err := fs.MkdirAll(configSyncDir, 0755); err != nil {
 		t.Fatalf("Failed to create temp directory: %v", err)
 	}
-	defer fs.RemoveAll(configSyncDir)
 
 	// Write initial YAML content to the temp file
 	initialContent := `
@@ -95,7 +94,6 @@ func TestAddSqliteModule(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer fs.Remove(tempFile.Name())
 
 	// Write initial YAML content to the temp file
 	initialContent := `
@@ -170,7 +168,6 @@ func TestRemoveProfile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer fs.Remove(tempFile.Name())
 
 	// Write initial YAML content to the temp file
 	initialContent := `

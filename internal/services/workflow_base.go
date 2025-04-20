@@ -208,7 +208,7 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, strategy Workflo
 				return true
 			})
 
-			ws.publishWork(sharedUpdate.Repository, sharedUpdate.updateBranchName, strategy, sharedUpdate.WorkflowUpdateResult, finalReports)
+			return ws.publishWork(sharedUpdate.Repository, sharedUpdate.updateBranchName, strategy, sharedUpdate.WorkflowUpdateResult, finalReports)
 		}
 		return nil
 	case err := <-errCh:

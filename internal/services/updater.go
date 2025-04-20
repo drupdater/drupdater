@@ -206,12 +206,6 @@ type UpdateHooksPerSite map[string]map[string]drush.UpdateHook
 
 func (us *DefaultUpdater) UpdateDrupal(ctx context.Context, path string, worktree internal.Worktree, site string) (map[string]drush.UpdateHook, error) {
 
-	type Result struct {
-		Site        string
-		UpdateHooks map[string]drush.UpdateHook
-		err         error
-	}
-
 	us.logger.Info("updating site", zap.String("site", site))
 
 	if err := us.settings.ConfigureDatabase(ctx, path, site); err != nil {
