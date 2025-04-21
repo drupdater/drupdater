@@ -7,6 +7,8 @@ import (
 
 	composer "github.com/drupdater/drupdater/pkg/composer"
 
+	drush "github.com/drupdater/drupdater/pkg/drush"
+
 	internal "github.com/drupdater/drupdater/internal"
 
 	mock "github.com/stretchr/testify/mock"
@@ -85,29 +87,29 @@ func (_c *MockUpdaterService_UpdateDependencies_Call) RunAndReturn(run func(cont
 	return _c
 }
 
-// UpdateDrupal provides a mock function with given fields: ctx, path, worktree, sites
-func (_m *MockUpdaterService) UpdateDrupal(ctx context.Context, path string, worktree internal.Worktree, sites []string) (UpdateHooksPerSite, error) {
-	ret := _m.Called(ctx, path, worktree, sites)
+// UpdateDrupal provides a mock function with given fields: ctx, path, worktree, site
+func (_m *MockUpdaterService) UpdateDrupal(ctx context.Context, path string, worktree internal.Worktree, site string) (map[string]drush.UpdateHook, error) {
+	ret := _m.Called(ctx, path, worktree, site)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UpdateDrupal")
 	}
 
-	var r0 UpdateHooksPerSite
+	var r0 map[string]drush.UpdateHook
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, internal.Worktree, []string) (UpdateHooksPerSite, error)); ok {
-		return rf(ctx, path, worktree, sites)
+	if rf, ok := ret.Get(0).(func(context.Context, string, internal.Worktree, string) (map[string]drush.UpdateHook, error)); ok {
+		return rf(ctx, path, worktree, site)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, internal.Worktree, []string) UpdateHooksPerSite); ok {
-		r0 = rf(ctx, path, worktree, sites)
+	if rf, ok := ret.Get(0).(func(context.Context, string, internal.Worktree, string) map[string]drush.UpdateHook); ok {
+		r0 = rf(ctx, path, worktree, site)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(UpdateHooksPerSite)
+			r0 = ret.Get(0).(map[string]drush.UpdateHook)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, internal.Worktree, []string) error); ok {
-		r1 = rf(ctx, path, worktree, sites)
+	if rf, ok := ret.Get(1).(func(context.Context, string, internal.Worktree, string) error); ok {
+		r1 = rf(ctx, path, worktree, site)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -124,24 +126,24 @@ type MockUpdaterService_UpdateDrupal_Call struct {
 //   - ctx context.Context
 //   - path string
 //   - worktree internal.Worktree
-//   - sites []string
-func (_e *MockUpdaterService_Expecter) UpdateDrupal(ctx interface{}, path interface{}, worktree interface{}, sites interface{}) *MockUpdaterService_UpdateDrupal_Call {
-	return &MockUpdaterService_UpdateDrupal_Call{Call: _e.mock.On("UpdateDrupal", ctx, path, worktree, sites)}
+//   - site string
+func (_e *MockUpdaterService_Expecter) UpdateDrupal(ctx interface{}, path interface{}, worktree interface{}, site interface{}) *MockUpdaterService_UpdateDrupal_Call {
+	return &MockUpdaterService_UpdateDrupal_Call{Call: _e.mock.On("UpdateDrupal", ctx, path, worktree, site)}
 }
 
-func (_c *MockUpdaterService_UpdateDrupal_Call) Run(run func(ctx context.Context, path string, worktree internal.Worktree, sites []string)) *MockUpdaterService_UpdateDrupal_Call {
+func (_c *MockUpdaterService_UpdateDrupal_Call) Run(run func(ctx context.Context, path string, worktree internal.Worktree, site string)) *MockUpdaterService_UpdateDrupal_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(internal.Worktree), args[3].([]string))
+		run(args[0].(context.Context), args[1].(string), args[2].(internal.Worktree), args[3].(string))
 	})
 	return _c
 }
 
-func (_c *MockUpdaterService_UpdateDrupal_Call) Return(_a0 UpdateHooksPerSite, _a1 error) *MockUpdaterService_UpdateDrupal_Call {
+func (_c *MockUpdaterService_UpdateDrupal_Call) Return(_a0 map[string]drush.UpdateHook, _a1 error) *MockUpdaterService_UpdateDrupal_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockUpdaterService_UpdateDrupal_Call) RunAndReturn(run func(context.Context, string, internal.Worktree, []string) (UpdateHooksPerSite, error)) *MockUpdaterService_UpdateDrupal_Call {
+func (_c *MockUpdaterService_UpdateDrupal_Call) RunAndReturn(run func(context.Context, string, internal.Worktree, string) (map[string]drush.UpdateHook, error)) *MockUpdaterService_UpdateDrupal_Call {
 	_c.Call.Return(run)
 	return _c
 }

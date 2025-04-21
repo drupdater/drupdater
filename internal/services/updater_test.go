@@ -8,6 +8,7 @@ import (
 
 	internal "github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/pkg/composer"
+	"github.com/drupdater/drupdater/pkg/drupal"
 	"github.com/drupdater/drupdater/pkg/drupalorg"
 	"github.com/drupdater/drupdater/pkg/drush"
 
@@ -65,7 +66,7 @@ func TestExportConfiguration(t *testing.T) {
 	worktree.On("Add", "/tmp").Return(plumbing.NewHash(""), nil)
 	worktree.On("Commit", "Update configuration site1", &git.CommitOptions{}).Return(plumbing.NewHash(""), nil)
 
-	settingsService := NewMockSettingsService(t)
+	settingsService := drupal.NewMockSettingsService(t)
 
 	repositoryService := NewMockRepositoryService(t)
 	repositoryService.On("IsSomethingStagedInPath", worktree, "/tmp").Return(true, nil)
@@ -678,17 +679,15 @@ func TestUpdateDrupal(t *testing.T) {
 	t.Run("Update drupal", func(t *testing.T) {
 
 		worktree := internal.NewMockWorktree(t)
-		settingsService := NewMockSettingsService(t)
+		settingsService := drupal.NewMockSettingsService(t)
 		repositoryService := NewMockRepositoryService(t)
 		drushService := drush.NewMockRunner(t)
 
 		repositoryService.On("IsSomethingStagedInPath", worktree, "/tmp/config").Return(false, nil)
 
 		settingsService.On("ConfigureDatabase", mock.Anything, "/tmp", "site1").Return(nil)
-		settingsService.On("ConfigureDatabase", mock.Anything, "/tmp", "site2").Return(nil)
 
-		drushService.On("GetUpdateHooks", mock.Anything, "/tmp", "site1").Return(map[string]drush.UpdateHook{}, nil)
-		drushService.On("GetUpdateHooks", mock.Anything, "/tmp", "site2").Return(map[string]drush.UpdateHook{
+		drushService.On("GetUpdateHooks", mock.Anything, "/tmp", "site1").Return(map[string]drush.UpdateHook{
 			"pre-update": {
 				Module:      "module",
 				UpdateID:    1,
@@ -697,13 +696,9 @@ func TestUpdateDrupal(t *testing.T) {
 			},
 		}, nil)
 		drushService.On("UpdateSite", mock.Anything, "/tmp", "site1").Return(nil)
-		drushService.On("UpdateSite", mock.Anything, "/tmp", "site2").Return(nil)
 		drushService.On("ConfigResave", mock.Anything, "/tmp", "site1").Return(nil)
-		drushService.On("ConfigResave", mock.Anything, "/tmp", "site2").Return(nil)
 		drushService.On("ExportConfiguration", mock.Anything, "/tmp", "site1").Return(nil)
-		drushService.On("ExportConfiguration", mock.Anything, "/tmp", "site2").Return(nil)
 		drushService.On("GetConfigSyncDir", mock.Anything, "/tmp", "site1", true).Return("/tmp/config", nil)
-		drushService.On("GetConfigSyncDir", mock.Anything, "/tmp", "site2", true).Return("/tmp/config", nil)
 
 		worktree.On("Add", "/tmp/config").Return(plumbing.NewHash(""), nil)
 
@@ -715,16 +710,14 @@ func TestUpdateDrupal(t *testing.T) {
 			drush:      drushService,
 		}
 
-		result, err := updater.UpdateDrupal(t.Context(), "/tmp", worktree, []string{"site1", "site2"})
+		result, err := updater.UpdateDrupal(t.Context(), "/tmp", worktree, "site1")
 
-		assert.Equal(t, UpdateHooksPerSite{
-			"site2": map[string]drush.UpdateHook{
-				"pre-update": {
-					Module:      "module",
-					UpdateID:    1,
-					Description: "description",
-					Type:        "type",
-				},
+		assert.Equal(t, map[string]drush.UpdateHook{
+			"pre-update": {
+				Module:      "module",
+				UpdateID:    1,
+				Description: "description",
+				Type:        "type",
 			},
 		}, result)
 

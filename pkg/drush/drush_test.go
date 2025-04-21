@@ -28,7 +28,7 @@ func TestExecDrush(t *testing.T) {
 		}
 		defer func() { execCommand = exec.CommandContext }()
 
-		output, err := executor.ExecDrush(t.Context(), "/tmp", "test_site", "status")
+		output, err := executor.execDrush(t.Context(), "/tmp", "test_site", "status")
 		assert.NoError(t, err)
 		assert.Equal(t, "[composer exec -- drush status]", output)
 	})
@@ -43,7 +43,7 @@ func TestExecDrush(t *testing.T) {
 		}
 		defer func() { execCommand = exec.CommandContext }()
 
-		output, err := executor.ExecDrush(t.Context(), "/tmp", "test_site", "status")
+		output, err := executor.execDrush(t.Context(), "/tmp", "test_site", "status")
 		assert.Error(t, err)
 		assert.Equal(t, "", output)
 	})

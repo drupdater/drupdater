@@ -4,7 +4,21 @@ import (
 	"context"
 
 	"github.com/drupdater/drupdater/internal"
+	composer "github.com/drupdater/drupdater/pkg/composer"
 )
+
+type TemplateData struct {
+	ComposerDiff           string
+	DependencyUpdateReport DependencyUpdateReport
+	SecurityReport         SecurityReport
+	UpdateHooks            UpdateHooksPerSite
+}
+
+type SecurityReport struct {
+	FixedAdvisories       []composer.Advisory
+	AfterUpdateAdvisories []composer.Advisory
+	NumUnresolvedIssues   int
+}
 
 // WorkflowStrategy defines the interface for different update workflows
 type WorkflowStrategy interface {

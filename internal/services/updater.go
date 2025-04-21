@@ -9,13 +9,11 @@ import (
 	"net/url"
 	"os"
 	"regexp"
-	"runtime"
-	"slices"
 	"strings"
-	"sync"
 
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/pkg/composer"
+	"github.com/drupdater/drupdater/pkg/drupal"
 	"github.com/drupdater/drupdater/pkg/drupalorg"
 	"github.com/drupdater/drupdater/pkg/drush"
 
@@ -72,13 +70,13 @@ type ConflictPatch struct {
 
 type UpdaterService interface {
 	UpdateDependencies(ctx context.Context, path string, packagesToUpdate []string, worktree internal.Worktree, minimalChanges bool) (DependencyUpdateReport, error)
-	UpdateDrupal(ctx context.Context, path string, worktree internal.Worktree, sites []string) (UpdateHooksPerSite, error)
+	UpdateDrupal(ctx context.Context, path string, worktree internal.Worktree, site string) (map[string]drush.UpdateHook, error)
 	UpdatePatches(ctx context.Context, path string, worktree internal.Worktree, operations []composer.PackageChange, patches map[string]map[string]string) (PatchUpdates, map[string]map[string]string)
 }
 
 type DefaultUpdater struct {
 	logger          *zap.Logger
-	settings        SettingsService
+	settings        drupal.SettingsService
 	repository      RepositoryService
 	afterSiteUpdate []AfterSiteUpdate
 	config          internal.Config
@@ -88,7 +86,7 @@ type DefaultUpdater struct {
 	drush           drush.Runner
 }
 
-func newDefaultUpdater(afterSiteUpdate []AfterSiteUpdate, logger *zap.Logger, settings SettingsService, repository RepositoryService, config internal.Config, composer composer.Runner, drupalOrg drupalorg.Client, drush drush.Runner) *DefaultUpdater {
+func newDefaultUpdater(afterSiteUpdate []AfterSiteUpdate, logger *zap.Logger, settings drupal.SettingsService, repository RepositoryService, config internal.Config, composer composer.Runner, drupalOrg drupalorg.Client, drush drush.Runner) *DefaultUpdater {
 
 	drupalOrgGitlab, err := gitlab.NewClient(os.Getenv("DRUPALCODE_ACCESS_TOKEN"), gitlab.WithBaseURL("https://git.drupalcode.org/api/v4"))
 	if err != nil {
@@ -206,83 +204,45 @@ func (us *DefaultUpdater) UpdateDependencies(ctx context.Context, path string, p
 
 type UpdateHooksPerSite map[string]map[string]drush.UpdateHook
 
-func (us *DefaultUpdater) UpdateDrupal(ctx context.Context, path string, worktree internal.Worktree, sites []string) (UpdateHooksPerSite, error) {
+func (us *DefaultUpdater) UpdateDrupal(ctx context.Context, path string, worktree internal.Worktree, site string) (map[string]drush.UpdateHook, error) {
 
-	var wg sync.WaitGroup
-	updateHooksPerSite := UpdateHooksPerSite{}
+	us.logger.Info("updating site", zap.String("site", site))
 
-	type Result struct {
-		Site        string
-		UpdateHooks map[string]drush.UpdateHook
-		err         error
+	if err := us.settings.ConfigureDatabase(ctx, path, site); err != nil {
+		return nil, err
 	}
 
-	for chunk := range slices.Chunk(sites, runtime.NumCPU()) {
-		resultChannel := make(chan Result, len(sites))
+	hooks, err := us.drush.GetUpdateHooks(ctx, path, site)
+	us.logger.Debug("update hooks", zap.Any("hooks", hooks))
+	if err != nil {
+		return nil, err
 
-		for _, site := range chunk {
+	}
 
-			wg.Add(1)
+	if err := us.drush.UpdateSite(ctx, path, site); err != nil {
+		return nil, err
 
-			go func(site string) {
-				defer wg.Done()
+	}
 
-				us.logger.Info("updating site", zap.String("site", site))
+	if err := us.drush.ConfigResave(ctx, path, site); err != nil {
+		return nil, err
 
-				if err := us.settings.ConfigureDatabase(ctx, path, site); err != nil {
-					resultChannel <- Result{err: err}
-					return
-				}
+	}
 
-				hooks, err := us.drush.GetUpdateHooks(ctx, path, site)
-				us.logger.Debug("update hooks", zap.Any("hooks", hooks))
-				if err != nil {
-					resultChannel <- Result{err: err}
-					return
-				}
+	for _, asu := range us.afterSiteUpdate {
+		if err := asu.Execute(ctx, path, worktree, site); err != nil {
+			return nil, err
 
-				if err := us.drush.UpdateSite(ctx, path, site); err != nil {
-					resultChannel <- Result{err: err}
-					return
-				}
-
-				if err := us.drush.ConfigResave(ctx, path, site); err != nil {
-					resultChannel <- Result{err: err}
-					return
-				}
-
-				for _, asu := range us.afterSiteUpdate {
-					if err := asu.Execute(ctx, path, worktree, site); err != nil {
-						resultChannel <- Result{err: err}
-						return
-					}
-				}
-
-				us.logger.Info("export configuration", zap.String("site", site))
-				if err := us.ExportConfiguration(ctx, worktree, path, site); err != nil {
-					resultChannel <- Result{err: err}
-					return
-				}
-
-				resultChannel <- Result{Site: site, UpdateHooks: hooks, err: nil}
-			}(site)
-		}
-
-		wg.Wait()
-
-		close(resultChannel)
-
-		for result := range resultChannel {
-			if result.err != nil {
-				return nil, result.err
-			}
-			if len(result.UpdateHooks) != 0 {
-				updateHooksPerSite[result.Site] = result.UpdateHooks
-			}
 		}
 	}
 
-	return updateHooksPerSite, nil
+	us.logger.Info("export configuration", zap.String("site", site))
+	if err := us.ExportConfiguration(ctx, worktree, path, site); err != nil {
+		return nil, err
+
+	}
+
+	return hooks, nil
 }
 
 func (us *DefaultUpdater) UpdatePatches(ctx context.Context, path string, worktree internal.Worktree, operations []composer.PackageChange, patches map[string]map[string]string) (PatchUpdates, map[string]map[string]string) {

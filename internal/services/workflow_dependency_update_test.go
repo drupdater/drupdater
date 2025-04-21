@@ -7,6 +7,7 @@ import (
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/codehosting"
 	"github.com/drupdater/drupdater/pkg/composer"
+	"github.com/drupdater/drupdater/pkg/drupal"
 	"github.com/drupdater/drupdater/pkg/drush"
 
 	"github.com/stretchr/testify/assert"
@@ -16,7 +17,7 @@ import (
 
 func TestStartUpdate(t *testing.T) {
 	logger := zap.NewNop()
-	installer := NewMockInstallerService(t)
+	installer := drupal.NewMockInstallerService(t)
 	updater := NewMockUpdaterService(t)
 	repositoryService := NewMockRepositoryService(t)
 	vcsProviderFactory := codehosting.NewMockVcsProviderFactory(t)
@@ -28,7 +29,7 @@ func TestStartUpdate(t *testing.T) {
 		RepositoryURL: "https://example.com/repo.git",
 		Branch:        "main",
 		Token:         "token",
-		Sites:         []string{"site1", "site2"},
+		Sites:         []string{"site1"},
 		DryRun:        false,
 	}
 
@@ -45,7 +46,8 @@ func TestStartUpdate(t *testing.T) {
 	worktree := internal.NewMockWorktree(t)
 	worktree.On("Checkout", mock.Anything).Return(nil)
 
-	installer.On("InstallDrupal", mock.Anything, config.RepositoryURL, config.Branch, config.Token, config.Sites).Return(nil)
+	installer.On("InstallDrupal", mock.Anything, "/tmp", "site1").Return(nil)
+	//installer.On("InstallDrupal", mock.Anything, "/tmp", "site2").Return(nil)
 	repositoryService.On("CloneRepository", config.RepositoryURL, config.Branch, config.Token).Return(repository, worktree, "/tmp", nil)
 	repositoryService.On("BranchExists", mock.Anything, mock.Anything).Return(false, nil)
 	updater.On("UpdateDependencies", mock.Anything, "/tmp", []string{}, mock.Anything, false).Return(DependencyUpdateReport{
@@ -84,21 +86,21 @@ func TestStartUpdate(t *testing.T) {
 		},
 		AddedAllowPlugins: []string{"plugin1", "plugin2"},
 	}, nil)
-	updater.On("UpdateDrupal", mock.Anything, "/tmp", mock.Anything, config.Sites).Return(UpdateHooksPerSite{
-		"site1": map[string]drush.UpdateHook{
-			"hook": {
-				Module:      "module",
-				UpdateID:    1,
-				Description: "description",
-				Type:        "type",
-			},
+	updater.On("UpdateDrupal", mock.Anything, "/tmp", mock.Anything, "site1").Return(map[string]drush.UpdateHook{
+		"hook": {
+			Module:      "module",
+			UpdateID:    1,
+			Description: "description",
+			Type:        "type",
 		},
 	}, nil)
+
 	vcsProviderFactory.On("Create", "https://example.com/repo.git", "token").Return(vcsProvider)
 
 	fixture, _ := os.ReadFile("testdata/dependency_update.md")
 	vcsProvider.On("CreateMergeRequest", mock.Anything, string(fixture), mock.Anything, config.Branch).Return(codehosting.MergeRequest{}, nil)
 	repository.On("Push", mock.Anything).Return(nil)
+	composer.On("Install", mock.Anything, "/tmp").Return(nil)
 	composer.On("Diff", mock.Anything, mock.Anything, mock.Anything, true).Return("Dummy Table", nil)
 
 	err := workflowService.StartUpdate(t.Context(), strategy)
@@ -113,7 +115,7 @@ func TestStartUpdate(t *testing.T) {
 
 func TestStartUpdateWithDryRun(t *testing.T) {
 	logger := zap.NewNop()
-	installer := NewMockInstallerService(t)
+	installer := drupal.NewMockInstallerService(t)
 	updater := NewMockUpdaterService(t)
 	repositoryService := NewMockRepositoryService(t)
 	vcsProviderFactory := codehosting.NewMockVcsProviderFactory(t)
@@ -142,12 +144,15 @@ func TestStartUpdateWithDryRun(t *testing.T) {
 	worktree := internal.NewMockWorktree(t)
 	worktree.On("Checkout", mock.Anything).Return(nil)
 
-	installer.On("InstallDrupal", mock.Anything, config.RepositoryURL, config.Branch, config.Token, config.Sites).Return(nil)
+	installer.On("InstallDrupal", mock.Anything, "/tmp", "site1").Return(nil)
+	installer.On("InstallDrupal", mock.Anything, "/tmp", "site2").Return(nil)
 	repositoryService.On("CloneRepository", config.RepositoryURL, config.Branch, config.Token).Return(repository, worktree, "/tmp", nil)
 	repositoryService.On("BranchExists", mock.Anything, mock.Anything).Return(false, nil)
 	updater.On("UpdateDependencies", mock.Anything, "/tmp", []string{}, mock.Anything, false).Return(DependencyUpdateReport{}, nil)
-	updater.On("UpdateDrupal", mock.Anything, "/tmp", mock.Anything, config.Sites).Return(UpdateHooksPerSite{}, nil)
+	updater.On("UpdateDrupal", mock.Anything, "/tmp", mock.Anything, "site1").Return(map[string]drush.UpdateHook{}, nil)
+	updater.On("UpdateDrupal", mock.Anything, "/tmp", mock.Anything, "site2").Return(map[string]drush.UpdateHook{}, nil)
 	composer.On("Diff", mock.Anything, mock.Anything, mock.Anything, true).Return("Dummy Table", nil)
+	composer.On("Install", mock.Anything, "/tmp").Return(nil)
 
 	err := workflowService.StartUpdate(t.Context(), strategy)
 

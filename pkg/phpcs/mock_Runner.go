@@ -22,22 +22,22 @@ func (_m *MockRunner) EXPECT() *MockRunner_Expecter {
 }
 
 // Run provides a mock function with given fields: ctx, dir
-func (_m *MockRunner) Run(ctx context.Context, dir string) (string, error) {
+func (_m *MockRunner) Run(ctx context.Context, dir string) (ReturnOutput, error) {
 	ret := _m.Called(ctx, dir)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Run")
 	}
 
-	var r0 string
+	var r0 ReturnOutput
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) (string, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string) (ReturnOutput, error)); ok {
 		return rf(ctx, dir)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string) string); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, string) ReturnOutput); ok {
 		r0 = rf(ctx, dir)
 	} else {
-		r0 = ret.Get(0).(string)
+		r0 = ret.Get(0).(ReturnOutput)
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
@@ -68,12 +68,12 @@ func (_c *MockRunner_Run_Call) Run(run func(ctx context.Context, dir string)) *M
 	return _c
 }
 
-func (_c *MockRunner_Run_Call) Return(_a0 string, _a1 error) *MockRunner_Run_Call {
+func (_c *MockRunner_Run_Call) Return(_a0 ReturnOutput, _a1 error) *MockRunner_Run_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockRunner_Run_Call) RunAndReturn(run func(context.Context, string) (string, error)) *MockRunner_Run_Call {
+func (_c *MockRunner_Run_Call) RunAndReturn(run func(context.Context, string) (ReturnOutput, error)) *MockRunner_Run_Call {
 	_c.Call.Return(run)
 	return _c
 }

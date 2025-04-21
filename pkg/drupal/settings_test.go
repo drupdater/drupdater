@@ -1,10 +1,10 @@
-package services
+package drupal
 
 import (
-	"os"
 	"testing"
 
 	"github.com/drupdater/drupdater/pkg/drush"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/mock"
 
 	"go.uber.org/zap"
@@ -15,9 +15,12 @@ func TestIsSqliteModuleEnabled(t *testing.T) {
 	logger := zap.NewNop()
 	drush := drush.NewMockRunner(t)
 
-	settingsService := &DrupalSettingsService{
+	fs := afero.NewMemMapFs()
+
+	settingsService := &DefaultSettingsService{
 		logger: logger,
 		drush:  drush,
+		fs:     fs,
 	}
 
 	dir := "/tmp"
@@ -28,10 +31,9 @@ func TestIsSqliteModuleEnabled(t *testing.T) {
 	drush.On("GetConfigSyncDir", mock.Anything, "/tmp", "default", false).Return(configSyncDir, nil)
 
 	// Create a temporary directory and file to act as the config sync directory and core.extension.yml
-	if err := os.MkdirAll(configSyncDir, 0755); err != nil {
+	if err := fs.MkdirAll(configSyncDir, 0755); err != nil {
 		t.Fatalf("Failed to create temp directory: %v", err)
 	}
-	defer os.RemoveAll(configSyncDir)
 
 	// Write initial YAML content to the temp file
 	initialContent := `
@@ -47,11 +49,11 @@ theme:
   gin: 0
 profile: thunder
 `
-	if err := os.WriteFile(coreExtensionPath, []byte(initialContent), 0644); err != nil {
+	if err := afero.WriteFile(fs, coreExtensionPath, []byte(initialContent), 0644); err != nil {
 		t.Fatalf("Failed to write initial content to core.extension.yml: %v", err)
 	}
 
-	enabled, err := settingsService.IsSqliteModuleEnabled(t.Context(), dir, site)
+	enabled, err := settingsService.isSqliteModuleEnabled(t.Context(), dir, site)
 	if err != nil {
 		t.Fatalf("Failed to check if sqlite module is enabled: %v", err)
 	}
@@ -65,11 +67,11 @@ profile: thunder
 module:
   existing_module: 0
 `
-	if err := os.WriteFile(coreExtensionPath, []byte(disabledContent), 0644); err != nil {
+	if err := afero.WriteFile(fs, coreExtensionPath, []byte(disabledContent), 0644); err != nil {
 		t.Fatalf("Failed to write disabled content to core.extension.yml: %v", err)
 	}
 
-	enabled, err = settingsService.IsSqliteModuleEnabled(t.Context(), dir, site)
+	enabled, err = settingsService.isSqliteModuleEnabled(t.Context(), dir, site)
 	if err != nil {
 		t.Fatalf("Failed to check if sqlite module is enabled: %v", err)
 	}
@@ -82,12 +84,16 @@ module:
 }
 
 func TestAddSqliteModule(t *testing.T) {
+
+	logger := zap.NewNop()
+	drush := drush.NewMockRunner(t)
+	fs := afero.NewMemMapFs()
+
 	// Create a temporary file to act as the core.extension.yml
-	tempFile, err := os.Create("/tmp/core.extension.yml")
+	tempFile, err := fs.Create("/tmp/core.extension.yml")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tempFile.Name())
 
 	// Write initial YAML content to the temp file
 	initialContent := `
@@ -111,23 +117,21 @@ profile: thunder
 		t.Fatalf("Failed to close temp file: %v", err)
 	}
 
-	logger := zap.NewNop()
-	drush := drush.NewMockRunner(t)
-
-	settingsService := &DrupalSettingsService{
+	settingsService := &DefaultSettingsService{
 		logger: logger,
 		drush:  drush,
+		fs:     fs,
 	}
 
 	drush.On("GetConfigSyncDir", mock.Anything, "/tmp", "default", false).Return("/tmp", nil)
 
 	// Call the function to add the SQLite module
-	if err := settingsService.AddSqliteModule(t.Context(), "/tmp", "default"); err != nil {
+	if err := settingsService.addSqliteModule(t.Context(), "/tmp", "default"); err != nil {
 		t.Fatalf("Failed to add SQLite module: %v", err)
 	}
 
 	// Read the updated file content
-	updatedContent, err := os.ReadFile(tempFile.Name())
+	updatedContent, err := afero.ReadFile(fs, tempFile.Name())
 	if err != nil {
 		t.Fatalf("Failed to read updated content from temp file: %v", err)
 	}
@@ -154,12 +158,16 @@ profile: thunder
 }
 
 func TestRemoveProfile(t *testing.T) {
+
+	logger := zap.NewNop()
+	drush := drush.NewMockRunner(t)
+	fs := afero.NewMemMapFs()
+
 	// Create a temporary file to act as the core.extension.yml
-	tempFile, err := os.Create("/tmp/core.extension.yml")
+	tempFile, err := fs.Create("/tmp/core.extension.yml")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
-	defer os.Remove(tempFile.Name())
 
 	// Write initial YAML content to the temp file
 	initialContent := `
@@ -183,12 +191,10 @@ profile: standard
 		t.Fatalf("Failed to close temp file: %v", err)
 	}
 
-	logger := zap.NewNop()
-	drush := drush.NewMockRunner(t)
-
-	settingsService := &DrupalSettingsService{
+	settingsService := &DefaultSettingsService{
 		logger: logger,
 		drush:  drush,
+		fs:     fs,
 	}
 
 	drush.On("GetConfigSyncDir", mock.Anything, "/tmp", "default", false).Return("/tmp", nil)
@@ -210,7 +216,7 @@ theme:
 `
 
 	// Read the updated file content
-	updatedContent, err := os.ReadFile(tempFile.Name())
+	updatedContent, err := afero.ReadFile(fs, tempFile.Name())
 	if err != nil {
 		t.Fatalf("Failed to read updated content from temp file: %v", err)
 	}
