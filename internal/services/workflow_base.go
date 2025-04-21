@@ -7,6 +7,7 @@ import (
 	"embed"
 	"fmt"
 	"os"
+	"runtime"
 	"sync"
 	"text/template"
 
@@ -97,10 +98,18 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, strategy Workflo
 	var updateDone = make(chan struct{})
 	var siteReports sync.Map // map[string]UpdateReport
 
+	// Limit concurrency to number of CPU cores
+	cpuLimit := runtime.NumCPU()
+	sem := make(chan struct{}, cpuLimit)
+
 	// 1. Run installCode()
 	wg.Add(1)
 	go func() {
-		defer wg.Done()
+		sem <- struct{}{}
+		defer func() {
+			<-sem
+			wg.Done()
+		}()
 
 		path, err := ws.installCode(ctx)
 		if err != nil {
@@ -118,7 +127,11 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, strategy Workflo
 	for _, site := range ws.config.Sites {
 		wg.Add(1)
 		go func(site string) {
-			defer wg.Done()
+			sem <- struct{}{}
+			defer func() {
+				<-sem
+				wg.Done()
+			}()
 
 			select {
 			case installPath := <-installCodeDone:
@@ -140,7 +153,12 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, strategy Workflo
 	// 3. Run updateSharedCode() in parallel
 	wg.Add(1)
 	go func() {
-		defer wg.Done()
+		sem <- struct{}{}
+		defer func() {
+			<-sem
+			wg.Done()
+		}()
+
 		var err error
 		update, err := ws.updateSharedCode(ctx, strategy)
 		if err != nil {
@@ -159,7 +177,11 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, strategy Workflo
 	for _, site := range ws.config.Sites {
 		wg.Add(1)
 		go func(site string) {
-			defer wg.Done()
+			sem <- struct{}{}
+			defer func() {
+				<-sem
+				wg.Done()
+			}()
 
 			// Wait for install to finish
 			select {
