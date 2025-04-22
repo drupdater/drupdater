@@ -345,6 +345,9 @@ func (ws *WorkflowBaseService) publishWork(repository internal.Repository, updat
 			Username: "du", // yes, this can be anything except an empty string
 			Password: ws.config.Token,
 		},
+		Options: map[string]string{
+			"ci.skip": "",
+		},
 	})
 
 	if err != nil {
