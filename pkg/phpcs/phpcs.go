@@ -33,7 +33,7 @@ func (s *CLI) execComposer(ctx context.Context, dir string, args ...string) (str
 	out, err := command.CombinedOutput()
 	output := strings.TrimSuffix(string(out), "\n")
 
-	s.logger.Debug("executing composer", zap.String("dir", dir), zap.Strings("args", args), zap.String("output", output))
+	s.logger.Sugar().Debugf("%s\n%s", command.String(), output)
 
 	return output, err
 }
@@ -65,7 +65,6 @@ type ReturnOutputTotals struct {
 }
 
 func (s *CLI) Run(ctx context.Context, dir string) (ReturnOutput, error) {
-	s.logger.Debug("running phpcs")
 	out, err := s.execComposer(ctx, dir, "exec", "--", "phpcs", "--report=json", "-q", "--runtime-set", "ignore_errors_on_exit", "1", "--runtime-set", "ignore_warnings_on_exit", "1")
 	if err != nil {
 		return ReturnOutput{}, err
@@ -79,7 +78,6 @@ func (s *CLI) Run(ctx context.Context, dir string) (ReturnOutput, error) {
 }
 
 func (s *CLI) RunCBF(ctx context.Context, dir string) error {
-	s.logger.Debug("running phpcbf")
 	_, err := s.execComposer(ctx, dir, "exec", "--", "phpcbf")
 	return err
 }

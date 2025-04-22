@@ -44,8 +44,7 @@ func (s *DependencyUpdateStrategy) PostUpdate(ctx context.Context, path string, 
 	// Execute all after update hooks
 	for _, au := range s.afterUpdate {
 		if err := au.Execute(ctx, path, worktree); err != nil {
-			s.logger.Error("failed to execute after update", zap.Error(err))
-			return err
+			return fmt.Errorf("failed to execute after update: %w", err)
 		}
 	}
 

@@ -79,8 +79,7 @@ func (rs *GitRepositoryService) CloneRepository(repository string, branch string
 	if _, err := w.Filesystem.Stat(".git/hooks/prepare-commit-msg"); err == nil {
 		err = w.Filesystem.Remove(".git/hooks/prepare-commit-msg")
 		if err != nil {
-			rs.logger.Error("failed to remove prepare-commit-msg hook", zap.Error(err))
-			return checkout, w, "", err
+			return checkout, w, "", fmt.Errorf("failed to remove prepare-commit-msg hook: %w", err)
 		}
 	}
 
@@ -89,8 +88,7 @@ func (rs *GitRepositoryService) CloneRepository(repository string, branch string
 		Branch: plumbing.NewBranchReferenceName(random),
 		Create: true,
 	}); err != nil {
-		rs.logger.Error("failed to checkout branch", zap.Error(err))
-		return checkout, w, "", err
+		return checkout, w, "", fmt.Errorf("failed to checkout branch: %w", err)
 	}
 
 	return checkout, w, w.Filesystem.Root(), nil
@@ -128,10 +126,7 @@ func (rs *GitRepositoryService) IsSomethingStagedInPath(worktree internal.Worktr
 	}
 
 	for filePath, s := range status {
-		rs.logger.Debug("checking file", zap.String("file", filePath), zap.Any("status", s.Staging))
-
 		if s.Staging != git.Unmodified && strings.Contains(filePath, dir) {
-			rs.logger.Debug("file staged", zap.String("file", filePath))
 			return true
 		}
 	}

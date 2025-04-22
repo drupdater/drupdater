@@ -16,6 +16,7 @@ import (
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 type Action struct {
@@ -61,7 +62,7 @@ func (act *Action) run(ctx context.Context) {
 	exitCode := 0
 	err := act.workflowService.StartUpdate(ctx, act.workflowStrategy)
 	if err != nil {
-		act.logger.Error("failed to start update", zap.Error(err))
+		act.logger.Sugar().Error(err)
 		exitCode = 1
 	}
 
@@ -81,15 +82,16 @@ func runApp(config internal.Config) {
 		}),
 		fx.Provide(
 			func() (*zap.Logger, error) {
-				logger, err := zap.NewDevelopment(
-					zap.IncreaseLevel(zap.InfoLevel),
-					zap.WithCaller(false),
-					zap.AddStacktrace(zap.PanicLevel),
-				)
-				if config.Verbose {
-					logger, err = zap.NewDevelopment()
+
+				loggerConfig := zap.NewDevelopmentConfig()
+				loggerConfig.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+
+				if !config.Verbose {
+					loggerConfig.Level.SetLevel(zapcore.InfoLevel)
+					loggerConfig.DisableCaller = true
+					loggerConfig.DisableStacktrace = true
 				}
-				return logger, err
+				return loggerConfig.Build()
 			},
 			func() (otter.Cache[string, string], error) {
 				return otter.MustBuilder[string, string](100).Build()
