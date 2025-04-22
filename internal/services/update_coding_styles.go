@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strings"
 	"text/template"
@@ -68,8 +69,7 @@ func (h *UpdateCodingStyles) Execute(ctx context.Context, path string, worktree 
 
 	codingStyleUpdateResult, err := h.phpcs.Run(ctx, path)
 	if err != nil {
-		h.logger.Error("failed to run phpcs", zap.Error(err))
-		return err
+		return fmt.Errorf("failed to run phpcs: %w", err)
 	}
 
 	if codingStyleUpdateResult.Totals.Fixable == 0 {
@@ -92,8 +92,7 @@ func (h *UpdateCodingStyles) Execute(ctx context.Context, path string, worktree 
 		relativePath := strings.TrimLeft(strings.TrimPrefix(file, path), "/")
 
 		if _, err := worktree.Add(relativePath); err != nil {
-			h.logger.Error("failed to add file to commit", zap.Error(err))
-			return err
+			return fmt.Errorf("failed to add file to commit: %w", err)
 		}
 	}
 
@@ -159,8 +158,7 @@ func (h *UpdateCodingStyles) CreatePHPCSConfig(ctx context.Context, path string,
 	outputFile.Close()
 
 	if _, err := worktree.Add("phpcs.xml"); err != nil {
-		h.logger.Error("failed to add file to commit", zap.Error(err))
-		return false, err
+		return false, fmt.Errorf("failed to add file to commit: %w", err)
 	}
 
 	if _, err = worktree.Commit("Add PHPCS config", &git.CommitOptions{}); err != nil {
@@ -177,8 +175,7 @@ func (h *UpdateCodingStyles) InstallCoder(ctx context.Context, path string, work
 	}
 
 	if err := worktree.AddGlob("composer.*"); err != nil {
-		h.logger.Error("failed to add file to commit", zap.Error(err))
-		return err
+		return fmt.Errorf("failed to add file to commit: %w", err)
 	}
 	if _, err := worktree.Commit("Install drupal/coder", &git.CommitOptions{}); err != nil {
 		return err

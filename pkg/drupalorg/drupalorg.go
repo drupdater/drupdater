@@ -2,6 +2,7 @@ package drupalorg
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"regexp"
 
@@ -38,15 +39,13 @@ type Issue struct {
 func (s *HTTPClient) GetIssue(issueID string) (*Issue, error) {
 	resp, err := http.Get(s.DrupalOrgBaseURL + "/api-d7/node/" + issueID + ".json")
 	if err != nil {
-		s.logger.Error("failed to make request", zap.Error(err))
-		return nil, err
+		return nil, fmt.Errorf("failed to make request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	var apiResp Issue
 	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
-		s.logger.Error("failed to decode response", zap.Error(err))
-		return nil, err
+		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
 	return &apiResp, nil

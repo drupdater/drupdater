@@ -117,13 +117,12 @@ func (us *DefaultUpdater) UpdateDependencies(ctx context.Context, path string, p
 	}
 
 	if err := json.Unmarshal([]byte(patchesString), &patches); err != nil {
-		us.logger.Error("failed to unmarshal patches", zap.Error(err))
+		return updateReport, fmt.Errorf("failed to unmarshal patches: %w", err)
 	}
 
 	operations, err := us.composer.ListPendingUpdates(ctx, path, packagesToUpdate, minimalChanges)
 	if err != nil {
-		us.logger.Error("failed to get composer updates", zap.Error(err))
-		return updateReport, err
+		return updateReport, fmt.Errorf("failed to get composer updates: %w", err)
 	}
 	patchUpdates, newPatches := us.UpdatePatches(ctx, path, worktree, operations, patches)
 	updateReport.PatchUpdates = patchUpdates
@@ -131,36 +130,36 @@ func (us *DefaultUpdater) UpdateDependencies(ctx context.Context, path string, p
 		// get patches json string
 		jsonString, err := json.Marshal(newPatches)
 		if err != nil {
-			us.logger.Error("failed to marshal patches", zap.Error(err))
+			return updateReport, fmt.Errorf("failed to marshal patches: %w", err)
 		}
 		err = us.composer.SetConfig(ctx, path, "extra.patches", string(jsonString))
 		if err != nil {
-			us.logger.Error("failed to set composer config", zap.Error(err))
+			return updateReport, fmt.Errorf("failed to set composer config: %w", err)
 		}
 
 		err = us.composer.UpdateLockHash(ctx, path)
 		if err != nil {
-			us.logger.Error("failed to update composer lock hash", zap.Error(err))
+			return updateReport, fmt.Errorf("failed to update composer lock hash: %w", err)
 		}
 
 		err = worktree.AddGlob("composer.*")
 		if err != nil {
-			us.logger.Error("failed to add composer.* files", zap.Error(err))
+			return updateReport, fmt.Errorf("failed to add composer.* files: %w", err)
 		}
 		if _, err := worktree.Commit("Update patches", &git.CommitOptions{}); err != nil {
-			us.logger.Error("failed to commit composer.lock", zap.Error(err))
+			return updateReport, fmt.Errorf("failed to commit patches: %w", err)
 		}
 	}
 
 	allowPlugins, err := us.composer.GetAllowPlugins(ctx, path)
 	if err != nil {
-		us.logger.Error("failed to get composer allow plugins", zap.Error(err))
+		return updateReport, fmt.Errorf("failed to get composer allow plugins: %w", err)
 	}
 
 	// Allow all plugins during update
 	err = us.composer.SetConfig(ctx, path, "allow-plugins", "true")
 	if err != nil {
-		us.logger.Error("failed to set composer config", zap.Error(err))
+		return updateReport, fmt.Errorf("failed to set composer config: %w", err)
 	}
 
 	packagesToKeep := []string{}
@@ -193,10 +192,10 @@ func (us *DefaultUpdater) UpdateDependencies(ctx context.Context, path string, p
 
 	err = worktree.AddGlob("composer.*")
 	if err != nil {
-		us.logger.Error("failed to add composer.* files", zap.Error(err))
+		return updateReport, fmt.Errorf("failed to add composer.* files: %w", err)
 	}
 	if _, err := worktree.Commit("Update composer.json and composer.lock", &git.CommitOptions{}); err != nil {
-		us.logger.Error("failed to commit composer.lock", zap.Error(err))
+		return updateReport, fmt.Errorf("failed to commit composer.json and composer.lock: %w", err)
 	}
 
 	return updateReport, nil
@@ -474,8 +473,7 @@ func (us *DefaultUpdater) ExportConfiguration(ctx context.Context, worktree inte
 
 	_, err = worktree.Add(configPath)
 	if err != nil {
-		siteLogger.Error("failed to add configuration", zap.Error(err))
-		return err
+		return fmt.Errorf("failed to add configuration: %w", err)
 	}
 
 	if !us.repository.IsSomethingStagedInPath(worktree, configPath) {
@@ -484,8 +482,7 @@ func (us *DefaultUpdater) ExportConfiguration(ctx context.Context, worktree inte
 	}
 
 	if _, err = worktree.Commit("Update configuration "+site, &git.CommitOptions{}); err != nil {
-		siteLogger.Error("failed to commit configuration", zap.Error(err))
-		return err
+		return fmt.Errorf("failed to commit configuration: %w", err)
 	}
 
 	return nil
@@ -507,14 +504,13 @@ func (us *DefaultUpdater) downloadFile(url, folder string, file string) error {
 
 	err = os.MkdirAll(folder, os.ModePerm)
 	if err != nil {
-		us.logger.Error("failed to create directory", zap.Error(err))
-		return err
+		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
 	// Create the output file
 	outFile, err := os.Create(folder + "/" + file)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create file: %w", err)
 	}
 	defer outFile.Close()
 

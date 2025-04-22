@@ -75,13 +75,15 @@ func NewWorkflowBaseService(
 }
 
 func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, strategy WorkflowStrategy) error {
-	ws.logger.Info("starting update workflow")
-
-	// Clean up the temporary directory
-	defer ws.Cleanup()
-
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+
+	defer func() {
+		// Clean up the temporary directory
+		tmpDirName := fmt.Sprintf("/tmp/%x", md5.Sum([]byte(ws.config.RepositoryURL)))
+		os.RemoveAll(tmpDirName)
+
+		cancel()
+	}()
 
 	var wg sync.WaitGroup
 	errCh := make(chan error, len(ws.config.Sites)*2+2) // site installs + site updates + installCode + updateCode
@@ -242,10 +244,10 @@ func (ws *WorkflowBaseService) installCode(ctx context.Context) (string, error) 
 	ws.logger.Info("cloning repository for site-install", zap.String("repositoryURL", ws.config.RepositoryURL), zap.String("branch", ws.config.Branch))
 	_, _, path, err := ws.repository.CloneRepository(ws.config.RepositoryURL, ws.config.Branch, ws.config.Token)
 	if err != nil {
-		ws.logger.Error("failed to clone repository", zap.String("repositoryURL", ws.config.RepositoryURL), zap.String("branch", ws.config.Branch), zap.Error(err))
-		return "", err
+		return "", fmt.Errorf("failed to clone repository: %w", err)
 	}
 
+	ws.logger.Info("running composer install")
 	if err = ws.composer.Install(ctx, path); err != nil {
 		return "", err
 	}
@@ -269,26 +271,22 @@ func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context, strategy Wo
 
 	// Check if we should continue with the update
 	if !strategy.ShouldContinue(packagesToUpdate) {
-
 		return SharedUpdate{}, err
 	}
 
 	ws.logger.Info("updating dependencies")
 	updateReport, err := ws.updater.UpdateDependencies(ctx, path, packagesToUpdate, worktree, minimalChanges)
 	if err != nil {
-
 		return SharedUpdate{}, err
 	}
 
 	table, err := ws.composer.Diff(ctx, path, ws.config.Branch, true)
 	if err != nil {
-
 		return SharedUpdate{}, err
 	}
 
 	if table == "" {
 		ws.logger.Info("no packages were updated, skipping update")
-
 		return SharedUpdate{}, err
 	}
 
@@ -303,7 +301,6 @@ func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context, strategy Wo
 	}
 	if exists {
 		ws.logger.Info("branch already exists", zap.String("branch", updateBranchName))
-
 		return SharedUpdate{}, err
 	}
 
@@ -314,14 +311,11 @@ func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context, strategy Wo
 		Force:  false,
 		Keep:   true,
 	}); err != nil {
-		ws.logger.Error("failed to checkout branch", zap.Error(err))
-
-		return SharedUpdate{}, err
+		return SharedUpdate{}, fmt.Errorf("failed to checkout branch: %w", err)
 	}
 
 	// Run post-update actions from strategy
 	if err := strategy.PostUpdate(ctx, path, worktree); err != nil {
-
 		return SharedUpdate{}, err
 	}
 
@@ -348,8 +342,7 @@ func (ws *WorkflowBaseService) publishWork(repository internal.Repository, updat
 	})
 
 	if err != nil {
-		ws.logger.Error("failed to push changes", zap.Error(err))
-		return err
+		return fmt.Errorf("failed to push changes: %w", err)
 	}
 
 	// Use strategy to get PR details
@@ -358,22 +351,19 @@ func (ws *WorkflowBaseService) publishWork(repository internal.Repository, updat
 	// Get template data from strategy
 	data, err := strategy.GetTemplateData(result, updateHooks)
 	if err != nil {
-		ws.logger.Error("failed to get template data", zap.Error(err))
-		return err
+		return fmt.Errorf("failed to get template data: %w", err)
 	}
 
 	// Generate description and create MR
 	description, err := ws.GenerateDescription(data, templateName)
 	if err != nil {
-		ws.logger.Error("failed to generate description", zap.Error(err))
-		return err
+		return fmt.Errorf("failed to generate description: %w", err)
 	}
 
 	codehostingPlatform := ws.vcsProviderFactory.Create(ws.config.RepositoryURL, ws.config.Token)
 	mr, err := codehostingPlatform.CreateMergeRequest(title, description, updateBranchName, ws.config.Branch)
 	if err != nil {
-		ws.logger.Error("failed to create merge request", zap.Error(err))
-		return err
+		return fmt.Errorf("failed to create merge request: %w", err)
 	}
 	ws.logger.Info("merge request created", zap.String("url", mr.URL))
 
@@ -394,9 +384,4 @@ func (ws *WorkflowBaseService) GenerateDescription(data interface{}, filename st
 	}
 
 	return output.String(), nil
-}
-
-func (ws *WorkflowBaseService) Cleanup() {
-	tmpDirName := fmt.Sprintf("/tmp/%x", md5.Sum([]byte(ws.config.RepositoryURL)))
-	os.RemoveAll(tmpDirName)
 }

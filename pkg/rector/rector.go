@@ -31,14 +31,12 @@ func (s *CLI) execComposer(ctx context.Context, dir string, args ...string) (str
 	out, err := command.CombinedOutput()
 	output := strings.TrimSuffix(string(out), "\n")
 
-	s.logger.Debug("executing composer", zap.String("dir", dir), zap.Strings("args", args), zap.String("output", output))
+	s.logger.Sugar().Debugf("%s\n%s", command.String(), output)
 
 	return output, err
 }
 
 func (s *CLI) Run(ctx context.Context, dir string, customCodeDirectories []string) (string, error) {
-	s.logger.Debug("remove deprecations")
-
 	if len(customCodeDirectories) == 0 {
 		s.logger.Debug("no custom code directories found")
 		return `{

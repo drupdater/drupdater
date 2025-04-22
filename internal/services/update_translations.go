@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/pkg/drush"
@@ -43,7 +44,7 @@ func (h *UpdateTranslations) Execute(ctx context.Context, path string, worktree 
 
 	_, err = worktree.Add(translationPath)
 	if err != nil {
-		h.logger.Error("failed to add translation path", zap.Error(err), zap.String("site", site))
+		return fmt.Errorf("failed to add translation path: %w", err)
 	}
 
 	status, _ := worktree.Status()
@@ -54,7 +55,7 @@ func (h *UpdateTranslations) Execute(ctx context.Context, path string, worktree 
 	}
 	_, err = worktree.Commit("Update translations", &git.CommitOptions{})
 	if err != nil {
-		h.logger.Error("failed to commit translation path", zap.Error(err), zap.String("site", site))
+		return fmt.Errorf("failed to commit translation path: %w", err)
 	}
 
 	return nil

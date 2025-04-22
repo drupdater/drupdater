@@ -50,13 +50,12 @@ func (e CLI) execDrush(ctx context.Context, dir string, site string, args ...str
 	out, err := command.CombinedOutput()
 	output := strings.TrimSuffix(string(out), "\n")
 
-	e.logger.Debug("executing drush", zap.String("dir", dir), zap.String("site", site), zap.Strings("args", args), zap.String("output", output))
+	e.logger.Sugar().Debugf("%s\n%s", command.String(), output)
 
 	return output, err
 }
 
 func (e CLI) InstallSite(ctx context.Context, dir string, site string) error {
-	e.logger.Debug("installing site")
 	_, err := e.execDrush(ctx, dir, site, "--existing-config", "--yes", "site:install", "--sites-subdir="+site)
 
 	return err
@@ -80,31 +79,26 @@ func (e CLI) GetConfigSyncDir(ctx context.Context, dir string, site string, rela
 }
 
 func (e CLI) ExportConfiguration(ctx context.Context, dir string, site string) error {
-	e.logger.Debug("exporting configuration")
 	_, err := e.execDrush(ctx, dir, site, "config:export", "--yes")
 	return err
 }
 
 func (e CLI) UpdateSite(ctx context.Context, dir string, site string) error {
-	e.logger.Debug("updating site")
-	_, err := e.execDrush(ctx, dir, site, "updatedb", "--yes", "-vvv")
+	_, err := e.execDrush(ctx, dir, site, "updatedb", "--yes")
 	return err
 }
 
 func (e CLI) ConfigResave(ctx context.Context, dir string, site string) error {
-	e.logger.Debug("config resave")
 	_, err := e.execDrush(ctx, dir, site, "php:script", "/opt/drupdater/config-resave.php")
 	return err
 }
 
 func (e CLI) IsModuleEnabled(ctx context.Context, dir string, site string, module string) (bool, error) {
-	e.logger.Debug("checking if module is enabled")
 	out, err := e.execDrush(ctx, dir, site, "pm:list", "--status=enabled", "--field=name", "--filter="+module)
 	return out == module, err
 }
 
 func (e CLI) LocalizeTranslations(ctx context.Context, dir string, site string) error {
-	e.logger.Debug("localizing translations")
 	_, err := e.execDrush(ctx, dir, site, "locale-deploy:localize-translations")
 	return err
 }
@@ -136,7 +130,6 @@ type UpdateHook struct {
 }
 
 func (e CLI) GetUpdateHooks(ctx context.Context, dir string, site string) (map[string]UpdateHook, error) {
-	e.logger.Debug("getting update hooks")
 	data, err := e.execDrush(ctx, dir, site, "updatedb-status", "--format=json")
 	if err != nil {
 		return nil, err
@@ -148,8 +141,7 @@ func (e CLI) GetUpdateHooks(ctx context.Context, dir string, site string) (map[s
 
 	var updates map[string]UpdateHook
 	if err := json.Unmarshal([]byte(data), &updates); err != nil {
-		e.logger.Error("failed to unmarshal update hooks", zap.Error(err))
-		return nil, err
+		return nil, fmt.Errorf("failed to unmarshal update hooks: %w", err)
 	}
 
 	return updates, nil

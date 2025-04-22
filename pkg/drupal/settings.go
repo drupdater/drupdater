@@ -44,8 +44,7 @@ func (ss *DefaultSettingsService) ConfigureDatabase(ctx context.Context, dir str
 
 	webroot, err := ss.composer.GetConfig(ctx, dir, "extra.drupal-scaffold.locations.web-root")
 	if err != nil {
-		siteLogger.Error("failed to get Drupal web dir", zap.String("dir", dir), zap.Error(err))
-		return err
+		return fmt.Errorf("failed to get Drupal web dir: %w", err)
 	}
 	webroot = strings.TrimSuffix(webroot, "/")
 
@@ -70,7 +69,7 @@ $settings['hash_salt'] = 'changeme';
 	if !isSqliteEnabled {
 		siteLogger.Debug("enabling sqlite module")
 		if err := ss.addSqliteModule(ctx, dir, site); err != nil {
-			siteLogger.Error("failed to enable sqlite module", zap.Error(err))
+			return fmt.Errorf("failed to enable sqlite module: %w", err)
 		}
 		settings += `
 if (isset($settings['config_exclude_modules'])) {
@@ -86,17 +85,14 @@ if (isset($settings['config_exclude_modules'])) {
 	// If the file doesn't exist, create it, or append to the file
 	f, err := ss.fs.OpenFile(settingsPath, os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
-		siteLogger.Error("failed to open settings file", zap.Error(err))
-		return err
+		return fmt.Errorf("failed to open settings file: %w", err)
 	}
 	if _, err := f.Write([]byte(settings)); err != nil {
 		f.Close() // ignore error; Write error takes precedence
-		siteLogger.Error("failed to write settings", zap.Error(err))
-		return err
+		return fmt.Errorf("failed to write settings: %w", err)
 	}
 	if err := f.Close(); err != nil {
-		siteLogger.Error("failed to close settings file", zap.Error(err))
-		return err
+		return fmt.Errorf("failed to close settings file: %w", err)
 	}
 
 	return nil
@@ -115,15 +111,13 @@ func (ss *DefaultSettingsService) isSqliteModuleEnabled(ctx context.Context, dir
 	// Read the existing YAML file
 	file, err := afero.ReadFile(ss.fs, coreExtensionPath)
 	if err != nil {
-		siteLogger.Error("failed to read core extension file", zap.Error(err))
-		return false, err
+		return false, fmt.Errorf("failed to read core extension file: %w", err)
 	}
 
 	// Unmarshal the YAML data
 	var config map[string]interface{}
 	if err := yaml.Unmarshal(file, &config); err != nil {
-		siteLogger.Error("failed to unmarshal core extension file", zap.Error(err))
-		return false, err
+		return false, fmt.Errorf("failed to unmarshal core extension file: %w", err)
 	}
 
 	// Check if the sqlite module is enabled
@@ -148,15 +142,13 @@ func (ss *DefaultSettingsService) addSqliteModule(ctx context.Context, dir strin
 	// Read the existing YAML file
 	file, err := afero.ReadFile(ss.fs, coreExtensionPath)
 	if err != nil {
-		siteLogger.Error("failed to read core extension file", zap.Error(err))
-		return err
+		return fmt.Errorf("failed to read core extension file: %w", err)
 	}
 
 	// Unmarshal the YAML data
 	var config map[string]interface{}
 	if err := yaml.Unmarshal(file, &config); err != nil {
-		siteLogger.Error("failed to unmarshal core extension file", zap.Error(err))
-		return err
+		return fmt.Errorf("failed to unmarshal core extension file: %w", err)
 	}
 
 	config["module"].(map[string]interface{})["sqlite"] = 0
@@ -164,14 +156,12 @@ func (ss *DefaultSettingsService) addSqliteModule(ctx context.Context, dir strin
 	// Marshal the updated config back to YAML
 	updatedConfig, err := yaml.Marshal(config)
 	if err != nil {
-		siteLogger.Error("failed to marshal updated config", zap.Error(err))
-		return err
+		return fmt.Errorf("failed to marshal updated config: %w", err)
 	}
 
 	// Write the updated config back to the file
 	if err := afero.WriteFile(ss.fs, coreExtensionPath, updatedConfig, 0644); err != nil {
-		siteLogger.Error("failed to write updated core extension file", zap.Error(err))
-		return err
+		return fmt.Errorf("failed to write updated core extension file: %w", err)
 	}
 	siteLogger.Debug("sqlite module added to core extension file")
 
@@ -210,15 +200,13 @@ func (ss *DefaultSettingsService) RemoveProfile(ctx context.Context, dir string,
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		siteLogger.Error("Error reading file:", zap.Error(err))
-		return err
+		return fmt.Errorf("failed to read file: %w", err)
 	}
 
 	// Rewrite the file without the target line
 	file, err := ss.fs.Create(coreExtensionPath)
 	if err != nil {
-		siteLogger.Error("Error creating file:", zap.Error(err))
-		return err
+		return fmt.Errorf("failed to create file: %w", err)
 	}
 	defer file.Close()
 
@@ -226,13 +214,11 @@ func (ss *DefaultSettingsService) RemoveProfile(ctx context.Context, dir string,
 	for _, line := range lines {
 		_, err := writer.WriteString(line + "\n")
 		if err != nil {
-			siteLogger.Error("Error writing to file:", zap.Error(err))
-			return err
+			return fmt.Errorf("failed to write file: %w", err)
 		}
 	}
 	if err := writer.Flush(); err != nil {
-		siteLogger.Error("Error flushing to file:", zap.Error(err))
-		return err
+		return fmt.Errorf("failed to flush file: %w", err)
 	}
 
 	return nil

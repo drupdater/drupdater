@@ -63,14 +63,12 @@ func (s *CLI) execComposer(ctx context.Context, dir string, args ...string) (str
 
 	out, err := command.CombinedOutput()
 	output := strings.TrimSuffix(string(out), "\n")
-
-	s.logger.Debug("executing composer", zap.String("dir", dir), zap.Strings("args", args), zap.String("output", output))
+	s.logger.Sugar().Debugf("%s\n%s", command.String(), output)
 
 	return output, err
 }
 
 func (s *CLI) Update(ctx context.Context, dir string, packages []string, packagesToKeep []string, minimalChanges bool, dryRun bool) (string, error) {
-	s.logger.Debug("composer update", zap.Strings("packages", packages))
 	args := append([]string{"update", "--no-interaction", "--no-progress", "--optimize-autoloader", "--with-all-dependencies", "--no-ansi"}, packages...)
 	for _, packageToKeep := range packagesToKeep {
 		args = append(args, fmt.Sprintf("--with=%s", packageToKeep))
@@ -83,11 +81,14 @@ func (s *CLI) Update(ctx context.Context, dir string, packages []string, package
 	} else {
 		args = append(args, "--bump-after-update")
 	}
-	return s.execComposer(ctx, dir, args...)
+	out, err := s.execComposer(ctx, dir, args...)
+	if err != nil {
+		return "", fmt.Errorf("failed to update dependencies: %w, output: %s, arg: %v", err, out, args)
+	}
+	return out, nil
 }
 
 func (s *CLI) Install(ctx context.Context, dir string) error {
-	s.logger.Debug("composer install")
 	out, err := s.execComposer(ctx, dir, "install", "--no-interaction", "--no-progress", "--optimize-autoloader")
 	if err != nil {
 		return fmt.Errorf("failed to install dependencies: %w, output: %s", err, out)
@@ -96,16 +97,22 @@ func (s *CLI) Install(ctx context.Context, dir string) error {
 }
 
 func (s *CLI) Require(ctx context.Context, dir string, args ...string) (string, error) {
-	return s.execComposer(ctx, dir, append([]string{"require"}, args...)...)
+	out, err := s.execComposer(ctx, dir, append([]string{"require"}, args...)...)
+	if err != nil {
+		return "", fmt.Errorf("failed to require package: %w, output: %s", err, out)
+	}
+	return out, nil
 }
 
 func (s *CLI) Remove(ctx context.Context, dir string, packages ...string) (string, error) {
-	return s.execComposer(ctx, dir, append([]string{"remove"}, packages...)...)
+	out, err := s.execComposer(ctx, dir, append([]string{"remove"}, packages...)...)
+	if err != nil {
+		return "", fmt.Errorf("failed to remove package: %w, output: %s", err, out)
+	}
+	return out, nil
 }
 
 func (s *CLI) Audit(ctx context.Context, dir string) (Audit, error) {
-	s.logger.Debug("running composer audit")
-
 	var composerAudit Audit
 	out, err := s.execComposer(ctx, dir, "audit", "--format=json", "--locked", "--no-plugins")
 	if err != nil {
@@ -195,12 +202,10 @@ func (c *Audit) UnmarshalJSON(data []byte) error {
 }
 
 func (s *CLI) Normalize(ctx context.Context, dir string) (string, error) {
-	s.logger.Debug("running composer normalize")
 	return s.execComposer(ctx, dir, "normalize")
 }
 
 func (s *CLI) Diff(ctx context.Context, dir string, targetBranch string, withLinks bool) (string, error) {
-	s.logger.Debug("generating diff table")
 	args := []string{"diff", targetBranch}
 	if withLinks {
 		args = append(args, "--with-links")
@@ -223,7 +228,6 @@ func (s *CLI) Diff(ctx context.Context, dir string, targetBranch string, withLin
 }
 
 func (s *CLI) GetInstalledPackageVersion(ctx context.Context, dir string, packageName string) (string, error) {
-	s.logger.Debug("getting installed package version")
 	out, err := s.execComposer(ctx, dir, "show", packageName, "--locked", "--no-ansi", "--format=json")
 	if err != nil {
 		return "", err
@@ -267,13 +271,11 @@ func (s *CLI) SetAllowPlugins(ctx context.Context, dir string, plugins map[strin
 }
 
 func (s *CLI) GetConfig(ctx context.Context, dir string, key string) (string, error) {
-	s.logger.Debug("getting composer config", zap.String("key", key))
 	//ctx = context.Background()
 	return s.execComposer(ctx, dir, "config", "--json", key)
 }
 
 func (s *CLI) SetConfig(ctx context.Context, dir string, key string, value string) error {
-	s.logger.Debug("setting composer config", zap.String("key", key), zap.String("value", value))
 	_, err := s.execComposer(ctx, dir, "config", "--json", key, value)
 	return err
 }
@@ -287,7 +289,6 @@ type PackageChange struct {
 }
 
 func (s *CLI) ListPendingUpdates(ctx context.Context, dir string, packagesToUpdate []string, minimalChanges bool) ([]PackageChange, error) {
-	s.logger.Debug("getting outdated packages")
 	log, err := s.Update(ctx, dir, packagesToUpdate, []string{}, minimalChanges, true)
 	if err != nil {
 		return nil, err
@@ -395,7 +396,7 @@ func (s *CLI) CheckIfPatchApplies(ctx context.Context, packageName string, packa
 	}
 
 	// Run composer require in the temporary directory
-	if _, err := s.Require(ctx, s.tempDir, packageName+":"+packageVersion, "--with-all-dependencies"); err != nil {
+	if _, err := s.Require(ctx, s.tempDir, packageName+":"+packageVersion, "--with-all-dependencies", "--quiet"); err != nil {
 		return false, nil
 	}
 
@@ -423,7 +424,7 @@ func (s *CLI) GetInstalledPlugins(ctx context.Context, dir string) (map[string]i
 }
 
 func (s *CLI) IsPackageInstalled(ctx context.Context, dir string, packageToCheck string) (bool, error) {
-	_, err := s.execComposer(ctx, dir, "show", "--locked", packageToCheck)
+	_, err := s.execComposer(ctx, dir, "show", "--locked", "--quiet", packageToCheck)
 	if err != nil {
 		return false, err
 	}
@@ -431,7 +432,6 @@ func (s *CLI) IsPackageInstalled(ctx context.Context, dir string, packageToCheck
 }
 
 func (s *CLI) GetLockHash(dir string) (string, error) {
-	s.logger.Debug("getting composer lock hash")
 	file, err := s.fs.Open(dir + "/composer.lock")
 	if err != nil {
 		return "", err
@@ -451,7 +451,6 @@ func (s *CLI) GetLockHash(dir string) (string, error) {
 }
 
 func (s *CLI) UpdateLockHash(ctx context.Context, dir string) error {
-	s.logger.Debug("updating composer lock hash")
 	_, err := s.execComposer(ctx, dir, "update", "--lock", "--no-install")
 	return err
 }
