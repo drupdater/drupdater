@@ -2,6 +2,8 @@ package rector
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"os/exec"
 	"strings"
 
@@ -11,7 +13,7 @@ import (
 var execCommand = exec.CommandContext
 
 type Runner interface {
-	Run(ctx context.Context, dir string, customCodeDirectories []string) (string, error)
+	Run(ctx context.Context, dir string, customCodeDirectories []string) (ReturnOutput, error)
 }
 
 type CLI struct {
@@ -36,22 +38,49 @@ func (s *CLI) execComposer(ctx context.Context, dir string, args ...string) (str
 	return output, err
 }
 
-func (s *CLI) Run(ctx context.Context, dir string, customCodeDirectories []string) (string, error) {
+type ReturnOutput struct {
+	Totals       ReturnOutputTotals     `json:"totals"`
+	FileDiffs    []ReturnOutputFillDiff `json:"file_diffs"`
+	ChangedFiles []string               `json:"changed_files"`
+}
+
+type ReturnOutputTotals struct {
+	ChangedFiles int `json:"changed_files"`
+	Errors       int `json:"errors"`
+}
+
+type ReturnOutputFillDiff struct {
+	File           string   `json:"file"`
+	Diff           string   `json:"diff"`
+	AppliedRectors []string `json:"applied_rectors"`
+}
+
+func (s *CLI) Run(ctx context.Context, dir string, customCodeDirectories []string) (ReturnOutput, error) {
 	if len(customCodeDirectories) == 0 {
 		s.logger.Debug("no custom code directories found")
-		return `{
-    "totals": {
-        "changed_files": 0,
-        "errors": 0
-    },
-    "file_diffs": [],
-    "changed_files": []
-}`, nil
-
+		return ReturnOutput{
+			Totals: ReturnOutputTotals{
+				ChangedFiles: 0,
+				Errors:       0,
+			},
+			FileDiffs:    []ReturnOutputFillDiff{},
+			ChangedFiles: []string{},
+		}, nil
 	}
 
 	args := []string{"exec", "--", "rector", "process", "--config=/opt/drupdater/rector.php", "--no-progress-bar", "--no-diffs", "--debug", "--output-format=json"}
 	args = append(args, customCodeDirectories...)
 
-	return s.execComposer(ctx, dir, args...)
+	out, err := s.execComposer(ctx, dir, args...)
+
+	if err != nil {
+		return ReturnOutput{}, fmt.Errorf("failed to run composer command: %w", err)
+	}
+
+	var deprecationRemovalResult ReturnOutput
+	if err := json.Unmarshal([]byte(out), &deprecationRemovalResult); err != nil {
+		return ReturnOutput{}, fmt.Errorf("failed to unmarshal JSON: %w", err)
+	}
+
+	return deprecationRemovalResult, nil
 }
