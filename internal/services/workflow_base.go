@@ -249,7 +249,7 @@ func (ws *WorkflowBaseService) installCode(ctx context.Context) (string, error) 
 
 	ws.logger.Info("running composer install")
 	if err = ws.composer.Install(ctx, path); err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to run composer install: %w", err)
 	}
 
 	return path, nil
@@ -259,35 +259,34 @@ func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context, strategy Wo
 	ws.logger.Info("cloning repository for update", zap.String("repositoryURL", ws.config.RepositoryURL), zap.String("branch", ws.config.Branch))
 	repository, worktree, path, err := ws.repository.CloneRepository(ws.config.RepositoryURL, ws.config.Branch, ws.config.Token)
 	if err != nil {
-		return SharedUpdate{}, err
+		return SharedUpdate{}, fmt.Errorf("failed to clone repository: %w", err)
 	}
 
 	// Use strategy to determine what to update
 	packagesToUpdate, minimalChanges, err := strategy.PreUpdate(ctx, path)
 	if err != nil {
 
-		return SharedUpdate{}, err
+		return SharedUpdate{}, fmt.Errorf("failed to pre-update: %w", err)
 	}
 
 	// Check if we should continue with the update
 	if !strategy.ShouldContinue(packagesToUpdate) {
-		return SharedUpdate{}, err
+		return SharedUpdate{}, fmt.Errorf("update skipped by strategy")
 	}
 
 	ws.logger.Info("updating dependencies")
 	updateReport, err := ws.updater.UpdateDependencies(ctx, path, packagesToUpdate, worktree, minimalChanges)
 	if err != nil {
-		return SharedUpdate{}, err
+		return SharedUpdate{}, fmt.Errorf("failed to update dependencies: %w", err)
 	}
 
 	table, err := ws.composer.Diff(ctx, path, ws.config.Branch, true)
 	if err != nil {
-		return SharedUpdate{}, err
+		return SharedUpdate{}, fmt.Errorf("failed to get diff: %w", err)
 	}
 
 	if table == "" {
-		ws.logger.Info("no packages were updated, skipping update")
-		return SharedUpdate{}, err
+		return SharedUpdate{}, fmt.Errorf("no packages were updated, skipping update")
 	}
 
 	ws.logger.Sugar().Info("composer diff table", fmt.Sprintf("\n%s", table))
@@ -297,11 +296,10 @@ func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context, strategy Wo
 	// Check if branch already exists
 	exists, err := ws.repository.BranchExists(repository, updateBranchName)
 	if err != nil {
-		ws.logger.Error("failed to check if branch exists", zap.Error(err))
+		return SharedUpdate{}, fmt.Errorf("failed to check if branch exists: %w", err)
 	}
 	if exists {
-		ws.logger.Info("branch already exists", zap.String("branch", updateBranchName))
-		return SharedUpdate{}, err
+		return SharedUpdate{}, fmt.Errorf("branch %s already exists, skipping", updateBranchName)
 	}
 
 	// Create final branch for changes
@@ -316,7 +314,7 @@ func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context, strategy Wo
 
 	// Run post-update actions from strategy
 	if err := strategy.PostUpdate(ctx, path, worktree); err != nil {
-		return SharedUpdate{}, err
+		return SharedUpdate{}, fmt.Errorf("failed to post-update: %w", err)
 	}
 
 	sharedUpdate := SharedUpdate{
@@ -373,14 +371,14 @@ func (ws *WorkflowBaseService) publishWork(repository internal.Repository, updat
 func (ws *WorkflowBaseService) GenerateDescription(data interface{}, filename string) (string, error) {
 	tmpl, err := template.ParseFS(templates, "templates/*.go.tmpl")
 	if err != nil {
-		panic(err)
+		return "", fmt.Errorf("failed to parse template: %w", err)
 	}
 
 	var output bytes.Buffer
 
 	err = tmpl.ExecuteTemplate(&output, filename, data)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to execute template: %w", err)
 	}
 
 	return output.String(), nil

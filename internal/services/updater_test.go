@@ -60,37 +60,6 @@ func TestUpdateDependencies(t *testing.T) {
 	})
 }
 
-func TestExportConfiguration(t *testing.T) {
-
-	worktree := internal.NewMockWorktree(t)
-	worktree.On("Add", "/tmp").Return(plumbing.NewHash(""), nil)
-	worktree.On("Commit", "Update configuration site1", &git.CommitOptions{}).Return(plumbing.NewHash(""), nil)
-
-	settingsService := drupal.NewMockSettingsService(t)
-
-	repositoryService := NewMockRepositoryService(t)
-	repositoryService.On("IsSomethingStagedInPath", worktree, "/tmp").Return(true, nil)
-
-	drush := drush.NewMockRunner(t)
-	drush.On("ExportConfiguration", mock.Anything, "/tmp", "site1").Return(nil)
-	drush.On("GetConfigSyncDir", mock.Anything, "/tmp", "site1", true).Return("/tmp", nil)
-
-	logger := zap.NewNop()
-
-	updater := &DefaultUpdater{
-		logger:     logger,
-		drush:      drush,
-		settings:   settingsService,
-		repository: repositoryService,
-	}
-
-	err := updater.ExportConfiguration(t.Context(), worktree, "/tmp", "site1")
-	if err != nil {
-		t.Fatalf("Failed to export configuration: %v", err)
-	}
-
-}
-
 func TestUpdatePatches(t *testing.T) {
 
 	logger := zap.NewNop()
@@ -680,10 +649,7 @@ func TestUpdateDrupal(t *testing.T) {
 
 		worktree := internal.NewMockWorktree(t)
 		settingsService := drupal.NewMockSettingsService(t)
-		repositoryService := NewMockRepositoryService(t)
 		drushService := drush.NewMockRunner(t)
-
-		repositoryService.On("IsSomethingStagedInPath", worktree, "/tmp/config").Return(false, nil)
 
 		settingsService.On("ConfigureDatabase", mock.Anything, "/tmp", "site1").Return(nil)
 
@@ -698,16 +664,11 @@ func TestUpdateDrupal(t *testing.T) {
 		drushService.On("UpdateSite", mock.Anything, "/tmp", "site1").Return(nil)
 		drushService.On("ConfigResave", mock.Anything, "/tmp", "site1").Return(nil)
 		drushService.On("ExportConfiguration", mock.Anything, "/tmp", "site1").Return(nil)
-		drushService.On("GetConfigSyncDir", mock.Anything, "/tmp", "site1", true).Return("/tmp/config", nil)
-
-		worktree.On("Add", "/tmp/config").Return(plumbing.NewHash(""), nil)
 
 		updater := &DefaultUpdater{
-			logger: logger,
-
-			settings:   settingsService,
-			repository: repositoryService,
-			drush:      drushService,
+			logger:   logger,
+			settings: settingsService,
+			drush:    drushService,
 		}
 
 		result, err := updater.UpdateDrupal(t.Context(), "/tmp", worktree, "site1")
