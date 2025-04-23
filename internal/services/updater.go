@@ -208,37 +208,36 @@ func (us *DefaultUpdater) UpdateDrupal(ctx context.Context, path string, worktre
 	us.logger.Info("updating site", zap.String("site", site))
 
 	if err := us.settings.ConfigureDatabase(ctx, path, site); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to configure database: %w", err)
 	}
 
 	hooks, err := us.drush.GetUpdateHooks(ctx, path, site)
 	us.logger.Debug("update hooks", zap.Any("hooks", hooks))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get update hooks: %w", err)
 
 	}
 
 	if err := us.drush.UpdateSite(ctx, path, site); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to update site: %w", err)
 
 	}
 
 	if err := us.drush.ConfigResave(ctx, path, site); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to resave config: %w", err)
 
 	}
 
 	for _, asu := range us.afterSiteUpdate {
 		if err := asu.Execute(ctx, path, worktree, site); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to execute after site update: %w", err)
 
 		}
 	}
 
 	us.logger.Info("export configuration", zap.String("site", site))
-	if err := us.ExportConfiguration(ctx, worktree, path, site); err != nil {
-		return nil, err
-
+	if err := us.drush.ExportConfiguration(ctx, path, site); err != nil {
+		return nil, fmt.Errorf("failed to export configuration: %w", err)
 	}
 
 	return hooks, nil
@@ -454,38 +453,6 @@ func (us *DefaultUpdater) cleanURLString(s string) string {
 	// Define a regex pattern to keep only URL-valid characters
 	re := regexp.MustCompile(`[^a-zA-Z0-9\-._~:/?#\[\]@!$&'()*+,;=]`)
 	return re.ReplaceAllString(s, "")
-}
-
-func (us *DefaultUpdater) ExportConfiguration(ctx context.Context, worktree internal.Worktree, dir string, site string) error {
-
-	siteLogger := us.logger.With(zap.String("site", site))
-
-	if err := us.drush.ExportConfiguration(ctx, dir, site); err != nil {
-		return err
-	}
-
-	configPath, err := us.drush.GetConfigSyncDir(ctx, dir, site, true)
-	if err != nil {
-		return err
-	}
-
-	siteLogger.Debug("config sync directory", zap.String("path", configPath))
-
-	_, err = worktree.Add(configPath)
-	if err != nil {
-		return fmt.Errorf("failed to add configuration: %w", err)
-	}
-
-	if !us.repository.IsSomethingStagedInPath(worktree, configPath) {
-		siteLogger.Debug("nothing to commit")
-		return nil
-	}
-
-	if _, err = worktree.Commit("Update configuration "+site, &git.CommitOptions{}); err != nil {
-		return fmt.Errorf("failed to commit configuration: %w", err)
-	}
-
-	return nil
 }
 
 // DownloadFile downloads a file from a given URL and saves it to a specified local path.

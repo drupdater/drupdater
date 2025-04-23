@@ -79,7 +79,7 @@ func (e CLI) GetConfigSyncDir(ctx context.Context, dir string, site string, rela
 }
 
 func (e CLI) ExportConfiguration(ctx context.Context, dir string, site string) error {
-	_, err := e.execDrush(ctx, dir, site, "config:export", "--yes")
+	_, err := e.execDrush(ctx, dir, site, "config:export", "--yes", "--commit", "--message=Update configuration "+site)
 	return err
 }
 

@@ -110,7 +110,6 @@ func (rs *GitRepositoryService) BranchExists(repository internal.Repository, bra
 			break // End of refs
 		}
 
-		rs.logger.Debug("checking branch", zap.String("branch", ref.Name().String()))
 		if ref.Name().String() == remoteBranchRef {
 			return true, nil
 		}
