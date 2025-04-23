@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"encoding/json"
 
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/pkg/composer"
@@ -17,20 +16,6 @@ type UpdateRemoveDeprecations struct {
 	rector   rector.Runner
 	config   internal.Config
 	composer composer.Runner
-}
-
-type RectorReturn struct {
-	Totals struct {
-		ChangedFiles int `json:"changed_files"`
-		Errors       int `json:"errors"`
-	} `json:"totals"`
-	FileDiffs []struct {
-		File           string   `json:"file"`
-		Diff           string   `json:"diff"`
-		AppliedRectors []string `json:"applied_rectors"`
-	} `json:"file_diffs"`
-
-	ChangedFiles []string `json:"changed_files"`
 }
 
 func newUpdateRemoveDeprecations(logger *zap.Logger, rector rector.Runner, config internal.Config, composer composer.Runner) *UpdateRemoveDeprecations {
@@ -64,7 +49,7 @@ func (h *UpdateRemoveDeprecations) Execute(ctx context.Context, path string, wor
 		return err
 	}
 
-	out, err := h.rector.Run(ctx, path, customCodeDirectories)
+	deprecationRemovalResult, err := h.rector.Run(ctx, path, customCodeDirectories)
 	if err != nil {
 		return err
 	}
@@ -74,11 +59,6 @@ func (h *UpdateRemoveDeprecations) Execute(ctx context.Context, path string, wor
 		if _, err := h.composer.Remove(ctx, path, "palantirnet/drupal-rector"); err != nil {
 			return err
 		}
-	}
-
-	var deprecationRemovalResult RectorReturn
-	if err := json.Unmarshal([]byte(out), &deprecationRemovalResult); err != nil {
-		return err
 	}
 
 	if deprecationRemovalResult.Totals.ChangedFiles == 0 {

@@ -26,22 +26,22 @@ func TestRemoveDeprecations(t *testing.T) {
 		composer.On("Require", mock.Anything, "/path/to/repo", "palantirnet/drupal-rector").Return("", nil)
 		composer.On("GetCustomCodeDirectories", mock.Anything, "/path/to/repo").Return([]string{"web/modules/custom"}, nil)
 
-		rector := rector.NewMockRunner(t)
-		rector.On("Run", mock.Anything, "/path/to/repo", []string{"web/modules/custom"}).Return(`{
-    "totals": {
-        "changed_files": 0,
-        "errors": 0
-    },
-    "file_diffs": [],
-    "changed_files": []
-}`, nil)
+		runner := rector.NewMockRunner(t)
+		runner.On("Run", mock.Anything, "/path/to/repo", []string{"web/modules/custom"}).Return(rector.ReturnOutput{
+			ChangedFiles: []string{},
+			FileDiffs:    []rector.ReturnOutputFillDiff{},
+			Totals: rector.ReturnOutputTotals{
+				ChangedFiles: 0,
+				Errors:       0,
+			},
+		}, nil)
 		composer.On("Remove", mock.Anything, "/path/to/repo", "palantirnet/drupal-rector").Return("", nil)
 
-		updateRemoveDeprecations := newUpdateRemoveDeprecations(logger, rector, config, composer)
+		updateRemoveDeprecations := newUpdateRemoveDeprecations(logger, runner, config, composer)
 		err := updateRemoveDeprecations.Execute(t.Context(), "/path/to/repo", worktree)
 		assert.NoError(t, err)
 		composer.AssertExpectations(t)
-		rector.AssertExpectations(t)
+		runner.AssertExpectations(t)
 		worktree.AssertExpectations(t)
 	})
 
@@ -50,34 +50,33 @@ func TestRemoveDeprecations(t *testing.T) {
 		composer.On("IsPackageInstalled", mock.Anything, "/path/to/repo", "palantirnet/drupal-rector").Return(true, nil)
 		composer.On("GetCustomCodeDirectories", mock.Anything, "/path/to/repo").Return([]string{"web/modules/custom"}, nil)
 
-		rector := rector.NewMockRunner(t)
-		rector.On("Run", mock.Anything, "/path/to/repo", []string{"web/modules/custom"}).Return(`{
-    "totals": {
-        "changed_files": 1,
-        "errors": 0
-    },
-    "file_diffs": [
-        {
-            "file": "tests/Drupal/FunctionalJavascriptTests/ThunderOrgTestHomePageTest.php",
-            "diff": "--- Original\n+++ New\n@@ -13,6 +13,11 @@\n  */\n class ThunderOrgTestHomePageTest extends WebDriverTestBase {\n \n+  /**\n+   * {@inheritdoc}\n+   */\n+  protected $defaultTheme = 'stark';\n+\n   use ThunderTestTrait;\n \n   /**\n",
-            "applied_rectors": [
-                "DrupalRector\\Drupal8\\Rector\\Deprecation\\FunctionalTestDefaultThemePropertyRector",
-                "DrupalRector\\Drupal9\\Rector\\Property\\ProtectedStaticModulesPropertyRector"
-            ]
-        }
-    ],
-    "changed_files": [
-        "tests/Drupal/FunctionalJavascriptTests/ThunderOrgTestHomePageTest.php"
-    ]
-}`, nil)
+		runner := rector.NewMockRunner(t)
+		runner.On("Run", mock.Anything, "/path/to/repo", []string{"web/modules/custom"}).Return(rector.ReturnOutput{
+			ChangedFiles: []string{"tests/Drupal/FunctionalJavascriptTests/ThunderOrgTestHomePageTest.php"},
+			FileDiffs: []rector.ReturnOutputFillDiff{
+				{
+					File: "tests/Drupal/FunctionalJavascriptTests/ThunderOrgTestHomePageTest.php",
+					Diff: "--- Original\n+++ New\n@@ -13,6 +13,11 @@\n  */\n class ThunderOrgTestHomePageTest extends WebDriverTestBase {\n \n+  /**\n+   * {@inheritdoc}\n+   */\n+  protected $defaultTheme = 'stark';\n+\n   use ThunderTestTrait;\n \n   /**\n",
+					AppliedRectors: []string{
+						"DrupalRector\\Drupal8\\Rector\\Deprecation\\FunctionalTestDefaultThemePropertyRector",
+						"DrupalRector\\Drupal9\\Rector\\Property\\ProtectedStaticModulesPropertyRector",
+					},
+				},
+			},
+			Totals: rector.ReturnOutputTotals{
+				ChangedFiles: 1,
+				Errors:       0,
+			},
+		}, nil)
+
 		worktree.On("Add", "tests/Drupal/FunctionalJavascriptTests/ThunderOrgTestHomePageTest.php").Return(plumbing.NewHash(""), nil)
 		worktree.On("Commit", "Remove deprecations", mock.Anything).Return(plumbing.NewHash(""), nil)
 
-		updateRemoveDeprecations := newUpdateRemoveDeprecations(logger, rector, config, composer)
+		updateRemoveDeprecations := newUpdateRemoveDeprecations(logger, runner, config, composer)
 		err := updateRemoveDeprecations.Execute(t.Context(), "/path/to/repo", worktree)
 		assert.NoError(t, err)
 		composer.AssertExpectations(t)
-		rector.AssertExpectations(t)
+		runner.AssertExpectations(t)
 		worktree.AssertExpectations(t)
 	})
 
@@ -86,21 +85,21 @@ func TestRemoveDeprecations(t *testing.T) {
 		composer.On("IsPackageInstalled", mock.Anything, "/path/to/repo", "palantirnet/drupal-rector").Return(true, nil)
 		composer.On("GetCustomCodeDirectories", mock.Anything, "/path/to/repo").Return([]string{"web/modules/custom"}, nil)
 
-		rector := rector.NewMockRunner(t)
-		rector.On("Run", mock.Anything, "/path/to/repo", []string{"web/modules/custom"}).Return(`{
-    "totals": {
-        "changed_files": 0,
-        "errors": 0
-    },
-    "file_diffs": [],
-    "changed_files": []
-}`, nil)
+		runner := rector.NewMockRunner(t)
+		runner.On("Run", mock.Anything, "/path/to/repo", []string{"web/modules/custom"}).Return(rector.ReturnOutput{
+			ChangedFiles: []string{},
+			FileDiffs:    []rector.ReturnOutputFillDiff{},
+			Totals: rector.ReturnOutputTotals{
+				ChangedFiles: 0,
+				Errors:       0,
+			},
+		}, nil)
 
-		updateRemoveDeprecations := newUpdateRemoveDeprecations(logger, rector, config, composer)
+		updateRemoveDeprecations := newUpdateRemoveDeprecations(logger, runner, config, composer)
 		err := updateRemoveDeprecations.Execute(t.Context(), "/path/to/repo", worktree)
 		assert.NoError(t, err)
 		composer.AssertExpectations(t)
-		rector.AssertExpectations(t)
+		runner.AssertExpectations(t)
 		worktree.AssertExpectations(t)
 	})
 
@@ -109,14 +108,14 @@ func TestRemoveDeprecations(t *testing.T) {
 		composer.On("IsPackageInstalled", mock.Anything, "/path/to/repo", "palantirnet/drupal-rector").Return(true, nil)
 		composer.On("GetCustomCodeDirectories", mock.Anything, "/path/to/repo").Return([]string{"web/modules/custom"}, nil)
 
-		rector := rector.NewMockRunner(t)
-		rector.On("Run", mock.Anything, "/path/to/repo", []string{"web/modules/custom"}).Return("", assert.AnError)
+		runner := rector.NewMockRunner(t)
+		runner.On("Run", mock.Anything, "/path/to/repo", []string{"web/modules/custom"}).Return(rector.ReturnOutput{}, assert.AnError)
 
-		updateRemoveDeprecations := newUpdateRemoveDeprecations(logger, rector, config, composer)
+		updateRemoveDeprecations := newUpdateRemoveDeprecations(logger, runner, config, composer)
 		err := updateRemoveDeprecations.Execute(t.Context(), "/path/to/repo", worktree)
 		assert.Error(t, err)
 		composer.AssertExpectations(t)
-		rector.AssertExpectations(t)
+		runner.AssertExpectations(t)
 	})
 
 }
