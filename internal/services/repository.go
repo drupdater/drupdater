@@ -38,8 +38,13 @@ func (rs *GitRepositoryService) CloneRepository(repository string, branch string
 
 	hash := fmt.Sprintf("%x", md5.Sum([]byte(repository)))
 	projectDir := filepath.Join(os.TempDir(), hash)
-	rs.fs.MkdirAll(projectDir, os.ModePerm)
+	if err := rs.fs.MkdirAll(projectDir, os.ModePerm); err != nil {
+		return nil, nil, "", fmt.Errorf("failed to create project directory: %w", err)
+	}
 	tmpDirName, err := afero.TempDir(rs.fs, projectDir, "repo")
+	if err != nil {
+		return nil, nil, "", fmt.Errorf("failed to create temporary directory: %w", err)
+	}
 
 	checkout, err := git.PlainClone(tmpDirName, false, &git.CloneOptions{
 		URL:           repository,
