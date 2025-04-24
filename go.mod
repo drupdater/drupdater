@@ -14,7 +14,10 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
-require golang.org/x/text v0.24.0 // indirect
+require (
+	github.com/kamildrazkiewicz/go-flow v0.0.0-20170919072006-2a1d885f8ce4 // indirect
+	golang.org/x/text v0.24.0 // indirect
+)
 
 require (
 	dario.cat/mergo v1.0.1 // indirect
