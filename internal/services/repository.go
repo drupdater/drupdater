@@ -3,10 +3,12 @@ package services
 import (
 	"crypto/md5"
 	"fmt"
-	"math/rand"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/drupdater/drupdater/internal"
+	"github.com/spf13/afero"
 
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -22,28 +24,22 @@ type RepositoryService interface {
 
 type GitRepositoryService struct {
 	logger *zap.Logger
+	fs     afero.Fs
 }
 
 func NewGitRepositoryService(logger *zap.Logger) *GitRepositoryService {
 	return &GitRepositoryService{
 		logger: logger,
+		fs:     afero.NewOsFs(),
 	}
 }
 
 func (rs *GitRepositoryService) CloneRepository(repository string, branch string, token string) (internal.Repository, internal.Worktree, string, error) {
 
-	randString := func(n int) string {
-		const letters = "abcdef0123456789"
-		b := make([]byte, n)
-		for i := range b {
-			b[i] = letters[rand.Intn(len(letters))]
-		}
-		return string(b)
-	}
-
-	random := randString(6)
-	hash := md5.Sum([]byte(repository))
-	tmpDirName := fmt.Sprintf("/tmp/%x/checkout-%s", hash, random)
+	hash := fmt.Sprintf("%x", md5.Sum([]byte(repository)))
+	projectDir := filepath.Join(os.TempDir(), hash)
+	rs.fs.MkdirAll(projectDir, os.ModePerm)
+	tmpDirName, err := afero.TempDir(rs.fs, projectDir, "repo")
 
 	checkout, err := git.PlainClone(tmpDirName, false, &git.CloneOptions{
 		URL:           repository,
@@ -85,7 +81,7 @@ func (rs *GitRepositoryService) CloneRepository(repository string, branch string
 
 	// Create initial temporary branch
 	if err := w.Checkout(&git.CheckoutOptions{
-		Branch: plumbing.NewBranchReferenceName(random),
+		Branch: plumbing.NewBranchReferenceName(hash),
 		Create: true,
 	}); err != nil {
 		return checkout, w, "", fmt.Errorf("failed to checkout branch: %w", err)
