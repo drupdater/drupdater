@@ -14,6 +14,7 @@ import (
 	"github.com/drupdater/drupdater/pkg/drupalorg"
 	"github.com/drupdater/drupdater/pkg/drush"
 	"github.com/drupdater/drupdater/pkg/phpcs"
+	"github.com/drupdater/drupdater/pkg/rector"
 	"github.com/gookit/event"
 	"github.com/maypok86/otter"
 	"github.com/spf13/cobra"
@@ -54,8 +55,14 @@ var rootCmd = &cobra.Command{
 
 		if !config.SkipCBF {
 			phpcsRunner := phpcs.NewCLI(logger)
-			plugin1 := addon.NewUpdateCodingStyles(logger, phpcsRunner, config, composer)
-			event.AddSubscriber(plugin1)
+			phpcsPlugin := addon.NewUpdateCodingStyles(logger, phpcsRunner, config, composer)
+			event.AddSubscriber(phpcsPlugin)
+		}
+
+		if !config.SkipRector {
+			rectorRunner := rector.NewCLI(logger)
+			rectorPlugin := addon.NewUpdateRemoveDeprecations(logger, rectorRunner, config, composer)
+			event.AddSubscriber(rectorPlugin)
 		}
 
 		workflow.StartUpdate(ctx, strategy)

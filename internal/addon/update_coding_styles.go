@@ -35,7 +35,7 @@ func NewUpdateCodingStyles(logger *zap.Logger, phpcs phpcs.Runner, config intern
 func (h *UpdateCodingStyles) SubscribedEvents() map[string]interface{} {
 	return map[string]interface{}{
 		"post-code-update": event.ListenerItem{
-			Priority: event.AboveNormal,
+			Priority: event.Normal,
 			Listener: event.ListenerFunc(h.postCodeUpdateHandler),
 		},
 	}
