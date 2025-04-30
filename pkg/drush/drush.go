@@ -33,14 +33,14 @@ type CLI struct {
 	cache  otter.Cache[string, string]
 }
 
-func NewCLI(logger *zap.Logger, cache otter.Cache[string, string]) Runner {
-	return CLI{
+func NewCLI(logger *zap.Logger, cache otter.Cache[string, string]) *CLI {
+	return &CLI{
 		logger: logger,
 		cache:  cache,
 	}
 }
 
-func (e CLI) execDrush(ctx context.Context, dir string, site string, args ...string) (string, error) {
+func (e *CLI) execDrush(ctx context.Context, dir string, site string, args ...string) (string, error) {
 	command := execCommand(ctx, "composer", append([]string{"exec", "--", "drush"}, args...)...)
 	command.Dir = dir
 	// os.Environ() preserves the current environment variables
@@ -55,13 +55,13 @@ func (e CLI) execDrush(ctx context.Context, dir string, site string, args ...str
 	return output, err
 }
 
-func (e CLI) InstallSite(ctx context.Context, dir string, site string) error {
+func (e *CLI) InstallSite(ctx context.Context, dir string, site string) error {
 	_, err := e.execDrush(ctx, dir, site, "--existing-config", "--yes", "site:install", "--sites-subdir="+site)
 
 	return err
 }
 
-func (e CLI) GetConfigSyncDir(ctx context.Context, dir string, site string, relative bool) (string, error) {
+func (e *CLI) GetConfigSyncDir(ctx context.Context, dir string, site string, relative bool) (string, error) {
 	cacheKey := fmt.Sprintf("config-sync-dir_%s_%s_%t", dir, site, relative)
 	value, ok := e.cache.Get(cacheKey)
 	if ok {
@@ -78,32 +78,32 @@ func (e CLI) GetConfigSyncDir(ctx context.Context, dir string, site string, rela
 	return configSyncDir, nil
 }
 
-func (e CLI) ExportConfiguration(ctx context.Context, dir string, site string) error {
+func (e *CLI) ExportConfiguration(ctx context.Context, dir string, site string) error {
 	_, err := e.execDrush(ctx, dir, site, "config:export", "--yes", "--commit", "--message=Update configuration "+site)
 	return err
 }
 
-func (e CLI) UpdateSite(ctx context.Context, dir string, site string) error {
+func (e *CLI) UpdateSite(ctx context.Context, dir string, site string) error {
 	_, err := e.execDrush(ctx, dir, site, "updatedb", "--yes")
 	return err
 }
 
-func (e CLI) ConfigResave(ctx context.Context, dir string, site string) error {
+func (e *CLI) ConfigResave(ctx context.Context, dir string, site string) error {
 	_, err := e.execDrush(ctx, dir, site, "php:script", "/opt/drupdater/config-resave.php")
 	return err
 }
 
-func (e CLI) IsModuleEnabled(ctx context.Context, dir string, site string, module string) (bool, error) {
+func (e *CLI) IsModuleEnabled(ctx context.Context, dir string, site string, module string) (bool, error) {
 	out, err := e.execDrush(ctx, dir, site, "pm:list", "--status=enabled", "--field=name", "--filter="+module)
 	return out == module, err
 }
 
-func (e CLI) LocalizeTranslations(ctx context.Context, dir string, site string) error {
+func (e *CLI) LocalizeTranslations(ctx context.Context, dir string, site string) error {
 	_, err := e.execDrush(ctx, dir, site, "locale-deploy:localize-translations")
 	return err
 }
 
-func (e CLI) GetTranslationPath(ctx context.Context, dir string, site string, relative bool) (string, error) {
+func (e *CLI) GetTranslationPath(ctx context.Context, dir string, site string, relative bool) (string, error) {
 	cacheKey := fmt.Sprintf("translation-path_%s_%s_%t", dir, site, relative)
 	value, ok := e.cache.Get(cacheKey)
 	if ok {
@@ -129,7 +129,7 @@ type UpdateHook struct {
 	Type        string      `json:"type"`
 }
 
-func (e CLI) GetUpdateHooks(ctx context.Context, dir string, site string) (map[string]UpdateHook, error) {
+func (e *CLI) GetUpdateHooks(ctx context.Context, dir string, site string) (map[string]UpdateHook, error) {
 	data, err := e.execDrush(ctx, dir, site, "updatedb-status", "--format=json")
 	if err != nil {
 		return nil, err

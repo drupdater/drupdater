@@ -16,20 +16,11 @@ import (
 	"github.com/drupdater/drupdater/pkg/drupal"
 	"github.com/drupdater/drupdater/pkg/drupalorg"
 	"github.com/drupdater/drupdater/pkg/drush"
-
-	gitlab "gitlab.com/gitlab-org/api/client-go"
-
 	git "github.com/go-git/go-git/v5"
+	"github.com/gookit/event"
+	gitlab "gitlab.com/gitlab-org/api/client-go"
 	"go.uber.org/zap"
 )
-
-type AfterSiteUpdate interface {
-	Execute(ctx context.Context, path string, worktree internal.Worktree, site string) error
-}
-
-type AfterUpdate interface {
-	Execute(ctx context.Context, path string, worktree internal.Worktree) error
-}
 
 type DependencyUpdateReport struct {
 	AddedAllowPlugins []string
@@ -75,18 +66,17 @@ type UpdaterService interface {
 }
 
 type DefaultUpdater struct {
-	logger          *zap.Logger
-	settings        drupal.SettingsService
-	repository      RepositoryService
-	afterSiteUpdate []AfterSiteUpdate
-	config          internal.Config
-	composer        composer.Runner
-	drupalOrg       drupalorg.Client
-	gitlab          *gitlab.Client
-	drush           drush.Runner
+	logger     *zap.Logger
+	settings   drupal.SettingsService
+	repository RepositoryService
+	config     internal.Config
+	composer   composer.Runner
+	drupalOrg  drupalorg.Client
+	gitlab     *gitlab.Client
+	drush      drush.Runner
 }
 
-func newDefaultUpdater(afterSiteUpdate []AfterSiteUpdate, logger *zap.Logger, settings drupal.SettingsService, repository RepositoryService, config internal.Config, composer composer.Runner, drupalOrg drupalorg.Client, drush drush.Runner) *DefaultUpdater {
+func NewDefaultUpdater(logger *zap.Logger, settings drupal.SettingsService, repository RepositoryService, config internal.Config, composer composer.Runner, drupalOrg drupalorg.Client, drush drush.Runner) *DefaultUpdater {
 
 	drupalOrgGitlab, err := gitlab.NewClient(os.Getenv("DRUPALCODE_ACCESS_TOKEN"), gitlab.WithBaseURL("https://git.drupalcode.org/api/v4"))
 	if err != nil {
@@ -94,15 +84,14 @@ func newDefaultUpdater(afterSiteUpdate []AfterSiteUpdate, logger *zap.Logger, se
 	}
 
 	return &DefaultUpdater{
-		logger:          logger,
-		settings:        settings,
-		repository:      repository,
-		afterSiteUpdate: afterSiteUpdate,
-		config:          config,
-		composer:        composer,
-		drupalOrg:       drupalOrg,
-		gitlab:          drupalOrgGitlab,
-		drush:           drush,
+		logger:     logger,
+		settings:   settings,
+		repository: repository,
+		config:     config,
+		composer:   composer,
+		drupalOrg:  drupalOrg,
+		gitlab:     drupalOrgGitlab,
+		drush:      drush,
 	}
 }
 
@@ -228,12 +217,7 @@ func (us *DefaultUpdater) UpdateDrupal(ctx context.Context, path string, worktre
 
 	}
 
-	for _, asu := range us.afterSiteUpdate {
-		if err := asu.Execute(ctx, path, worktree, site); err != nil {
-			return nil, fmt.Errorf("failed to execute after site update: %w", err)
-
-		}
-	}
+	event.MustFire("post-site-update", event.M{"arg0": "val0", "arg1": "val1"})
 
 	us.logger.Info("export configuration", zap.String("site", site))
 	if err := us.drush.ExportConfiguration(ctx, path, site); err != nil {

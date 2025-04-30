@@ -4,115 +4,22 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/internal/addon"
 	"github.com/drupdater/drupdater/internal/codehosting"
 	"github.com/drupdater/drupdater/internal/services"
-	"github.com/drupdater/drupdater/pkg"
-
+	"github.com/drupdater/drupdater/pkg/composer"
+	"github.com/drupdater/drupdater/pkg/drupal"
+	"github.com/drupdater/drupdater/pkg/drupalorg"
+	"github.com/drupdater/drupdater/pkg/drush"
+	"github.com/drupdater/drupdater/pkg/phpcs"
+	"github.com/gookit/event"
 	"github.com/maypok86/otter"
 	"github.com/spf13/cobra"
-	"go.uber.org/fx"
-	"go.uber.org/fx/fxevent"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
-
-type Action struct {
-	sh               fx.Shutdowner
-	logger           *zap.Logger
-	workflowService  services.WorkflowService
-	workflowStrategy services.WorkflowStrategy
-}
-
-func newAction(
-	lc fx.Lifecycle,
-	sh fx.Shutdowner,
-	logger *zap.Logger,
-	workflowService services.WorkflowService,
-	workflowStrategy services.WorkflowStrategy,
-) *Action {
-	act := &Action{
-		sh:               sh,
-		logger:           logger,
-		workflowService:  workflowService,
-		workflowStrategy: workflowStrategy,
-	}
-
-	lc.Append(fx.Hook{
-		OnStart: act.start,
-		OnStop:  act.stop,
-	})
-
-	return act
-}
-
-func (act *Action) start(ctx context.Context) error {
-	go act.run(ctx)
-	return nil
-}
-
-func (act *Action) stop(_ context.Context) error {
-	return nil
-}
-
-func (act *Action) run(ctx context.Context) {
-
-	exitCode := 0
-	err := act.workflowService.StartUpdate(ctx, act.workflowStrategy)
-	if err != nil {
-		act.logger.Sugar().Error(err)
-		exitCode = 1
-	}
-
-	err = act.sh.Shutdown(fx.ExitCode(exitCode))
-	if err != nil {
-		act.logger.Error("failed to shutdown", zap.Error(err))
-	}
-}
-
-func runApp(config internal.Config) {
-	app := fx.New(
-		fx.WithLogger(func(log *zap.Logger) fxevent.Logger {
-			if config.Verbose {
-				return &fxevent.ZapLogger{Logger: log}
-			}
-			return &fxevent.ZapLogger{Logger: zap.NewNop()}
-		}),
-		fx.Provide(
-			func() (*zap.Logger, error) {
-
-				loggerConfig := zap.NewDevelopmentConfig()
-				loggerConfig.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
-
-				if !config.Verbose {
-					loggerConfig.Level.SetLevel(zapcore.InfoLevel)
-					loggerConfig.DisableCaller = true
-					loggerConfig.DisableStacktrace = true
-				}
-				return loggerConfig.Build()
-			},
-			func() (otter.Cache[string, string], error) {
-				return otter.MustBuilder[string, string](100).Build()
-			},
-			func() internal.Config {
-				return config
-			},
-			func(lc fx.Lifecycle, sh fx.Shutdowner, logger *zap.Logger, workflowService services.WorkflowService, dependencyUpdateService *services.DependencyUpdateStrategy, securityUpdateService *services.SecurityUpdateStrategy) *Action {
-				if config.Security {
-					return newAction(lc, sh, logger, workflowService, securityUpdateService)
-				}
-				return newAction(lc, sh, logger, workflowService, dependencyUpdateService)
-			},
-		),
-		fx.Options(services.Module, codehosting.Module, pkg.Module),
-		fx.Invoke(func(*Action) {}),
-		fx.StartTimeout(15*time.Minute),
-	)
-
-	app.Run()
-}
 
 var config internal.Config
 
@@ -124,7 +31,34 @@ var rootCmd = &cobra.Command{
 	Run: func(_ *cobra.Command, args []string) {
 		config.RepositoryURL = args[0]
 		config.Token = args[1]
-		runApp(config)
+
+		logger := NewLogger(config)
+		cache := NewCache()
+		drush := drush.NewCLI(logger, cache)
+		composer := composer.NewCLI(logger)
+		drupalOrg := drupalorg.NewHTTPClient(logger)
+		settings := drupal.NewDefaultSettingsService(logger, drush, composer)
+		installer := drupal.NewDefaultInstallerService(logger, drush, settings)
+		git := services.NewGitRepositoryService(logger)
+		vcsProviderFactory := codehosting.NewDefaultVcsProviderFactory()
+		updater := services.NewDefaultUpdater(logger, settings, git, config, composer, drupalOrg, drush)
+
+		workflow := services.NewWorkflowBaseService(logger, config, updater, vcsProviderFactory, git, installer, composer)
+
+		var strategy services.WorkflowStrategy
+		strategy = services.NewDependencyUpdateStrategy(logger, config)
+		if config.Security {
+			strategy = services.NewSecurityUpdateStrategy(logger, config, composer)
+		}
+		ctx := context.Background()
+
+		if !config.SkipCBF {
+			phpcsRunner := phpcs.NewCLI(logger)
+			plugin1 := addon.NewUpdateCodingStyles(logger, phpcsRunner, config, composer)
+			event.AddSubscriber(plugin1)
+		}
+
+		workflow.StartUpdate(ctx, strategy)
 	},
 }
 
@@ -145,4 +79,23 @@ func Execute() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+}
+
+func NewCache() otter.Cache[string, string] {
+	cache, _ := otter.MustBuilder[string, string](100).Build()
+	return cache
+}
+
+func NewLogger(config internal.Config) *zap.Logger {
+
+	loggerConfig := zap.NewDevelopmentConfig()
+	loggerConfig.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+
+	if !config.Verbose {
+		loggerConfig.Level.SetLevel(zapcore.InfoLevel)
+		loggerConfig.DisableCaller = true
+		loggerConfig.DisableStacktrace = true
+	}
+	log, _ := loggerConfig.Build()
+	return log
 }
