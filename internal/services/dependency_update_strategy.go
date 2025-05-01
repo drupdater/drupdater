@@ -48,9 +48,7 @@ func (s *DependencyUpdateStrategy) PostUpdate(ctx context.Context, path string, 
 	e.SetName("post-code-update")
 	event.AddEvent(e)
 
-	event.FireEvent(e)
-
-	return nil
+	return event.FireEvent(e)
 }
 
 func (s *DependencyUpdateStrategy) GenerateBranchName(_ string) string {

@@ -30,7 +30,7 @@ var rootCmd = &cobra.Command{
 	Short: "Drupal Updater",
 	Long:  `Drupal Updater is a tool to update Drupal dependencies and create merge requests.`,
 	Args:  cobra.ExactArgs(2),
-	Run: func(_ *cobra.Command, args []string) {
+	RunE: func(_ *cobra.Command, args []string) error {
 		config.RepositoryURL = args[0]
 		config.Token = args[1]
 
@@ -66,7 +66,7 @@ var rootCmd = &cobra.Command{
 			event.AddSubscriber(rectorPlugin)
 		}
 
-		workflow.StartUpdate(ctx, strategy)
+		return workflow.StartUpdate(ctx, strategy)
 	},
 }
 

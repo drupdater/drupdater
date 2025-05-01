@@ -16,5 +16,8 @@ type PostCodeUpdate struct {
 
 type PostSiteUpdate struct {
 	event.BasicEvent
-	site string
+	Ctx      context.Context
+	Path     string
+	Worktree internal.Worktree
+	Site     string
 }

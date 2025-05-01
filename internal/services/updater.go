@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/internal/addon"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/drupal"
 	"github.com/drupdater/drupdater/pkg/drupalorg"
@@ -218,7 +219,18 @@ func (us *DefaultUpdater) UpdateDrupal(ctx context.Context, path string, worktre
 
 	}
 
-	event.MustFire("post-site-update", event.M{"arg0": "val0", "arg1": "val1"})
+	e := &addon.PostSiteUpdate{
+		Ctx:      ctx,
+		Worktree: worktree,
+		Path:     path,
+		Site:     site,
+	}
+	e.SetName("post-site-update")
+	event.AddEvent(e)
+
+	if err := event.FireEvent(e); err != nil {
+		return nil, fmt.Errorf("failed to fire event: %w", err)
+	}
 
 	us.logger.Info("export configuration", zap.String("site", site))
 	if err := us.drush.ExportConfiguration(ctx, path, site); err != nil {
