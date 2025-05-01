@@ -6,27 +6,26 @@ import (
 	"time"
 
 	"github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/internal/addon"
+	"github.com/gookit/event"
 	"go.uber.org/zap"
 )
 
 // DependencyUpdateStrategy implements the dependency update workflow
 type DependencyUpdateStrategy struct {
-	logger      *zap.Logger
-	config      internal.Config
-	current     time.Time
-	afterUpdate []AfterUpdate
+	logger  *zap.Logger
+	config  internal.Config
+	current time.Time
 }
 
 func NewDependencyUpdateStrategy(
-	afterUpdate []AfterUpdate,
 	logger *zap.Logger,
 	config internal.Config,
 ) *DependencyUpdateStrategy {
 	return &DependencyUpdateStrategy{
-		afterUpdate: afterUpdate,
-		logger:      logger,
-		config:      config,
-		current:     time.Now(),
+		logger:  logger,
+		config:  config,
+		current: time.Now(),
 	}
 }
 
@@ -41,14 +40,15 @@ func (s *DependencyUpdateStrategy) ShouldContinue(_ []string) bool {
 }
 
 func (s *DependencyUpdateStrategy) PostUpdate(ctx context.Context, path string, worktree internal.Worktree) error {
-	// Execute all after update hooks
-	for _, au := range s.afterUpdate {
-		if err := au.Execute(ctx, path, worktree); err != nil {
-			return fmt.Errorf("failed to execute after update: %w", err)
-		}
+	e := &addon.PostCodeUpdate{
+		Ctx:      ctx,
+		Worktree: worktree,
+		Path:     path,
 	}
+	e.SetName("post-code-update")
+	event.AddEvent(e)
 
-	return nil
+	return event.FireEvent(e)
 }
 
 func (s *DependencyUpdateStrategy) GenerateBranchName(_ string) string {

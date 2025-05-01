@@ -1,10 +1,11 @@
-package services
+package addon
 
 import (
 	"testing"
 
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/pkg/drush"
+	"github.com/drupdater/drupdater/pkg/repo"
 
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -16,11 +17,11 @@ import (
 func TestUpdateTranslationsEventHandlerWithoutLocaleDeploy(t *testing.T) {
 	// Create mocks
 	mockDrush := drush.NewMockRunner(t)
-	mockRepository := NewMockRepositoryService(t)
+	mockRepository := repo.NewMockRepositoryService(t)
 	logger := zap.NewNop()
 
 	// Create an instance of UpdateTranslationsEventHandler with mocked dependencies
-	handler := newUpdateTranslations(logger, mockDrush, mockRepository)
+	handler := NewUpdateTranslations(logger, mockDrush, mockRepository)
 
 	worktree := internal.NewMockWorktree(t)
 
@@ -28,7 +29,13 @@ func TestUpdateTranslationsEventHandlerWithoutLocaleDeploy(t *testing.T) {
 	mockDrush.On("IsModuleEnabled", mock.Anything, "/tmp", "example.com", "locale_deploy").Return(false, nil)
 
 	// Verify the results
-	assert.NoError(t, handler.Execute(t.Context(), "/tmp", worktree, "example.com"))
+	event := &PostSiteUpdate{
+		Ctx:      t.Context(),
+		Path:     "/tmp",
+		Worktree: worktree,
+		Site:     "example.com",
+	}
+	assert.NoError(t, handler.postSiteUpdateHandler(event))
 
 	mockDrush.AssertExpectations(t)
 }
@@ -36,11 +43,11 @@ func TestUpdateTranslationsEventHandlerWithoutLocaleDeploy(t *testing.T) {
 func TestUpdateTranslationsEventHandlerWitLocaleDeploy(t *testing.T) {
 	// Create mocks
 	mockDrush := drush.NewMockRunner(t)
-	mockRepository := NewMockRepositoryService(t)
+	mockRepository := repo.NewMockRepositoryService(t)
 	logger := zap.NewNop()
 
 	// Create an instance of UpdateTranslationsEventHandler with mocked dependencies
-	handler := newUpdateTranslations(logger, mockDrush, mockRepository)
+	handler := NewUpdateTranslations(logger, mockDrush, mockRepository)
 
 	worktree := internal.NewMockWorktree(t)
 
@@ -56,7 +63,13 @@ func TestUpdateTranslationsEventHandlerWitLocaleDeploy(t *testing.T) {
 	worktree.On("Status").Return(git.Status{}, nil)
 
 	// Verify the results
-	assert.NoError(t, handler.Execute(t.Context(), "/tmp", worktree, "example.com"))
+	event := &PostSiteUpdate{
+		Ctx:      t.Context(),
+		Path:     "/tmp",
+		Worktree: worktree,
+		Site:     "example.com",
+	}
+	assert.NoError(t, handler.postSiteUpdateHandler(event))
 
 	mockDrush.AssertExpectations(t)
 	mockRepository.AssertExpectations(t)

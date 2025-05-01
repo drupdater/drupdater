@@ -5,11 +5,11 @@ go 1.24.1
 require (
 	github.com/go-git/go-git/v5 v5.15.0
 	github.com/google/go-github/v68 v68.0.0
+	github.com/gookit/event v1.1.2
 	github.com/maypok86/otter v1.2.4
 	github.com/spf13/cobra v1.9.1
 	github.com/stretchr/testify v1.10.0
 	gitlab.com/gitlab-org/api/client-go v0.127.0
-	go.uber.org/fx v1.23.0
 	go.uber.org/zap v1.27.0
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -43,7 +43,6 @@ require (
 	github.com/spf13/pflag v1.0.6 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
-	go.uber.org/dig v1.18.1 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.37.0 // indirect
 	golang.org/x/net v0.39.0 // indirect

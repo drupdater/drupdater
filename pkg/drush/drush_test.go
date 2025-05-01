@@ -16,7 +16,7 @@ import (
 func TestExecDrush(t *testing.T) {
 	logger := zaptest.NewLogger(t)
 	cache, _ := otter.MustBuilder[string, string](100).Build()
-	executor := NewCLI(logger, cache).(CLI)
+	executor := NewCLI(logger, cache)
 
 	t.Run("successful execution", func(t *testing.T) {
 		execCommand = func(_ context.Context, name string, arg ...string) *exec.Cmd {

@@ -9,6 +9,7 @@ import (
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/drupal"
 	"github.com/drupdater/drupdater/pkg/drush"
+	"github.com/drupdater/drupdater/pkg/repo"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -19,7 +20,7 @@ func TestStartUpdate(t *testing.T) {
 	logger := zap.NewNop()
 	installer := drupal.NewMockInstallerService(t)
 	updater := NewMockUpdaterService(t)
-	repositoryService := NewMockRepositoryService(t)
+	repositoryService := repo.NewMockRepositoryService(t)
 	vcsProviderFactory := codehosting.NewMockVcsProviderFactory(t)
 	vcsProvider := codehosting.NewMockPlatform(t)
 	repository := internal.NewMockRepository(t)
@@ -33,14 +34,7 @@ func TestStartUpdate(t *testing.T) {
 		DryRun:        false,
 	}
 
-	afterUpdateCommand := NewMockAfterUpdate(t)
-	afterUpdateCommand.On("Execute", mock.Anything, "/tmp", mock.Anything).Return(nil)
-
-	afterUpdate := []AfterUpdate{
-		afterUpdateCommand,
-	}
-
-	strategy := NewDependencyUpdateStrategy(afterUpdate, logger, config)
+	strategy := NewDependencyUpdateStrategy(logger, config)
 	workflowService := NewWorkflowBaseService(logger, config, updater, vcsProviderFactory, repositoryService, installer, composer)
 
 	worktree := internal.NewMockWorktree(t)
@@ -117,7 +111,7 @@ func TestStartUpdateWithDryRun(t *testing.T) {
 	logger := zap.NewNop()
 	installer := drupal.NewMockInstallerService(t)
 	updater := NewMockUpdaterService(t)
-	repositoryService := NewMockRepositoryService(t)
+	repositoryService := repo.NewMockRepositoryService(t)
 	vcsProviderFactory := codehosting.NewMockVcsProviderFactory(t)
 	vcsProvider := codehosting.NewMockPlatform(t)
 	repository := internal.NewMockRepository(t)
@@ -131,14 +125,7 @@ func TestStartUpdateWithDryRun(t *testing.T) {
 		DryRun:        true,
 	}
 
-	afterUpdateCommand := NewMockAfterUpdate(t)
-	afterUpdateCommand.On("Execute", mock.Anything, "/tmp", mock.Anything).Return(nil)
-
-	afterUpdate := []AfterUpdate{
-		afterUpdateCommand,
-	}
-
-	strategy := NewDependencyUpdateStrategy(afterUpdate, logger, config)
+	strategy := NewDependencyUpdateStrategy(logger, config)
 	workflowService := NewWorkflowBaseService(logger, config, updater, vcsProviderFactory, repositoryService, installer, composer)
 
 	worktree := internal.NewMockWorktree(t)

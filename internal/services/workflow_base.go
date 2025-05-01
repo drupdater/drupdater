@@ -16,6 +16,7 @@ import (
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/drupal"
 	"github.com/drupdater/drupdater/pkg/drush"
+	"github.com/drupdater/drupdater/pkg/repo"
 
 	git "github.com/go-git/go-git/v5"
 	gitConfig "github.com/go-git/go-git/v5/config"
@@ -49,7 +50,7 @@ type WorkflowBaseService struct {
 	config             internal.Config
 	updater            UpdaterService
 	vcsProviderFactory codehosting.VcsProviderFactory
-	repository         RepositoryService
+	repository         repo.RepositoryService
 	installer          drupal.InstallerService
 	composer           composer.Runner
 }
@@ -59,7 +60,7 @@ func NewWorkflowBaseService(
 	config internal.Config,
 	updater UpdaterService,
 	vcsProviderFactory codehosting.VcsProviderFactory,
-	repository RepositoryService,
+	repository repo.RepositoryService,
 	installer drupal.InstallerService,
 	composerService composer.Runner,
 ) *WorkflowBaseService {

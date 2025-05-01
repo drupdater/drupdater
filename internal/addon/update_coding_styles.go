@@ -1,4 +1,4 @@
-package services
+package addon
 
 import (
 	"context"
@@ -12,6 +12,7 @@ import (
 	"github.com/drupdater/drupdater/pkg/phpcs"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/gookit/event"
 	"go.uber.org/zap"
 )
 
@@ -22,12 +23,21 @@ type UpdateCodingStyles struct {
 	composer composer.Runner
 }
 
-func newUpdateCodingStyles(logger *zap.Logger, phpcs phpcs.Runner, config internal.Config, composer composer.Runner) *UpdateCodingStyles {
+func NewUpdateCodingStyles(logger *zap.Logger, phpcs phpcs.Runner, config internal.Config, composer composer.Runner) *UpdateCodingStyles {
 	return &UpdateCodingStyles{
 		logger:   logger,
 		phpcs:    phpcs,
 		config:   config,
 		composer: composer,
+	}
+}
+
+func (h *UpdateCodingStyles) SubscribedEvents() map[string]interface{} {
+	return map[string]interface{}{
+		"post-code-update": event.ListenerItem{
+			Priority: event.Normal,
+			Listener: event.ListenerFunc(h.postCodeUpdateHandler),
+		},
 	}
 }
 
@@ -41,17 +51,14 @@ var fileExists = func(path string) bool {
 	return true
 }
 
-func (h *UpdateCodingStyles) Execute(ctx context.Context, path string, worktree internal.Worktree) error {
+func (h *UpdateCodingStyles) postCodeUpdateHandler(e event.Event) error {
 
-	if h.config.SkipCBF {
-		h.logger.Debug("skipping coding styles update")
-		return nil
-	}
+	event := e.(*PostCodeUpdate)
 
 	h.logger.Info("updating coding styles")
 
-	if !fileExists(path) {
-		created, err := h.CreatePHPCSConfig(ctx, path, worktree)
+	if !fileExists(event.Path) {
+		created, err := h.CreatePHPCSConfig(event.Ctx, event.Path, event.Worktree)
 		if err != nil {
 			return err
 		}
@@ -61,13 +68,13 @@ func (h *UpdateCodingStyles) Execute(ctx context.Context, path string, worktree 
 		}
 	}
 
-	if installed, _ := h.composer.IsPackageInstalled(ctx, path, "drupal/coder"); !installed {
-		if err := h.InstallCoder(ctx, path, worktree); err != nil {
+	if installed, _ := h.composer.IsPackageInstalled(event.Ctx, event.Path, "drupal/coder"); !installed {
+		if err := h.InstallCoder(event.Ctx, event.Path, event.Worktree); err != nil {
 			return err
 		}
 	}
 
-	codingStyleUpdateResult, err := h.phpcs.Run(ctx, path)
+	codingStyleUpdateResult, err := h.phpcs.Run(event.Ctx, event.Path)
 	if err != nil {
 		return fmt.Errorf("failed to run phpcs: %w", err)
 	}
@@ -77,7 +84,7 @@ func (h *UpdateCodingStyles) Execute(ctx context.Context, path string, worktree 
 		return nil
 	}
 
-	err = h.phpcs.RunCBF(ctx, path)
+	err = h.phpcs.RunCBF(event.Ctx, event.Path)
 	if err != nil {
 		h.logger.Debug("remaining issues", zap.Error(err))
 	}
@@ -89,14 +96,14 @@ func (h *UpdateCodingStyles) Execute(ctx context.Context, path string, worktree 
 		if (codingStyleUpdateResult.Files[file].Errors + codingStyleUpdateResult.Files[file].Warnings) == 0 {
 			continue
 		}
-		relativePath := strings.TrimLeft(strings.TrimPrefix(file, path), "/")
+		relativePath := strings.TrimLeft(strings.TrimPrefix(file, event.Path), "/")
 
-		if _, err := worktree.Add(relativePath); err != nil {
+		if _, err := event.Worktree.Add(relativePath); err != nil {
 			return fmt.Errorf("failed to add file to commit: %w", err)
 		}
 	}
 
-	_, err = worktree.Commit("Update coding styles", &git.CommitOptions{})
+	_, err = event.Worktree.Commit("Update coding styles", &git.CommitOptions{})
 	return err
 }
 
