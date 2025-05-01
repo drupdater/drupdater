@@ -73,3 +73,9 @@ Drupdater supports the following flags:
 ### Environment Variables
 
 - `DRUPALCODE_ACCESS_TOKEN`: Set this to your Drupal.org GitLab access token to enable patch removal of committed patches during updates.
+
+## FAQ
+
+### I am using a private packagist. How can Drupdater access it?
+
+Drupdater uses the `COMPOSER_AUTH` environment variable to access private packagist repositories. You can set this variable in your CI/CD pipeline or pass it as an argument when running Drupdater.
