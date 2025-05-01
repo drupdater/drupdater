@@ -78,4 +78,4 @@ Drupdater supports the following flags:
 
 ### I am using a private packagist. How can Drupdater access it?
 
-Drupdater uses the `COMPOSER_AUTH` environment variable to access private packagist repositories. You can set this variable in your CI/CD pipeline or pass it as an argument when running Drupdater.
+Drupdater uses the `COMPOSER_AUTH` environment variable to access private packagist repositories. You can set this variable in your CI/CD pipeline or pass it as an argument when running Drupdater. See the [Composer documentation](https://getcomposer.org/doc/03-cli.md#composer-auth) for more information on how to set up authentication for private repositories.
