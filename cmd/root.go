@@ -15,6 +15,7 @@ import (
 	"github.com/drupdater/drupdater/pkg/drush"
 	"github.com/drupdater/drupdater/pkg/phpcs"
 	"github.com/drupdater/drupdater/pkg/rector"
+	"github.com/drupdater/drupdater/pkg/repo"
 	"github.com/gookit/event"
 	"github.com/maypok86/otter"
 	"github.com/spf13/cobra"
@@ -40,7 +41,7 @@ var rootCmd = &cobra.Command{
 		drupalOrg := drupalorg.NewHTTPClient(logger)
 		settings := drupal.NewDefaultSettingsService(logger, drush, composer)
 		installer := drupal.NewDefaultInstallerService(logger, drush, settings)
-		git := services.NewGitRepositoryService(logger)
+		git := repo.NewGitRepositoryService(logger)
 		vcsProviderFactory := codehosting.NewDefaultVcsProviderFactory()
 		updater := services.NewDefaultUpdater(logger, settings, git, config, composer, drupalOrg, drush)
 

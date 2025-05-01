@@ -1,4 +1,4 @@
-package services
+package addon
 
 import (
 	"context"
@@ -6,18 +6,19 @@ import (
 
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/pkg/drush"
+	"github.com/drupdater/drupdater/pkg/repo"
+	"github.com/go-git/go-git/v5"
 
-	git "github.com/go-git/go-git/v5"
 	"go.uber.org/zap"
 )
 
 type UpdateTranslations struct {
 	logger     *zap.Logger
 	drush      drush.Runner
-	repository RepositoryService
+	repository repo.RepositoryService
 }
 
-func newUpdateTranslations(logger *zap.Logger, drush drush.Runner, repository RepositoryService) *UpdateTranslations {
+func NewUpdateTranslations(logger *zap.Logger, drush drush.Runner, repository repo.RepositoryService) *UpdateTranslations {
 	return &UpdateTranslations{
 		logger:     logger,
 		drush:      drush,

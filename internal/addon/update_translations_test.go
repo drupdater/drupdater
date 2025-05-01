@@ -1,10 +1,11 @@
-package services
+package addon
 
 import (
 	"testing"
 
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/pkg/drush"
+	"github.com/drupdater/drupdater/pkg/repo"
 
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -16,11 +17,11 @@ import (
 func TestUpdateTranslationsEventHandlerWithoutLocaleDeploy(t *testing.T) {
 	// Create mocks
 	mockDrush := drush.NewMockRunner(t)
-	mockRepository := NewMockRepositoryService(t)
+	mockRepository := repo.NewMockRepositoryService(t)
 	logger := zap.NewNop()
 
 	// Create an instance of UpdateTranslationsEventHandler with mocked dependencies
-	handler := newUpdateTranslations(logger, mockDrush, mockRepository)
+	handler := NewUpdateTranslations(logger, mockDrush, mockRepository)
 
 	worktree := internal.NewMockWorktree(t)
 
@@ -36,11 +37,11 @@ func TestUpdateTranslationsEventHandlerWithoutLocaleDeploy(t *testing.T) {
 func TestUpdateTranslationsEventHandlerWitLocaleDeploy(t *testing.T) {
 	// Create mocks
 	mockDrush := drush.NewMockRunner(t)
-	mockRepository := NewMockRepositoryService(t)
+	mockRepository := repo.NewMockRepositoryService(t)
 	logger := zap.NewNop()
 
 	// Create an instance of UpdateTranslationsEventHandler with mocked dependencies
-	handler := newUpdateTranslations(logger, mockDrush, mockRepository)
+	handler := NewUpdateTranslations(logger, mockDrush, mockRepository)
 
 	worktree := internal.NewMockWorktree(t)
 

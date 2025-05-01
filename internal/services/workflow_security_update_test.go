@@ -9,6 +9,7 @@ import (
 	composer "github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/drupal"
 	drush "github.com/drupdater/drupdater/pkg/drush"
+	"github.com/drupdater/drupdater/pkg/repo"
 	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
 	"go.uber.org/zap"
@@ -76,7 +77,7 @@ func TestSecurityUpdateStartUpdate(t *testing.T) {
 	logger := zap.NewNop()
 	installer := drupal.NewMockInstallerService(t)
 	updater := NewMockUpdaterService(t)
-	repositoryService := NewMockRepositoryService(t)
+	repositoryService := repo.NewMockRepositoryService(t)
 	vcsProviderFactory := codehosting.NewMockVcsProviderFactory(t)
 	vcsProvider := codehosting.NewMockPlatform(t)
 	repository := internal.NewMockRepository(t)
@@ -133,7 +134,7 @@ func TestSecurityUpdateStartUpdateWithDryRun(t *testing.T) {
 	logger := zap.NewNop()
 	installer := drupal.NewMockInstallerService(t)
 	updater := NewMockUpdaterService(t)
-	repositoryService := NewMockRepositoryService(t)
+	repositoryService := repo.NewMockRepositoryService(t)
 	vcsProviderFactory := codehosting.NewMockVcsProviderFactory(t)
 	vcsProvider := codehosting.NewMockPlatform(t)
 	repository := internal.NewMockRepository(t)
