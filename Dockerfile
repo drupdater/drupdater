@@ -44,6 +44,7 @@ RUN git config --global user.email "update@drupdater.com" && \
     git config --global user.name "Drupdater"
 
 COPY scripts/ /opt/drupdater/
+COPY --from=build /build/drupdater /opt/drupdater/bin
 
 CMD [""]
 ENTRYPOINT ["/opt/drupdater/bin"]
