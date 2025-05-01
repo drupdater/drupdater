@@ -32,6 +32,7 @@ ENV COMPOSER_CACHE_DIR=/tmp/composer/cache
 ENV COMPOSER_ALLOW_SUPERUSER=1
 ENV COMPOSER_NO_AUDIT=1
 ENV COMPOSER_FUND=0
+ENV COMPOSER_PROCESS_TIMEOUT=0
 COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
 
 # Add mglaman/composer-drupal-lenient as a global composer plugin.
@@ -43,11 +44,6 @@ RUN git config --global user.email "update@drupdater.com" && \
     git config --global user.name "Drupdater"
 
 COPY scripts/ /opt/drupdater/
-
-
-# Production image.
-FROM base AS prod
-COPY --from=build /build/drupdater /opt/drupdater/bin
 
 CMD [""]
 ENTRYPOINT ["/opt/drupdater/bin"]
