@@ -1,7 +1,7 @@
 ARG PHP_VERSION=8.3
 
 # Build go binary.
-FROM golang:1.24.1-bookworm AS build
+FROM golang:1.24.2-bookworm AS build
 
 RUN mkdir -p /build/
 
