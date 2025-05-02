@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/internal/codehosting"
 	"github.com/spf13/afero"
 
 	git "github.com/go-git/go-git/v5"
@@ -23,14 +24,16 @@ type RepositoryService interface {
 }
 
 type GitRepositoryService struct {
-	logger *zap.Logger
-	fs     afero.Fs
+	logger   *zap.Logger
+	fs       afero.Fs
+	platform codehosting.Platform
 }
 
-func NewGitRepositoryService(logger *zap.Logger) *GitRepositoryService {
+func NewGitRepositoryService(logger *zap.Logger, platform codehosting.Platform) *GitRepositoryService {
 	return &GitRepositoryService{
-		logger: logger,
-		fs:     afero.NewOsFs(),
+		logger:   logger,
+		fs:       afero.NewOsFs(),
+		platform: platform,
 	}
 }
 
@@ -61,10 +64,12 @@ func (rs *GitRepositoryService) CloneRepository(repository string, branch string
 		return nil, nil, "", fmt.Errorf("git clone: %w", err)
 	}
 
+	username, email := rs.platform.GetUser()
+
 	// Set the user name and email for the commit
 	config, _ := checkout.Config()
-	config.User.Name = "DrupalUpdaterBot"
-	config.User.Email = "technology@drupdater.com"
+	config.User.Name = username
+	config.User.Email = email
 	err = checkout.SetConfig(config)
 	if err != nil {
 		return checkout, nil, "", err

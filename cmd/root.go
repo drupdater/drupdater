@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"context"
-	"fmt"
 	"os"
 
 	"github.com/drupdater/drupdater/internal"
@@ -26,11 +24,14 @@ import (
 var config internal.Config
 
 var rootCmd = &cobra.Command{
-	Use:   "drupdater <repository-url> <token>",
+	Use:   "drupdater repository-url token",
 	Short: "Drupal Updater",
 	Long:  `Drupal Updater is a tool to update Drupal dependencies and create merge requests.`,
 	Args:  cobra.ExactArgs(2),
-	RunE: func(_ *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cmd.SilenceUsage = true
+		cmd.SilenceErrors = true
+
 		config.RepositoryURL = args[0]
 		config.Token = args[1]
 
@@ -41,18 +42,17 @@ var rootCmd = &cobra.Command{
 		drupalOrg := drupalorg.NewHTTPClient(logger)
 		settings := drupal.NewDefaultSettingsService(logger, drush, composer)
 		installer := drupal.NewDefaultInstallerService(logger, drush, settings)
-		git := repo.NewGitRepositoryService(logger)
 		vcsProviderFactory := codehosting.NewDefaultVcsProviderFactory()
+		platform := vcsProviderFactory.Create(config.RepositoryURL, config.Token)
+		git := repo.NewGitRepositoryService(logger, platform)
 		updater := services.NewDefaultUpdater(logger, settings, git, config, composer, drupalOrg, drush)
-
-		workflow := services.NewWorkflowBaseService(logger, config, updater, vcsProviderFactory, git, installer, composer)
+		workflow := services.NewWorkflowBaseService(logger, config, updater, platform, git, installer, composer)
 
 		var strategy services.WorkflowStrategy
 		strategy = services.NewDependencyUpdateStrategy(logger, config)
 		if config.Security {
 			strategy = services.NewSecurityUpdateStrategy(logger, config, composer)
 		}
-		ctx := context.Background()
 
 		if !config.SkipCBF {
 			phpcsRunner := phpcs.NewCLI(logger)
@@ -66,7 +66,16 @@ var rootCmd = &cobra.Command{
 			event.AddSubscriber(rectorPlugin)
 		}
 
-		return workflow.StartUpdate(ctx, strategy)
+		localeDeploy := addon.NewUpdateTranslations(logger, drush, git)
+		event.AddSubscriber(localeDeploy)
+
+		err := workflow.StartUpdate(cmd.Context(), strategy)
+		if err != nil {
+			logger.Sugar().Error(err)
+			return err
+		}
+		logger.Info("update finished")
+		return nil
 	},
 }
 
@@ -84,7 +93,6 @@ func init() {
 
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Println(err)
 		os.Exit(1)
 	}
 }

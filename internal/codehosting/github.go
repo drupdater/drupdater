@@ -79,3 +79,12 @@ func (g Github) downloadAndWriteFile(branch string, file string, dir string) {
 	}
 
 }
+
+func (g Github) GetUser() (name string, email string) {
+	user, _, err := g.client.Users.Get(context.TODO(), "")
+	if err != nil {
+		panic(err)
+	}
+
+	return user.GetName(), user.GetEmail()
+}

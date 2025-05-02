@@ -41,4 +41,5 @@ func (vpf *DefaultVcsProviderFactory) getProvider(repositoryURL string) string {
 type Platform interface {
 	CreateMergeRequest(title string, description string, sourceBranch string, targetBranch string) (MergeRequest, error)
 	DownloadComposerFiles(branch string) string
+	GetUser() (name string, email string)
 }

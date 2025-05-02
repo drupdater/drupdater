@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	internal "github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/internal/codehosting"
 	git "github.com/go-git/go-git/v5"
 
 	"github.com/stretchr/testify/assert"
@@ -18,7 +19,8 @@ type mockWorktree struct {
 
 func TestIsSomethingStaged(t *testing.T) {
 	logger := zap.NewNop()
-	service := NewGitRepositoryService(logger)
+	vcsProvider := codehosting.NewMockPlatform(t)
+	service := NewGitRepositoryService(logger, vcsProvider)
 
 	tests := []struct {
 		name     string

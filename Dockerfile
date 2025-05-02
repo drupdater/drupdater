@@ -40,9 +40,6 @@ RUN composer global config --no-plugins allow-plugins.mglaman/composer-drupal-le
     composer global config --no-plugins allow-plugins.ion-bazan/composer-diff true; \
     composer global require mglaman/composer-drupal-lenient ion-bazan/composer-diff;
 
-RUN git config --global user.email "update@drupdater.com" && \
-    git config --global user.name "Drupdater"
-
 COPY scripts/ /opt/drupdater/
 COPY --from=build /build/drupdater /opt/drupdater/bin
 

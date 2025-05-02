@@ -27,7 +27,7 @@ func NewUpdateTranslations(logger *zap.Logger, drush drush.Runner, repository re
 
 func (h *UpdateTranslations) SubscribedEvents() map[string]interface{} {
 	return map[string]interface{}{
-		"post-code-update": event.ListenerItem{
+		"post-site-update": event.ListenerItem{
 			Priority: event.Normal,
 			Listener: event.ListenerFunc(h.postSiteUpdateHandler),
 		},
