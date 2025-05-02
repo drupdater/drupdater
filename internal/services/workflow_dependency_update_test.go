@@ -21,7 +21,6 @@ func TestStartUpdate(t *testing.T) {
 	installer := drupal.NewMockInstallerService(t)
 	updater := NewMockUpdaterService(t)
 	repositoryService := repo.NewMockRepositoryService(t)
-	vcsProviderFactory := codehosting.NewMockVcsProviderFactory(t)
 	vcsProvider := codehosting.NewMockPlatform(t)
 	repository := internal.NewMockRepository(t)
 	composer := composer.NewMockRunner(t)
@@ -35,7 +34,7 @@ func TestStartUpdate(t *testing.T) {
 	}
 
 	strategy := NewDependencyUpdateStrategy(logger, config)
-	workflowService := NewWorkflowBaseService(logger, config, updater, vcsProviderFactory, repositoryService, installer, composer)
+	workflowService := NewWorkflowBaseService(logger, config, updater, vcsProvider, repositoryService, installer, composer)
 
 	worktree := internal.NewMockWorktree(t)
 	worktree.On("Checkout", mock.Anything).Return(nil)
@@ -89,8 +88,6 @@ func TestStartUpdate(t *testing.T) {
 		},
 	}, nil)
 
-	vcsProviderFactory.On("Create", "https://example.com/repo.git", "token").Return(vcsProvider)
-
 	fixture, _ := os.ReadFile("testdata/dependency_update.md")
 	vcsProvider.On("CreateMergeRequest", mock.Anything, string(fixture), mock.Anything, config.Branch).Return(codehosting.MergeRequest{}, nil)
 	repository.On("Push", mock.Anything).Return(nil)
@@ -103,7 +100,7 @@ func TestStartUpdate(t *testing.T) {
 	installer.AssertExpectations(t)
 	repositoryService.AssertExpectations(t)
 	updater.AssertExpectations(t)
-	vcsProviderFactory.AssertExpectations(t)
+	vcsProvider.AssertExpectations(t)
 	vcsProvider.AssertExpectations(t)
 }
 
@@ -112,7 +109,6 @@ func TestStartUpdateWithDryRun(t *testing.T) {
 	installer := drupal.NewMockInstallerService(t)
 	updater := NewMockUpdaterService(t)
 	repositoryService := repo.NewMockRepositoryService(t)
-	vcsProviderFactory := codehosting.NewMockVcsProviderFactory(t)
 	vcsProvider := codehosting.NewMockPlatform(t)
 	repository := internal.NewMockRepository(t)
 	composer := composer.NewMockRunner(t)
@@ -126,7 +122,7 @@ func TestStartUpdateWithDryRun(t *testing.T) {
 	}
 
 	strategy := NewDependencyUpdateStrategy(logger, config)
-	workflowService := NewWorkflowBaseService(logger, config, updater, vcsProviderFactory, repositoryService, installer, composer)
+	workflowService := NewWorkflowBaseService(logger, config, updater, vcsProvider, repositoryService, installer, composer)
 
 	worktree := internal.NewMockWorktree(t)
 	worktree.On("Checkout", mock.Anything).Return(nil)
@@ -147,6 +143,6 @@ func TestStartUpdateWithDryRun(t *testing.T) {
 	installer.AssertExpectations(t)
 	repositoryService.AssertExpectations(t)
 	updater.AssertExpectations(t)
-	vcsProviderFactory.AssertExpectations(t)
+	vcsProvider.AssertExpectations(t)
 	vcsProvider.AssertExpectations(t)
 }

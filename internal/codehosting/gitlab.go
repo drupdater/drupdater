@@ -81,5 +81,13 @@ func (g Gitlab) downloadAndWriteFile(branch string, file string, dir string) {
 	if err != nil {
 		panic(err)
 	}
+}
 
+func (g Gitlab) GetUser() (name string, email string) {
+	user, _, err := g.client.Users.CurrentUser()
+	if err != nil {
+		panic(err)
+	}
+
+	return user.Name, user.Email
 }

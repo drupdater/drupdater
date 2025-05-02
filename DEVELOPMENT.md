@@ -5,7 +5,7 @@
 To build mocks, you need `mockery`:
 
 ```bash
-docker run -v "$PWD":/src -w /src -e GOFLAGS="-buildvcs=false" vektra/mockery:v2
+docker run -v "$PWD":/src -w /src -e GOFLAGS="-buildvcs=false" vektra/mockery:3.2
 ```
 
 ## Execute tests

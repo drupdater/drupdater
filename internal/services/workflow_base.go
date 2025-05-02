@@ -46,32 +46,32 @@ type SharedUpdate struct {
 }
 
 type WorkflowBaseService struct {
-	logger             *zap.Logger
-	config             internal.Config
-	updater            UpdaterService
-	vcsProviderFactory codehosting.VcsProviderFactory
-	repository         repo.RepositoryService
-	installer          drupal.InstallerService
-	composer           composer.Runner
+	logger     *zap.Logger
+	config     internal.Config
+	updater    UpdaterService
+	platform   codehosting.Platform
+	repository repo.RepositoryService
+	installer  drupal.InstallerService
+	composer   composer.Runner
 }
 
 func NewWorkflowBaseService(
 	logger *zap.Logger,
 	config internal.Config,
 	updater UpdaterService,
-	vcsProviderFactory codehosting.VcsProviderFactory,
+	platform codehosting.Platform,
 	repository repo.RepositoryService,
 	installer drupal.InstallerService,
 	composerService composer.Runner,
 ) *WorkflowBaseService {
 	return &WorkflowBaseService{
-		logger:             logger,
-		config:             config,
-		updater:            updater,
-		vcsProviderFactory: vcsProviderFactory,
-		repository:         repository,
-		installer:          installer,
-		composer:           composerService,
+		logger:     logger,
+		config:     config,
+		updater:    updater,
+		platform:   platform,
+		repository: repository,
+		installer:  installer,
+		composer:   composerService,
 	}
 }
 
@@ -359,8 +359,7 @@ func (ws *WorkflowBaseService) publishWork(repository internal.Repository, updat
 		return fmt.Errorf("failed to generate description: %w", err)
 	}
 
-	codehostingPlatform := ws.vcsProviderFactory.Create(ws.config.RepositoryURL, ws.config.Token)
-	mr, err := codehostingPlatform.CreateMergeRequest(title, description, updateBranchName, ws.config.Branch)
+	mr, err := ws.platform.CreateMergeRequest(title, description, updateBranchName, ws.config.Branch)
 	if err != nil {
 		return fmt.Errorf("failed to create merge request: %w", err)
 	}

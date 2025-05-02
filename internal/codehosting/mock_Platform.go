@@ -136,3 +136,56 @@ func (_c *MockPlatform_DownloadComposerFiles_Call) RunAndReturn(run func(branch 
 	_c.Call.Return(run)
 	return _c
 }
+
+// GetUser provides a mock function for the type MockPlatform
+func (_mock *MockPlatform) GetUser() (string, string) {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetUser")
+	}
+
+	var r0 string
+	var r1 string
+	if returnFunc, ok := ret.Get(0).(func() (string, string)); ok {
+		return returnFunc()
+	}
+	if returnFunc, ok := ret.Get(0).(func() string); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	if returnFunc, ok := ret.Get(1).(func() string); ok {
+		r1 = returnFunc()
+	} else {
+		r1 = ret.Get(1).(string)
+	}
+	return r0, r1
+}
+
+// MockPlatform_GetUser_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetUser'
+type MockPlatform_GetUser_Call struct {
+	*mock.Call
+}
+
+// GetUser is a helper method to define mock.On call
+func (_e *MockPlatform_Expecter) GetUser() *MockPlatform_GetUser_Call {
+	return &MockPlatform_GetUser_Call{Call: _e.mock.On("GetUser")}
+}
+
+func (_c *MockPlatform_GetUser_Call) Run(run func()) *MockPlatform_GetUser_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockPlatform_GetUser_Call) Return(name string, email string) *MockPlatform_GetUser_Call {
+	_c.Call.Return(name, email)
+	return _c
+}
+
+func (_c *MockPlatform_GetUser_Call) RunAndReturn(run func() (string, string)) *MockPlatform_GetUser_Call {
+	_c.Call.Return(run)
+	return _c
+}
