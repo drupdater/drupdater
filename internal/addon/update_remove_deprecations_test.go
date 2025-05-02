@@ -23,7 +23,7 @@ func TestRemoveDeprecations(t *testing.T) {
 	t.Run("Rector is not installed", func(t *testing.T) {
 		composer := composer.NewMockRunner(t)
 		composer.On("IsPackageInstalled", mock.Anything, "/path/to/repo", "palantirnet/drupal-rector").Return(false, assert.AnError)
-		composer.On("Require", mock.Anything, "/path/to/repo", "palantirnet/drupal-rector").Return("", nil)
+		composer.On("Require", mock.Anything, "/path/to/repo", []string{"palantirnet/drupal-rector"}).Return("", nil)
 		composer.On("GetCustomCodeDirectories", mock.Anything, "/path/to/repo").Return([]string{"web/modules/custom"}, nil)
 
 		runner := rector.NewMockRunner(t)
@@ -35,7 +35,7 @@ func TestRemoveDeprecations(t *testing.T) {
 				Errors:       0,
 			},
 		}, nil)
-		composer.On("Remove", mock.Anything, "/path/to/repo", "palantirnet/drupal-rector").Return("", nil)
+		composer.On("Remove", mock.Anything, "/path/to/repo", []string{"palantirnet/drupal-rector"}).Return("", nil)
 
 		updateRemoveDeprecations := NewUpdateRemoveDeprecations(logger, runner, config, composer)
 		postCodeUpdate := &PostCodeUpdate{

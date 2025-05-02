@@ -72,7 +72,7 @@ func TestCodingStyles(t *testing.T) {
 
 		composer := composer.NewMockRunner(t)
 		composer.On("IsPackageInstalled", mock.Anything, "/tmp", "drupal/coder").Return(false, nil)
-		composer.On("Require", mock.Anything, "/tmp", "--dev", "drupal/coder").Return("", nil)
+		composer.On("Require", mock.Anything, "/tmp", []string{"--dev", "drupal/coder"}).Return("", nil)
 
 		worktree.On("AddGlob", "composer.*").Return(nil)
 		worktree.On("Commit", "Install drupal/coder", &git.CommitOptions{}).Return(plumbing.NewHash(""), nil)

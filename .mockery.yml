@@ -1,0 +1,7 @@
+template: testify
+filename: "mock_{{.InterfaceName}}.go"
+packages:
+  github.com/drupdater/drupdater:
+    config:
+      all: true
+      recursive: true
