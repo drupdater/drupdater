@@ -118,7 +118,7 @@ func TestSecurityUpdateStartUpdate(t *testing.T) {
 	composerService.On("GetLockHash", "/tmp").Return("ddd", nil)
 	composerService.On("Install", mock.Anything, "/tmp").Return(nil)
 
-	err := workflowService.StartUpdate(t.Context(), strategy)
+	err := workflowService.StartUpdate(t.Context(), strategy, nil)
 
 	assert.NoError(t, err)
 	installer.AssertExpectations(t)
@@ -166,7 +166,7 @@ func TestSecurityUpdateStartUpdateWithDryRun(t *testing.T) {
 	composerService.On("GetLockHash", "/tmp").Return("ddd", nil)
 	composerService.On("Install", mock.Anything, "/tmp").Return(nil)
 
-	err := workflowService.StartUpdate(t.Context(), strategy)
+	err := workflowService.StartUpdate(t.Context(), strategy, nil)
 
 	assert.NoError(t, err)
 	installer.AssertExpectations(t)

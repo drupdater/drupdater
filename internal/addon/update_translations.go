@@ -34,9 +34,13 @@ func (h *UpdateTranslations) SubscribedEvents() map[string]interface{} {
 	}
 }
 
+func (h *UpdateTranslations) RenderTemplate() (string, error) {
+	return "", nil
+}
+
 func (h *UpdateTranslations) postSiteUpdateHandler(e event.Event) error {
 
-	event := e.(*PostSiteUpdate)
+	event := e.(*PostSiteUpdateEvent)
 
 	enabled, err := h.drush.IsModuleEnabled(event.Ctx, event.Path, event.Site, "locale_deploy")
 	if !enabled || err != nil {

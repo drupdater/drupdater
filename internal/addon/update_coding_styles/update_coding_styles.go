@@ -1,4 +1,4 @@
-package addon
+package updatecodingstyles
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"text/template"
 
 	"github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/internal/addon"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/phpcs"
 
@@ -41,6 +42,10 @@ func (h *UpdateCodingStyles) SubscribedEvents() map[string]interface{} {
 	}
 }
 
+func (h *UpdateCodingStyles) RenderTemplate() (string, error) {
+	return "", nil
+}
+
 var fileExists = func(path string) bool {
 
 	if _, err := os.Stat(path + "/phpcs.xml"); os.IsNotExist(err) {
@@ -53,7 +58,7 @@ var fileExists = func(path string) bool {
 
 func (h *UpdateCodingStyles) postCodeUpdateHandler(e event.Event) error {
 
-	event := e.(*PostCodeUpdate)
+	event := e.(*addon.PostCodeUpdateEvent)
 
 	h.logger.Info("updating coding styles")
 

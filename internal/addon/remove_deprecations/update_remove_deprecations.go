@@ -1,7 +1,8 @@
-package addon
+package removedeprecations
 
 import (
 	"github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/internal/addon"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/rector"
 	"github.com/gookit/event"
@@ -35,9 +36,13 @@ func (h *UpdateRemoveDeprecations) SubscribedEvents() map[string]interface{} {
 	}
 }
 
+func (h *UpdateRemoveDeprecations) RenderTemplate() (string, error) {
+	return "", nil
+}
+
 func (h *UpdateRemoveDeprecations) postCodeUpdateHandler(e event.Event) error {
 
-	event := e.(*PostCodeUpdate)
+	event := e.(*addon.PostCodeUpdateEvent)
 
 	h.logger.Info("remove deprecations")
 

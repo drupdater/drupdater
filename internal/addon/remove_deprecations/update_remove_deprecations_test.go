@@ -1,9 +1,10 @@
-package addon
+package removedeprecations
 
 import (
 	"testing"
 
 	internal "github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/internal/addon"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/rector"
 
@@ -38,7 +39,7 @@ func TestRemoveDeprecations(t *testing.T) {
 		composer.On("Remove", mock.Anything, "/path/to/repo", []string{"palantirnet/drupal-rector"}).Return("", nil)
 
 		updateRemoveDeprecations := NewUpdateRemoveDeprecations(logger, runner, config, composer)
-		postCodeUpdate := &PostCodeUpdate{
+		postCodeUpdate := &addon.PostCodeUpdateEvent{
 			Ctx:      t.Context(),
 			Path:     "/path/to/repo",
 			Worktree: worktree,
@@ -78,7 +79,7 @@ func TestRemoveDeprecations(t *testing.T) {
 		worktree.On("Commit", "Remove deprecations", mock.Anything).Return(plumbing.NewHash(""), nil)
 
 		updateRemoveDeprecations := NewUpdateRemoveDeprecations(logger, runner, config, composer)
-		postCodeUpdate := &PostCodeUpdate{
+		postCodeUpdate := &addon.PostCodeUpdateEvent{
 			Ctx:      t.Context(),
 			Path:     "/path/to/repo",
 			Worktree: worktree,
@@ -106,7 +107,7 @@ func TestRemoveDeprecations(t *testing.T) {
 		}, nil)
 
 		updateRemoveDeprecations := NewUpdateRemoveDeprecations(logger, runner, config, composer)
-		postCodeUpdate := &PostCodeUpdate{
+		postCodeUpdate := &addon.PostCodeUpdateEvent{
 			Ctx:      t.Context(),
 			Path:     "/path/to/repo",
 			Worktree: worktree,
@@ -127,7 +128,7 @@ func TestRemoveDeprecations(t *testing.T) {
 		runner.On("Run", mock.Anything, "/path/to/repo", []string{"web/modules/custom"}).Return(rector.ReturnOutput{}, assert.AnError)
 
 		updateRemoveDeprecations := NewUpdateRemoveDeprecations(logger, runner, config, composer)
-		postCodeUpdate := &PostCodeUpdate{
+		postCodeUpdate := &addon.PostCodeUpdateEvent{
 			Ctx:      t.Context(),
 			Path:     "/path/to/repo",
 			Worktree: worktree,

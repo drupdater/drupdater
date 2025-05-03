@@ -29,7 +29,7 @@ func TestUpdateTranslationsEventHandlerWithoutLocaleDeploy(t *testing.T) {
 	mockDrush.On("IsModuleEnabled", mock.Anything, "/tmp", "example.com", "locale_deploy").Return(false, nil)
 
 	// Verify the results
-	event := &PostSiteUpdate{
+	event := &PostSiteUpdateEvent{
 		Ctx:      t.Context(),
 		Path:     "/tmp",
 		Worktree: worktree,
@@ -63,7 +63,7 @@ func TestUpdateTranslationsEventHandlerWitLocaleDeploy(t *testing.T) {
 	worktree.On("Status").Return(git.Status{}, nil)
 
 	// Verify the results
-	event := &PostSiteUpdate{
+	event := &PostSiteUpdateEvent{
 		Ctx:      t.Context(),
 		Path:     "/tmp",
 		Worktree: worktree,

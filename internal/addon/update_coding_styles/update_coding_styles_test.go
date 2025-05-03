@@ -1,9 +1,10 @@
-package addon
+package updatecodingstyles
 
 import (
 	"testing"
 
 	internal "github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/internal/addon"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/phpcs"
 
@@ -43,7 +44,7 @@ func TestCodingStyles(t *testing.T) {
 		worktree.On("Commit", "Add PHPCS config", &git.CommitOptions{}).Return(plumbing.NewHash(""), nil)
 
 		updateCodingStyles := NewUpdateCodingStyles(logger, runner, internal.Config{SkipCBF: false}, composer)
-		postCodeUpdate := &PostCodeUpdate{
+		postCodeUpdate := &addon.PostCodeUpdateEvent{
 			Ctx:      t.Context(),
 			Path:     "/tmp",
 			Worktree: worktree,
@@ -78,7 +79,7 @@ func TestCodingStyles(t *testing.T) {
 		worktree.On("Commit", "Install drupal/coder", &git.CommitOptions{}).Return(plumbing.NewHash(""), nil)
 
 		updateCodingStyles := NewUpdateCodingStyles(logger, runner, internal.Config{SkipCBF: false}, composer)
-		postCodeUpdate := &PostCodeUpdate{
+		postCodeUpdate := &addon.PostCodeUpdateEvent{
 			Ctx:      t.Context(),
 			Path:     "/tmp",
 			Worktree: worktree,
@@ -108,7 +109,7 @@ func TestCodingStyles(t *testing.T) {
 		composer.On("IsPackageInstalled", mock.Anything, "/path/to/repo", "drupal/coder").Return(true, nil)
 
 		updateCodingStyles := NewUpdateCodingStyles(logger, runner, internal.Config{SkipCBF: false}, composer)
-		postCodeUpdate := &PostCodeUpdate{
+		postCodeUpdate := &addon.PostCodeUpdateEvent{
 			Ctx:      t.Context(),
 			Path:     "/path/to/repo",
 			Worktree: worktree,
@@ -159,7 +160,7 @@ func TestCodingStyles(t *testing.T) {
 		worktree.On("Commit", "Update coding styles", &git.CommitOptions{}).Return(plumbing.NewHash(""), nil)
 
 		updateCodingStyles := NewUpdateCodingStyles(logger, runner, internal.Config{SkipCBF: false}, composer)
-		postCodeUpdate := &PostCodeUpdate{
+		postCodeUpdate := &addon.PostCodeUpdateEvent{
 			Ctx:      t.Context(),
 			Path:     "/path/to/repo",
 			Worktree: worktree,
@@ -207,7 +208,7 @@ func TestCodingStyles(t *testing.T) {
 		composer.On("IsPackageInstalled", mock.Anything, "/path/to/repo", "drupal/coder").Return(true, nil)
 
 		updateCodingStyles := NewUpdateCodingStyles(logger, runner, internal.Config{SkipCBF: false}, composer)
-		postCodeUpdate := &PostCodeUpdate{
+		postCodeUpdate := &addon.PostCodeUpdateEvent{
 			Ctx:      t.Context(),
 			Path:     "/path/to/repo",
 			Worktree: worktree,

@@ -141,41 +141,30 @@ func (us *DefaultUpdater) UpdateDependencies(ctx context.Context, path string, p
 			return updateReport, fmt.Errorf("failed to commit patches: %w", err)
 		}
 	}
-
-	allowPlugins, err := us.composer.GetAllowPlugins(ctx, path)
-	if err != nil {
-		return updateReport, fmt.Errorf("failed to get composer allow plugins: %w", err)
-	}
-
-	// Allow all plugins during update
-	err = us.composer.SetConfig(ctx, path, "allow-plugins", "true")
-	if err != nil {
-		return updateReport, fmt.Errorf("failed to set composer config: %w", err)
-	}
-
 	packagesToKeep := []string{}
 	for _, patchUpdate := range patchUpdates.Conflicts {
 		packagesToKeep = append(packagesToKeep, fmt.Sprintf("%s:%s", patchUpdate.Package, patchUpdate.FixedVersion))
 	}
+
+	preComposerUpdateEvent := &addon.PreComposerUpdateEvent{
+		Ctx:      ctx,
+		Worktree: worktree,
+		Path:     path,
+	}
+	preComposerUpdateEvent.SetName("pre-composer-update")
+	event.FireEvent(preComposerUpdateEvent)
+
 	if _, err = us.composer.Update(ctx, path, packagesToUpdate, packagesToKeep, minimalChanges, false); err != nil {
 		return updateReport, err
 	}
 
-	allPlugins, err := us.composer.GetInstalledPlugins(ctx, path)
-	if err != nil {
-		return updateReport, err
+	postComposerUpdateEvent := &addon.PostComposerUpdateEvent{
+		Ctx:      ctx,
+		Worktree: worktree,
+		Path:     path,
 	}
-
-	// Add new plugins to allow-plugins
-	for key := range allPlugins {
-		if _, ok := allowPlugins[key]; !ok {
-			allowPlugins[key] = false
-			updateReport.AddedAllowPlugins = append(updateReport.AddedAllowPlugins, key)
-		}
-	}
-	if err := us.composer.SetAllowPlugins(ctx, path, allowPlugins); err != nil {
-		return updateReport, err
-	}
+	postComposerUpdateEvent.SetName("post-composer-update")
+	event.FireEvent(postComposerUpdateEvent)
 
 	if _, err := us.composer.Normalize(ctx, path); err != nil {
 		us.logger.Debug("failed to run composer normalize", zap.Error(err))
@@ -219,14 +208,13 @@ func (us *DefaultUpdater) UpdateDrupal(ctx context.Context, path string, worktre
 
 	}
 
-	e := &addon.PostSiteUpdate{
+	e := &addon.PostSiteUpdateEvent{
 		Ctx:      ctx,
 		Worktree: worktree,
 		Path:     path,
 		Site:     site,
 	}
 	e.SetName("post-site-update")
-	event.AddEvent(e)
 
 	if err := event.FireEvent(e); err != nil {
 		return nil, fmt.Errorf("failed to fire event: %w", err)

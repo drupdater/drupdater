@@ -5,6 +5,9 @@ import (
 
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/addon"
+	allowplugins "github.com/drupdater/drupdater/internal/addon/allow_plugins"
+	removedeprecations "github.com/drupdater/drupdater/internal/addon/remove_deprecations"
+	updatecodingstyles "github.com/drupdater/drupdater/internal/addon/update_coding_styles"
 	"github.com/drupdater/drupdater/internal/codehosting"
 	"github.com/drupdater/drupdater/internal/services"
 	"github.com/drupdater/drupdater/pkg/composer"
@@ -54,22 +57,31 @@ var rootCmd = &cobra.Command{
 			strategy = services.NewSecurityUpdateStrategy(logger, config, composer)
 		}
 
+		var addonList []addon.Addon
+
 		if !config.SkipCBF {
 			phpcsRunner := phpcs.NewCLI(logger)
-			phpcsPlugin := addon.NewUpdateCodingStyles(logger, phpcsRunner, config, composer)
-			event.AddSubscriber(phpcsPlugin)
+			phpcsPlugin := updatecodingstyles.NewUpdateCodingStyles(logger, phpcsRunner, config, composer)
+			addonList = append(addonList, phpcsPlugin)
 		}
 
 		if !config.SkipRector {
 			rectorRunner := rector.NewCLI(logger)
-			rectorPlugin := addon.NewUpdateRemoveDeprecations(logger, rectorRunner, config, composer)
-			event.AddSubscriber(rectorPlugin)
+			rectorPlugin := removedeprecations.NewUpdateRemoveDeprecations(logger, rectorRunner, config, composer)
+			addonList = append(addonList, rectorPlugin)
 		}
 
 		localeDeploy := addon.NewUpdateTranslations(logger, drush, git)
-		event.AddSubscriber(localeDeploy)
+		addonList = append(addonList, localeDeploy)
 
-		err := workflow.StartUpdate(cmd.Context(), strategy)
+		allowPlugins := allowplugins.NewDefaultAllowPlugins(logger, composer)
+		addonList = append(addonList, allowPlugins)
+
+		for _, addon := range addonList {
+			event.AddSubscriber(addon)
+		}
+
+		err := workflow.StartUpdate(cmd.Context(), strategy, addonList)
 		if err != nil {
 			logger.Sugar().Error(err)
 			return err

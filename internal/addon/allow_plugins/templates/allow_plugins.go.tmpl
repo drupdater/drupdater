@@ -1,18 +1,14 @@
-{{ define "composer_plugins" -}}
 ## 🔌 New Composer plugins
 
 During the update process, new Composer plugins were detected and added to the allowlist with their initial value set to false:
 
-{{ range . -}}
+{{ range .NewAllowPlugins -}}
 - {{ . }}
 {{ end }}
 Please review the changes and adjust the values as needed. Run the following command to allow the plugins:
 
 ```bash
-{{ range . -}}
+{{ range .NewAllowPlugins -}}
 composer config allow-plugins.{{ . }} true
 {{ end -}}
 ```
-
-{{ end }}
-

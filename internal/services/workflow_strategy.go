@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/internal/addon"
 	composer "github.com/drupdater/drupdater/pkg/composer"
 )
 
@@ -12,6 +13,7 @@ type TemplateData struct {
 	DependencyUpdateReport DependencyUpdateReport
 	SecurityReport         SecurityReport
 	UpdateHooks            UpdateHooksPerSite
+	Addons                 []addon.Addon
 }
 
 type SecurityReport struct {

@@ -94,7 +94,7 @@ func TestStartUpdate(t *testing.T) {
 	composer.On("Install", mock.Anything, "/tmp").Return(nil)
 	composer.On("Diff", mock.Anything, mock.Anything, mock.Anything, true).Return("Dummy Table", nil)
 
-	err := workflowService.StartUpdate(t.Context(), strategy)
+	err := workflowService.StartUpdate(t.Context(), strategy, nil)
 
 	assert.NoError(t, err)
 	installer.AssertExpectations(t)
@@ -137,7 +137,7 @@ func TestStartUpdateWithDryRun(t *testing.T) {
 	composer.On("Diff", mock.Anything, mock.Anything, mock.Anything, true).Return("Dummy Table", nil)
 	composer.On("Install", mock.Anything, "/tmp").Return(nil)
 
-	err := workflowService.StartUpdate(t.Context(), strategy)
+	err := workflowService.StartUpdate(t.Context(), strategy, nil)
 
 	assert.NoError(t, err)
 	installer.AssertExpectations(t)

@@ -12,6 +12,7 @@ import (
 	"text/template"
 
 	"github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/internal/addon"
 	"github.com/drupdater/drupdater/internal/codehosting"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/drupal"
@@ -29,7 +30,7 @@ import (
 var templates embed.FS
 
 type WorkflowService interface {
-	StartUpdate(ctx context.Context, strategy WorkflowStrategy) error
+	StartUpdate(ctx context.Context, strategy WorkflowStrategy, addons []addon.Addon) error
 }
 
 type WorkflowUpdateResult struct {
@@ -75,7 +76,7 @@ func NewWorkflowBaseService(
 	}
 }
 
-func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, strategy WorkflowStrategy) error {
+func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, strategy WorkflowStrategy, addons []addon.Addon) error {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	defer func() {
@@ -233,7 +234,7 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, strategy Workflo
 				return true
 			})
 
-			return ws.publishWork(sharedUpdate.Repository, sharedUpdate.updateBranchName, strategy, sharedUpdate.WorkflowUpdateResult, finalReports)
+			return ws.publishWork(sharedUpdate.Repository, sharedUpdate.updateBranchName, strategy, sharedUpdate.WorkflowUpdateResult, finalReports, addons)
 		}
 		return nil
 	case err := <-errCh:
@@ -328,7 +329,7 @@ func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context, strategy Wo
 	return sharedUpdate, nil
 }
 
-func (ws *WorkflowBaseService) publishWork(repository internal.Repository, updateBranchName string, strategy WorkflowStrategy, result WorkflowUpdateResult, updateHooks UpdateHooksPerSite) error {
+func (ws *WorkflowBaseService) publishWork(repository internal.Repository, updateBranchName string, strategy WorkflowStrategy, result WorkflowUpdateResult, updateHooks UpdateHooksPerSite, addons []addon.Addon) error {
 	err := repository.Push(&git.PushOptions{
 		RemoteName: "origin",
 		RefSpecs: []gitConfig.RefSpec{
@@ -349,6 +350,7 @@ func (ws *WorkflowBaseService) publishWork(repository internal.Repository, updat
 
 	// Get template data from strategy
 	data, err := strategy.GetTemplateData(result, updateHooks)
+	data.Addons = addons
 	if err != nil {
 		return fmt.Errorf("failed to get template data: %w", err)
 	}

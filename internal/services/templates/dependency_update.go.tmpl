@@ -1,5 +1,7 @@
 This automated merge request by [Drupdater](https://github.com/drupdater/drupdater) includes updates for your Drupal site. Please review the changes carefully to ensure compatibility and stability before merging.
 {{ if .DependencyUpdateReport.PatchUpdates.Changes }}{{ template "patch_updates" .DependencyUpdateReport.PatchUpdates }}{{ end -}}
-{{ if .DependencyUpdateReport.AddedAllowPlugins }}{{ template "composer_plugins" .DependencyUpdateReport.AddedAllowPlugins }}{{ end -}}
+{{ range .Addons -}}
+{{ .RenderTemplate }}
+{{ end }}
 {{ template "composer_diff" .ComposerDiff }}
 {{ if .UpdateHooks }}{{ template "update_hooks" .UpdateHooks }}{{ end }}
