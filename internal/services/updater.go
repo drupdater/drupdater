@@ -166,10 +166,6 @@ func (us *DefaultUpdater) UpdateDependencies(ctx context.Context, path string, p
 	postComposerUpdateEvent.SetName("post-composer-update")
 	event.FireEvent(postComposerUpdateEvent)
 
-	if _, err := us.composer.Normalize(ctx, path); err != nil {
-		us.logger.Debug("failed to run composer normalize", zap.Error(err))
-	}
-
 	err = worktree.AddGlob("composer.*")
 	if err != nil {
 		return updateReport, fmt.Errorf("failed to add composer.* files: %w", err)

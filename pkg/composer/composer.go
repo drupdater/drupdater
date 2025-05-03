@@ -426,7 +426,7 @@ func (s *CLI) GetInstalledPlugins(ctx context.Context, dir string) (map[string]i
 func (s *CLI) IsPackageInstalled(ctx context.Context, dir string, packageToCheck string) (bool, error) {
 	_, err := s.execComposer(ctx, dir, "show", "--locked", "--quiet", packageToCheck)
 	if err != nil {
-		return false, err
+		return false, nil
 	}
 	return true, nil
 }

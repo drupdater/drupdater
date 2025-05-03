@@ -6,6 +6,7 @@ import (
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/addon"
 	allowplugins "github.com/drupdater/drupdater/internal/addon/allow_plugins"
+	"github.com/drupdater/drupdater/internal/addon/composer_normalize"
 	localedeploy "github.com/drupdater/drupdater/internal/addon/locale_deploy"
 	removedeprecations "github.com/drupdater/drupdater/internal/addon/remove_deprecations"
 	updatecodingstyles "github.com/drupdater/drupdater/internal/addon/update_coding_styles"
@@ -77,6 +78,9 @@ var rootCmd = &cobra.Command{
 
 		allowPlugins := allowplugins.NewDefaultAllowPlugins(logger, composer)
 		addonList = append(addonList, allowPlugins)
+
+		composerNormalize := composer_normalize.NewDefaultComposerNormalize(logger, composer)
+		addonList = append(addonList, composerNormalize)
 
 		for _, addon := range addonList {
 			event.AddSubscriber(addon)
