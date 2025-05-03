@@ -1,9 +1,10 @@
-package addon
+package localedeploy
 
 import (
 	"testing"
 
 	"github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/internal/addon"
 	"github.com/drupdater/drupdater/pkg/drush"
 	"github.com/drupdater/drupdater/pkg/repo"
 
@@ -29,7 +30,7 @@ func TestUpdateTranslationsEventHandlerWithoutLocaleDeploy(t *testing.T) {
 	mockDrush.On("IsModuleEnabled", mock.Anything, "/tmp", "example.com", "locale_deploy").Return(false, nil)
 
 	// Verify the results
-	event := &PostSiteUpdateEvent{
+	event := &addon.PostSiteUpdateEvent{
 		Ctx:      t.Context(),
 		Path:     "/tmp",
 		Worktree: worktree,
@@ -63,7 +64,7 @@ func TestUpdateTranslationsEventHandlerWitLocaleDeploy(t *testing.T) {
 	worktree.On("Status").Return(git.Status{}, nil)
 
 	// Verify the results
-	event := &PostSiteUpdateEvent{
+	event := &addon.PostSiteUpdateEvent{
 		Ctx:      t.Context(),
 		Path:     "/tmp",
 		Worktree: worktree,

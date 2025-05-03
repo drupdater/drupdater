@@ -30,14 +30,8 @@ func TestUpdateDependencies(t *testing.T) {
 		worktree := internal.NewMockWorktree(t)
 
 		composerService.On("GetConfig", mock.Anything, "/tmp", "extra.patches").Return("", assert.AnError)
-		//		composerService.On("GetAllowPlugins", mock.Anything, "/tmp").Return(map[string]bool{}, nil)
-		//		composerService.On("SetConfig", mock.Anything, "/tmp", "allow-plugins", "true").Return(nil)
 		composerService.On("Update", mock.Anything, "/tmp", []string{}, []string{}, false, false).Return("", nil)
 		composerService.On("Normalize", mock.Anything, "/tmp").Return("", nil)
-		//		composerService.On("SetAllowPlugins", mock.Anything, "/tmp", map[string]bool{}).Return(nil)
-		//		composerService.On("GetAllowPlugins", mock.Anything, "/tmp").Return(map[string]bool{}, nil)
-
-		//		composerService.On("GetInstalledPlugins", mock.Anything, "/tmp").Return(map[string]interface{}{}, nil)
 		composerService.On("ListPendingUpdates", mock.Anything, "/tmp", []string{}, false).Return([]composer.PackageChange{}, nil)
 
 		worktree.On("AddGlob", "composer.*").Return(nil)

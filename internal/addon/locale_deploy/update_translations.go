@@ -1,8 +1,9 @@
-package addon
+package localedeploy
 
 import (
 	"fmt"
 
+	"github.com/drupdater/drupdater/internal/addon"
 	"github.com/drupdater/drupdater/pkg/drush"
 	"github.com/drupdater/drupdater/pkg/repo"
 	"github.com/go-git/go-git/v5"
@@ -40,7 +41,7 @@ func (h *UpdateTranslations) RenderTemplate() (string, error) {
 
 func (h *UpdateTranslations) postSiteUpdateHandler(e event.Event) error {
 
-	event := e.(*PostSiteUpdateEvent)
+	event := e.(*addon.PostSiteUpdateEvent)
 
 	enabled, err := h.drush.IsModuleEnabled(event.Ctx, event.Path, event.Site, "locale_deploy")
 	if !enabled || err != nil {

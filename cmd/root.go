@@ -6,6 +6,7 @@ import (
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/addon"
 	allowplugins "github.com/drupdater/drupdater/internal/addon/allow_plugins"
+	localedeploy "github.com/drupdater/drupdater/internal/addon/locale_deploy"
 	removedeprecations "github.com/drupdater/drupdater/internal/addon/remove_deprecations"
 	updatecodingstyles "github.com/drupdater/drupdater/internal/addon/update_coding_styles"
 	"github.com/drupdater/drupdater/internal/codehosting"
@@ -71,7 +72,7 @@ var rootCmd = &cobra.Command{
 			addonList = append(addonList, rectorPlugin)
 		}
 
-		localeDeploy := addon.NewUpdateTranslations(logger, drush, git)
+		localeDeploy := localedeploy.NewUpdateTranslations(logger, drush, git)
 		addonList = append(addonList, localeDeploy)
 
 		allowPlugins := allowplugins.NewDefaultAllowPlugins(logger, composer)
