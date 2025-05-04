@@ -39,7 +39,7 @@ func (h *DefaultAllowPlugins) SubscribedEvents() map[string]interface{} {
 }
 
 func (h *DefaultAllowPlugins) RenderTemplate() (string, error) {
-	return h.BasicAddon.Render("allow_plugins.go.tmpl", struct {
+	return h.Render("allow_plugins.go.tmpl", struct {
 		NewAllowPlugins []string
 	}{
 		NewAllowPlugins: h.newAllowPlugins,

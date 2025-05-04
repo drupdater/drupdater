@@ -1,4 +1,4 @@
-package composer_normalize
+package composernormalize
 
 import (
 	"github.com/drupdater/drupdater/internal/addon"

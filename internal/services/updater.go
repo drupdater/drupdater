@@ -152,7 +152,10 @@ func (us *DefaultUpdater) UpdateDependencies(ctx context.Context, path string, p
 		Path:     path,
 	}
 	preComposerUpdateEvent.SetName("pre-composer-update")
-	event.FireEvent(preComposerUpdateEvent)
+	err = event.FireEvent(preComposerUpdateEvent)
+	if err != nil {
+		return updateReport, fmt.Errorf("failed to fire event: %w", err)
+	}
 
 	if _, err = us.composer.Update(ctx, path, packagesToUpdate, packagesToKeep, minimalChanges, false); err != nil {
 		return updateReport, err
@@ -164,7 +167,10 @@ func (us *DefaultUpdater) UpdateDependencies(ctx context.Context, path string, p
 		Path:     path,
 	}
 	postComposerUpdateEvent.SetName("post-composer-update")
-	event.FireEvent(postComposerUpdateEvent)
+	err = event.FireEvent(postComposerUpdateEvent)
+	if err != nil {
+		return updateReport, fmt.Errorf("failed to fire event: %w", err)
+	}
 
 	err = worktree.AddGlob("composer.*")
 	if err != nil {
