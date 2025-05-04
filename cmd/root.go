@@ -5,7 +5,7 @@ import (
 
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/addon"
-	allowplugins "github.com/drupdater/drupdater/internal/addon/allowplugins"
+	"github.com/drupdater/drupdater/internal/addon/allowplugins"
 	"github.com/drupdater/drupdater/internal/addon/composernormalize"
 	localedeploy "github.com/drupdater/drupdater/internal/addon/locale_deploy"
 	removedeprecations "github.com/drupdater/drupdater/internal/addon/remove_deprecations"

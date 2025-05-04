@@ -107,7 +107,7 @@ func TestDefaultAllowPlugins_PostComposerUpdateHandler(t *testing.T) {
 
 func TestDefaultAllowPlugins_RenderTemplate(t *testing.T) {
 
-	fixture, _ := os.ReadFile("testdata/allow_plugins.md")
+	fixture, _ := os.ReadFile("testdata/allowplugins.md")
 	expected := string(fixture)
 	logger := zap.NewNop()
 

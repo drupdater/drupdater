@@ -31,7 +31,6 @@ func TestUpdateDependencies(t *testing.T) {
 
 		composerService.On("GetConfig", mock.Anything, "/tmp", "extra.patches").Return("", assert.AnError)
 		composerService.On("Update", mock.Anything, "/tmp", []string{}, []string{}, false, false).Return("", nil)
-		composerService.On("Normalize", mock.Anything, "/tmp").Return("", nil)
 		composerService.On("ListPendingUpdates", mock.Anything, "/tmp", []string{}, false).Return([]composer.PackageChange{}, nil)
 
 		worktree.On("AddGlob", "composer.*").Return(nil)
