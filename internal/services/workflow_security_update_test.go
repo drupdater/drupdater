@@ -101,7 +101,7 @@ func TestSecurityUpdateStartUpdate(t *testing.T) {
 	repositoryService.On("CloneRepository", config.RepositoryURL, config.Branch, config.Token).Return(repository, worktree, "/tmp", nil)
 	repositoryService.On("BranchExists", mock.Anything, "security-update-ddd").Return(false, nil)
 
-	updater.On("UpdateDependencies", mock.Anything, "/tmp", []string{"package1"}, mock.Anything, true).Return(DependencyUpdateReport{}, nil)
+	updater.On("UpdateDependencies", mock.Anything, "/tmp", []string{"package1"}, mock.Anything, true).Return(nil)
 	updater.On("UpdateDrupal", mock.Anything, "/tmp", mock.Anything, "site1").Return(map[string]drush.UpdateHook{}, nil)
 	updater.On("UpdateDrupal", mock.Anything, "/tmp", mock.Anything, "site2").Return(map[string]drush.UpdateHook{}, nil)
 
@@ -153,7 +153,7 @@ func TestSecurityUpdateStartUpdateWithDryRun(t *testing.T) {
 	installer.On("InstallDrupal", mock.Anything, "/tmp", "site2").Return(nil)
 	repositoryService.On("BranchExists", mock.Anything, "security-update-ddd").Return(false, nil)
 	repositoryService.On("CloneRepository", config.RepositoryURL, config.Branch, config.Token).Return(repository, worktree, "/tmp", nil)
-	updater.On("UpdateDependencies", mock.Anything, "/tmp", []string{"package1"}, mock.Anything, true).Return(DependencyUpdateReport{}, nil)
+	updater.On("UpdateDependencies", mock.Anything, "/tmp", []string{"package1"}, mock.Anything, true).Return(nil)
 	updater.On("UpdateDrupal", mock.Anything, "/tmp", mock.Anything, "site1").Return(map[string]drush.UpdateHook{}, nil)
 	updater.On("UpdateDrupal", mock.Anything, "/tmp", mock.Anything, "site2").Return(map[string]drush.UpdateHook{}, nil)
 	composerService.On("Diff", mock.Anything, mock.Anything, mock.Anything, true).Return("foo", nil)

@@ -43,42 +43,7 @@ func TestStartUpdate(t *testing.T) {
 	//installer.On("InstallDrupal", mock.Anything, "/tmp", "site2").Return(nil)
 	repositoryService.On("CloneRepository", config.RepositoryURL, config.Branch, config.Token).Return(repository, worktree, "/tmp", nil)
 	repositoryService.On("BranchExists", mock.Anything, mock.Anything).Return(false, nil)
-	updater.On("UpdateDependencies", mock.Anything, "/tmp", []string{}, mock.Anything, false).Return(DependencyUpdateReport{
-		PatchUpdates: PatchUpdates{
-			Removed: []RemovedPatch{
-				{
-					Package:          "package1",
-					PatchPath:        "patch1",
-					Reason:           "reason1",
-					PatchDescription: "package1 not installed anymore",
-				},
-				{
-					Package:          "package1",
-					PatchPath:        "patch1",
-					Reason:           "Fixed",
-					PatchDescription: "Issue #issue1: [title1](link1) was fixed in version 2.0",
-				},
-			},
-			Updated: []UpdatedPatch{
-				{
-					Package:           "package2",
-					PreviousPatchPath: "oldPatch",
-					NewPatchPath:      "newPatch",
-					PatchDescription:  "description",
-				},
-			},
-			Conflicts: []ConflictPatch{
-				{
-					Package:          "package3",
-					PatchPath:        "patch3",
-					FixedVersion:     "2.0",
-					NewVersion:       "3.0",
-					PatchDescription: "description",
-				},
-			},
-		},
-		AddedAllowPlugins: []string{"plugin1", "plugin2"},
-	}, nil)
+	updater.On("UpdateDependencies", mock.Anything, "/tmp", []string{}, mock.Anything, false).Return(nil)
 	updater.On("UpdateDrupal", mock.Anything, "/tmp", mock.Anything, "site1").Return(map[string]drush.UpdateHook{
 		"hook": {
 			Module:      "module",
@@ -131,7 +96,7 @@ func TestStartUpdateWithDryRun(t *testing.T) {
 	installer.On("InstallDrupal", mock.Anything, "/tmp", "site2").Return(nil)
 	repositoryService.On("CloneRepository", config.RepositoryURL, config.Branch, config.Token).Return(repository, worktree, "/tmp", nil)
 	repositoryService.On("BranchExists", mock.Anything, mock.Anything).Return(false, nil)
-	updater.On("UpdateDependencies", mock.Anything, "/tmp", []string{}, mock.Anything, false).Return(DependencyUpdateReport{}, nil)
+	updater.On("UpdateDependencies", mock.Anything, "/tmp", []string{}, mock.Anything, false).Return(nil)
 	updater.On("UpdateDrupal", mock.Anything, "/tmp", mock.Anything, "site1").Return(map[string]drush.UpdateHook{}, nil)
 	updater.On("UpdateDrupal", mock.Anything, "/tmp", mock.Anything, "site2").Return(map[string]drush.UpdateHook{}, nil)
 	composer.On("Diff", mock.Anything, mock.Anything, mock.Anything, true).Return("Dummy Table", nil)
