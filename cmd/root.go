@@ -7,6 +7,7 @@ import (
 	"github.com/drupdater/drupdater/internal/addon"
 	"github.com/drupdater/drupdater/internal/addon/allowplugins"
 	"github.com/drupdater/drupdater/internal/addon/composernormalize"
+	"github.com/drupdater/drupdater/internal/addon/composerpatches"
 	"github.com/drupdater/drupdater/internal/addon/localedeploy"
 	"github.com/drupdater/drupdater/internal/addon/removedeprecations"
 	updatecodingstyles "github.com/drupdater/drupdater/internal/addon/update_coding_styles"
@@ -50,7 +51,7 @@ var rootCmd = &cobra.Command{
 		vcsProviderFactory := codehosting.NewDefaultVcsProviderFactory()
 		platform := vcsProviderFactory.Create(config.RepositoryURL, config.Token)
 		git := repo.NewGitRepositoryService(logger, platform)
-		updater := services.NewDefaultUpdater(logger, settings, git, config, composer, drupalOrg, drush)
+		updater := services.NewDefaultUpdater(logger, settings, config, composer, drush)
 		workflow := services.NewWorkflowBaseService(logger, config, updater, platform, git, installer, composer)
 
 		var strategy services.WorkflowStrategy
@@ -81,6 +82,9 @@ var rootCmd = &cobra.Command{
 
 		composerNormalize := composernormalize.NewDefaultComposerNormalize(logger, composer)
 		addonList = append(addonList, composerNormalize)
+
+		composerPatches := composerpatches.NewDefaultComposerPatches(logger, composer, drupalOrg)
+		addonList = append(addonList, composerPatches)
 
 		for _, addon := range addonList {
 			event.AddSubscriber(addon)

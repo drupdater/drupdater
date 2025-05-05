@@ -20,9 +20,12 @@ type PostCodeUpdateEvent struct {
 
 type PreComposerUpdateEvent struct {
 	event.BasicEvent
-	Ctx      context.Context
-	Path     string
-	Worktree internal.Worktree
+	Ctx              context.Context
+	Path             string
+	Worktree         internal.Worktree
+	PackagesToUpdate []string
+	PackagesToKeep   []string
+	MinimalChanges   bool
 }
 
 type PostComposerUpdateEvent struct {

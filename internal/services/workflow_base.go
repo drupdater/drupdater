@@ -34,8 +34,7 @@ type WorkflowService interface {
 }
 
 type WorkflowUpdateResult struct {
-	updateReport DependencyUpdateReport
-	table        string
+	table string
 }
 
 type SharedUpdate struct {
@@ -277,7 +276,7 @@ func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context, strategy Wo
 	}
 
 	ws.logger.Info("updating dependencies")
-	updateReport, err := ws.updater.UpdateDependencies(ctx, path, packagesToUpdate, worktree, minimalChanges)
+	err = ws.updater.UpdateDependencies(ctx, path, packagesToUpdate, worktree, minimalChanges)
 	if err != nil {
 		return SharedUpdate{}, fmt.Errorf("failed to update dependencies: %w", err)
 	}
@@ -322,7 +321,7 @@ func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context, strategy Wo
 	sharedUpdate := SharedUpdate{
 		Path:                 path,
 		Worktree:             worktree,
-		WorkflowUpdateResult: WorkflowUpdateResult{updateReport: updateReport, table: table},
+		WorkflowUpdateResult: WorkflowUpdateResult{table: table},
 		Repository:           repository,
 		updateBranchName:     updateBranchName,
 	}

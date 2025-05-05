@@ -7,6 +7,7 @@ package services
 import (
 	"context"
 
+	"github.com/drupdater/drupdater/internal/addon"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -38,16 +39,16 @@ func (_m *MockWorkflowService) EXPECT() *MockWorkflowService_Expecter {
 }
 
 // StartUpdate provides a mock function for the type MockWorkflowService
-func (_mock *MockWorkflowService) StartUpdate(ctx context.Context, strategy WorkflowStrategy) error {
-	ret := _mock.Called(ctx, strategy)
+func (_mock *MockWorkflowService) StartUpdate(ctx context.Context, strategy WorkflowStrategy, addons []addon.Addon) error {
+	ret := _mock.Called(ctx, strategy, addons)
 
 	if len(ret) == 0 {
 		panic("no return value specified for StartUpdate")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, WorkflowStrategy) error); ok {
-		r0 = returnFunc(ctx, strategy)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, WorkflowStrategy, []addon.Addon) error); ok {
+		r0 = returnFunc(ctx, strategy, addons)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -62,13 +63,14 @@ type MockWorkflowService_StartUpdate_Call struct {
 // StartUpdate is a helper method to define mock.On call
 //   - ctx
 //   - strategy
-func (_e *MockWorkflowService_Expecter) StartUpdate(ctx interface{}, strategy interface{}) *MockWorkflowService_StartUpdate_Call {
-	return &MockWorkflowService_StartUpdate_Call{Call: _e.mock.On("StartUpdate", ctx, strategy)}
+//   - addons
+func (_e *MockWorkflowService_Expecter) StartUpdate(ctx interface{}, strategy interface{}, addons interface{}) *MockWorkflowService_StartUpdate_Call {
+	return &MockWorkflowService_StartUpdate_Call{Call: _e.mock.On("StartUpdate", ctx, strategy, addons)}
 }
 
-func (_c *MockWorkflowService_StartUpdate_Call) Run(run func(ctx context.Context, strategy WorkflowStrategy)) *MockWorkflowService_StartUpdate_Call {
+func (_c *MockWorkflowService_StartUpdate_Call) Run(run func(ctx context.Context, strategy WorkflowStrategy, addons []addon.Addon)) *MockWorkflowService_StartUpdate_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(WorkflowStrategy))
+		run(args[0].(context.Context), args[1].(WorkflowStrategy), args[2].([]addon.Addon))
 	})
 	return _c
 }
@@ -78,7 +80,7 @@ func (_c *MockWorkflowService_StartUpdate_Call) Return(err error) *MockWorkflowS
 	return _c
 }
 
-func (_c *MockWorkflowService_StartUpdate_Call) RunAndReturn(run func(ctx context.Context, strategy WorkflowStrategy) error) *MockWorkflowService_StartUpdate_Call {
+func (_c *MockWorkflowService_StartUpdate_Call) RunAndReturn(run func(ctx context.Context, strategy WorkflowStrategy, addons []addon.Addon) error) *MockWorkflowService_StartUpdate_Call {
 	_c.Call.Return(run)
 	return _c
 }

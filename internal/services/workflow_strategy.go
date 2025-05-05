@@ -9,11 +9,10 @@ import (
 )
 
 type TemplateData struct {
-	ComposerDiff           string
-	DependencyUpdateReport DependencyUpdateReport
-	SecurityReport         SecurityReport
-	UpdateHooks            UpdateHooksPerSite
-	Addons                 []addon.Addon
+	ComposerDiff   string
+	SecurityReport SecurityReport
+	UpdateHooks    UpdateHooksPerSite
+	Addons         []addon.Addon
 }
 
 type SecurityReport struct {

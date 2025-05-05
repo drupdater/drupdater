@@ -63,8 +63,7 @@ func (s *DependencyUpdateStrategy) GeneratePRDetails() (string, string) {
 
 func (s *DependencyUpdateStrategy) GetTemplateData(result WorkflowUpdateResult, updateHooks UpdateHooksPerSite) (TemplateData, error) {
 	return TemplateData{
-		ComposerDiff:           result.table,
-		DependencyUpdateReport: result.updateReport,
-		UpdateHooks:            updateHooks,
+		ComposerDiff: result.table,
+		UpdateHooks:  updateHooks,
 	}, nil
 }

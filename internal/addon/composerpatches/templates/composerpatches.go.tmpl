@@ -1,4 +1,3 @@
-{{ define "patch_updates" }}
 ## 🩹 Patch updates
 
 {{ if .Removed -}}
@@ -37,6 +36,5 @@ The following patches were removed as they are no longer needed:
   - Patch: `{{ .PatchPath }}`
   - Reason: Patch is not compatible with the new version {{ .NewVersion }} and a newer patch that is compatible with the new version is not available
 
-{{ end -}}
 {{ end -}}
 {{ end -}}

@@ -8,7 +8,6 @@ import (
 	"context"
 
 	"github.com/drupdater/drupdater/internal"
-	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/drush"
 	mock "github.com/stretchr/testify/mock"
 )
@@ -41,29 +40,20 @@ func (_m *MockUpdaterService) EXPECT() *MockUpdaterService_Expecter {
 }
 
 // UpdateDependencies provides a mock function for the type MockUpdaterService
-func (_mock *MockUpdaterService) UpdateDependencies(ctx context.Context, path string, packagesToUpdate []string, worktree internal.Worktree, minimalChanges bool) (DependencyUpdateReport, error) {
+func (_mock *MockUpdaterService) UpdateDependencies(ctx context.Context, path string, packagesToUpdate []string, worktree internal.Worktree, minimalChanges bool) error {
 	ret := _mock.Called(ctx, path, packagesToUpdate, worktree, minimalChanges)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UpdateDependencies")
 	}
 
-	var r0 DependencyUpdateReport
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, []string, internal.Worktree, bool) (DependencyUpdateReport, error)); ok {
-		return returnFunc(ctx, path, packagesToUpdate, worktree, minimalChanges)
-	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, []string, internal.Worktree, bool) DependencyUpdateReport); ok {
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, []string, internal.Worktree, bool) error); ok {
 		r0 = returnFunc(ctx, path, packagesToUpdate, worktree, minimalChanges)
 	} else {
-		r0 = ret.Get(0).(DependencyUpdateReport)
+		r0 = ret.Error(0)
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string, []string, internal.Worktree, bool) error); ok {
-		r1 = returnFunc(ctx, path, packagesToUpdate, worktree, minimalChanges)
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
+	return r0
 }
 
 // MockUpdaterService_UpdateDependencies_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateDependencies'
@@ -88,12 +78,12 @@ func (_c *MockUpdaterService_UpdateDependencies_Call) Run(run func(ctx context.C
 	return _c
 }
 
-func (_c *MockUpdaterService_UpdateDependencies_Call) Return(dependencyUpdateReport DependencyUpdateReport, err error) *MockUpdaterService_UpdateDependencies_Call {
-	_c.Call.Return(dependencyUpdateReport, err)
+func (_c *MockUpdaterService_UpdateDependencies_Call) Return(err error) *MockUpdaterService_UpdateDependencies_Call {
+	_c.Call.Return(err)
 	return _c
 }
 
-func (_c *MockUpdaterService_UpdateDependencies_Call) RunAndReturn(run func(ctx context.Context, path string, packagesToUpdate []string, worktree internal.Worktree, minimalChanges bool) (DependencyUpdateReport, error)) *MockUpdaterService_UpdateDependencies_Call {
+func (_c *MockUpdaterService_UpdateDependencies_Call) RunAndReturn(run func(ctx context.Context, path string, packagesToUpdate []string, worktree internal.Worktree, minimalChanges bool) error) *MockUpdaterService_UpdateDependencies_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -153,66 +143,6 @@ func (_c *MockUpdaterService_UpdateDrupal_Call) Return(stringToUpdateHook map[st
 }
 
 func (_c *MockUpdaterService_UpdateDrupal_Call) RunAndReturn(run func(ctx context.Context, path string, worktree internal.Worktree, site string) (map[string]drush.UpdateHook, error)) *MockUpdaterService_UpdateDrupal_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// UpdatePatches provides a mock function for the type MockUpdaterService
-func (_mock *MockUpdaterService) UpdatePatches(ctx context.Context, path string, worktree internal.Worktree, operations []composer.PackageChange, patches map[string]map[string]string) (PatchUpdates, map[string]map[string]string) {
-	ret := _mock.Called(ctx, path, worktree, operations, patches)
-
-	if len(ret) == 0 {
-		panic("no return value specified for UpdatePatches")
-	}
-
-	var r0 PatchUpdates
-	var r1 map[string]map[string]string
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, internal.Worktree, []composer.PackageChange, map[string]map[string]string) (PatchUpdates, map[string]map[string]string)); ok {
-		return returnFunc(ctx, path, worktree, operations, patches)
-	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, internal.Worktree, []composer.PackageChange, map[string]map[string]string) PatchUpdates); ok {
-		r0 = returnFunc(ctx, path, worktree, operations, patches)
-	} else {
-		r0 = ret.Get(0).(PatchUpdates)
-	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string, internal.Worktree, []composer.PackageChange, map[string]map[string]string) map[string]map[string]string); ok {
-		r1 = returnFunc(ctx, path, worktree, operations, patches)
-	} else {
-		if ret.Get(1) != nil {
-			r1 = ret.Get(1).(map[string]map[string]string)
-		}
-	}
-	return r0, r1
-}
-
-// MockUpdaterService_UpdatePatches_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdatePatches'
-type MockUpdaterService_UpdatePatches_Call struct {
-	*mock.Call
-}
-
-// UpdatePatches is a helper method to define mock.On call
-//   - ctx
-//   - path
-//   - worktree
-//   - operations
-//   - patches
-func (_e *MockUpdaterService_Expecter) UpdatePatches(ctx interface{}, path interface{}, worktree interface{}, operations interface{}, patches interface{}) *MockUpdaterService_UpdatePatches_Call {
-	return &MockUpdaterService_UpdatePatches_Call{Call: _e.mock.On("UpdatePatches", ctx, path, worktree, operations, patches)}
-}
-
-func (_c *MockUpdaterService_UpdatePatches_Call) Run(run func(ctx context.Context, path string, worktree internal.Worktree, operations []composer.PackageChange, patches map[string]map[string]string)) *MockUpdaterService_UpdatePatches_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(internal.Worktree), args[3].([]composer.PackageChange), args[4].(map[string]map[string]string))
-	})
-	return _c
-}
-
-func (_c *MockUpdaterService_UpdatePatches_Call) Return(patchUpdates PatchUpdates, stringToStringToString map[string]map[string]string) *MockUpdaterService_UpdatePatches_Call {
-	_c.Call.Return(patchUpdates, stringToStringToString)
-	return _c
-}
-
-func (_c *MockUpdaterService_UpdatePatches_Call) RunAndReturn(run func(ctx context.Context, path string, worktree internal.Worktree, operations []composer.PackageChange, patches map[string]map[string]string) (PatchUpdates, map[string]map[string]string)) *MockUpdaterService_UpdatePatches_Call {
 	_c.Call.Return(run)
 	return _c
 }

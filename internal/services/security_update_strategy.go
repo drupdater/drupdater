@@ -95,8 +95,7 @@ func (s *SecurityUpdateStrategy) GeneratePRDetails() (string, string) {
 
 func (s *SecurityUpdateStrategy) GetTemplateData(result WorkflowUpdateResult, updateHooks UpdateHooksPerSite) (TemplateData, error) {
 	return TemplateData{
-		ComposerDiff:           result.table,
-		DependencyUpdateReport: result.updateReport,
+		ComposerDiff: result.table,
 		SecurityReport: SecurityReport{
 			FixedAdvisories:       s.GetFixedAdvisories(),
 			AfterUpdateAdvisories: s.afterAudit.Advisories,
