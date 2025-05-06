@@ -1,10 +1,9 @@
-package removedeprecations
+package addon
 
 import (
 	"testing"
 
 	internal "github.com/drupdater/drupdater/internal"
-	"github.com/drupdater/drupdater/internal/addon"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/rector"
 
@@ -38,8 +37,8 @@ func TestRemoveDeprecations(t *testing.T) {
 		}, nil)
 		composer.On("Remove", mock.Anything, "/path/to/repo", []string{"palantirnet/drupal-rector"}).Return("", nil)
 
-		updateRemoveDeprecations := NewUpdateRemoveDeprecations(logger, runner, config, composer)
-		postCodeUpdate := addon.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", worktree)
+		updateRemoveDeprecations := NewDeprecationsRemover(logger, runner, config, composer)
+		postCodeUpdate := NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", worktree)
 		err := updateRemoveDeprecations.postCodeUpdateHandler(postCodeUpdate)
 		assert.NoError(t, err)
 		composer.AssertExpectations(t)
@@ -74,8 +73,8 @@ func TestRemoveDeprecations(t *testing.T) {
 		worktree.On("Add", "tests/Drupal/FunctionalJavascriptTests/ThunderOrgTestHomePageTest.php").Return(plumbing.NewHash(""), nil)
 		worktree.On("Commit", "Remove deprecations", mock.Anything).Return(plumbing.NewHash(""), nil)
 
-		updateRemoveDeprecations := NewUpdateRemoveDeprecations(logger, runner, config, composer)
-		postCodeUpdate := addon.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", worktree)
+		updateRemoveDeprecations := NewDeprecationsRemover(logger, runner, config, composer)
+		postCodeUpdate := NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", worktree)
 		err := updateRemoveDeprecations.postCodeUpdateHandler(postCodeUpdate)
 		assert.NoError(t, err)
 		composer.AssertExpectations(t)
@@ -98,8 +97,8 @@ func TestRemoveDeprecations(t *testing.T) {
 			},
 		}, nil)
 
-		updateRemoveDeprecations := NewUpdateRemoveDeprecations(logger, runner, config, composer)
-		postCodeUpdate := addon.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", worktree)
+		updateRemoveDeprecations := NewDeprecationsRemover(logger, runner, config, composer)
+		postCodeUpdate := NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", worktree)
 		err := updateRemoveDeprecations.postCodeUpdateHandler(postCodeUpdate)
 		assert.NoError(t, err)
 		composer.AssertExpectations(t)
@@ -115,8 +114,8 @@ func TestRemoveDeprecations(t *testing.T) {
 		runner := rector.NewMockRunner(t)
 		runner.On("Run", mock.Anything, "/path/to/repo", []string{"web/modules/custom"}).Return(rector.ReturnOutput{}, assert.AnError)
 
-		updateRemoveDeprecations := NewUpdateRemoveDeprecations(logger, runner, config, composer)
-		postCodeUpdate := addon.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", worktree)
+		updateRemoveDeprecations := NewDeprecationsRemover(logger, runner, config, composer)
+		postCodeUpdate := NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", worktree)
 		err := updateRemoveDeprecations.postCodeUpdateHandler(postCodeUpdate)
 		assert.Error(t, err)
 		composer.AssertExpectations(t)

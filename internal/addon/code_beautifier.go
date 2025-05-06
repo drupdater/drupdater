@@ -1,14 +1,14 @@
-package updatecodingstyles
+package addon
 
 import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"text/template"
 
 	"github.com/drupdater/drupdater/internal"
-	"github.com/drupdater/drupdater/internal/addon"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/phpcs"
 
@@ -17,15 +17,17 @@ import (
 	"go.uber.org/zap"
 )
 
-type UpdateCodingStyles struct {
+// CodeBeautifier handles PHP code style formatting and fixes
+type CodeBeautifier struct {
 	logger   *zap.Logger
 	phpcs    phpcs.Runner
 	config   internal.Config
 	composer composer.Runner
 }
 
-func NewUpdateCodingStyles(logger *zap.Logger, phpcs phpcs.Runner, config internal.Config, composer composer.Runner) *UpdateCodingStyles {
-	return &UpdateCodingStyles{
+// NewCodeBeautifier creates a new code beautifier instance
+func NewCodeBeautifier(logger *zap.Logger, phpcs phpcs.Runner, config internal.Config, composer composer.Runner) *CodeBeautifier {
+	return &CodeBeautifier{
 		logger:   logger,
 		phpcs:    phpcs,
 		config:   config,
@@ -33,71 +35,70 @@ func NewUpdateCodingStyles(logger *zap.Logger, phpcs phpcs.Runner, config intern
 	}
 }
 
-func (h *UpdateCodingStyles) SubscribedEvents() map[string]interface{} {
+// SubscribedEvents returns the events this addon listens to
+func (cb *CodeBeautifier) SubscribedEvents() map[string]interface{} {
 	return map[string]interface{}{
 		"post-code-update": event.ListenerItem{
 			Priority: event.Normal,
-			Listener: event.ListenerFunc(h.postCodeUpdateHandler),
+			Listener: event.ListenerFunc(cb.postCodeUpdateHandler),
 		},
 	}
 }
 
-func (h *UpdateCodingStyles) RenderTemplate() (string, error) {
+// RenderTemplate returns the rendered template for this addon
+func (cb *CodeBeautifier) RenderTemplate() (string, error) {
 	return "", nil
 }
 
+// fileExists checks if phpcs.xml or phpcs.xml.dist exists in the given path
 var fileExists = func(path string) bool {
-
-	if _, err := os.Stat(path + "/phpcs.xml"); os.IsNotExist(err) {
-		if _, err := os.Stat(path + "/phpcs.xml.dist"); os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(path, "phpcs.xml")); os.IsNotExist(err) {
+		if _, err := os.Stat(filepath.Join(path, "phpcs.xml.dist")); os.IsNotExist(err) {
 			return false
 		}
 	}
 	return true
 }
 
-func (h *UpdateCodingStyles) postCodeUpdateHandler(e event.Event) error {
-
-	event := e.(*addon.PostCodeUpdateEvent)
-
-	h.logger.Info("updating coding styles")
+func (cb *CodeBeautifier) postCodeUpdateHandler(e event.Event) error {
+	event := e.(*PostCodeUpdateEvent)
+	cb.logger.Info("updating coding styles")
 
 	if !fileExists(event.Path()) {
-		created, err := h.CreatePHPCSConfig(event.Context(), event.Path(), event.Worktree())
+		created, err := cb.CreatePHPCSConfig(event.Context(), event.Path(), event.Worktree())
 		if err != nil {
 			return err
 		}
 		if !created {
-			h.logger.Debug("no phpcs.xml created, skipping coding style update")
+			cb.logger.Debug("no phpcs.xml created, skipping coding style update")
 			return nil
 		}
 	}
 
-	if installed, _ := h.composer.IsPackageInstalled(event.Context(), event.Path(), "drupal/coder"); !installed {
-		if err := h.InstallCoder(event.Context(), event.Path(), event.Worktree()); err != nil {
+	if installed, _ := cb.composer.IsPackageInstalled(event.Context(), event.Path(), "drupal/coder"); !installed {
+		if err := cb.InstallCoder(event.Context(), event.Path(), event.Worktree()); err != nil {
 			return err
 		}
 	}
 
-	codingStyleUpdateResult, err := h.phpcs.Run(event.Context(), event.Path())
+	codingStyleUpdateResult, err := cb.phpcs.Run(event.Context(), event.Path())
 	if err != nil {
 		return fmt.Errorf("failed to run phpcs: %w", err)
 	}
 
 	if codingStyleUpdateResult.Totals.Fixable == 0 {
-		h.logger.Debug("no coding style issues found")
+		cb.logger.Debug("no coding style issues found")
 		return nil
 	}
 
-	err = h.phpcs.RunCBF(event.Context(), event.Path())
+	err = cb.phpcs.RunCBF(event.Context(), event.Path())
 	if err != nil {
-		h.logger.Debug("remaining issues", zap.Error(err))
+		cb.logger.Debug("remaining issues", zap.Error(err))
 	}
 
-	h.logger.Debug("adding files to commit", zap.Any("files", codingStyleUpdateResult.Files))
+	cb.logger.Debug("adding files to commit", zap.Any("files", codingStyleUpdateResult.Files))
 
 	for file := range codingStyleUpdateResult.Files {
-
 		if (codingStyleUpdateResult.Files[file].Errors + codingStyleUpdateResult.Files[file].Warnings) == 0 {
 			continue
 		}
@@ -112,8 +113,9 @@ func (h *UpdateCodingStyles) postCodeUpdateHandler(e event.Event) error {
 	return err
 }
 
-func (h *UpdateCodingStyles) CreatePHPCSConfig(ctx context.Context, path string, worktree internal.Worktree) (bool, error) {
-	h.logger.Debug("no phpcs.xml or phpcs.xml.dist file found, creating phpcs.xml")
+// CreatePHPCSConfig generates a phpcs.xml configuration file
+func (cb *CodeBeautifier) CreatePHPCSConfig(ctx context.Context, path string, worktree internal.Worktree) (bool, error) {
+	cb.logger.Debug("no phpcs.xml or phpcs.xml.dist file found, creating phpcs.xml")
 
 	phpcsTemplate := `<?xml version="1.0" encoding="UTF-8"?>
 <ruleset name="drupal-updater">
@@ -128,19 +130,17 @@ func (h *UpdateCodingStyles) CreatePHPCSConfig(ctx context.Context, path string,
 </ruleset>
 `
 
-	// Parse the template
 	tmpl, err := template.New("ruleset").Parse(phpcsTemplate)
 	if err != nil {
 		panic(err)
 	}
 
-	// Create the output file
-	outputFile, err := os.Create(path + "/phpcs.xml")
+	outputFile, err := os.Create(filepath.Join(path, "phpcs.xml"))
 	if err != nil {
 		panic(err)
 	}
 
-	drupalVersion, _ := h.composer.GetInstalledPackageVersion(ctx, path, "drupal/core")
+	drupalVersion, _ := cb.composer.GetInstalledPackageVersion(ctx, path, "drupal/core")
 	majorVersion := strings.Split(drupalVersion, ".")[0]
 
 	data := struct {
@@ -151,17 +151,16 @@ func (h *UpdateCodingStyles) CreatePHPCSConfig(ctx context.Context, path string,
 		Version: majorVersion,
 	}
 
-	data.Files, err = h.composer.GetCustomCodeDirectories(ctx, path)
+	data.Files, err = cb.composer.GetCustomCodeDirectories(ctx, path)
 	if err != nil {
 		return false, err
 	}
 
 	if len(data.Files) == 0 {
-		h.logger.Debug("no custom code directories found, skipping coding style update")
+		cb.logger.Debug("no custom code directories found, skipping coding style update")
 		return false, nil
 	}
 
-	// Execute the template and write to the file
 	err = tmpl.Execute(outputFile, data)
 	if err != nil {
 		panic(err)
@@ -180,9 +179,10 @@ func (h *UpdateCodingStyles) CreatePHPCSConfig(ctx context.Context, path string,
 	return true, nil
 }
 
-func (h *UpdateCodingStyles) InstallCoder(ctx context.Context, path string, worktree internal.Worktree) error {
-	h.logger.Debug("drupal/coder is not installed, installing")
-	if _, err := h.composer.Require(ctx, path, "--dev", "drupal/coder"); err != nil {
+// InstallCoder installs the drupal/coder package
+func (cb *CodeBeautifier) InstallCoder(ctx context.Context, path string, worktree internal.Worktree) error {
+	cb.logger.Debug("drupal/coder is not installed, installing")
+	if _, err := cb.composer.Require(ctx, path, "--dev", "drupal/coder"); err != nil {
 		return err
 	}
 

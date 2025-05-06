@@ -1,4 +1,4 @@
-package composerpatches
+package addon
 
 import (
 	"context"
@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	"github.com/drupdater/drupdater/internal"
-	"github.com/drupdater/drupdater/internal/addon"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/drupalorg"
 	git "github.com/go-git/go-git/v5"
@@ -53,8 +52,8 @@ type ConflictPatch struct {
 	NewVersion       string
 }
 
-type DefaultComposerPatches struct {
-	addon.BasicAddon
+type ComposerPatches1 struct {
+	BasicAddon
 	logger       *zap.Logger
 	composer     composer.Runner
 	drupalOrg    drupalorg.Client
@@ -62,14 +61,14 @@ type DefaultComposerPatches struct {
 	patchUpdates PatchUpdates
 }
 
-func NewDefaultComposerPatches(logger *zap.Logger, composer composer.Runner, drupalOrg drupalorg.Client) *DefaultComposerPatches {
+func NewComposerPatches1(logger *zap.Logger, composer composer.Runner, drupalOrg drupalorg.Client) *ComposerPatches1 {
 
 	drupalOrgGitlab, err := gitlab.NewClient(os.Getenv("DRUPALCODE_ACCESS_TOKEN"), gitlab.WithBaseURL("https://git.drupalcode.org/api/v4"))
 	if err != nil {
 		logger.Error("failed to create gitlab client", zap.Error(err))
 	}
 
-	return &DefaultComposerPatches{
+	return &ComposerPatches1{
 		logger:    logger,
 		composer:  composer,
 		drupalOrg: drupalOrg,
@@ -77,7 +76,7 @@ func NewDefaultComposerPatches(logger *zap.Logger, composer composer.Runner, dru
 	}
 }
 
-func (h *DefaultComposerPatches) SubscribedEvents() map[string]interface{} {
+func (h *ComposerPatches1) SubscribedEvents() map[string]interface{} {
 	return map[string]interface{}{
 		"pre-composer-update": event.ListenerItem{
 			Priority: event.Normal,
@@ -86,12 +85,12 @@ func (h *DefaultComposerPatches) SubscribedEvents() map[string]interface{} {
 	}
 }
 
-func (h *DefaultComposerPatches) RenderTemplate() (string, error) {
+func (h *ComposerPatches1) RenderTemplate() (string, error) {
 	return h.Render("composerpatches.go.tmpl", h.patchUpdates)
 }
 
-func (h *DefaultComposerPatches) preComposerUpdateHandler(e event.Event) error {
-	event := e.(*addon.PreComposerUpdateEvent)
+func (h *ComposerPatches1) preComposerUpdateHandler(e event.Event) error {
+	event := e.(*PreComposerUpdateEvent)
 	ctx := event.Context()
 	path := event.Path()
 	worktree := event.Worktree()
@@ -146,7 +145,7 @@ func (h *DefaultComposerPatches) preComposerUpdateHandler(e event.Event) error {
 	return nil
 }
 
-func (h *DefaultComposerPatches) UpdatePatches(ctx context.Context, path string, worktree internal.Worktree, operations []composer.PackageChange, patches map[string]map[string]string) (PatchUpdates, map[string]map[string]string) {
+func (h *ComposerPatches1) UpdatePatches(ctx context.Context, path string, worktree internal.Worktree, operations []composer.PackageChange, patches map[string]map[string]string) (PatchUpdates, map[string]map[string]string) {
 
 	updates := PatchUpdates{}
 	h.logger.Debug("composer patches", zap.Any("patches", patches))
@@ -348,7 +347,7 @@ func (h *DefaultComposerPatches) UpdatePatches(ctx context.Context, path string,
 	return updates, patches
 }
 
-func (h *DefaultComposerPatches) cleanURLString(s string) string {
+func (h *ComposerPatches1) cleanURLString(s string) string {
 	// Replace spaces with underscores
 	s = strings.ToLower(s)
 	s = strings.ReplaceAll(s, " ", "_")
@@ -359,7 +358,7 @@ func (h *DefaultComposerPatches) cleanURLString(s string) string {
 }
 
 // DownloadFile downloads a file from a given URL and saves it to a specified local path.
-func (h *DefaultComposerPatches) downloadFile(url, folder string, file string) error {
+func (h *ComposerPatches1) downloadFile(url, folder string, file string) error {
 	// Get the file from the URL
 	resp, err := http.Get(url)
 	if err != nil {

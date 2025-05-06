@@ -1,11 +1,10 @@
-package allowplugins
+package addon
 
 import (
 	"context"
 	"os"
 	"testing"
 
-	"github.com/drupdater/drupdater/internal/addon"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/go-git/go-git/v5"
 	"github.com/stretchr/testify/assert"
@@ -16,7 +15,7 @@ func TestNewDefaultAllowPlugins(t *testing.T) {
 	logger := zap.NewNop()
 	composerRunner := composer.NewMockRunner(t)
 
-	ap := NewDefaultAllowPlugins(logger, composerRunner)
+	ap := NewComposerAllowPlugins(logger, composerRunner)
 
 	assert.NotNil(t, ap)
 	assert.Equal(t, logger, ap.logger)
@@ -27,7 +26,7 @@ func TestDefaultAllowPlugins_SubscribedEvents(t *testing.T) {
 	logger := zap.NewNop()
 	composerRunner := composer.NewMockRunner(t)
 
-	ap := NewDefaultAllowPlugins(logger, composerRunner)
+	ap := NewComposerAllowPlugins(logger, composerRunner)
 	events := ap.SubscribedEvents()
 
 	assert.Len(t, events, 2)
@@ -52,9 +51,9 @@ func TestDefaultAllowPlugins_PreComposerUpdateHandler(t *testing.T) {
 	// Mock the SetConfig call
 	composerRunner.On("SetConfig", ctx, path, "allow-plugins", "true").Return(nil)
 
-	ap := NewDefaultAllowPlugins(logger, composerRunner)
+	ap := NewComposerAllowPlugins(logger, composerRunner)
 
-	e := addon.NewPreComposerUpdateEvent(ctx, path, worktree, []string{}, []string{}, false)
+	e := NewPreComposerUpdateEvent(ctx, path, worktree, []string{}, []string{}, false)
 
 	err := ap.preComposerUpdateHandler(e)
 
@@ -90,10 +89,10 @@ func TestDefaultAllowPlugins_PostComposerUpdateHandler(t *testing.T) {
 	}
 	composerRunner.On("SetAllowPlugins", ctx, path, expectedUpdatedPlugins).Return(nil)
 
-	ap := NewDefaultAllowPlugins(logger, composerRunner)
+	ap := NewComposerAllowPlugins(logger, composerRunner)
 	ap.allowPlugins = existingPlugins
 
-	e := addon.NewPostComposerUpdateEvent(ctx, path, worktree)
+	e := NewPostComposerUpdateEvent(ctx, path, worktree)
 	err := ap.postComposerUpdateHandler(e)
 
 	assert.NoError(t, err)
@@ -108,7 +107,7 @@ func TestDefaultAllowPlugins_RenderTemplate(t *testing.T) {
 	logger := zap.NewNop()
 
 	composerRunner := composer.NewMockRunner(t)
-	ap := NewDefaultAllowPlugins(logger, composerRunner)
+	ap := NewComposerAllowPlugins(logger, composerRunner)
 	ap.newAllowPlugins = []string{"plugin1", "plugin2"}
 	result, err := ap.RenderTemplate()
 	assert.NoError(t, err)

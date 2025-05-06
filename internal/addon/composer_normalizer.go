@@ -1,26 +1,25 @@
-package composernormalize
+package addon
 
 import (
-	"github.com/drupdater/drupdater/internal/addon"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/gookit/event"
 	"go.uber.org/zap"
 )
 
-type DefaultComposerNormalize struct {
-	addon.BasicAddon
+type ComposerNormalizer struct {
+	BasicAddon
 	logger   *zap.Logger
 	composer composer.Runner
 }
 
-func NewDefaultComposerNormalize(logger *zap.Logger, composer composer.Runner) *DefaultComposerNormalize {
-	return &DefaultComposerNormalize{
+func NewComposerNormalizer(logger *zap.Logger, composer composer.Runner) *ComposerNormalizer {
+	return &ComposerNormalizer{
 		logger:   logger,
 		composer: composer,
 	}
 }
 
-func (h *DefaultComposerNormalize) SubscribedEvents() map[string]interface{} {
+func (h *ComposerNormalizer) SubscribedEvents() map[string]interface{} {
 	return map[string]interface{}{
 		"post-composer-update": event.ListenerItem{
 			Priority: event.Max,
@@ -29,12 +28,12 @@ func (h *DefaultComposerNormalize) SubscribedEvents() map[string]interface{} {
 	}
 }
 
-func (h *DefaultComposerNormalize) RenderTemplate() (string, error) {
+func (h *ComposerNormalizer) RenderTemplate() (string, error) {
 	return "", nil
 }
 
-func (h *DefaultComposerNormalize) postComposerUpdateHandler(e event.Event) error {
-	event := e.(*addon.PostComposerUpdateEvent)
+func (h *ComposerNormalizer) postComposerUpdateHandler(e event.Event) error {
+	event := e.(*PostComposerUpdateEvent)
 
 	installed, err := h.composer.IsPackageInstalled(event.Context(), event.Path(), "ergebnis/composer-normalize")
 	if err != nil {

@@ -1,10 +1,9 @@
-package localedeploy
+package addon
 
 import (
 	"testing"
 
 	"github.com/drupdater/drupdater/internal"
-	"github.com/drupdater/drupdater/internal/addon"
 	"github.com/drupdater/drupdater/pkg/drush"
 	"github.com/drupdater/drupdater/pkg/repo"
 
@@ -22,7 +21,7 @@ func TestUpdateTranslationsEventHandlerWithoutLocaleDeploy(t *testing.T) {
 	logger := zap.NewNop()
 
 	// Create an instance of UpdateTranslationsEventHandler with mocked dependencies
-	handler := NewUpdateTranslations(logger, mockDrush, mockRepository)
+	handler := NewTranslationsUpdater(logger, mockDrush, mockRepository)
 
 	worktree := internal.NewMockWorktree(t)
 	path := "/tmp"
@@ -32,7 +31,7 @@ func TestUpdateTranslationsEventHandlerWithoutLocaleDeploy(t *testing.T) {
 	mockDrush.On("IsModuleEnabled", mock.Anything, "/tmp", "example.com", "locale_deploy").Return(false, nil)
 
 	// Verify the results
-	event := addon.NewPostSiteUpdateEvent(ctx, path, worktree, "example.com")
+	event := NewPostSiteUpdateEvent(ctx, path, worktree, "example.com")
 	assert.NoError(t, handler.postSiteUpdateHandler(event))
 
 	mockDrush.AssertExpectations(t)
@@ -45,7 +44,7 @@ func TestUpdateTranslationsEventHandlerWitLocaleDeploy(t *testing.T) {
 	logger := zap.NewNop()
 
 	// Create an instance of UpdateTranslationsEventHandler with mocked dependencies
-	handler := NewUpdateTranslations(logger, mockDrush, mockRepository)
+	handler := NewTranslationsUpdater(logger, mockDrush, mockRepository)
 
 	worktree := internal.NewMockWorktree(t)
 	path := "/tmp"
@@ -63,7 +62,7 @@ func TestUpdateTranslationsEventHandlerWitLocaleDeploy(t *testing.T) {
 	worktree.On("Status").Return(git.Status{}, nil)
 
 	// Verify the results
-	event := addon.NewPostSiteUpdateEvent(ctx, path, worktree, "example.com")
+	event := NewPostSiteUpdateEvent(ctx, path, worktree, "example.com")
 	assert.NoError(t, handler.postSiteUpdateHandler(event))
 
 	mockDrush.AssertExpectations(t)

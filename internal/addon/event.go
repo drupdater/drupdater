@@ -10,7 +10,7 @@ import (
 
 // templates contains embedded template files for addons
 //
-//go:embed */templates
+//go:embed templates
 var templates embed.FS
 
 type BasicAddonEvent struct {

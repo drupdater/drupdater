@@ -1,4 +1,4 @@
-package composerpatches
+package addon
 
 import (
 	"encoding/json"
@@ -34,7 +34,7 @@ func TestUpdatePatches(t *testing.T) {
 		drupalOrgService.On("FindIssueNumber", "patches/core/0001-local-patch.patch").Return("", false)
 
 		composerService.On("CheckIfPatchApplies", mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/core/0001-local-patch.patch").Return(true, nil)
-		updater := &DefaultComposerPatches{
+		updater := &ComposerPatches1{
 			logger:    logger,
 			composer:  composerService,
 			drupalOrg: drupalOrgService,
@@ -73,7 +73,7 @@ func TestUpdatePatches(t *testing.T) {
 
 		composerService.On("CheckIfPatchApplies", mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/core/0001-local-patch.patch").Return(false, nil)
 		composerService.On("IsPackageInstalled", mock.Anything, "/tmp", "drupal/core").Return(true, nil)
-		updater := &DefaultComposerPatches{
+		updater := &ComposerPatches1{
 			logger:    logger,
 			composer:  composerService,
 			drupalOrg: drupalOrgService,
@@ -135,7 +135,7 @@ func TestUpdatePatches(t *testing.T) {
 
 		composerService.On("CheckIfPatchApplies", mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/remote/0001-remote.patch").Return(true, nil)
 
-		updater := &DefaultComposerPatches{
+		updater := &ComposerPatches1{
 			logger:    logger,
 			composer:  composerService,
 			drupalOrg: drupalOrgService,
@@ -226,7 +226,7 @@ func TestUpdatePatches(t *testing.T) {
 
 		git, _ := gitlab.NewClient("", gitlab.WithBaseURL(mockServer.URL))
 
-		updater := &DefaultComposerPatches{
+		updater := &ComposerPatches1{
 			logger:    logger,
 			composer:  composerService,
 			drupalOrg: drupalOrgService,
@@ -316,7 +316,7 @@ func TestUpdatePatches(t *testing.T) {
 
 		git, _ := gitlab.NewClient("", gitlab.WithBaseURL(mockServer.URL))
 
-		updater := &DefaultComposerPatches{
+		updater := &ComposerPatches1{
 			logger:    logger,
 			composer:  composerService,
 			drupalOrg: drupalOrgService,
@@ -403,7 +403,7 @@ func TestUpdatePatches(t *testing.T) {
 
 		git, _ := gitlab.NewClient("", gitlab.WithBaseURL(mockServer.URL))
 
-		updater := &DefaultComposerPatches{
+		updater := &ComposerPatches1{
 			logger:    logger,
 			composer:  composerService,
 			drupalOrg: drupalOrgService,
@@ -473,7 +473,7 @@ func TestUpdatePatches(t *testing.T) {
 
 		git, _ := gitlab.NewClient("", gitlab.WithBaseURL(mockServer.URL))
 
-		updater := &DefaultComposerPatches{
+		updater := &ComposerPatches1{
 			logger:    logger,
 			composer:  composerService,
 			drupalOrg: drupalOrgService,
@@ -517,7 +517,7 @@ func TestUpdatePatches(t *testing.T) {
 		composerService.On("IsPackageInstalled", mock.Anything, "/tmp", "drupal/core").Return(true, nil)
 		composerService.On("IsPackageInstalled", mock.Anything, "/tmp", "drupal/pathauto").Return(true, nil)
 
-		updater := &DefaultComposerPatches{
+		updater := &ComposerPatches1{
 			logger:    logger,
 			composer:  composerService,
 			drupalOrg: drupalOrgService,
@@ -565,7 +565,7 @@ func TestUpdatePatches(t *testing.T) {
 
 		composerService.On("IsPackageInstalled", mock.Anything, "/tmp", "drupal/core").Return(false, nil)
 
-		updater := &DefaultComposerPatches{
+		updater := &ComposerPatches1{
 			logger:    logger,
 			composer:  composerService,
 			drupalOrg: drupalOrgService,

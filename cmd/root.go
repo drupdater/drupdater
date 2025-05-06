@@ -5,12 +5,6 @@ import (
 
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/addon"
-	"github.com/drupdater/drupdater/internal/addon/allowplugins"
-	"github.com/drupdater/drupdater/internal/addon/composernormalize"
-	"github.com/drupdater/drupdater/internal/addon/composerpatches"
-	"github.com/drupdater/drupdater/internal/addon/localedeploy"
-	"github.com/drupdater/drupdater/internal/addon/removedeprecations"
-	updatecodingstyles "github.com/drupdater/drupdater/internal/addon/update_coding_styles"
 	"github.com/drupdater/drupdater/internal/codehosting"
 	"github.com/drupdater/drupdater/internal/services"
 	"github.com/drupdater/drupdater/pkg/composer"
@@ -64,26 +58,26 @@ var rootCmd = &cobra.Command{
 
 		if !config.SkipCBF {
 			phpcsRunner := phpcs.NewCLI(logger)
-			phpcsPlugin := updatecodingstyles.NewUpdateCodingStyles(logger, phpcsRunner, config, composer)
+			phpcsPlugin := addon.NewCodeBeautifier(logger, phpcsRunner, config, composer)
 			addonList = append(addonList, phpcsPlugin)
 		}
 
 		if !config.SkipRector {
 			rectorRunner := rector.NewCLI(logger)
-			rectorPlugin := removedeprecations.NewUpdateRemoveDeprecations(logger, rectorRunner, config, composer)
+			rectorPlugin := addon.NewDeprecationsRemover(logger, rectorRunner, config, composer)
 			addonList = append(addonList, rectorPlugin)
 		}
 
-		localeDeploy := localedeploy.NewUpdateTranslations(logger, drush, git)
+		localeDeploy := addon.NewTranslationsUpdater(logger, drush, git)
 		addonList = append(addonList, localeDeploy)
 
-		allowPlugins := allowplugins.NewDefaultAllowPlugins(logger, composer)
+		allowPlugins := addon.NewComposerAllowPlugins(logger, composer)
 		addonList = append(addonList, allowPlugins)
 
-		composerNormalize := composernormalize.NewDefaultComposerNormalize(logger, composer)
+		composerNormalize := addon.NewComposerNormalizer(logger, composer)
 		addonList = append(addonList, composerNormalize)
 
-		composerPatches := composerpatches.NewDefaultComposerPatches(logger, composer, drupalOrg)
+		composerPatches := addon.NewComposerPatches1(logger, composer, drupalOrg)
 		addonList = append(addonList, composerPatches)
 
 		for _, addon := range addonList {

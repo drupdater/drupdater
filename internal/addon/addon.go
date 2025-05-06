@@ -18,7 +18,7 @@ type BasicAddon struct {
 }
 
 func (h *BasicAddon) Render(name string, data any) (string, error) {
-	tmpl, err := template.ParseFS(templates, "*/templates/*.go.tmpl")
+	tmpl, err := template.ParseFS(templates, "templates/*.go.tmpl")
 	if err != nil {
 		return "", fmt.Errorf("failed to parse template: %w", err)
 	}

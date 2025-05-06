@@ -1,10 +1,9 @@
-package composernormalize
+package addon
 
 import (
 	"context"
 	"testing"
 
-	"github.com/drupdater/drupdater/internal/addon"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/go-git/go-git/v5"
 	"github.com/gookit/event"
@@ -18,7 +17,7 @@ func TestDefaultComposerNormalize_SubscribedEvents(t *testing.T) {
 	logger := zap.NewNop()
 	composer := composer.NewMockRunner(t)
 
-	normalize := NewDefaultComposerNormalize(logger, composer)
+	normalize := NewComposerNormalizer(logger, composer)
 	events := normalize.SubscribedEvents()
 
 	assert.Contains(t, events, "post-composer-update", "Should subscribe to post-composer-update event")
@@ -37,9 +36,9 @@ func TestDefaultComposerNormalize_PostComposerUpdateHandler_PackageInstalled(t *
 	composer.On("IsPackageInstalled", ctx, testPath, "ergebnis/composer-normalize").Return(true, nil)
 	composer.On("Normalize", ctx, testPath).Return("normalized", nil)
 
-	normalize := NewDefaultComposerNormalize(logger, composer)
+	normalize := NewComposerNormalizer(logger, composer)
 
-	e := addon.NewPostComposerUpdateEvent(ctx, testPath, worktree)
+	e := NewPostComposerUpdateEvent(ctx, testPath, worktree)
 	err := normalize.postComposerUpdateHandler(e)
 
 	assert.NoError(t, err)
@@ -57,9 +56,9 @@ func TestDefaultComposerNormalize_PostComposerUpdateHandler_PackageNotInstalled(
 	// Mock expectations - package not installed
 	composer.On("IsPackageInstalled", ctx, testPath, "ergebnis/composer-normalize").Return(false, nil)
 
-	normalize := NewDefaultComposerNormalize(logger, composer)
+	normalize := NewComposerNormalizer(logger, composer)
 
-	e := addon.NewPostComposerUpdateEvent(ctx, testPath, worktree)
+	e := NewPostComposerUpdateEvent(ctx, testPath, worktree)
 
 	err := normalize.postComposerUpdateHandler(e)
 
@@ -73,7 +72,7 @@ func TestDefaultComposerNormalize_RenderTemplate(t *testing.T) {
 	logger := zap.NewNop()
 	composer := composer.NewMockRunner(t)
 
-	normalize := NewDefaultComposerNormalize(logger, composer)
+	normalize := NewComposerNormalizer(logger, composer)
 
 	template, err := normalize.RenderTemplate()
 
