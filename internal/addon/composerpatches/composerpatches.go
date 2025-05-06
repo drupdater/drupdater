@@ -92,9 +92,9 @@ func (h *DefaultComposerPatches) RenderTemplate() (string, error) {
 
 func (h *DefaultComposerPatches) preComposerUpdateHandler(e event.Event) error {
 	event := e.(*addon.PreComposerUpdateEvent)
-	ctx := event.Ctx
-	path := event.Path
-	worktree := event.Worktree
+	ctx := event.Context()
+	path := event.Path()
+	worktree := event.Worktree()
 	packagesToUpdate := event.PackagesToUpdate
 	minimalChanges := event.MinimalChanges
 

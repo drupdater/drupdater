@@ -43,34 +43,34 @@ func (h *UpdateTranslations) postSiteUpdateHandler(e event.Event) error {
 
 	event := e.(*addon.PostSiteUpdateEvent)
 
-	enabled, err := h.drush.IsModuleEnabled(event.Ctx, event.Path, event.Site, "locale_deploy")
+	enabled, err := h.drush.IsModuleEnabled(event.Context(), event.Path(), event.Site(), "locale_deploy")
 	if !enabled || err != nil {
 		return err
 	}
 
 	h.logger.Info("updating translations")
 
-	if err := h.drush.LocalizeTranslations(event.Ctx, event.Path, event.Site); err != nil {
+	if err := h.drush.LocalizeTranslations(event.Context(), event.Path(), event.Site()); err != nil {
 		return err
 	}
 
-	translationPath, err := h.drush.GetTranslationPath(event.Ctx, event.Path, event.Site, true)
+	translationPath, err := h.drush.GetTranslationPath(event.Context(), event.Path(), event.Site(), true)
 	if err != nil {
 		return err
 	}
 
-	_, err = event.Worktree.Add(translationPath)
+	_, err = event.Worktree().Add(translationPath)
 	if err != nil {
 		return fmt.Errorf("failed to add translation path: %w", err)
 	}
 
-	status, _ := event.Worktree.Status()
+	status, _ := event.Worktree().Status()
 	h.logger.Debug("Git status", zap.Any("status", status))
-	if !h.repository.IsSomethingStagedInPath(event.Worktree, translationPath) {
+	if !h.repository.IsSomethingStagedInPath(event.Worktree(), translationPath) {
 		h.logger.Debug("nothing to commit")
 		return nil
 	}
-	_, err = event.Worktree.Commit("Update translations", &git.CommitOptions{})
+	_, err = event.Worktree().Commit("Update translations", &git.CommitOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to commit translation path: %w", err)
 	}

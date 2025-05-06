@@ -62,8 +62,8 @@ func (h *UpdateCodingStyles) postCodeUpdateHandler(e event.Event) error {
 
 	h.logger.Info("updating coding styles")
 
-	if !fileExists(event.Path) {
-		created, err := h.CreatePHPCSConfig(event.Ctx, event.Path, event.Worktree)
+	if !fileExists(event.Path()) {
+		created, err := h.CreatePHPCSConfig(event.Context(), event.Path(), event.Worktree())
 		if err != nil {
 			return err
 		}
@@ -73,13 +73,13 @@ func (h *UpdateCodingStyles) postCodeUpdateHandler(e event.Event) error {
 		}
 	}
 
-	if installed, _ := h.composer.IsPackageInstalled(event.Ctx, event.Path, "drupal/coder"); !installed {
-		if err := h.InstallCoder(event.Ctx, event.Path, event.Worktree); err != nil {
+	if installed, _ := h.composer.IsPackageInstalled(event.Context(), event.Path(), "drupal/coder"); !installed {
+		if err := h.InstallCoder(event.Context(), event.Path(), event.Worktree()); err != nil {
 			return err
 		}
 	}
 
-	codingStyleUpdateResult, err := h.phpcs.Run(event.Ctx, event.Path)
+	codingStyleUpdateResult, err := h.phpcs.Run(event.Context(), event.Path())
 	if err != nil {
 		return fmt.Errorf("failed to run phpcs: %w", err)
 	}
@@ -89,7 +89,7 @@ func (h *UpdateCodingStyles) postCodeUpdateHandler(e event.Event) error {
 		return nil
 	}
 
-	err = h.phpcs.RunCBF(event.Ctx, event.Path)
+	err = h.phpcs.RunCBF(event.Context(), event.Path())
 	if err != nil {
 		h.logger.Debug("remaining issues", zap.Error(err))
 	}
@@ -101,14 +101,14 @@ func (h *UpdateCodingStyles) postCodeUpdateHandler(e event.Event) error {
 		if (codingStyleUpdateResult.Files[file].Errors + codingStyleUpdateResult.Files[file].Warnings) == 0 {
 			continue
 		}
-		relativePath := strings.TrimLeft(strings.TrimPrefix(file, event.Path), "/")
+		relativePath := strings.TrimLeft(strings.TrimPrefix(file, event.Path()), "/")
 
-		if _, err := event.Worktree.Add(relativePath); err != nil {
+		if _, err := event.Worktree().Add(relativePath); err != nil {
 			return fmt.Errorf("failed to add file to commit: %w", err)
 		}
 	}
 
-	_, err = event.Worktree.Commit("Update coding styles", &git.CommitOptions{})
+	_, err = event.Worktree().Commit("Update coding styles", &git.CommitOptions{})
 	return err
 }
 

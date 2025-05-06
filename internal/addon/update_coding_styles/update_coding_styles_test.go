@@ -44,11 +44,7 @@ func TestCodingStyles(t *testing.T) {
 		worktree.On("Commit", "Add PHPCS config", &git.CommitOptions{}).Return(plumbing.NewHash(""), nil)
 
 		updateCodingStyles := NewUpdateCodingStyles(logger, runner, internal.Config{SkipCBF: false}, composer)
-		postCodeUpdate := &addon.PostCodeUpdateEvent{
-			Ctx:      t.Context(),
-			Path:     "/tmp",
-			Worktree: worktree,
-		}
+		postCodeUpdate := addon.NewPostCodeUpdateEvent(t.Context(), "/tmp", worktree)
 		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
 		assert.NoError(t, err)
 		runner.AssertExpectations(t)
@@ -79,11 +75,7 @@ func TestCodingStyles(t *testing.T) {
 		worktree.On("Commit", "Install drupal/coder", &git.CommitOptions{}).Return(plumbing.NewHash(""), nil)
 
 		updateCodingStyles := NewUpdateCodingStyles(logger, runner, internal.Config{SkipCBF: false}, composer)
-		postCodeUpdate := &addon.PostCodeUpdateEvent{
-			Ctx:      t.Context(),
-			Path:     "/tmp",
-			Worktree: worktree,
-		}
+		postCodeUpdate := addon.NewPostCodeUpdateEvent(t.Context(), "/tmp", worktree)
 		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
 		assert.NoError(t, err)
 		runner.AssertExpectations(t)
@@ -109,11 +101,7 @@ func TestCodingStyles(t *testing.T) {
 		composer.On("IsPackageInstalled", mock.Anything, "/path/to/repo", "drupal/coder").Return(true, nil)
 
 		updateCodingStyles := NewUpdateCodingStyles(logger, runner, internal.Config{SkipCBF: false}, composer)
-		postCodeUpdate := &addon.PostCodeUpdateEvent{
-			Ctx:      t.Context(),
-			Path:     "/path/to/repo",
-			Worktree: worktree,
-		}
+		postCodeUpdate := addon.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", worktree)
 		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
 		assert.NoError(t, err)
 		runner.AssertExpectations(t)
@@ -160,11 +148,7 @@ func TestCodingStyles(t *testing.T) {
 		worktree.On("Commit", "Update coding styles", &git.CommitOptions{}).Return(plumbing.NewHash(""), nil)
 
 		updateCodingStyles := NewUpdateCodingStyles(logger, runner, internal.Config{SkipCBF: false}, composer)
-		postCodeUpdate := &addon.PostCodeUpdateEvent{
-			Ctx:      t.Context(),
-			Path:     "/path/to/repo",
-			Worktree: worktree,
-		}
+		postCodeUpdate := addon.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", worktree)
 		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
 
 		assert.NoError(t, err)
@@ -208,11 +192,7 @@ func TestCodingStyles(t *testing.T) {
 		composer.On("IsPackageInstalled", mock.Anything, "/path/to/repo", "drupal/coder").Return(true, nil)
 
 		updateCodingStyles := NewUpdateCodingStyles(logger, runner, internal.Config{SkipCBF: false}, composer)
-		postCodeUpdate := &addon.PostCodeUpdateEvent{
-			Ctx:      t.Context(),
-			Path:     "/path/to/repo",
-			Worktree: worktree,
-		}
+		postCodeUpdate := addon.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", worktree)
 		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
 
 		assert.Error(t, err)

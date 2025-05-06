@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// DefaultAllowPlugins handles composer plugin management during updates
 type DefaultAllowPlugins struct {
 	addon.BasicAddon
 	logger   *zap.Logger
@@ -18,6 +19,7 @@ type DefaultAllowPlugins struct {
 	newAllowPlugins []string
 }
 
+// NewDefaultAllowPlugins creates a new DefaultAllowPlugins instance
 func NewDefaultAllowPlugins(logger *zap.Logger, composer composer.Runner) *DefaultAllowPlugins {
 	return &DefaultAllowPlugins{
 		logger:   logger,
@@ -25,58 +27,58 @@ func NewDefaultAllowPlugins(logger *zap.Logger, composer composer.Runner) *Defau
 	}
 }
 
-func (h *DefaultAllowPlugins) SubscribedEvents() map[string]interface{} {
+// SubscribedEvents returns the events this addon subscribes to
+func (ap *DefaultAllowPlugins) SubscribedEvents() map[string]interface{} {
 	return map[string]interface{}{
 		"pre-composer-update": event.ListenerItem{
 			Priority: event.Normal,
-			Listener: event.ListenerFunc(h.preComposerUpdateHandler),
+			Listener: event.ListenerFunc(ap.preComposerUpdateHandler),
 		},
 		"post-composer-update": event.ListenerItem{
 			Priority: event.Normal,
-			Listener: event.ListenerFunc(h.postComposerUpdateHandler),
+			Listener: event.ListenerFunc(ap.postComposerUpdateHandler),
 		},
 	}
 }
 
-func (h *DefaultAllowPlugins) RenderTemplate() (string, error) {
-	return h.Render("allowplugins.go.tmpl", struct {
+// RenderTemplate returns the rendered template for this addon
+func (ap *DefaultAllowPlugins) RenderTemplate() (string, error) {
+	return ap.Render("allowplugins.go.tmpl", struct {
 		NewAllowPlugins []string
 	}{
-		NewAllowPlugins: h.newAllowPlugins,
+		NewAllowPlugins: ap.newAllowPlugins,
 	})
 }
 
-func (h *DefaultAllowPlugins) preComposerUpdateHandler(e event.Event) error {
-
-	event := e.(*addon.PreComposerUpdateEvent)
+func (ap *DefaultAllowPlugins) preComposerUpdateHandler(e event.Event) error {
+	evt := e.(*addon.PreComposerUpdateEvent)
 
 	var err error
-	h.allowPlugins, err = h.composer.GetAllowPlugins(event.Ctx, event.Path)
+	ap.allowPlugins, err = ap.composer.GetAllowPlugins(evt.Context(), evt.Path())
 	if err != nil {
 		return fmt.Errorf("failed to get composer allow plugins: %w", err)
 	}
 
 	// Allow all plugins during update
-	return h.composer.SetConfig(event.Ctx, event.Path, "allow-plugins", "true")
+	return ap.composer.SetConfig(evt.Context(), evt.Path(), "allow-plugins", "true")
 }
 
-func (h *DefaultAllowPlugins) postComposerUpdateHandler(e event.Event) error {
+func (ap *DefaultAllowPlugins) postComposerUpdateHandler(e event.Event) error {
+	evt := e.(*addon.PostComposerUpdateEvent)
 
-	event := e.(*addon.PostComposerUpdateEvent)
-
-	allPlugins, err := h.composer.GetInstalledPlugins(event.Ctx, event.Path)
+	allPlugins, err := ap.composer.GetInstalledPlugins(evt.Context(), evt.Path())
 	if err != nil {
 		return err
 	}
 
 	// Add new plugins to allow-plugins
 	for key := range allPlugins {
-		if _, ok := h.allowPlugins[key]; !ok {
-			h.allowPlugins[key] = false
-			h.newAllowPlugins = append(h.newAllowPlugins, key)
+		if _, ok := ap.allowPlugins[key]; !ok {
+			ap.allowPlugins[key] = false
+			ap.newAllowPlugins = append(ap.newAllowPlugins, key)
 		}
 	}
-	if err := h.composer.SetAllowPlugins(event.Ctx, event.Path, h.allowPlugins); err != nil {
+	if err := ap.composer.SetAllowPlugins(evt.Context(), evt.Path(), ap.allowPlugins); err != nil {
 		return err
 	}
 

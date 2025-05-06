@@ -7,6 +7,7 @@ import (
 
 	"github.com/drupdater/drupdater/internal/addon"
 	"github.com/drupdater/drupdater/pkg/composer"
+	"github.com/go-git/go-git/v5"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 )
@@ -40,6 +41,7 @@ func TestDefaultAllowPlugins_PreComposerUpdateHandler(t *testing.T) {
 
 	ctx := context.Background()
 	path := "/some/path"
+	worktree := &git.Worktree{}
 
 	// Mock the GetAllowPlugins call
 	existingPlugins := map[string]bool{
@@ -52,10 +54,7 @@ func TestDefaultAllowPlugins_PreComposerUpdateHandler(t *testing.T) {
 
 	ap := NewDefaultAllowPlugins(logger, composerRunner)
 
-	e := &addon.PreComposerUpdateEvent{
-		Ctx:  ctx,
-		Path: path,
-	}
+	e := addon.NewPreComposerUpdateEvent(ctx, path, worktree, []string{}, []string{}, false)
 
 	err := ap.preComposerUpdateHandler(e)
 
@@ -70,6 +69,7 @@ func TestDefaultAllowPlugins_PostComposerUpdateHandler(t *testing.T) {
 
 	ctx := context.Background()
 	path := "/some/path"
+	worktree := &git.Worktree{}
 
 	// Setup existing plugins
 	existingPlugins := map[string]bool{
@@ -93,11 +93,7 @@ func TestDefaultAllowPlugins_PostComposerUpdateHandler(t *testing.T) {
 	ap := NewDefaultAllowPlugins(logger, composerRunner)
 	ap.allowPlugins = existingPlugins
 
-	e := &addon.PostComposerUpdateEvent{
-		Ctx:  ctx,
-		Path: path,
-	}
-
+	e := addon.NewPostComposerUpdateEvent(ctx, path, worktree)
 	err := ap.postComposerUpdateHandler(e)
 
 	assert.NoError(t, err)

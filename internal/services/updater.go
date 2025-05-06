@@ -40,15 +40,7 @@ func NewDefaultUpdater(logger *zap.Logger, settings drupal.SettingsService, conf
 
 func (us *DefaultUpdater) UpdateDependencies(ctx context.Context, path string, packagesToUpdate []string, worktree internal.Worktree, minimalChanges bool) error {
 
-	preComposerUpdateEvent := &addon.PreComposerUpdateEvent{
-		Ctx:              ctx,
-		Worktree:         worktree,
-		Path:             path,
-		PackagesToUpdate: packagesToUpdate,
-		PackagesToKeep:   []string{},
-		MinimalChanges:   minimalChanges,
-	}
-	preComposerUpdateEvent.SetName("pre-composer-update")
+	preComposerUpdateEvent := addon.NewPreComposerUpdateEvent(ctx, path, worktree, packagesToUpdate, []string{}, minimalChanges)
 	err := event.FireEvent(preComposerUpdateEvent)
 	if err != nil {
 		return fmt.Errorf("failed to fire event: %w", err)
@@ -58,12 +50,7 @@ func (us *DefaultUpdater) UpdateDependencies(ctx context.Context, path string, p
 		return err
 	}
 
-	postComposerUpdateEvent := &addon.PostComposerUpdateEvent{
-		Ctx:      ctx,
-		Worktree: worktree,
-		Path:     path,
-	}
-	postComposerUpdateEvent.SetName("post-composer-update")
+	postComposerUpdateEvent := addon.NewPostComposerUpdateEvent(ctx, path, worktree)
 	err = event.FireEvent(postComposerUpdateEvent)
 	if err != nil {
 		return fmt.Errorf("failed to fire event: %w", err)
@@ -107,14 +94,7 @@ func (us *DefaultUpdater) UpdateDrupal(ctx context.Context, path string, worktre
 
 	}
 
-	e := &addon.PostSiteUpdateEvent{
-		Ctx:      ctx,
-		Worktree: worktree,
-		Path:     path,
-		Site:     site,
-	}
-	e.SetName("post-site-update")
-
+	e := addon.NewPostSiteUpdateEvent(ctx, path, worktree, site)
 	if err := event.FireEvent(e); err != nil {
 		return nil, fmt.Errorf("failed to fire event: %w", err)
 	}

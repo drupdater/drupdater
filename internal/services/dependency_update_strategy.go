@@ -40,12 +40,7 @@ func (s *DependencyUpdateStrategy) ShouldContinue(_ []string) bool {
 }
 
 func (s *DependencyUpdateStrategy) PostUpdate(ctx context.Context, path string, worktree internal.Worktree) error {
-	e := &addon.PostCodeUpdateEvent{
-		Ctx:      ctx,
-		Worktree: worktree,
-		Path:     path,
-	}
-	e.SetName("post-code-update")
+	e := addon.NewPostCodeUpdateEvent(ctx, path, worktree)
 	event.AddEvent(e)
 
 	return event.FireEvent(e)

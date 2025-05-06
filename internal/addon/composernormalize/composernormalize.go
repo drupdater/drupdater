@@ -36,7 +36,7 @@ func (h *DefaultComposerNormalize) RenderTemplate() (string, error) {
 func (h *DefaultComposerNormalize) postComposerUpdateHandler(e event.Event) error {
 	event := e.(*addon.PostComposerUpdateEvent)
 
-	installed, err := h.composer.IsPackageInstalled(event.Ctx, event.Path, "ergebnis/composer-normalize")
+	installed, err := h.composer.IsPackageInstalled(event.Context(), event.Path(), "ergebnis/composer-normalize")
 	if err != nil {
 		return err
 	}
@@ -45,6 +45,6 @@ func (h *DefaultComposerNormalize) postComposerUpdateHandler(e event.Event) erro
 		return nil
 	}
 
-	_, err = h.composer.Normalize(event.Ctx, event.Path)
+	_, err = h.composer.Normalize(event.Context(), event.Path())
 	return err
 }

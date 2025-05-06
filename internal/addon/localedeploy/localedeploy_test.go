@@ -25,17 +25,14 @@ func TestUpdateTranslationsEventHandlerWithoutLocaleDeploy(t *testing.T) {
 	handler := NewUpdateTranslations(logger, mockDrush, mockRepository)
 
 	worktree := internal.NewMockWorktree(t)
+	path := "/tmp"
+	ctx := t.Context()
 
 	// Set up expectations
 	mockDrush.On("IsModuleEnabled", mock.Anything, "/tmp", "example.com", "locale_deploy").Return(false, nil)
 
 	// Verify the results
-	event := &addon.PostSiteUpdateEvent{
-		Ctx:      t.Context(),
-		Path:     "/tmp",
-		Worktree: worktree,
-		Site:     "example.com",
-	}
+	event := addon.NewPostSiteUpdateEvent(ctx, path, worktree, "example.com")
 	assert.NoError(t, handler.postSiteUpdateHandler(event))
 
 	mockDrush.AssertExpectations(t)
@@ -51,6 +48,8 @@ func TestUpdateTranslationsEventHandlerWitLocaleDeploy(t *testing.T) {
 	handler := NewUpdateTranslations(logger, mockDrush, mockRepository)
 
 	worktree := internal.NewMockWorktree(t)
+	path := "/tmp"
+	ctx := t.Context()
 
 	// Set up expectations
 	mockDrush.On("IsModuleEnabled", mock.Anything, "/tmp", "example.com", "locale_deploy").Return(true, nil)
@@ -64,12 +63,7 @@ func TestUpdateTranslationsEventHandlerWitLocaleDeploy(t *testing.T) {
 	worktree.On("Status").Return(git.Status{}, nil)
 
 	// Verify the results
-	event := &addon.PostSiteUpdateEvent{
-		Ctx:      t.Context(),
-		Path:     "/tmp",
-		Worktree: worktree,
-		Site:     "example.com",
-	}
+	event := addon.NewPostSiteUpdateEvent(ctx, path, worktree, "example.com")
 	assert.NoError(t, handler.postSiteUpdateHandler(event))
 
 	mockDrush.AssertExpectations(t)
