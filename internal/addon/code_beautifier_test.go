@@ -43,7 +43,7 @@ func TestCodingStyles(t *testing.T) {
 		worktree.On("Commit", "Add PHPCS config", &git.CommitOptions{}).Return(plumbing.NewHash(""), nil)
 
 		updateCodingStyles := NewCodeBeautifier(logger, runner, internal.Config{SkipCBF: false}, composer)
-		postCodeUpdate := NewPostCodeUpdateEvent(t.Context(), "/tmp", worktree)
+		postCodeUpdate := NewPostCodeUpdateEvent(t.Context(), "/tmp", worktree, internal.Config{})
 		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
 		assert.NoError(t, err)
 		runner.AssertExpectations(t)
@@ -74,7 +74,7 @@ func TestCodingStyles(t *testing.T) {
 		worktree.On("Commit", "Install drupal/coder", &git.CommitOptions{}).Return(plumbing.NewHash(""), nil)
 
 		updateCodingStyles := NewCodeBeautifier(logger, runner, internal.Config{SkipCBF: false}, composer)
-		postCodeUpdate := NewPostCodeUpdateEvent(t.Context(), "/tmp", worktree)
+		postCodeUpdate := NewPostCodeUpdateEvent(t.Context(), "/tmp", worktree, internal.Config{})
 		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
 		assert.NoError(t, err)
 		runner.AssertExpectations(t)
@@ -100,7 +100,7 @@ func TestCodingStyles(t *testing.T) {
 		composer.On("IsPackageInstalled", mock.Anything, "/path/to/repo", "drupal/coder").Return(true, nil)
 
 		updateCodingStyles := NewCodeBeautifier(logger, runner, internal.Config{SkipCBF: false}, composer)
-		postCodeUpdate := NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", worktree)
+		postCodeUpdate := NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", worktree, internal.Config{})
 		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
 		assert.NoError(t, err)
 		runner.AssertExpectations(t)
@@ -147,7 +147,7 @@ func TestCodingStyles(t *testing.T) {
 		worktree.On("Commit", "Update coding styles", &git.CommitOptions{}).Return(plumbing.NewHash(""), nil)
 
 		updateCodingStyles := NewCodeBeautifier(logger, runner, internal.Config{SkipCBF: false}, composer)
-		postCodeUpdate := NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", worktree)
+		postCodeUpdate := NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", worktree, internal.Config{})
 		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
 
 		assert.NoError(t, err)
@@ -191,7 +191,7 @@ func TestCodingStyles(t *testing.T) {
 		composer.On("IsPackageInstalled", mock.Anything, "/path/to/repo", "drupal/coder").Return(true, nil)
 
 		updateCodingStyles := NewCodeBeautifier(logger, runner, internal.Config{SkipCBF: false}, composer)
-		postCodeUpdate := NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", worktree)
+		postCodeUpdate := NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", worktree, internal.Config{})
 		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
 
 		assert.Error(t, err)

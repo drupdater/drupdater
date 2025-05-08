@@ -2,5 +2,3 @@ This automated merge request by [Drupdater](https://github.com/drupdater/drupdat
 {{ range .Addons -}}
 {{ .RenderTemplate }}
 {{ end }}
-{{ template "composer_diff" .ComposerDiff }}
-{{ if .UpdateHooks }}{{ template "update_hooks" .UpdateHooks }}{{ end }}

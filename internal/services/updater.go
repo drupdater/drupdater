@@ -16,7 +16,7 @@ import (
 
 type UpdaterService interface {
 	UpdateDependencies(ctx context.Context, path string, packagesToUpdate []string, worktree internal.Worktree, minimalChanges bool) error
-	UpdateDrupal(ctx context.Context, path string, worktree internal.Worktree, site string) (map[string]drush.UpdateHook, error)
+	UpdateDrupal(ctx context.Context, path string, worktree internal.Worktree, site string) error
 	IsAborted() bool
 }
 
@@ -44,7 +44,7 @@ func NewDefaultUpdater(logger *zap.Logger, settings drupal.SettingsService, conf
 
 func (us *DefaultUpdater) UpdateDependencies(ctx context.Context, path string, packagesToUpdate []string, worktree internal.Worktree, minimalChanges bool) error {
 
-	preComposerUpdateEvent := addon.NewPreComposerUpdateEvent(ctx, path, worktree, packagesToUpdate, []string{}, minimalChanges)
+	preComposerUpdateEvent := addon.NewPreComposerUpdateEvent(ctx, path, worktree, us.config, packagesToUpdate, []string{}, minimalChanges)
 	err := event.FireEvent(preComposerUpdateEvent)
 	if err != nil {
 		return fmt.Errorf("failed to fire event: %w", err)
@@ -64,7 +64,7 @@ func (us *DefaultUpdater) UpdateDependencies(ctx context.Context, path string, p
 		return nil
 	}
 
-	postComposerUpdateEvent := addon.NewPostComposerUpdateEvent(ctx, path, worktree)
+	postComposerUpdateEvent := addon.NewPostComposerUpdateEvent(ctx, path, worktree, us.config)
 	err = event.FireEvent(postComposerUpdateEvent)
 	if err != nil {
 		return fmt.Errorf("failed to fire event: %w", err)
@@ -81,44 +81,40 @@ func (us *DefaultUpdater) UpdateDependencies(ctx context.Context, path string, p
 	return nil
 }
 
-type UpdateHooksPerSite map[string]map[string]drush.UpdateHook
-
-func (us *DefaultUpdater) UpdateDrupal(ctx context.Context, path string, worktree internal.Worktree, site string) (map[string]drush.UpdateHook, error) {
+func (us *DefaultUpdater) UpdateDrupal(ctx context.Context, path string, worktree internal.Worktree, site string) error {
 
 	us.logger.Info("updating site", zap.String("site", site))
 
 	if err := us.settings.ConfigureDatabase(ctx, path, site); err != nil {
-		return nil, fmt.Errorf("failed to configure database: %w", err)
+		return fmt.Errorf("failed to configure database: %w", err)
 	}
 
-	hooks, err := us.drush.GetUpdateHooks(ctx, path, site)
-	us.logger.Debug("update hooks", zap.Any("hooks", hooks))
-	if err != nil {
-		return nil, fmt.Errorf("failed to get update hooks: %w", err)
-
+	preSiteUpdateEvent := addon.NewPreSiteUpdateEvent(ctx, path, worktree, us.config, site)
+	if err := event.FireEvent(preSiteUpdateEvent); err != nil {
+		return fmt.Errorf("failed to fire event: %w", err)
 	}
 
 	if err := us.drush.UpdateSite(ctx, path, site); err != nil {
-		return nil, fmt.Errorf("failed to update site: %w", err)
+		return fmt.Errorf("failed to update site: %w", err)
 
 	}
 
 	if err := us.drush.ConfigResave(ctx, path, site); err != nil {
-		return nil, fmt.Errorf("failed to resave config: %w", err)
+		return fmt.Errorf("failed to resave config: %w", err)
 
 	}
 
-	e := addon.NewPostSiteUpdateEvent(ctx, path, worktree, site)
-	if err := event.FireEvent(e); err != nil {
-		return nil, fmt.Errorf("failed to fire event: %w", err)
+	postSiteUpdateEvent := addon.NewPostSiteUpdateEvent(ctx, path, worktree, us.config, site)
+	if err := event.FireEvent(postSiteUpdateEvent); err != nil {
+		return fmt.Errorf("failed to fire event: %w", err)
 	}
 
 	us.logger.Info("export configuration", zap.String("site", site))
 	if err := us.drush.ExportConfiguration(ctx, path, site); err != nil {
-		return nil, fmt.Errorf("failed to export configuration: %w", err)
+		return fmt.Errorf("failed to export configuration: %w", err)
 	}
 
-	return hooks, nil
+	return nil
 }
 
 func (us *DefaultUpdater) IsAborted() bool {

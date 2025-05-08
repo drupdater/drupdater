@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/go-git/go-git/v5"
 	"github.com/stretchr/testify/assert"
@@ -53,7 +54,7 @@ func TestDefaultAllowPlugins_PreComposerUpdateHandler(t *testing.T) {
 
 	ap := NewComposerAllowPlugins(logger, composerRunner)
 
-	e := NewPreComposerUpdateEvent(ctx, path, worktree, []string{}, []string{}, false)
+	e := NewPreComposerUpdateEvent(ctx, path, worktree, internal.Config{}, []string{}, []string{}, false)
 
 	err := ap.preComposerUpdateHandler(e)
 
@@ -92,7 +93,7 @@ func TestDefaultAllowPlugins_PostComposerUpdateHandler(t *testing.T) {
 	ap := NewComposerAllowPlugins(logger, composerRunner)
 	ap.allowPlugins = existingPlugins
 
-	e := NewPostComposerUpdateEvent(ctx, path, worktree)
+	e := NewPostComposerUpdateEvent(ctx, path, worktree, internal.Config{})
 	err := ap.postComposerUpdateHandler(e)
 
 	assert.NoError(t, err)

@@ -67,6 +67,8 @@ var rootCmd = &cobra.Command{
 			addon.NewComposerAllowPlugins(logger, composer),
 			addon.NewComposerNormalizer(logger, composer),
 			addon.NewComposerPatches1(logger, composer, drupalOrg),
+			addon.NewComposerDiff(logger, composer),
+			addon.NewUpdateHooks(logger, drush),
 		)
 
 		for _, addon := range addonList {

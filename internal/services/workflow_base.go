@@ -17,7 +17,6 @@ import (
 	"github.com/drupdater/drupdater/internal/codehosting"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/drupal"
-	"github.com/drupdater/drupdater/pkg/drush"
 	"github.com/drupdater/drupdater/pkg/repo"
 	"github.com/gookit/event"
 
@@ -35,22 +34,15 @@ type WorkflowService interface {
 	StartUpdate(ctx context.Context, addons []addon.Addon) error
 }
 
-type WorkflowUpdateResult struct {
-	table string
-}
-
 type TemplateData struct {
-	ComposerDiff string
-	UpdateHooks  UpdateHooksPerSite
-	Addons       []addon.Addon
+	Addons []addon.Addon
 }
 
 type SharedUpdate struct {
-	Path                 string
-	Worktree             internal.Worktree
-	Repository           internal.Repository
-	WorkflowUpdateResult WorkflowUpdateResult
-	updateBranchName     string
+	Path             string
+	Worktree         internal.Worktree
+	Repository       internal.Repository
+	updateBranchName string
 }
 
 type WorkflowBaseService struct {
@@ -109,7 +101,6 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []addon.A
 
 	var sharedUpdate SharedUpdate
 	var updateDone = make(chan struct{})
-	var siteReports sync.Map // map[string]UpdateReport
 
 	// Limit concurrency to number of CPU cores
 	cpuLimit := runtime.NumCPU()
@@ -151,7 +142,7 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []addon.A
 				// Put the path back for other goroutines
 				installCodeDone <- installPath
 
-				if err := ws.installer.InstallDrupal(ctx, installPath, site); err != nil {
+				if err := ws.installer.Install(ctx, installPath, site); err != nil {
 					errCh <- err
 					cancel()
 					return
@@ -211,14 +202,12 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []addon.A
 			}
 
 			// Update Drupal hooks
-			updateHooks, err := ws.updater.UpdateDrupal(ctx, sharedUpdate.Path, sharedUpdate.Worktree, site)
+			err := ws.updater.UpdateDrupal(ctx, sharedUpdate.Path, sharedUpdate.Worktree, site)
 			if err != nil {
 				errCh <- err
 				cancel()
 				return
 			}
-
-			siteReports.Store(site, updateHooks)
 
 		}(site)
 	}
@@ -234,16 +223,7 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []addon.A
 	case <-done:
 
 		if !ws.config.DryRun {
-
-			finalReports := make(UpdateHooksPerSite)
-			siteReports.Range(func(key, value any) bool {
-				site := key.(string)
-				report := value.(map[string]drush.UpdateHook)
-				finalReports[site] = report
-				return true
-			})
-
-			return ws.publishWork(sharedUpdate.Repository, sharedUpdate.updateBranchName, sharedUpdate.WorkflowUpdateResult, finalReports, addons)
+			return ws.publishWork(sharedUpdate.Repository, sharedUpdate.updateBranchName, addons)
 		}
 		return nil
 	case err := <-errCh:
@@ -283,14 +263,7 @@ func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context) (SharedUpda
 		return SharedUpdate{}, fmt.Errorf("update aborted")
 	}
 
-	table, err := ws.composer.Diff(ctx, path, ws.config.Branch, true)
-	if err != nil {
-		return SharedUpdate{}, fmt.Errorf("failed to get diff: %w", err)
-	}
-
-	ws.logger.Sugar().Info("composer diff table", fmt.Sprintf("\n%s", table))
-
-	e := addon.NewPostCodeUpdateEvent(ctx, path, worktree)
+	e := addon.NewPostCodeUpdateEvent(ctx, path, worktree, ws.config)
 	event.FireEvent(e)
 
 	// Get composer lock hash for branch name
@@ -321,16 +294,15 @@ func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context) (SharedUpda
 	}
 
 	sharedUpdate := SharedUpdate{
-		Path:                 path,
-		Worktree:             worktree,
-		WorkflowUpdateResult: WorkflowUpdateResult{table: table},
-		Repository:           repository,
-		updateBranchName:     updateBranchName,
+		Path:             path,
+		Worktree:         worktree,
+		Repository:       repository,
+		updateBranchName: updateBranchName,
 	}
 	return sharedUpdate, nil
 }
 
-func (ws *WorkflowBaseService) publishWork(repository internal.Repository, updateBranchName string, result WorkflowUpdateResult, updateHooks UpdateHooksPerSite, addons []addon.Addon) error {
+func (ws *WorkflowBaseService) publishWork(repository internal.Repository, updateBranchName string, addons []addon.Addon) error {
 	err := repository.Push(&git.PushOptions{
 		RemoteName: "origin",
 		RefSpecs: []gitConfig.RefSpec{
@@ -348,16 +320,12 @@ func (ws *WorkflowBaseService) publishWork(repository internal.Repository, updat
 
 	title := fmt.Sprintf("%s: Drupal Maintenance Updates", ws.current.Format("January 2006"))
 
-	templateName := "dependency_update.go.tmpl"
-
 	data := TemplateData{
-		ComposerDiff: result.table,
-		UpdateHooks:  updateHooks,
-		Addons:       addons,
+		Addons: addons,
 	}
 
 	// Generate description and create MR
-	description, err := ws.GenerateDescription(data, templateName)
+	description, err := ws.GenerateDescription(data, "dependency_update.go.tmpl")
 	if err != nil {
 		return fmt.Errorf("failed to generate description: %w", err)
 	}

@@ -49,7 +49,7 @@ module:
 			drush:    drush,
 			settings: settingsService,
 		}
-		err = installer.InstallDrupal(t.Context(), "/tmp", "site1")
+		err = installer.Install(t.Context(), "/tmp", "site1")
 		if err != nil {
 			t.Fatalf("Failed to install Drupal: %v", err)
 		}
@@ -66,7 +66,7 @@ module:
 			drush:    drush,
 			settings: settingsService,
 		}
-		err = installer.InstallDrupal(t.Context(), "/tmp", "site1")
+		err = installer.Install(t.Context(), "/tmp", "site1")
 		if err == nil {
 			t.Fatalf("Expected an error but got nil")
 		}

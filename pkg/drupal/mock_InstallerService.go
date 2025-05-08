@@ -37,12 +37,12 @@ func (_m *MockInstallerService) EXPECT() *MockInstallerService_Expecter {
 	return &MockInstallerService_Expecter{mock: &_m.Mock}
 }
 
-// InstallDrupal provides a mock function for the type MockInstallerService
-func (_mock *MockInstallerService) InstallDrupal(ctx context.Context, path string, site string) error {
+// Install provides a mock function for the type MockInstallerService
+func (_mock *MockInstallerService) Install(ctx context.Context, path string, site string) error {
 	ret := _mock.Called(ctx, path, site)
 
 	if len(ret) == 0 {
-		panic("no return value specified for InstallDrupal")
+		panic("no return value specified for Install")
 	}
 
 	var r0 error
@@ -54,32 +54,32 @@ func (_mock *MockInstallerService) InstallDrupal(ctx context.Context, path strin
 	return r0
 }
 
-// MockInstallerService_InstallDrupal_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'InstallDrupal'
-type MockInstallerService_InstallDrupal_Call struct {
+// MockInstallerService_Install_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Install'
+type MockInstallerService_Install_Call struct {
 	*mock.Call
 }
 
-// InstallDrupal is a helper method to define mock.On call
+// Install is a helper method to define mock.On call
 //   - ctx
 //   - path
 //   - site
-func (_e *MockInstallerService_Expecter) InstallDrupal(ctx interface{}, path interface{}, site interface{}) *MockInstallerService_InstallDrupal_Call {
-	return &MockInstallerService_InstallDrupal_Call{Call: _e.mock.On("InstallDrupal", ctx, path, site)}
+func (_e *MockInstallerService_Expecter) Install(ctx interface{}, path interface{}, site interface{}) *MockInstallerService_Install_Call {
+	return &MockInstallerService_Install_Call{Call: _e.mock.On("Install", ctx, path, site)}
 }
 
-func (_c *MockInstallerService_InstallDrupal_Call) Run(run func(ctx context.Context, path string, site string)) *MockInstallerService_InstallDrupal_Call {
+func (_c *MockInstallerService_Install_Call) Run(run func(ctx context.Context, path string, site string)) *MockInstallerService_Install_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(string), args[2].(string))
 	})
 	return _c
 }
 
-func (_c *MockInstallerService_InstallDrupal_Call) Return(err error) *MockInstallerService_InstallDrupal_Call {
+func (_c *MockInstallerService_Install_Call) Return(err error) *MockInstallerService_Install_Call {
 	_c.Call.Return(err)
 	return _c
 }
 
-func (_c *MockInstallerService_InstallDrupal_Call) RunAndReturn(run func(ctx context.Context, path string, site string) error) *MockInstallerService_InstallDrupal_Call {
+func (_c *MockInstallerService_Install_Call) RunAndReturn(run func(ctx context.Context, path string, site string) error) *MockInstallerService_Install_Call {
 	_c.Call.Return(run)
 	return _c
 }

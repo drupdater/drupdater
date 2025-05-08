@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/go-git/go-git/v5"
 	"github.com/gookit/event"
@@ -38,7 +39,7 @@ func TestDefaultComposerNormalize_PostComposerUpdateHandler_PackageInstalled(t *
 
 	normalize := NewComposerNormalizer(logger, composer)
 
-	e := NewPostComposerUpdateEvent(ctx, testPath, worktree)
+	e := NewPostComposerUpdateEvent(ctx, testPath, worktree, internal.Config{})
 	err := normalize.postComposerUpdateHandler(e)
 
 	assert.NoError(t, err)
@@ -58,7 +59,7 @@ func TestDefaultComposerNormalize_PostComposerUpdateHandler_PackageNotInstalled(
 
 	normalize := NewComposerNormalizer(logger, composer)
 
-	e := NewPostComposerUpdateEvent(ctx, testPath, worktree)
+	e := NewPostComposerUpdateEvent(ctx, testPath, worktree, internal.Config{})
 
 	err := normalize.postComposerUpdateHandler(e)
 

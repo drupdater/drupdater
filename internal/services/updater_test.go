@@ -64,14 +64,6 @@ func TestUpdateDrupal(t *testing.T) {
 
 		settingsService.On("ConfigureDatabase", mock.Anything, "/tmp", "site1").Return(nil)
 
-		drushService.On("GetUpdateHooks", mock.Anything, "/tmp", "site1").Return(map[string]drush.UpdateHook{
-			"pre-update": {
-				Module:      "module",
-				UpdateID:    1,
-				Description: "description",
-				Type:        "type",
-			},
-		}, nil)
 		drushService.On("UpdateSite", mock.Anything, "/tmp", "site1").Return(nil)
 		drushService.On("ConfigResave", mock.Anything, "/tmp", "site1").Return(nil)
 		drushService.On("ExportConfiguration", mock.Anything, "/tmp", "site1").Return(nil)
@@ -82,16 +74,7 @@ func TestUpdateDrupal(t *testing.T) {
 			drush:    drushService,
 		}
 
-		result, err := updater.UpdateDrupal(t.Context(), "/tmp", worktree, "site1")
-
-		assert.Equal(t, map[string]drush.UpdateHook{
-			"pre-update": {
-				Module:      "module",
-				UpdateID:    1,
-				Description: "description",
-				Type:        "type",
-			},
-		}, result)
+		err := updater.UpdateDrupal(t.Context(), "/tmp", worktree, "site1")
 
 		settingsService.AssertExpectations(t)
 		worktree.AssertExpectations(t)

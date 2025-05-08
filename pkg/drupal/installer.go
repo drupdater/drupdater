@@ -9,7 +9,7 @@ import (
 )
 
 type InstallerService interface {
-	InstallDrupal(ctx context.Context, path string, site string) error
+	Install(ctx context.Context, path string, site string) error
 }
 
 type DefaultInstallerService struct {
@@ -26,7 +26,7 @@ func NewDefaultInstallerService(logger *zap.Logger, drush drush.Runner, settings
 	}
 }
 
-func (is *DefaultInstallerService) InstallDrupal(ctx context.Context, path string, site string) error {
+func (is *DefaultInstallerService) Install(ctx context.Context, path string, site string) error {
 
 	is.logger.Info("installing site", zap.String("site", site))
 
