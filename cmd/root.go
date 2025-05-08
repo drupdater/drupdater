@@ -48,43 +48,32 @@ var rootCmd = &cobra.Command{
 		updater := services.NewDefaultUpdater(logger, settings, config, composer, drush)
 		workflow := services.NewWorkflowBaseService(logger, config, updater, platform, git, installer, composer)
 
-		var strategy services.WorkflowStrategy
-		strategy = services.NewDependencyUpdateStrategy(logger, config)
-		if config.Security {
-			strategy = services.NewSecurityUpdateStrategy(logger, config, composer)
-		}
-
 		var addonList []addon.Addon
-
+		if config.Security {
+			addonList = append(addonList, addon.NewComposerAudit(logger, composer))
+		}
 		if !config.SkipCBF {
 			phpcsRunner := phpcs.NewCLI(logger)
-			phpcsPlugin := addon.NewCodeBeautifier(logger, phpcsRunner, config, composer)
-			addonList = append(addonList, phpcsPlugin)
+			addonList = append(addonList, addon.NewCodeBeautifier(logger, phpcsRunner, config, composer))
 		}
 
 		if !config.SkipRector {
 			rectorRunner := rector.NewCLI(logger)
-			rectorPlugin := addon.NewDeprecationsRemover(logger, rectorRunner, config, composer)
-			addonList = append(addonList, rectorPlugin)
+			addonList = append(addonList, addon.NewDeprecationsRemover(logger, rectorRunner, config, composer))
 		}
 
-		localeDeploy := addon.NewTranslationsUpdater(logger, drush, git)
-		addonList = append(addonList, localeDeploy)
-
-		allowPlugins := addon.NewComposerAllowPlugins(logger, composer)
-		addonList = append(addonList, allowPlugins)
-
-		composerNormalize := addon.NewComposerNormalizer(logger, composer)
-		addonList = append(addonList, composerNormalize)
-
-		composerPatches := addon.NewComposerPatches1(logger, composer, drupalOrg)
-		addonList = append(addonList, composerPatches)
+		addonList = append(addonList,
+			addon.NewTranslationsUpdater(logger, drush, git),
+			addon.NewComposerAllowPlugins(logger, composer),
+			addon.NewComposerNormalizer(logger, composer),
+			addon.NewComposerPatches1(logger, composer, drupalOrg),
+		)
 
 		for _, addon := range addonList {
 			event.AddSubscriber(addon)
 		}
 
-		err := workflow.StartUpdate(cmd.Context(), strategy, addonList)
+		err := workflow.StartUpdate(cmd.Context(), addonList)
 		if err != nil {
 			logger.Sugar().Error(err)
 			return err

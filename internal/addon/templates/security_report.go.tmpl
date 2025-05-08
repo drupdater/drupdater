@@ -1,4 +1,3 @@
-{{ define "security_report" -}}
 ## 🛡️ Security Report
 
 The security report shows fixed and unfixed security vulnerabilities. {{ if .NumUnresolvedIssues }}There are still {{ .NumUnresolvedIssues }} unresolved issues. Please investigate manually.{{ else }} All security issues have been resolved.{{ end }}
@@ -10,5 +9,4 @@ The security report shows fixed and unfixed security vulnerabilities. {{ if .Num
 {{ end -}}
 {{ range .AfterUpdateAdvisories -}}
 | ⛔     | {{ .CVE }} | {{ .Title }} | {{ .Severity }} | {{ .PackageName }} |
-{{ end -}}
 {{ end -}}

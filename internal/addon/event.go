@@ -122,3 +122,17 @@ func NewPostSiteUpdateEvent(ctx context.Context, path string, worktree internal.
 func (e *PostSiteUpdateEvent) Site() string {
 	return e.site
 }
+
+type PreMergeRequestCreateEvent struct {
+	event.BasicEvent
+	Title string
+}
+
+// NewPreMergeRequestCreateEvent creates a new PreMergeRequestCreateEvent instance
+func NewPreMergeRequestCreateEvent(title string) *PreMergeRequestCreateEvent {
+	evt := &PreMergeRequestCreateEvent{
+		Title: title,
+	}
+	evt.SetName("pre-merge-request-create")
+	return evt
+}

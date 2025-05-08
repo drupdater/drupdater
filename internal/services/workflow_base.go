@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"sync"
 	"text/template"
+	"time"
 
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/addon"
@@ -18,6 +19,7 @@ import (
 	"github.com/drupdater/drupdater/pkg/drupal"
 	"github.com/drupdater/drupdater/pkg/drush"
 	"github.com/drupdater/drupdater/pkg/repo"
+	"github.com/gookit/event"
 
 	git "github.com/go-git/go-git/v5"
 	gitConfig "github.com/go-git/go-git/v5/config"
@@ -30,11 +32,17 @@ import (
 var templates embed.FS
 
 type WorkflowService interface {
-	StartUpdate(ctx context.Context, strategy WorkflowStrategy, addons []addon.Addon) error
+	StartUpdate(ctx context.Context, addons []addon.Addon) error
 }
 
 type WorkflowUpdateResult struct {
 	table string
+}
+
+type TemplateData struct {
+	ComposerDiff string
+	UpdateHooks  UpdateHooksPerSite
+	Addons       []addon.Addon
 }
 
 type SharedUpdate struct {
@@ -53,6 +61,7 @@ type WorkflowBaseService struct {
 	repository repo.RepositoryService
 	installer  drupal.InstallerService
 	composer   composer.Runner
+	current    time.Time
 }
 
 func NewWorkflowBaseService(
@@ -72,10 +81,11 @@ func NewWorkflowBaseService(
 		repository: repository,
 		installer:  installer,
 		composer:   composerService,
+		current:    time.Now(),
 	}
 }
 
-func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, strategy WorkflowStrategy, addons []addon.Addon) error {
+func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []addon.Addon) error {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	defer func() {
@@ -163,7 +173,7 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, strategy Workflo
 		}()
 
 		var err error
-		update, err := ws.updateSharedCode(ctx, strategy)
+		update, err := ws.updateSharedCode(ctx)
 		if err != nil {
 			errCh <- err
 			cancel()
@@ -233,7 +243,7 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, strategy Workflo
 				return true
 			})
 
-			return ws.publishWork(sharedUpdate.Repository, sharedUpdate.updateBranchName, strategy, sharedUpdate.WorkflowUpdateResult, finalReports, addons)
+			return ws.publishWork(sharedUpdate.Repository, sharedUpdate.updateBranchName, sharedUpdate.WorkflowUpdateResult, finalReports, addons)
 		}
 		return nil
 	case err := <-errCh:
@@ -256,29 +266,21 @@ func (ws *WorkflowBaseService) installCode(ctx context.Context) (string, error) 
 	return path, nil
 }
 
-func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context, strategy WorkflowStrategy) (SharedUpdate, error) {
+func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context) (SharedUpdate, error) {
 	ws.logger.Info("cloning repository for update", zap.String("repositoryURL", ws.config.RepositoryURL), zap.String("branch", ws.config.Branch))
 	repository, worktree, path, err := ws.repository.CloneRepository(ws.config.RepositoryURL, ws.config.Branch, ws.config.Token)
 	if err != nil {
 		return SharedUpdate{}, fmt.Errorf("failed to clone repository: %w", err)
 	}
 
-	// Use strategy to determine what to update
-	packagesToUpdate, minimalChanges, err := strategy.PreUpdate(ctx, path)
-	if err != nil {
-
-		return SharedUpdate{}, fmt.Errorf("failed to pre-update: %w", err)
-	}
-
-	// Check if we should continue with the update
-	if !strategy.ShouldContinue(packagesToUpdate) {
-		return SharedUpdate{}, fmt.Errorf("update skipped by strategy")
-	}
-
 	ws.logger.Info("updating dependencies")
-	err = ws.updater.UpdateDependencies(ctx, path, packagesToUpdate, worktree, minimalChanges)
+	err = ws.updater.UpdateDependencies(ctx, path, []string{}, worktree, false)
 	if err != nil {
 		return SharedUpdate{}, fmt.Errorf("failed to update dependencies: %w", err)
+	}
+
+	if ws.updater.IsAborted() {
+		return SharedUpdate{}, fmt.Errorf("update aborted")
 	}
 
 	table, err := ws.composer.Diff(ctx, path, ws.config.Branch, true)
@@ -286,13 +288,18 @@ func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context, strategy Wo
 		return SharedUpdate{}, fmt.Errorf("failed to get diff: %w", err)
 	}
 
-	if table == "" {
-		return SharedUpdate{}, fmt.Errorf("no packages were updated, skipping update")
-	}
-
 	ws.logger.Sugar().Info("composer diff table", fmt.Sprintf("\n%s", table))
 
-	updateBranchName := strategy.GenerateBranchName(path)
+	e := addon.NewPostCodeUpdateEvent(ctx, path, worktree)
+	event.FireEvent(e)
+
+	// Get composer lock hash for branch name
+	composerLockHash, err := ws.composer.GetLockHash(path)
+	if err != nil {
+		return SharedUpdate{}, err
+	}
+
+	updateBranchName := fmt.Sprintf("update-%s", composerLockHash)
 
 	// Check if branch already exists
 	exists, err := ws.repository.BranchExists(repository, updateBranchName)
@@ -313,11 +320,6 @@ func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context, strategy Wo
 		return SharedUpdate{}, fmt.Errorf("failed to checkout branch: %w", err)
 	}
 
-	// Run post-update actions from strategy
-	if err := strategy.PostUpdate(ctx, path, worktree); err != nil {
-		return SharedUpdate{}, fmt.Errorf("failed to post-update: %w", err)
-	}
-
 	sharedUpdate := SharedUpdate{
 		Path:                 path,
 		Worktree:             worktree,
@@ -328,7 +330,7 @@ func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context, strategy Wo
 	return sharedUpdate, nil
 }
 
-func (ws *WorkflowBaseService) publishWork(repository internal.Repository, updateBranchName string, strategy WorkflowStrategy, result WorkflowUpdateResult, updateHooks UpdateHooksPerSite, addons []addon.Addon) error {
+func (ws *WorkflowBaseService) publishWork(repository internal.Repository, updateBranchName string, result WorkflowUpdateResult, updateHooks UpdateHooksPerSite, addons []addon.Addon) error {
 	err := repository.Push(&git.PushOptions{
 		RemoteName: "origin",
 		RefSpecs: []gitConfig.RefSpec{
@@ -344,14 +346,14 @@ func (ws *WorkflowBaseService) publishWork(repository internal.Repository, updat
 		return fmt.Errorf("failed to push changes: %w", err)
 	}
 
-	// Use strategy to get PR details
-	title, templateName := strategy.GeneratePRDetails()
+	title := fmt.Sprintf("%s: Drupal Maintenance Updates", ws.current.Format("January 2006"))
 
-	// Get template data from strategy
-	data, err := strategy.GetTemplateData(result, updateHooks)
-	data.Addons = addons
-	if err != nil {
-		return fmt.Errorf("failed to get template data: %w", err)
+	templateName := "dependency_update.go.tmpl"
+
+	data := TemplateData{
+		ComposerDiff: result.table,
+		UpdateHooks:  updateHooks,
+		Addons:       addons,
 	}
 
 	// Generate description and create MR
@@ -360,7 +362,10 @@ func (ws *WorkflowBaseService) publishWork(repository internal.Repository, updat
 		return fmt.Errorf("failed to generate description: %w", err)
 	}
 
-	mr, err := ws.platform.CreateMergeRequest(title, description, updateBranchName, ws.config.Branch)
+	e := addon.NewPreMergeRequestCreateEvent(title)
+	event.FireEvent(e)
+
+	mr, err := ws.platform.CreateMergeRequest(e.Title, description, updateBranchName, ws.config.Branch)
 	if err != nil {
 		return fmt.Errorf("failed to create merge request: %w", err)
 	}

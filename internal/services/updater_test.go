@@ -25,7 +25,14 @@ func TestUpdateDependencies(t *testing.T) {
 		drupalOrgService := drupalorg.NewMockClient(t)
 		worktree := internal.NewMockWorktree(t)
 
-		composerService.On("Update", mock.Anything, "/tmp", []string{}, []string{}, false, false).Return("", nil)
+		composerService.On("Update", mock.Anything, "/tmp", []string{}, []string{}, false, false).Return([]composer.PackageChange{
+			{
+				Package: "drupal/core",
+				Action:  "update",
+				From:    "9.4.0",
+				To:      "9.4.1",
+			},
+		}, nil)
 
 		worktree.On("AddGlob", "composer.*").Return(nil)
 		worktree.On("Commit", "Update composer.json and composer.lock", &git.CommitOptions{}).Return(plumbing.NewHash(""), nil)

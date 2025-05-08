@@ -21,7 +21,7 @@ func TestDefaultComposerNormalize_SubscribedEvents(t *testing.T) {
 	events := normalize.SubscribedEvents()
 
 	assert.Contains(t, events, "post-composer-update", "Should subscribe to post-composer-update event")
-	assert.Equal(t, event.Max, events["post-composer-update"].(event.ListenerItem).Priority, "Should have maximum priority")
+	assert.Equal(t, event.Min, events["post-composer-update"].(event.ListenerItem).Priority, "Should have maximum priority")
 }
 
 func TestDefaultComposerNormalize_PostComposerUpdateHandler_PackageInstalled(t *testing.T) {

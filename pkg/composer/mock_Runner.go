@@ -645,65 +645,6 @@ func (_c *MockRunner_IsPackageInstalled_Call) RunAndReturn(run func(ctx context.
 	return _c
 }
 
-// ListPendingUpdates provides a mock function for the type MockRunner
-func (_mock *MockRunner) ListPendingUpdates(ctx context.Context, dir string, packagesToUpdate []string, minimalChanges bool) ([]PackageChange, error) {
-	ret := _mock.Called(ctx, dir, packagesToUpdate, minimalChanges)
-
-	if len(ret) == 0 {
-		panic("no return value specified for ListPendingUpdates")
-	}
-
-	var r0 []PackageChange
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, []string, bool) ([]PackageChange, error)); ok {
-		return returnFunc(ctx, dir, packagesToUpdate, minimalChanges)
-	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, []string, bool) []PackageChange); ok {
-		r0 = returnFunc(ctx, dir, packagesToUpdate, minimalChanges)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]PackageChange)
-		}
-	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string, []string, bool) error); ok {
-		r1 = returnFunc(ctx, dir, packagesToUpdate, minimalChanges)
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// MockRunner_ListPendingUpdates_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListPendingUpdates'
-type MockRunner_ListPendingUpdates_Call struct {
-	*mock.Call
-}
-
-// ListPendingUpdates is a helper method to define mock.On call
-//   - ctx
-//   - dir
-//   - packagesToUpdate
-//   - minimalChanges
-func (_e *MockRunner_Expecter) ListPendingUpdates(ctx interface{}, dir interface{}, packagesToUpdate interface{}, minimalChanges interface{}) *MockRunner_ListPendingUpdates_Call {
-	return &MockRunner_ListPendingUpdates_Call{Call: _e.mock.On("ListPendingUpdates", ctx, dir, packagesToUpdate, minimalChanges)}
-}
-
-func (_c *MockRunner_ListPendingUpdates_Call) Run(run func(ctx context.Context, dir string, packagesToUpdate []string, minimalChanges bool)) *MockRunner_ListPendingUpdates_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].([]string), args[3].(bool))
-	})
-	return _c
-}
-
-func (_c *MockRunner_ListPendingUpdates_Call) Return(packageChanges []PackageChange, err error) *MockRunner_ListPendingUpdates_Call {
-	_c.Call.Return(packageChanges, err)
-	return _c
-}
-
-func (_c *MockRunner_ListPendingUpdates_Call) RunAndReturn(run func(ctx context.Context, dir string, packagesToUpdate []string, minimalChanges bool) ([]PackageChange, error)) *MockRunner_ListPendingUpdates_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // Normalize provides a mock function for the type MockRunner
 func (_mock *MockRunner) Normalize(ctx context.Context, dir string) (string, error) {
 	ret := _mock.Called(ctx, dir)
@@ -983,22 +924,24 @@ func (_c *MockRunner_SetConfig_Call) RunAndReturn(run func(ctx context.Context, 
 }
 
 // Update provides a mock function for the type MockRunner
-func (_mock *MockRunner) Update(ctx context.Context, dir string, packagesToUpdate []string, packagesToKeep []string, minimalChanges bool, dryRun bool) (string, error) {
+func (_mock *MockRunner) Update(ctx context.Context, dir string, packagesToUpdate []string, packagesToKeep []string, minimalChanges bool, dryRun bool) ([]PackageChange, error) {
 	ret := _mock.Called(ctx, dir, packagesToUpdate, packagesToKeep, minimalChanges, dryRun)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Update")
 	}
 
-	var r0 string
+	var r0 []PackageChange
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, []string, []string, bool, bool) (string, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, []string, []string, bool, bool) ([]PackageChange, error)); ok {
 		return returnFunc(ctx, dir, packagesToUpdate, packagesToKeep, minimalChanges, dryRun)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, []string, []string, bool, bool) string); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, []string, []string, bool, bool) []PackageChange); ok {
 		r0 = returnFunc(ctx, dir, packagesToUpdate, packagesToKeep, minimalChanges, dryRun)
 	} else {
-		r0 = ret.Get(0).(string)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]PackageChange)
+		}
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, string, []string, []string, bool, bool) error); ok {
 		r1 = returnFunc(ctx, dir, packagesToUpdate, packagesToKeep, minimalChanges, dryRun)
@@ -1031,12 +974,12 @@ func (_c *MockRunner_Update_Call) Run(run func(ctx context.Context, dir string, 
 	return _c
 }
 
-func (_c *MockRunner_Update_Call) Return(s string, err error) *MockRunner_Update_Call {
-	_c.Call.Return(s, err)
+func (_c *MockRunner_Update_Call) Return(packageChanges []PackageChange, err error) *MockRunner_Update_Call {
+	_c.Call.Return(packageChanges, err)
 	return _c
 }
 
-func (_c *MockRunner_Update_Call) RunAndReturn(run func(ctx context.Context, dir string, packagesToUpdate []string, packagesToKeep []string, minimalChanges bool, dryRun bool) (string, error)) *MockRunner_Update_Call {
+func (_c *MockRunner_Update_Call) RunAndReturn(run func(ctx context.Context, dir string, packagesToUpdate []string, packagesToKeep []string, minimalChanges bool, dryRun bool) ([]PackageChange, error)) *MockRunner_Update_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -22,7 +22,7 @@ func NewComposerNormalizer(logger *zap.Logger, composer composer.Runner) *Compos
 func (h *ComposerNormalizer) SubscribedEvents() map[string]interface{} {
 	return map[string]interface{}{
 		"post-composer-update": event.ListenerItem{
-			Priority: event.Max,
+			Priority: event.Min,
 			Listener: event.ListenerFunc(h.postComposerUpdateHandler),
 		},
 	}

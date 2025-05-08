@@ -17,6 +17,7 @@ import (
 type UpdaterService interface {
 	UpdateDependencies(ctx context.Context, path string, packagesToUpdate []string, worktree internal.Worktree, minimalChanges bool) error
 	UpdateDrupal(ctx context.Context, path string, worktree internal.Worktree, site string) (map[string]drush.UpdateHook, error)
+	IsAborted() bool
 }
 
 type DefaultUpdater struct {
@@ -25,6 +26,8 @@ type DefaultUpdater struct {
 	config   internal.Config
 	composer composer.Runner
 	drush    drush.Runner
+
+	aborted bool
 }
 
 func NewDefaultUpdater(logger *zap.Logger, settings drupal.SettingsService, config internal.Config, composer composer.Runner, drush drush.Runner) *DefaultUpdater {
@@ -35,6 +38,7 @@ func NewDefaultUpdater(logger *zap.Logger, settings drupal.SettingsService, conf
 		config:   config,
 		composer: composer,
 		drush:    drush,
+		aborted:  false,
 	}
 }
 
@@ -45,9 +49,19 @@ func (us *DefaultUpdater) UpdateDependencies(ctx context.Context, path string, p
 	if err != nil {
 		return fmt.Errorf("failed to fire event: %w", err)
 	}
+	if preComposerUpdateEvent.IsAborted() {
+		us.aborted = true
+		return nil
+	}
 
-	if _, err = us.composer.Update(ctx, path, preComposerUpdateEvent.PackagesToUpdate, preComposerUpdateEvent.PackagesToKeep, preComposerUpdateEvent.MinimalChanges, false); err != nil {
+	changes, err := us.composer.Update(ctx, path, preComposerUpdateEvent.PackagesToUpdate, preComposerUpdateEvent.PackagesToKeep, preComposerUpdateEvent.MinimalChanges, false)
+	if err != nil {
 		return err
+	}
+	if len(changes) == 0 {
+		us.logger.Info("no changes detected")
+		us.aborted = true
+		return nil
 	}
 
 	postComposerUpdateEvent := addon.NewPostComposerUpdateEvent(ctx, path, worktree)
@@ -105,4 +119,8 @@ func (us *DefaultUpdater) UpdateDrupal(ctx context.Context, path string, worktre
 	}
 
 	return hooks, nil
+}
+
+func (us *DefaultUpdater) IsAborted() bool {
+	return us.aborted
 }

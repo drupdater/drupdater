@@ -96,6 +96,7 @@ func (h *ComposerPatches1) preComposerUpdateHandler(e event.Event) error {
 	worktree := event.Worktree()
 	packagesToUpdate := event.PackagesToUpdate
 	minimalChanges := event.MinimalChanges
+	packagesToKeep := event.PackagesToKeep
 
 	patches := make(map[string]map[string]string)
 	patchesString, err := h.composer.GetConfig(ctx, path, "extra.patches")
@@ -108,7 +109,7 @@ func (h *ComposerPatches1) preComposerUpdateHandler(e event.Event) error {
 		return fmt.Errorf("failed to unmarshal patches: %w", err)
 	}
 
-	operations, err := h.composer.ListPendingUpdates(ctx, path, packagesToUpdate, minimalChanges)
+	operations, err := h.composer.Update(ctx, path, packagesToUpdate, packagesToKeep, minimalChanges, true)
 	if err != nil {
 		return fmt.Errorf("failed to get composer updates: %w", err)
 	}
