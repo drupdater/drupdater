@@ -27,6 +27,11 @@ jobs:
     - name: Test
       run: go test -v ./... -coverprofile=coverage.txt
 
+    - name: Upload results to Codecov
+      uses: codecov/codecov-action@v5
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        
   lint:
     name: lint
     runs-on: ubuntu-latest
