@@ -3,13 +3,15 @@ package addon
 import (
 	"fmt"
 
+	"github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/internal/services"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/gookit/event"
 	"go.uber.org/zap"
 )
 
 type ComposerDiff struct {
-	BasicAddon
+	internal.BasicAddon
 	logger   *zap.Logger
 	composer composer.Runner
 
@@ -25,9 +27,9 @@ func NewComposerDiff(logger *zap.Logger, composer composer.Runner) *ComposerDiff
 
 func (h *ComposerDiff) SubscribedEvents() map[string]interface{} {
 	return map[string]interface{}{
-		"post-code-update": event.ListenerItem{
+		"post-composer-update": event.ListenerItem{
 			Priority: event.Min,
-			Listener: event.ListenerFunc(h.postCodeUpdateHandler),
+			Listener: event.ListenerFunc(h.postComposerUpdateHandler),
 		},
 	}
 }
@@ -36,10 +38,10 @@ func (h *ComposerDiff) RenderTemplate() (string, error) {
 	return h.Render("composer_diff.go.tmpl", h.table)
 }
 
-func (h *ComposerDiff) postCodeUpdateHandler(e event.Event) error {
-	event := e.(*PostCodeUpdateEvent)
+func (h *ComposerDiff) postComposerUpdateHandler(e event.Event) error {
+	event := e.(*services.PostComposerUpdateEvent)
 
-	table, err := h.composer.Diff(event.Context(), event.Path(), event.Config().Branch, true)
+	table, err := h.composer.Diff(event.Context(), event.Path(), true)
 	if err != nil {
 		return fmt.Errorf("failed to get diff: %w", err)
 	}

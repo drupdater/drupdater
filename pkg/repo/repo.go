@@ -89,14 +89,6 @@ func (rs *GitRepositoryService) CloneRepository(repository string, branch string
 		}
 	}
 
-	// Create initial temporary branch
-	if err := w.Checkout(&git.CheckoutOptions{
-		Branch: plumbing.NewBranchReferenceName(hash),
-		Create: true,
-	}); err != nil {
-		return checkout, w, "", fmt.Errorf("failed to checkout branch: %w", err)
-	}
-
 	return checkout, w, w.Filesystem.Root(), nil
 }
 

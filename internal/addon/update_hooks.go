@@ -3,13 +3,15 @@ package addon
 import (
 	"fmt"
 
+	"github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/internal/services"
 	"github.com/drupdater/drupdater/pkg/drush"
 	"github.com/gookit/event"
 	"go.uber.org/zap"
 )
 
 type UpdateHooks struct {
-	BasicAddon
+	internal.BasicAddon
 	logger *zap.Logger
 	drush  drush.Runner
 
@@ -40,9 +42,9 @@ func (h *UpdateHooks) RenderTemplate() (string, error) {
 type UpdateHooksPerSite map[string]map[string]drush.UpdateHook
 
 func (h *UpdateHooks) preSiteUpdateHandler(e event.Event) error {
-	event := e.(*PreSiteUpdateEvent)
+	event := e.(*services.PreSiteUpdateEvent)
 
-	hooks, err := h.drush.GetUpdateHooks(event.Context(), event.Path(), event.site)
+	hooks, err := h.drush.GetUpdateHooks(event.Context(), event.Path(), event.Site())
 	h.logger.Debug("update hooks", zap.Any("hooks", hooks))
 	if err != nil {
 		return fmt.Errorf("failed to get update hooks: %w", err)
@@ -51,7 +53,7 @@ func (h *UpdateHooks) preSiteUpdateHandler(e event.Event) error {
 		h.logger.Debug("no update hooks found")
 		return nil
 	}
-	h.hooks[event.site] = hooks
+	h.hooks[event.Site()] = hooks
 
 	return err
 }

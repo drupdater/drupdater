@@ -2,7 +2,7 @@
 // github.com/vektra/mockery
 // template: testify
 
-package addon
+package internal
 
 import (
 	mock "github.com/stretchr/testify/mock"

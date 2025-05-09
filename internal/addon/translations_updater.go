@@ -3,6 +3,7 @@ package addon
 import (
 	"fmt"
 
+	"github.com/drupdater/drupdater/internal/services"
 	"github.com/drupdater/drupdater/pkg/drush"
 	"github.com/drupdater/drupdater/pkg/repo"
 	"github.com/go-git/go-git/v5"
@@ -43,7 +44,7 @@ func (tu *TranslationsUpdater) RenderTemplate() (string, error) {
 }
 
 func (tu *TranslationsUpdater) postSiteUpdateHandler(e event.Event) error {
-	evt := e.(*PostSiteUpdateEvent)
+	evt := e.(*services.PostSiteUpdateEvent)
 
 	enabled, err := tu.drush.IsModuleEnabled(evt.Context(), evt.Path(), evt.Site(), "locale_deploy")
 	if !enabled || err != nil {

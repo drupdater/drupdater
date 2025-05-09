@@ -37,6 +37,53 @@ func (_m *MockInstallerService) EXPECT() *MockInstallerService_Expecter {
 	return &MockInstallerService_Expecter{mock: &_m.Mock}
 }
 
+// ConfigureDatabase provides a mock function for the type MockInstallerService
+func (_mock *MockInstallerService) ConfigureDatabase(ctx context.Context, dir string, site string) error {
+	ret := _mock.Called(ctx, dir, site)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ConfigureDatabase")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = returnFunc(ctx, dir, site)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockInstallerService_ConfigureDatabase_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ConfigureDatabase'
+type MockInstallerService_ConfigureDatabase_Call struct {
+	*mock.Call
+}
+
+// ConfigureDatabase is a helper method to define mock.On call
+//   - ctx
+//   - dir
+//   - site
+func (_e *MockInstallerService_Expecter) ConfigureDatabase(ctx interface{}, dir interface{}, site interface{}) *MockInstallerService_ConfigureDatabase_Call {
+	return &MockInstallerService_ConfigureDatabase_Call{Call: _e.mock.On("ConfigureDatabase", ctx, dir, site)}
+}
+
+func (_c *MockInstallerService_ConfigureDatabase_Call) Run(run func(ctx context.Context, dir string, site string)) *MockInstallerService_ConfigureDatabase_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockInstallerService_ConfigureDatabase_Call) Return(err error) *MockInstallerService_ConfigureDatabase_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockInstallerService_ConfigureDatabase_Call) RunAndReturn(run func(ctx context.Context, dir string, site string) error) *MockInstallerService_ConfigureDatabase_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Install provides a mock function for the type MockInstallerService
 func (_mock *MockInstallerService) Install(ctx context.Context, path string, site string) error {
 	ret := _mock.Called(ctx, path, site)
@@ -80,6 +127,53 @@ func (_c *MockInstallerService_Install_Call) Return(err error) *MockInstallerSer
 }
 
 func (_c *MockInstallerService_Install_Call) RunAndReturn(run func(ctx context.Context, path string, site string) error) *MockInstallerService_Install_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// RemoveProfile provides a mock function for the type MockInstallerService
+func (_mock *MockInstallerService) RemoveProfile(ctx context.Context, dir string, site string) error {
+	ret := _mock.Called(ctx, dir, site)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RemoveProfile")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = returnFunc(ctx, dir, site)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockInstallerService_RemoveProfile_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RemoveProfile'
+type MockInstallerService_RemoveProfile_Call struct {
+	*mock.Call
+}
+
+// RemoveProfile is a helper method to define mock.On call
+//   - ctx
+//   - dir
+//   - site
+func (_e *MockInstallerService_Expecter) RemoveProfile(ctx interface{}, dir interface{}, site interface{}) *MockInstallerService_RemoveProfile_Call {
+	return &MockInstallerService_RemoveProfile_Call{Call: _e.mock.On("RemoveProfile", ctx, dir, site)}
+}
+
+func (_c *MockInstallerService_RemoveProfile_Call) Run(run func(ctx context.Context, dir string, site string)) *MockInstallerService_RemoveProfile_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *MockInstallerService_RemoveProfile_Call) Return(err error) *MockInstallerService_RemoveProfile_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockInstallerService_RemoveProfile_Call) RunAndReturn(run func(ctx context.Context, dir string, site string) error) *MockInstallerService_RemoveProfile_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -3,6 +3,8 @@ package addon
 import (
 	"fmt"
 
+	"github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/internal/services"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/gookit/event"
 	"go.uber.org/zap"
@@ -10,7 +12,7 @@ import (
 
 // ComposerAllowPlugins handles composer plugin management during updates
 type ComposerAllowPlugins struct {
-	BasicAddon
+	internal.BasicAddon
 	logger   *zap.Logger
 	composer composer.Runner
 
@@ -50,7 +52,7 @@ func (ap *ComposerAllowPlugins) RenderTemplate() (string, error) {
 }
 
 func (ap *ComposerAllowPlugins) preComposerUpdateHandler(e event.Event) error {
-	evt := e.(*PreComposerUpdateEvent)
+	evt := e.(*services.PreComposerUpdateEvent)
 
 	var err error
 	ap.allowPlugins, err = ap.composer.GetAllowPlugins(evt.Context(), evt.Path())
@@ -63,7 +65,7 @@ func (ap *ComposerAllowPlugins) preComposerUpdateHandler(e event.Event) error {
 }
 
 func (ap *ComposerAllowPlugins) postComposerUpdateHandler(e event.Event) error {
-	evt := e.(*PostComposerUpdateEvent)
+	evt := e.(*services.PostComposerUpdateEvent)
 
 	allPlugins, err := ap.composer.GetInstalledPlugins(evt.Context(), evt.Path())
 	if err != nil {

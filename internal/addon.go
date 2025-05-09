@@ -1,12 +1,18 @@
-package addon
+package internal
 
 import (
 	"bytes"
+	"embed"
 	"fmt"
 	"html/template"
 
 	"github.com/gookit/event"
 )
+
+// templates contains embedded template files for addons
+//
+//go:embed addon/templates
+var templates embed.FS
 
 type Addon interface {
 	event.Subscriber
@@ -18,7 +24,7 @@ type BasicAddon struct {
 }
 
 func (h *BasicAddon) Render(name string, data any) (string, error) {
-	tmpl, err := template.ParseFS(templates, "templates/*.go.tmpl")
+	tmpl, err := template.ParseFS(templates, "addon/templates/*.go.tmpl")
 	if err != nil {
 		return "", fmt.Errorf("failed to parse template: %w", err)
 	}

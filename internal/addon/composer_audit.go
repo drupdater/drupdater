@@ -5,6 +5,8 @@ import (
 	"slices"
 	"time"
 
+	"github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/internal/services"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/gookit/event"
 
@@ -19,7 +21,7 @@ type SecurityReport struct {
 
 // ComposerAudit handles updating translations for Drupal sites
 type ComposerAudit struct {
-	BasicAddon
+	internal.BasicAddon
 	logger   *zap.Logger
 	composer composer.Runner
 	current  time.Time
@@ -65,7 +67,7 @@ func (tu *ComposerAudit) RenderTemplate() (string, error) {
 }
 
 func (tu *ComposerAudit) preComposerUpdateHandler(e event.Event) error {
-	evt := e.(*PreComposerUpdateEvent)
+	evt := e.(*services.PreComposerUpdateEvent)
 	var err error
 
 	tu.beforeAudit, err = tu.composer.Audit(evt.Context(), evt.Path())
@@ -98,7 +100,7 @@ func (tu *ComposerAudit) preComposerUpdateHandler(e event.Event) error {
 }
 
 func (tu *ComposerAudit) postCodeUpdateHandler(e event.Event) error {
-	evt := e.(*PostCodeUpdateEvent)
+	evt := e.(*services.PostCodeUpdateEvent)
 
 	var err error
 	tu.afterAudit, err = tu.composer.Audit(evt.Context(), evt.Path())
@@ -128,7 +130,7 @@ func (tu *ComposerAudit) GetFixedAdvisories() []composer.Advisory {
 }
 
 func (tu *ComposerAudit) preMergeRequestCreateHandler(e event.Event) error {
-	evt := e.(*PreMergeRequestCreateEvent)
+	evt := e.(*services.PreMergeRequestCreateEvent)
 
 	evt.Title = fmt.Sprintf("%s: Drupal Security Updates", tu.current.Format("2006-01-02"))
 

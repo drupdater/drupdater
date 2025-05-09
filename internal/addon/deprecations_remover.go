@@ -2,6 +2,7 @@ package addon
 
 import (
 	"github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/internal/services"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/rector"
 	"github.com/gookit/event"
@@ -44,7 +45,7 @@ func (dr *DeprecationsRemover) RenderTemplate() (string, error) {
 }
 
 func (dr *DeprecationsRemover) postCodeUpdateHandler(e event.Event) error {
-	evt := e.(*PostCodeUpdateEvent)
+	evt := e.(*services.PostCodeUpdateEvent)
 
 	dr.logger.Info("remove deprecations")
 

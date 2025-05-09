@@ -40,15 +40,13 @@ var rootCmd = &cobra.Command{
 		drush := drush.NewCLI(logger, cache)
 		composer := composer.NewCLI(logger)
 		drupalOrg := drupalorg.NewHTTPClient(logger)
-		settings := drupal.NewDefaultSettingsService(logger, drush, composer)
-		installer := drupal.NewDefaultInstallerService(logger, drush, settings)
+		installer := drupal.NewDefaultInstallerService(logger, drush, composer)
 		vcsProviderFactory := codehosting.NewDefaultVcsProviderFactory()
 		platform := vcsProviderFactory.Create(config.RepositoryURL, config.Token)
 		git := repo.NewGitRepositoryService(logger, platform)
-		updater := drupal.NewDefaultUpdater(logger, settings, config, composer, drush)
-		workflow := services.NewWorkflowBaseService(logger, config, updater, platform, git, installer, composer)
+		workflow := services.NewWorkflowBaseService(logger, config, drush, platform, git, installer, composer)
 
-		var addonList []addon.Addon
+		var addonList []internal.Addon
 		if config.Security {
 			addonList = append(addonList, addon.NewComposerAudit(logger, composer))
 		}

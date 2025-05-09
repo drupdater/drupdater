@@ -9,6 +9,7 @@ import (
 	"text/template"
 
 	"github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/internal/services"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/phpcs"
 
@@ -61,7 +62,7 @@ var fileExists = func(path string) bool {
 }
 
 func (cb *CodeBeautifier) postCodeUpdateHandler(e event.Event) error {
-	event := e.(*PostCodeUpdateEvent)
+	event := e.(*services.PostCodeUpdateEvent)
 	cb.logger.Info("updating coding styles")
 
 	if !fileExists(event.Path()) {

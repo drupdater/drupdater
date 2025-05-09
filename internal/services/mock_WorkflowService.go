@@ -7,7 +7,7 @@ package services
 import (
 	"context"
 
-	"github.com/drupdater/drupdater/internal/addon"
+	"github.com/drupdater/drupdater/internal"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -39,7 +39,7 @@ func (_m *MockWorkflowService) EXPECT() *MockWorkflowService_Expecter {
 }
 
 // StartUpdate provides a mock function for the type MockWorkflowService
-func (_mock *MockWorkflowService) StartUpdate(ctx context.Context, addons []addon.Addon) error {
+func (_mock *MockWorkflowService) StartUpdate(ctx context.Context, addons []internal.Addon) error {
 	ret := _mock.Called(ctx, addons)
 
 	if len(ret) == 0 {
@@ -47,7 +47,7 @@ func (_mock *MockWorkflowService) StartUpdate(ctx context.Context, addons []addo
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, []addon.Addon) error); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []internal.Addon) error); ok {
 		r0 = returnFunc(ctx, addons)
 	} else {
 		r0 = ret.Error(0)
@@ -67,9 +67,9 @@ func (_e *MockWorkflowService_Expecter) StartUpdate(ctx interface{}, addons inte
 	return &MockWorkflowService_StartUpdate_Call{Call: _e.mock.On("StartUpdate", ctx, addons)}
 }
 
-func (_c *MockWorkflowService_StartUpdate_Call) Run(run func(ctx context.Context, addons []addon.Addon)) *MockWorkflowService_StartUpdate_Call {
+func (_c *MockWorkflowService_StartUpdate_Call) Run(run func(ctx context.Context, addons []internal.Addon)) *MockWorkflowService_StartUpdate_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].([]addon.Addon))
+		run(args[0].(context.Context), args[1].([]internal.Addon))
 	})
 	return _c
 }
@@ -79,7 +79,7 @@ func (_c *MockWorkflowService_StartUpdate_Call) Return(err error) *MockWorkflowS
 	return _c
 }
 
-func (_c *MockWorkflowService_StartUpdate_Call) RunAndReturn(run func(ctx context.Context, addons []addon.Addon) error) *MockWorkflowService_StartUpdate_Call {
+func (_c *MockWorkflowService_StartUpdate_Call) RunAndReturn(run func(ctx context.Context, addons []internal.Addon) error) *MockWorkflowService_StartUpdate_Call {
 	_c.Call.Return(run)
 	return _c
 }

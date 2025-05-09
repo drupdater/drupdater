@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/internal/services"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/drupalorg"
 	git "github.com/go-git/go-git/v5"
@@ -53,7 +54,7 @@ type ConflictPatch struct {
 }
 
 type ComposerPatches1 struct {
-	BasicAddon
+	internal.BasicAddon
 	logger       *zap.Logger
 	composer     composer.Runner
 	drupalOrg    drupalorg.Client
@@ -90,7 +91,7 @@ func (h *ComposerPatches1) RenderTemplate() (string, error) {
 }
 
 func (h *ComposerPatches1) preComposerUpdateHandler(e event.Event) error {
-	event := e.(*PreComposerUpdateEvent)
+	event := e.(*services.PreComposerUpdateEvent)
 	ctx := event.Context()
 	path := event.Path()
 	worktree := event.Worktree()

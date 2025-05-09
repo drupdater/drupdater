@@ -150,8 +150,8 @@ func (_c *MockRunner_CheckIfPatchApplies_Call) RunAndReturn(run func(ctx context
 }
 
 // Diff provides a mock function for the type MockRunner
-func (_mock *MockRunner) Diff(ctx context.Context, path string, targetBranch string, withLinks bool) (string, error) {
-	ret := _mock.Called(ctx, path, targetBranch, withLinks)
+func (_mock *MockRunner) Diff(ctx context.Context, path string, withLinks bool) (string, error) {
+	ret := _mock.Called(ctx, path, withLinks)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Diff")
@@ -159,16 +159,16 @@ func (_mock *MockRunner) Diff(ctx context.Context, path string, targetBranch str
 
 	var r0 string
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, bool) (string, error)); ok {
-		return returnFunc(ctx, path, targetBranch, withLinks)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool) (string, error)); ok {
+		return returnFunc(ctx, path, withLinks)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, bool) string); ok {
-		r0 = returnFunc(ctx, path, targetBranch, withLinks)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool) string); ok {
+		r0 = returnFunc(ctx, path, withLinks)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string, bool) error); ok {
-		r1 = returnFunc(ctx, path, targetBranch, withLinks)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, bool) error); ok {
+		r1 = returnFunc(ctx, path, withLinks)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -183,15 +183,14 @@ type MockRunner_Diff_Call struct {
 // Diff is a helper method to define mock.On call
 //   - ctx
 //   - path
-//   - targetBranch
 //   - withLinks
-func (_e *MockRunner_Expecter) Diff(ctx interface{}, path interface{}, targetBranch interface{}, withLinks interface{}) *MockRunner_Diff_Call {
-	return &MockRunner_Diff_Call{Call: _e.mock.On("Diff", ctx, path, targetBranch, withLinks)}
+func (_e *MockRunner_Expecter) Diff(ctx interface{}, path interface{}, withLinks interface{}) *MockRunner_Diff_Call {
+	return &MockRunner_Diff_Call{Call: _e.mock.On("Diff", ctx, path, withLinks)}
 }
 
-func (_c *MockRunner_Diff_Call) Run(run func(ctx context.Context, path string, targetBranch string, withLinks bool)) *MockRunner_Diff_Call {
+func (_c *MockRunner_Diff_Call) Run(run func(ctx context.Context, path string, withLinks bool)) *MockRunner_Diff_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(bool))
+		run(args[0].(context.Context), args[1].(string), args[2].(bool))
 	})
 	return _c
 }
@@ -201,7 +200,7 @@ func (_c *MockRunner_Diff_Call) Return(s string, err error) *MockRunner_Diff_Cal
 	return _c
 }
 
-func (_c *MockRunner_Diff_Call) RunAndReturn(run func(ctx context.Context, path string, targetBranch string, withLinks bool) (string, error)) *MockRunner_Diff_Call {
+func (_c *MockRunner_Diff_Call) RunAndReturn(run func(ctx context.Context, path string, withLinks bool) (string, error)) *MockRunner_Diff_Call {
 	_c.Call.Return(run)
 	return _c
 }

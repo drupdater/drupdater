@@ -24,7 +24,7 @@ type Runner interface {
 	Remove(ctx context.Context, dir string, packages ...string) (string, error)
 	Audit(ctx context.Context, dir string) (Audit, error)
 	Normalize(ctx context.Context, dir string) (string, error)
-	Diff(ctx context.Context, path string, targetBranch string, withLinks bool) (string, error)
+	Diff(ctx context.Context, path string, withLinks bool) (string, error)
 
 	GetInstalledPackageVersion(ctx context.Context, dir string, packageName string) (string, error)
 	GetAllowPlugins(ctx context.Context, dir string) (map[string]bool, error)
@@ -260,8 +260,8 @@ func (s *CLI) Normalize(ctx context.Context, dir string) (string, error) {
 	return s.execComposer(ctx, dir, "normalize")
 }
 
-func (s *CLI) Diff(ctx context.Context, dir string, targetBranch string, withLinks bool) (string, error) {
-	args := []string{"diff", targetBranch}
+func (s *CLI) Diff(ctx context.Context, dir string, withLinks bool) (string, error) {
+	args := []string{"diff"}
 	if withLinks {
 		args = append(args, "--with-links")
 	}
@@ -275,7 +275,7 @@ func (s *CLI) Diff(ctx context.Context, dir string, targetBranch string, withLin
 		// If table is too long, Github/Gitlab will not accept it. So we use the version without the links.
 		tableCharCount := utf8.RuneCountInString(out)
 		if tableCharCount > 63000 {
-			return s.Diff(ctx, dir, targetBranch, false)
+			return s.Diff(ctx, dir, false)
 		}
 	}
 

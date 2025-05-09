@@ -13,10 +13,10 @@ import (
 	"time"
 
 	"github.com/drupdater/drupdater/internal"
-	"github.com/drupdater/drupdater/internal/addon"
 	"github.com/drupdater/drupdater/internal/codehosting"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/drupal"
+	"github.com/drupdater/drupdater/pkg/drush"
 	"github.com/drupdater/drupdater/pkg/repo"
 	"github.com/gookit/event"
 
@@ -31,11 +31,11 @@ import (
 var templates embed.FS
 
 type WorkflowService interface {
-	StartUpdate(ctx context.Context, addons []addon.Addon) error
+	StartUpdate(ctx context.Context, addons []internal.Addon) error
 }
 
 type TemplateData struct {
-	Addons []addon.Addon
+	Addons []internal.Addon
 }
 
 type SharedUpdate struct {
@@ -48,7 +48,7 @@ type SharedUpdate struct {
 type WorkflowBaseService struct {
 	logger     *zap.Logger
 	config     internal.Config
-	updater    drupal.UpdaterService
+	drush      drush.Runner
 	platform   codehosting.Platform
 	repository repo.RepositoryService
 	installer  drupal.InstallerService
@@ -59,7 +59,7 @@ type WorkflowBaseService struct {
 func NewWorkflowBaseService(
 	logger *zap.Logger,
 	config internal.Config,
-	updater drupal.UpdaterService,
+	drush drush.Runner,
 	platform codehosting.Platform,
 	repository repo.RepositoryService,
 	installer drupal.InstallerService,
@@ -68,7 +68,7 @@ func NewWorkflowBaseService(
 	return &WorkflowBaseService{
 		logger:     logger,
 		config:     config,
-		updater:    updater,
+		drush:      drush,
 		platform:   platform,
 		repository: repository,
 		installer:  installer,
@@ -77,7 +77,7 @@ func NewWorkflowBaseService(
 	}
 }
 
-func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []addon.Addon) error {
+func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []internal.Addon) error {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	defer func() {
@@ -201,8 +201,7 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []addon.A
 				return
 			}
 
-			// Update Drupal hooks
-			err := ws.updater.UpdateDrupal(ctx, sharedUpdate.Path, sharedUpdate.Worktree, site)
+			err := ws.updateSite(ctx, sharedUpdate, site)
 			if err != nil {
 				errCh <- err
 				cancel()
@@ -254,13 +253,38 @@ func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context) (SharedUpda
 	}
 
 	ws.logger.Info("updating dependencies")
-	err = ws.updater.UpdateDependencies(ctx, path, worktree, false)
+
+	preComposerUpdateEvent := NewPreComposerUpdateEvent(ctx, path, worktree, []string{}, []string{}, false)
+	err = event.FireEvent(preComposerUpdateEvent)
+	if err != nil {
+		return SharedUpdate{}, fmt.Errorf("failed to fire event: %w", err)
+	}
+
+	changes, err := ws.composer.Update(ctx, path, preComposerUpdateEvent.PackagesToUpdate, preComposerUpdateEvent.PackagesToKeep, preComposerUpdateEvent.MinimalChanges, false)
 	if err != nil {
 		return SharedUpdate{}, fmt.Errorf("failed to update dependencies: %w", err)
 	}
+	if len(changes) == 0 {
+		ws.logger.Warn("no changes detected")
+		return SharedUpdate{}, nil
+	}
 
-	e := addon.NewPostCodeUpdateEvent(ctx, path, worktree, ws.config)
-	err = event.FireEvent(e)
+	postComposerUpdateEvent := NewPostComposerUpdateEvent(ctx, path, worktree)
+	err = event.FireEvent(postComposerUpdateEvent)
+	if err != nil {
+		return SharedUpdate{}, fmt.Errorf("failed to fire event: %w", err)
+	}
+
+	err = worktree.AddGlob("composer.*")
+	if err != nil {
+		return SharedUpdate{}, fmt.Errorf("failed to add composer.* files: %w", err)
+	}
+	if _, err := worktree.Commit("Update composer.json and composer.lock", &git.CommitOptions{}); err != nil {
+		return SharedUpdate{}, fmt.Errorf("failed to commit composer.json and composer.lock: %w", err)
+	}
+
+	postCodeUpdateEvent := NewPostCodeUpdateEvent(ctx, path, worktree)
+	err = event.FireEvent(postCodeUpdateEvent)
 	if err != nil {
 		return SharedUpdate{}, fmt.Errorf("failed to fire event: %w", err)
 	}
@@ -301,7 +325,42 @@ func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context) (SharedUpda
 	return sharedUpdate, nil
 }
 
-func (ws *WorkflowBaseService) publishWork(repository internal.Repository, updateBranchName string, addons []addon.Addon) error {
+func (ws *WorkflowBaseService) updateSite(ctx context.Context, sharedUpdate SharedUpdate, site string) error {
+	ws.logger.Info("updating site", zap.String("site", site))
+
+	if err := ws.installer.ConfigureDatabase(ctx, sharedUpdate.Path, site); err != nil {
+		return fmt.Errorf("failed to configure database: %w", err)
+	}
+
+	preSiteUpdateEvent := NewPreSiteUpdateEvent(ctx, sharedUpdate.Path, sharedUpdate.Worktree, site)
+	if err := event.FireEvent(preSiteUpdateEvent); err != nil {
+		return fmt.Errorf("failed to fire event: %w", err)
+	}
+
+	if err := ws.drush.UpdateSite(ctx, sharedUpdate.Path, site); err != nil {
+		return fmt.Errorf("failed to update site: %w", err)
+
+	}
+
+	if err := ws.drush.ConfigResave(ctx, sharedUpdate.Path, site); err != nil {
+		return fmt.Errorf("failed to resave config: %w", err)
+
+	}
+
+	postSiteUpdateEvent := NewPostSiteUpdateEvent(ctx, sharedUpdate.Path, sharedUpdate.Worktree, site)
+	if err := event.FireEvent(postSiteUpdateEvent); err != nil {
+		return fmt.Errorf("failed to fire event: %w", err)
+	}
+
+	ws.logger.Info("export configuration", zap.String("site", site))
+	if err := ws.drush.ExportConfiguration(ctx, sharedUpdate.Path, site); err != nil {
+		return fmt.Errorf("failed to export configuration: %w", err)
+	}
+
+	return nil
+}
+
+func (ws *WorkflowBaseService) publishWork(repository internal.Repository, updateBranchName string, addons []internal.Addon) error {
 	err := repository.Push(&git.PushOptions{
 		RemoteName: "origin",
 		RefSpecs: []gitConfig.RefSpec{
@@ -329,7 +388,7 @@ func (ws *WorkflowBaseService) publishWork(repository internal.Repository, updat
 		return fmt.Errorf("failed to generate description: %w", err)
 	}
 
-	e := addon.NewPreMergeRequestCreateEvent(title)
+	e := NewPreMergeRequestCreateEvent(title)
 	err = event.FireEvent(e)
 	if err != nil {
 		return fmt.Errorf("failed to fire event: %w", err)
