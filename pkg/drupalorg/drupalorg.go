@@ -9,11 +9,6 @@ import (
 	"go.uber.org/zap"
 )
 
-type Client interface {
-	GetIssue(issueID string) (*Issue, error)
-	FindIssueNumber(text string) (string, bool)
-}
-
 type HTTPClient struct {
 	DrupalOrgBaseURL string
 	logger           *zap.Logger

@@ -17,30 +17,6 @@ import (
 
 var execCommand = exec.CommandContext
 
-type Runner interface {
-	Update(ctx context.Context, dir string, packagesToUpdate []string, packagesToKeep []string, minimalChanges bool, dryRun bool) (string, error)
-	Install(ctx context.Context, dir string) error
-	Require(ctx context.Context, dir string, args ...string) (string, error)
-	Remove(ctx context.Context, dir string, packages ...string) (string, error)
-	Audit(ctx context.Context, dir string) (Audit, error)
-	Normalize(ctx context.Context, dir string) (string, error)
-	Diff(ctx context.Context, path string, targetBranch string, withLinks bool) (string, error)
-
-	GetInstalledPackageVersion(ctx context.Context, dir string, packageName string) (string, error)
-	GetAllowPlugins(ctx context.Context, dir string) (map[string]bool, error)
-	SetAllowPlugins(ctx context.Context, dir string, plugins map[string]bool) error
-	GetConfig(ctx context.Context, dir string, key string) (string, error)
-	SetConfig(ctx context.Context, dir string, key string, value string) error
-
-	ListPendingUpdates(ctx context.Context, dir string, packagesToUpdate []string, minimalChanges bool) ([]PackageChange, error)
-	CheckIfPatchApplies(ctx context.Context, packageName string, packageVersion string, patchPath string) (bool, error)
-	GetInstalledPlugins(ctx context.Context, dir string) (map[string]interface{}, error)
-	IsPackageInstalled(ctx context.Context, dir string, packageToCheck string) (bool, error)
-	GetLockHash(dir string) (string, error)
-	UpdateLockHash(ctx context.Context, dir string) error
-	GetCustomCodeDirectories(ctx context.Context, dir string) ([]string, error)
-}
-
 type CLI struct {
 	fs     afero.Fs
 	logger *zap.Logger
@@ -68,7 +44,15 @@ func (s *CLI) execComposer(ctx context.Context, dir string, args ...string) (str
 	return output, err
 }
 
-func (s *CLI) Update(ctx context.Context, dir string, packages []string, packagesToKeep []string, minimalChanges bool, dryRun bool) (string, error) {
+// PackageChange represents an individual package operation
+type PackageChange struct {
+	Action  string // Install, Upgrade, Remove, Downgrade
+	Package string
+	From    string
+	To      string
+}
+
+func (s *CLI) Update(ctx context.Context, dir string, packages []string, packagesToKeep []string, minimalChanges bool, dryRun bool) ([]PackageChange, error) {
 	args := append([]string{"update", "--no-interaction", "--no-progress", "--optimize-autoloader", "--with-all-dependencies", "--no-ansi"}, packages...)
 	for _, packageToKeep := range packagesToKeep {
 		args = append(args, fmt.Sprintf("--with=%s", packageToKeep))
@@ -81,11 +65,59 @@ func (s *CLI) Update(ctx context.Context, dir string, packages []string, package
 	} else {
 		args = append(args, "--bump-after-update")
 	}
+	var changes []PackageChange
 	out, err := s.execComposer(ctx, dir, args...)
 	if err != nil {
-		return "", fmt.Errorf("failed to update dependencies: %w, output: %s, arg: %v", err, out, args)
+		return changes, fmt.Errorf("failed to update dependencies: %w, output: %s, arg: %v", err, out, args)
 	}
-	return out, nil
+
+	// Regular expression to capture upgrade operations
+	upgradeRegex := regexp.MustCompile(`- Upgrading ([\w\-/]+) \(([\w\.\-]+) => ([\w\.\-]+)\)`)
+	downgradingRegex := regexp.MustCompile(`- Downgrading ([\w\-/]+) \(([\w\.\-]+) => ([\w\.\-]+)\)`)
+	removeRegex := regexp.MustCompile(`- Removing ([\w\-/]+) \(([\w\.\-]+)\)`)
+	installRegex := regexp.MustCompile(`- Installing ([\w\-/]+) \(([\w\.\-]+)\)`)
+
+	// Match upgrades
+	for _, match := range upgradeRegex.FindAllStringSubmatch(out, -1) {
+		changes = append(changes, PackageChange{
+			Action:  "Upgrade",
+			Package: match[1],
+			From:    match[2],
+			To:      match[3],
+		})
+	}
+
+	// Match downgrades
+	for _, match := range downgradingRegex.FindAllStringSubmatch(out, -1) {
+		changes = append(changes, PackageChange{
+			Action:  "Downgrade",
+			Package: match[1],
+			From:    match[2],
+			To:      match[3],
+		})
+	}
+
+	// Match removals
+	for _, match := range removeRegex.FindAllStringSubmatch(out, -1) {
+		changes = append(changes, PackageChange{
+			Action:  "Remove",
+			Package: match[1],
+			From:    match[2],
+			To:      "",
+		})
+	}
+
+	// Match installations
+	for _, match := range installRegex.FindAllStringSubmatch(out, -1) {
+		changes = append(changes, PackageChange{
+			Action:  "Install",
+			Package: match[1],
+			From:    "",
+			To:      match[2],
+		})
+	}
+
+	return changes, nil
 }
 
 func (s *CLI) Install(ctx context.Context, dir string) error {
@@ -205,8 +237,8 @@ func (s *CLI) Normalize(ctx context.Context, dir string) (string, error) {
 	return s.execComposer(ctx, dir, "normalize")
 }
 
-func (s *CLI) Diff(ctx context.Context, dir string, targetBranch string, withLinks bool) (string, error) {
-	args := []string{"diff", targetBranch}
+func (s *CLI) Diff(ctx context.Context, dir string, withLinks bool) (string, error) {
+	args := []string{"diff"}
 	if withLinks {
 		args = append(args, "--with-links")
 	}
@@ -220,7 +252,7 @@ func (s *CLI) Diff(ctx context.Context, dir string, targetBranch string, withLin
 		// If table is too long, Github/Gitlab will not accept it. So we use the version without the links.
 		tableCharCount := utf8.RuneCountInString(out)
 		if tableCharCount > 63000 {
-			return s.Diff(ctx, dir, targetBranch, false)
+			return s.Diff(ctx, dir, false)
 		}
 	}
 
@@ -278,71 +310,6 @@ func (s *CLI) GetConfig(ctx context.Context, dir string, key string) (string, er
 func (s *CLI) SetConfig(ctx context.Context, dir string, key string, value string) error {
 	_, err := s.execComposer(ctx, dir, "config", "--json", key, value)
 	return err
-}
-
-// PackageChange represents an individual package operation
-type PackageChange struct {
-	Action  string // Install, Upgrade, Remove, Downgrade
-	Package string
-	From    string
-	To      string
-}
-
-func (s *CLI) ListPendingUpdates(ctx context.Context, dir string, packagesToUpdate []string, minimalChanges bool) ([]PackageChange, error) {
-	log, err := s.Update(ctx, dir, packagesToUpdate, []string{}, minimalChanges, true)
-	if err != nil {
-		return nil, err
-	}
-
-	var changes []PackageChange
-
-	// Regular expression to capture upgrade operations
-	upgradeRegex := regexp.MustCompile(`- Upgrading ([\w\-/]+) \(([\w\.\-]+) => ([\w\.\-]+)\)`)
-	downgradingRegex := regexp.MustCompile(`- Downgrading ([\w\-/]+) \(([\w\.\-]+) => ([\w\.\-]+)\)`)
-	removeRegex := regexp.MustCompile(`- Removing ([\w\-/]+) \(([\w\.\-]+)\)`)
-	installRegex := regexp.MustCompile(`- Installing ([\w\-/]+) \(([\w\.\-]+)\)`)
-
-	// Match upgrades
-	for _, match := range upgradeRegex.FindAllStringSubmatch(log, -1) {
-		changes = append(changes, PackageChange{
-			Action:  "Upgrade",
-			Package: match[1],
-			From:    match[2],
-			To:      match[3],
-		})
-	}
-
-	// Match downgrades
-	for _, match := range downgradingRegex.FindAllStringSubmatch(log, -1) {
-		changes = append(changes, PackageChange{
-			Action:  "Downgrade",
-			Package: match[1],
-			From:    match[2],
-			To:      match[3],
-		})
-	}
-
-	// Match removals
-	for _, match := range removeRegex.FindAllStringSubmatch(log, -1) {
-		changes = append(changes, PackageChange{
-			Action:  "Remove",
-			Package: match[1],
-			From:    match[2],
-			To:      "",
-		})
-	}
-
-	// Match installations
-	for _, match := range installRegex.FindAllStringSubmatch(log, -1) {
-		changes = append(changes, PackageChange{
-			Action:  "Install",
-			Package: match[1],
-			From:    "",
-			To:      match[2],
-		})
-	}
-
-	return changes, nil
 }
 
 func (s *CLI) initTempDir() {
@@ -426,7 +393,7 @@ func (s *CLI) GetInstalledPlugins(ctx context.Context, dir string) (map[string]i
 func (s *CLI) IsPackageInstalled(ctx context.Context, dir string, packageToCheck string) (bool, error) {
 	_, err := s.execComposer(ctx, dir, "show", "--locked", "--quiet", packageToCheck)
 	if err != nil {
-		return false, err
+		return false, nil
 	}
 	return true, nil
 }

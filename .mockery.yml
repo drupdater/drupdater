@@ -1,5 +1,4 @@
 template: testify
-filename: "mock_{{.InterfaceName}}.go"
 packages:
   github.com/drupdater/drupdater:
     config:

@@ -11,11 +11,6 @@ import (
 
 var execCommand = exec.CommandContext
 
-type Runner interface {
-	Run(ctx context.Context, dir string) (ReturnOutput, error)
-	RunCBF(ctx context.Context, dir string) error
-}
-
 type CLI struct {
 	logger *zap.Logger
 }

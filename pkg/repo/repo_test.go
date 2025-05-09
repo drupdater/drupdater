@@ -3,8 +3,6 @@ package repo
 import (
 	"testing"
 
-	internal "github.com/drupdater/drupdater/internal"
-	"github.com/drupdater/drupdater/internal/codehosting"
 	git "github.com/go-git/go-git/v5"
 
 	"github.com/stretchr/testify/assert"
@@ -19,8 +17,7 @@ type mockWorktree struct {
 
 func TestIsSomethingStaged(t *testing.T) {
 	logger := zap.NewNop()
-	vcsProvider := codehosting.NewMockPlatform(t)
-	service := NewGitRepositoryService(logger, vcsProvider)
+	service := NewGitRepositoryService(logger)
 
 	tests := []struct {
 		name     string
@@ -95,7 +92,7 @@ func TestIsSomethingStaged(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			worktree := internal.NewMockWorktree(t)
+			worktree := NewMockWorktree(t)
 			worktree.On("Status").Return(tt.worktree.status, tt.worktree.err)
 			result := service.IsSomethingStagedInPath(worktree, tt.worktree.dir)
 			assert.Equal(t, tt.expected, result)
