@@ -17,7 +17,7 @@ import (
 func TestStartUpdate(t *testing.T) {
 	logger := zap.NewNop()
 	installer := drupal.NewMockInstallerService(t)
-	updater := NewMockUpdaterService(t)
+	updater := drupal.NewMockUpdaterService(t)
 	repositoryService := repo.NewMockRepositoryService(t)
 	vcsProvider := codehosting.NewMockPlatform(t)
 	repository := internal.NewMockRepository(t)
@@ -40,8 +40,7 @@ func TestStartUpdate(t *testing.T) {
 	//installer.On("InstallDrupal", mock.Anything, "/tmp", "site2").Return(nil)
 	repositoryService.On("CloneRepository", config.RepositoryURL, config.Branch, config.Token).Return(repository, worktree, "/tmp", nil)
 	repositoryService.On("BranchExists", mock.Anything, mock.Anything).Return(false, nil)
-	updater.On("UpdateDependencies", mock.Anything, "/tmp", []string{}, mock.Anything, false).Return(nil)
-	updater.On("IsAborted").Return(false)
+	updater.On("UpdateDependencies", mock.Anything, "/tmp", mock.Anything, false).Return(nil)
 	updater.On("UpdateDrupal", mock.Anything, "/tmp", mock.Anything, "site1").Return(nil)
 
 	fixture, _ := os.ReadFile("testdata/dependency_update.md")
@@ -63,7 +62,7 @@ func TestStartUpdate(t *testing.T) {
 func TestStartUpdateWithDryRun(t *testing.T) {
 	logger := zap.NewNop()
 	installer := drupal.NewMockInstallerService(t)
-	updater := NewMockUpdaterService(t)
+	updater := drupal.NewMockUpdaterService(t)
 	repositoryService := repo.NewMockRepositoryService(t)
 	vcsProvider := codehosting.NewMockPlatform(t)
 	repository := internal.NewMockRepository(t)
@@ -86,10 +85,9 @@ func TestStartUpdateWithDryRun(t *testing.T) {
 	installer.On("Install", mock.Anything, "/tmp", "site2").Return(nil)
 	repositoryService.On("CloneRepository", config.RepositoryURL, config.Branch, config.Token).Return(repository, worktree, "/tmp", nil)
 	repositoryService.On("BranchExists", mock.Anything, mock.Anything).Return(false, nil)
-	updater.On("UpdateDependencies", mock.Anything, "/tmp", []string{}, mock.Anything, false).Return(nil)
+	updater.On("UpdateDependencies", mock.Anything, "/tmp", mock.Anything, false).Return(nil)
 	updater.On("UpdateDrupal", mock.Anything, "/tmp", mock.Anything, "site1").Return(nil)
 	updater.On("UpdateDrupal", mock.Anything, "/tmp", mock.Anything, "site2").Return(nil)
-	updater.On("IsAborted").Return(false)
 	composer.On("Install", mock.Anything, "/tmp").Return(nil)
 	composer.On("GetLockHash", "/tmp").Return("dummy-hash", nil)
 

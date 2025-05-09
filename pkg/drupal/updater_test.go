@@ -1,11 +1,10 @@
-package services
+package drupal
 
 import (
 	"testing"
 
 	internal "github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/pkg/composer"
-	"github.com/drupdater/drupdater/pkg/drupal"
 	"github.com/drupdater/drupdater/pkg/drupalorg"
 	"github.com/drupdater/drupdater/pkg/drush"
 
@@ -42,7 +41,7 @@ func TestUpdateDependencies(t *testing.T) {
 			composer: composerService,
 		}
 
-		err := updater.UpdateDependencies(t.Context(), "/tmp", []string{}, worktree, false)
+		err := updater.UpdateDependencies(t.Context(), "/tmp", worktree, false)
 
 		composerService.AssertExpectations(t)
 		drupalOrgService.AssertExpectations(t)
@@ -59,7 +58,7 @@ func TestUpdateDrupal(t *testing.T) {
 	t.Run("Update drupal", func(t *testing.T) {
 
 		worktree := internal.NewMockWorktree(t)
-		settingsService := drupal.NewMockSettingsService(t)
+		settingsService := NewMockSettingsService(t)
 		drushService := drush.NewMockRunner(t)
 
 		settingsService.On("ConfigureDatabase", mock.Anything, "/tmp", "site1").Return(nil)

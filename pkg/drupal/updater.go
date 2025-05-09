@@ -1,4 +1,4 @@
-package services
+package drupal
 
 import (
 	"context"
@@ -7,7 +7,6 @@ import (
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/addon"
 	"github.com/drupdater/drupdater/pkg/composer"
-	"github.com/drupdater/drupdater/pkg/drupal"
 	"github.com/drupdater/drupdater/pkg/drush"
 	git "github.com/go-git/go-git/v5"
 	"github.com/gookit/event"
@@ -15,22 +14,19 @@ import (
 )
 
 type UpdaterService interface {
-	UpdateDependencies(ctx context.Context, path string, packagesToUpdate []string, worktree internal.Worktree, minimalChanges bool) error
+	UpdateDependencies(ctx context.Context, path string, worktree internal.Worktree, minimalChanges bool) error
 	UpdateDrupal(ctx context.Context, path string, worktree internal.Worktree, site string) error
-	IsAborted() bool
 }
 
 type DefaultUpdater struct {
 	logger   *zap.Logger
-	settings drupal.SettingsService
+	settings SettingsService
 	config   internal.Config
 	composer composer.Runner
 	drush    drush.Runner
-
-	aborted bool
 }
 
-func NewDefaultUpdater(logger *zap.Logger, settings drupal.SettingsService, config internal.Config, composer composer.Runner, drush drush.Runner) *DefaultUpdater {
+func NewDefaultUpdater(logger *zap.Logger, settings SettingsService, config internal.Config, composer composer.Runner, drush drush.Runner) *DefaultUpdater {
 
 	return &DefaultUpdater{
 		logger:   logger,
@@ -38,29 +34,23 @@ func NewDefaultUpdater(logger *zap.Logger, settings drupal.SettingsService, conf
 		config:   config,
 		composer: composer,
 		drush:    drush,
-		aborted:  false,
 	}
 }
 
-func (us *DefaultUpdater) UpdateDependencies(ctx context.Context, path string, packagesToUpdate []string, worktree internal.Worktree, minimalChanges bool) error {
+func (us *DefaultUpdater) UpdateDependencies(ctx context.Context, path string, worktree internal.Worktree, minimalChanges bool) error {
 
-	preComposerUpdateEvent := addon.NewPreComposerUpdateEvent(ctx, path, worktree, us.config, packagesToUpdate, []string{}, minimalChanges)
+	preComposerUpdateEvent := addon.NewPreComposerUpdateEvent(ctx, path, worktree, us.config, []string{}, []string{}, minimalChanges)
 	err := event.FireEvent(preComposerUpdateEvent)
 	if err != nil {
 		return fmt.Errorf("failed to fire event: %w", err)
 	}
-	if preComposerUpdateEvent.IsAborted() {
-		us.aborted = true
-		return nil
-	}
 
 	changes, err := us.composer.Update(ctx, path, preComposerUpdateEvent.PackagesToUpdate, preComposerUpdateEvent.PackagesToKeep, preComposerUpdateEvent.MinimalChanges, false)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to update dependencies: %w", err)
 	}
 	if len(changes) == 0 {
-		us.logger.Info("no changes detected")
-		us.aborted = true
+		us.logger.Warn("no changes detected")
 		return nil
 	}
 
@@ -115,8 +105,4 @@ func (us *DefaultUpdater) UpdateDrupal(ctx context.Context, path string, worktre
 	}
 
 	return nil
-}
-
-func (us *DefaultUpdater) IsAborted() bool {
-	return us.aborted
 }

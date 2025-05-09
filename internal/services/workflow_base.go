@@ -48,7 +48,7 @@ type SharedUpdate struct {
 type WorkflowBaseService struct {
 	logger     *zap.Logger
 	config     internal.Config
-	updater    UpdaterService
+	updater    drupal.UpdaterService
 	platform   codehosting.Platform
 	repository repo.RepositoryService
 	installer  drupal.InstallerService
@@ -59,7 +59,7 @@ type WorkflowBaseService struct {
 func NewWorkflowBaseService(
 	logger *zap.Logger,
 	config internal.Config,
-	updater UpdaterService,
+	updater drupal.UpdaterService,
 	platform codehosting.Platform,
 	repository repo.RepositoryService,
 	installer drupal.InstallerService,
@@ -254,17 +254,16 @@ func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context) (SharedUpda
 	}
 
 	ws.logger.Info("updating dependencies")
-	err = ws.updater.UpdateDependencies(ctx, path, []string{}, worktree, false)
+	err = ws.updater.UpdateDependencies(ctx, path, worktree, false)
 	if err != nil {
 		return SharedUpdate{}, fmt.Errorf("failed to update dependencies: %w", err)
 	}
 
-	if ws.updater.IsAborted() {
-		return SharedUpdate{}, fmt.Errorf("update aborted")
-	}
-
 	e := addon.NewPostCodeUpdateEvent(ctx, path, worktree, ws.config)
-	event.FireEvent(e)
+	err = event.FireEvent(e)
+	if err != nil {
+		return SharedUpdate{}, fmt.Errorf("failed to fire event: %w", err)
+	}
 
 	// Get composer lock hash for branch name
 	composerLockHash, err := ws.composer.GetLockHash(path)
@@ -331,7 +330,10 @@ func (ws *WorkflowBaseService) publishWork(repository internal.Repository, updat
 	}
 
 	e := addon.NewPreMergeRequestCreateEvent(title)
-	event.FireEvent(e)
+	err = event.FireEvent(e)
+	if err != nil {
+		return fmt.Errorf("failed to fire event: %w", err)
+	}
 
 	mr, err := ws.platform.CreateMergeRequest(e.Title, description, updateBranchName, ws.config.Branch)
 	if err != nil {

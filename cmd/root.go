@@ -45,7 +45,7 @@ var rootCmd = &cobra.Command{
 		vcsProviderFactory := codehosting.NewDefaultVcsProviderFactory()
 		platform := vcsProviderFactory.Create(config.RepositoryURL, config.Token)
 		git := repo.NewGitRepositoryService(logger, platform)
-		updater := services.NewDefaultUpdater(logger, settings, config, composer, drush)
+		updater := drupal.NewDefaultUpdater(logger, settings, config, composer, drush)
 		workflow := services.NewWorkflowBaseService(logger, config, updater, platform, git, installer, composer)
 
 		var addonList []addon.Addon

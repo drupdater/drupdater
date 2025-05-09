@@ -2,7 +2,7 @@
 // github.com/vektra/mockery
 // template: testify
 
-package services
+package drupal
 
 import (
 	"context"
@@ -38,61 +38,17 @@ func (_m *MockUpdaterService) EXPECT() *MockUpdaterService_Expecter {
 	return &MockUpdaterService_Expecter{mock: &_m.Mock}
 }
 
-// IsAborted provides a mock function for the type MockUpdaterService
-func (_mock *MockUpdaterService) IsAborted() bool {
-	ret := _mock.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for IsAborted")
-	}
-
-	var r0 bool
-	if returnFunc, ok := ret.Get(0).(func() bool); ok {
-		r0 = returnFunc()
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-	return r0
-}
-
-// MockUpdaterService_IsAborted_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IsAborted'
-type MockUpdaterService_IsAborted_Call struct {
-	*mock.Call
-}
-
-// IsAborted is a helper method to define mock.On call
-func (_e *MockUpdaterService_Expecter) IsAborted() *MockUpdaterService_IsAborted_Call {
-	return &MockUpdaterService_IsAborted_Call{Call: _e.mock.On("IsAborted")}
-}
-
-func (_c *MockUpdaterService_IsAborted_Call) Run(run func()) *MockUpdaterService_IsAborted_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *MockUpdaterService_IsAborted_Call) Return(b bool) *MockUpdaterService_IsAborted_Call {
-	_c.Call.Return(b)
-	return _c
-}
-
-func (_c *MockUpdaterService_IsAborted_Call) RunAndReturn(run func() bool) *MockUpdaterService_IsAborted_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // UpdateDependencies provides a mock function for the type MockUpdaterService
-func (_mock *MockUpdaterService) UpdateDependencies(ctx context.Context, path string, packagesToUpdate []string, worktree internal.Worktree, minimalChanges bool) error {
-	ret := _mock.Called(ctx, path, packagesToUpdate, worktree, minimalChanges)
+func (_mock *MockUpdaterService) UpdateDependencies(ctx context.Context, path string, worktree internal.Worktree, minimalChanges bool) error {
+	ret := _mock.Called(ctx, path, worktree, minimalChanges)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UpdateDependencies")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, []string, internal.Worktree, bool) error); ok {
-		r0 = returnFunc(ctx, path, packagesToUpdate, worktree, minimalChanges)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, internal.Worktree, bool) error); ok {
+		r0 = returnFunc(ctx, path, worktree, minimalChanges)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -107,16 +63,15 @@ type MockUpdaterService_UpdateDependencies_Call struct {
 // UpdateDependencies is a helper method to define mock.On call
 //   - ctx
 //   - path
-//   - packagesToUpdate
 //   - worktree
 //   - minimalChanges
-func (_e *MockUpdaterService_Expecter) UpdateDependencies(ctx interface{}, path interface{}, packagesToUpdate interface{}, worktree interface{}, minimalChanges interface{}) *MockUpdaterService_UpdateDependencies_Call {
-	return &MockUpdaterService_UpdateDependencies_Call{Call: _e.mock.On("UpdateDependencies", ctx, path, packagesToUpdate, worktree, minimalChanges)}
+func (_e *MockUpdaterService_Expecter) UpdateDependencies(ctx interface{}, path interface{}, worktree interface{}, minimalChanges interface{}) *MockUpdaterService_UpdateDependencies_Call {
+	return &MockUpdaterService_UpdateDependencies_Call{Call: _e.mock.On("UpdateDependencies", ctx, path, worktree, minimalChanges)}
 }
 
-func (_c *MockUpdaterService_UpdateDependencies_Call) Run(run func(ctx context.Context, path string, packagesToUpdate []string, worktree internal.Worktree, minimalChanges bool)) *MockUpdaterService_UpdateDependencies_Call {
+func (_c *MockUpdaterService_UpdateDependencies_Call) Run(run func(ctx context.Context, path string, worktree internal.Worktree, minimalChanges bool)) *MockUpdaterService_UpdateDependencies_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].([]string), args[3].(internal.Worktree), args[4].(bool))
+		run(args[0].(context.Context), args[1].(string), args[2].(internal.Worktree), args[3].(bool))
 	})
 	return _c
 }
@@ -126,7 +81,7 @@ func (_c *MockUpdaterService_UpdateDependencies_Call) Return(err error) *MockUpd
 	return _c
 }
 
-func (_c *MockUpdaterService_UpdateDependencies_Call) RunAndReturn(run func(ctx context.Context, path string, packagesToUpdate []string, worktree internal.Worktree, minimalChanges bool) error) *MockUpdaterService_UpdateDependencies_Call {
+func (_c *MockUpdaterService_UpdateDependencies_Call) RunAndReturn(run func(ctx context.Context, path string, worktree internal.Worktree, minimalChanges bool) error) *MockUpdaterService_UpdateDependencies_Call {
 	_c.Call.Return(run)
 	return _c
 }
