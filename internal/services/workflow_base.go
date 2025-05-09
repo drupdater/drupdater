@@ -14,10 +14,6 @@ import (
 
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/codehosting"
-	"github.com/drupdater/drupdater/pkg/composer"
-	"github.com/drupdater/drupdater/pkg/drupal"
-	"github.com/drupdater/drupdater/pkg/drush"
-	"github.com/drupdater/drupdater/pkg/repo"
 	"github.com/gookit/event"
 
 	git "github.com/go-git/go-git/v5"
@@ -30,40 +26,36 @@ import (
 //go:embed templates
 var templates embed.FS
 
-type WorkflowService interface {
-	StartUpdate(ctx context.Context, addons []internal.Addon) error
-}
-
 type TemplateData struct {
 	Addons []internal.Addon
 }
 
 type SharedUpdate struct {
 	Path             string
-	Worktree         internal.Worktree
-	Repository       internal.Repository
+	Worktree         Worktree
+	Repository       GitRepository
 	updateBranchName string
 }
 
 type WorkflowBaseService struct {
 	logger     *zap.Logger
 	config     internal.Config
-	drush      drush.Runner
+	drush      Drush
 	platform   codehosting.Platform
-	repository repo.RepositoryService
-	installer  drupal.InstallerService
-	composer   composer.Runner
+	repository Repository
+	installer  Installer
+	composer   Composer
 	current    time.Time
 }
 
 func NewWorkflowBaseService(
 	logger *zap.Logger,
 	config internal.Config,
-	drush drush.Runner,
+	drush Drush,
 	platform codehosting.Platform,
-	repository repo.RepositoryService,
-	installer drupal.InstallerService,
-	composerService composer.Runner,
+	repository Repository,
+	installer Installer,
+	composerService Composer,
 ) *WorkflowBaseService {
 	return &WorkflowBaseService{
 		logger:     logger,
@@ -231,8 +223,9 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []interna
 }
 
 func (ws *WorkflowBaseService) installCode(ctx context.Context) (string, error) {
+	username, email := ws.platform.GetUser()
 	ws.logger.Info("cloning repository for site-install", zap.String("repositoryURL", ws.config.RepositoryURL), zap.String("branch", ws.config.Branch))
-	_, _, path, err := ws.repository.CloneRepository(ws.config.RepositoryURL, ws.config.Branch, ws.config.Token)
+	_, _, path, err := ws.repository.CloneRepository(ws.config.RepositoryURL, ws.config.Branch, ws.config.Token, username, email)
 	if err != nil {
 		return "", fmt.Errorf("failed to clone repository: %w", err)
 	}
@@ -247,7 +240,8 @@ func (ws *WorkflowBaseService) installCode(ctx context.Context) (string, error) 
 
 func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context) (SharedUpdate, error) {
 	ws.logger.Info("cloning repository for update", zap.String("repositoryURL", ws.config.RepositoryURL), zap.String("branch", ws.config.Branch))
-	repository, worktree, path, err := ws.repository.CloneRepository(ws.config.RepositoryURL, ws.config.Branch, ws.config.Token)
+	username, email := ws.platform.GetUser()
+	repository, worktree, path, err := ws.repository.CloneRepository(ws.config.RepositoryURL, ws.config.Branch, ws.config.Token, username, email)
 	if err != nil {
 		return SharedUpdate{}, fmt.Errorf("failed to clone repository: %w", err)
 	}
@@ -360,7 +354,7 @@ func (ws *WorkflowBaseService) updateSite(ctx context.Context, sharedUpdate Shar
 	return nil
 }
 
-func (ws *WorkflowBaseService) publishWork(repository internal.Repository, updateBranchName string, addons []internal.Addon) error {
+func (ws *WorkflowBaseService) publishWork(repository GitRepository, updateBranchName string, addons []internal.Addon) error {
 	err := repository.Push(&git.PushOptions{
 		RemoteName: "origin",
 		RefSpecs: []gitConfig.RefSpec{

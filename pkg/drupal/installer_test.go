@@ -2,10 +2,8 @@ package drupal
 
 import (
 	"errors"
-	"os"
 	"testing"
 
-	"github.com/drupdater/drupdater/pkg/drush"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/mock"
 	"gopkg.in/yaml.v3"
@@ -14,89 +12,11 @@ import (
 )
 
 func TestInstallDrupal(t *testing.T) {
-	// Create a temporary file to act as the core.extension.yml
-	tempFile, err := os.Create("/tmp/core.extension.yml")
-	if err != nil {
-		t.Fatalf("Failed to create temp file: %v", err)
-	}
-	defer os.Remove(tempFile.Name())
-
-	// Write initial YAML content to the temp file
-	initialContent := `
-module:
-  existing_module: 0
-`
-	if _, err := tempFile.Write([]byte(initialContent)); err != nil {
-		t.Fatalf("Failed to write initial content to temp file: %v", err)
-	}
-
-	// Close the temp file so it can be read by the function
-	if err := tempFile.Close(); err != nil {
-		t.Fatalf("Failed to close temp file: %v", err)
-	}
 
 	logger := zap.NewNop()
-
-	t.Run("Success", func(t *testing.T) {
-		drush := drush.NewMockRunner(t)
-
-		drush.On("InstallSite", mock.Anything, "/tmp", "site1").Return(nil)
-
-		installer := &DefaultInstallerService{
-			logger: logger,
-			drush:  drush,
-		}
-		err = installer.Install(t.Context(), "/tmp", "site1")
-		if err != nil {
-			t.Fatalf("Failed to install Drupal: %v", err)
-		}
-
-		drush.AssertExpectations(t)
-	})
-
-	t.Run("Failure", func(t *testing.T) {
-		drush := drush.NewMockRunner(t)
-		drush.On("InstallSite", mock.Anything, "/tmp", "site1").Return(errors.New("failed to install site"))
-
-		installer := &DefaultInstallerService{
-			logger: logger,
-			drush:  drush,
-		}
-		err = installer.Install(t.Context(), "/tmp", "site1")
-		if err == nil {
-			t.Fatalf("Expected an error but got nil")
-		}
-
-		drush.AssertExpectations(t)
-	})
-}
-
-func TestIsSqliteModuleEnabled(t *testing.T) {
-	logger := zap.NewNop()
-	drush := drush.NewMockRunner(t)
-
 	fs := afero.NewMemMapFs()
 
-	settingsService := &DefaultInstallerService{
-		logger: logger,
-		drush:  drush,
-		fs:     fs,
-	}
-
-	dir := "/tmp"
-	site := "default"
-	configSyncDir := "/tmp/config/sync"
-	coreExtensionPath := configSyncDir + "/core.extension.yml"
-
-	drush.On("GetConfigSyncDir", mock.Anything, "/tmp", "default", false).Return(configSyncDir, nil)
-
-	// Create a temporary directory and file to act as the config sync directory and core.extension.yml
-	if err := fs.MkdirAll(configSyncDir, 0755); err != nil {
-		t.Fatalf("Failed to create temp directory: %v", err)
-	}
-
-	// Write initial YAML content to the temp file
-	initialContent := `
+	coreExtensionContent := `
 _core:
   default_config_hash: 4GIX5Esnc_umpXUBj4IIocRX7Mt5fPhm4AgXfE3E56E
 module:
@@ -109,44 +29,94 @@ theme:
   gin: 0
 profile: thunder
 `
-	if err := afero.WriteFile(fs, coreExtensionPath, []byte(initialContent), 0644); err != nil {
+	configSyncDir := "/tmp/config/sync"
+	coreExtensionPath := configSyncDir + "/core.extension.yml"
+
+	if err := afero.WriteFile(fs, coreExtensionPath, []byte(coreExtensionContent), 0644); err != nil {
 		t.Fatalf("Failed to write initial content to core.extension.yml: %v", err)
 	}
 
-	enabled, err := settingsService.isSqliteModuleEnabled(t.Context(), dir, site)
-	if err != nil {
-		t.Fatalf("Failed to check if sqlite module is enabled: %v", err)
+	settingsContent := ""
+	settingsPath := "/tmp/web/sites/site1/settings.php"
+	if err := afero.WriteFile(fs, settingsPath, []byte(settingsContent), 0644); err != nil {
+		t.Fatalf("Failed to write initial content to settings.php: %v", err)
 	}
 
-	if !enabled {
-		t.Fatalf("Expected sqlite module to be enabled, but it was not")
-	}
+	t.Run("Success", func(t *testing.T) {
+		drush := NewMockDrush(t)
+		drush.EXPECT().InstallSite(mock.Anything, "/tmp", "site1").Return(nil)
+		drush.EXPECT().GetConfigSyncDir(mock.Anything, "/tmp", "site1", false).Return(configSyncDir, nil)
 
-	// Modify the YAML content to disable the sqlite module
-	disabledContent := `
-module:
-  existing_module: 0
+		composer := NewMockComposer(t)
+		composer.EXPECT().GetConfig(mock.Anything, "/tmp", "extra.drupal-scaffold.locations.web-root").Return("web", nil)
+
+		installer := &Installer{
+			logger:   logger,
+			drush:    drush,
+			composer: composer,
+			fs:       fs,
+		}
+		err := installer.Install(t.Context(), "/tmp", "site1")
+		if err != nil {
+			t.Fatalf("Failed to install Drupal: %v", err)
+		}
+
+		// Read the updated file content
+		settingsContent, err := afero.ReadFile(fs, settingsPath)
+		if err != nil {
+			t.Fatalf("Failed to read updated content from settings.php: %v", err)
+		}
+		updatedContent := `
+$databases['default']['default'] = [
+	'database' => '/site1.sqlite',
+	'prefix' => '',
+	'driver' => 'sqlite',
+	'namespace' => 'Drupal\\sqlite\\Driver\\Database\\sqlite',
+	'autoload' => 'core/modules/sqlite/src/Driver/Database/sqlite/',
+];
+$settings['skip_permissions_hardening'] = TRUE;
+$settings['file_private_path'] = '/private/site1';
+$settings['hash_salt'] = 'changeme';
 `
-	if err := afero.WriteFile(fs, coreExtensionPath, []byte(disabledContent), 0644); err != nil {
-		t.Fatalf("Failed to write disabled content to core.extension.yml: %v", err)
-	}
 
-	enabled, err = settingsService.isSqliteModuleEnabled(t.Context(), dir, site)
-	if err != nil {
-		t.Fatalf("Failed to check if sqlite module is enabled: %v", err)
-	}
+		// Check if the SQLite module was added correctly
+		if string(settingsContent) != updatedContent {
+			t.Fatalf("Expected content: %s, got: %s", updatedContent, settingsContent)
+		}
 
-	if enabled {
-		t.Fatalf("Expected sqlite module to be disabled, but it was enabled")
-	}
+		drush.AssertExpectations(t)
+		composer.AssertExpectations(t)
+	})
 
-	drush.AssertExpectations(t)
+	t.Run("Failure", func(t *testing.T) {
+		drush := NewMockDrush(t)
+		drush.EXPECT().InstallSite(mock.Anything, "/tmp", "site1").Return(errors.New("failed to install site"))
+		drush.EXPECT().GetConfigSyncDir(mock.Anything, "/tmp", "site1", false).Return(configSyncDir, nil)
+
+		composer := NewMockComposer(t)
+		composer.EXPECT().GetConfig(mock.Anything, "/tmp", "extra.drupal-scaffold.locations.web-root").Return("web", nil)
+
+		installer := &Installer{
+			logger:   logger,
+			drush:    drush,
+			composer: composer,
+			fs:       fs,
+		}
+		err := installer.Install(t.Context(), "/tmp", "site1")
+		if err == nil {
+			t.Fatalf("Expected an error but got nil")
+		}
+
+		drush.AssertExpectations(t)
+		composer.AssertExpectations(t)
+	})
+
 }
 
 func TestAddSqliteModule(t *testing.T) {
 
 	logger := zap.NewNop()
-	drush := drush.NewMockRunner(t)
+	drush := NewMockDrush(t)
 	fs := afero.NewMemMapFs()
 
 	// Create a temporary file to act as the core.extension.yml
@@ -177,7 +147,7 @@ profile: thunder
 		t.Fatalf("Failed to close temp file: %v", err)
 	}
 
-	settingsService := &DefaultInstallerService{
+	installer := &Installer{
 		logger: logger,
 		drush:  drush,
 		fs:     fs,
@@ -186,7 +156,7 @@ profile: thunder
 	drush.On("GetConfigSyncDir", mock.Anything, "/tmp", "default", false).Return("/tmp", nil)
 
 	// Call the function to add the SQLite module
-	if err := settingsService.addSqliteModule(t.Context(), "/tmp", "default"); err != nil {
+	if err := installer.addSqliteModule(t.Context(), "/tmp", "default"); err != nil {
 		t.Fatalf("Failed to add SQLite module: %v", err)
 	}
 
@@ -220,7 +190,7 @@ profile: thunder
 func TestRemoveProfile(t *testing.T) {
 
 	logger := zap.NewNop()
-	drush := drush.NewMockRunner(t)
+	drush := NewMockDrush(t)
 	fs := afero.NewMemMapFs()
 
 	// Create a temporary file to act as the core.extension.yml
@@ -251,7 +221,7 @@ profile: standard
 		t.Fatalf("Failed to close temp file: %v", err)
 	}
 
-	settingsService := &DefaultSettingsService{
+	installer := &Installer{
 		logger: logger,
 		drush:  drush,
 		fs:     fs,
@@ -260,7 +230,7 @@ profile: standard
 	drush.On("GetConfigSyncDir", mock.Anything, "/tmp", "default", false).Return("/tmp", nil)
 
 	// Call the function to add the SQLite module
-	if err := settingsService.RemoveProfile(t.Context(), "/tmp", "default"); err != nil {
+	if err := installer.RemoveProfile(t.Context(), "/tmp", "default"); err != nil {
 		t.Fatalf("Failed to remove profile: %v", err)
 	}
 

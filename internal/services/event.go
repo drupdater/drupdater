@@ -3,14 +3,13 @@ package services
 import (
 	"context"
 
-	"github.com/drupdater/drupdater/internal"
 	"github.com/gookit/event"
 )
 
 type BasicAddonEvent struct {
 	ctx      context.Context
 	path     string
-	worktree internal.Worktree
+	worktree Worktree
 }
 
 // Context returns the context
@@ -24,7 +23,7 @@ func (e *BasicAddonEvent) Path() string {
 }
 
 // Worktree returns the worktree
-func (e *BasicAddonEvent) Worktree() internal.Worktree {
+func (e *BasicAddonEvent) Worktree() Worktree {
 	return e.worktree
 }
 
@@ -38,7 +37,7 @@ type PreComposerUpdateEvent struct {
 }
 
 // NewPreComposerUpdateEvent creates a new PreComposerUpdateEvent instance
-func NewPreComposerUpdateEvent(ctx context.Context, path string, worktree internal.Worktree, packagesToUpdate []string, packagesToKeep []string, minimalChanges bool) *PreComposerUpdateEvent {
+func NewPreComposerUpdateEvent(ctx context.Context, path string, worktree Worktree, packagesToUpdate []string, packagesToKeep []string, minimalChanges bool) *PreComposerUpdateEvent {
 	evt := &PreComposerUpdateEvent{
 		BasicAddonEvent: BasicAddonEvent{
 			ctx:      ctx,
@@ -60,7 +59,7 @@ type PostComposerUpdateEvent struct {
 }
 
 // NewPostComposerUpdateEvent creates a new PostComposerUpdateEvent instance
-func NewPostComposerUpdateEvent(ctx context.Context, path string, worktree internal.Worktree) *PostComposerUpdateEvent {
+func NewPostComposerUpdateEvent(ctx context.Context, path string, worktree Worktree) *PostComposerUpdateEvent {
 	evt := &PostComposerUpdateEvent{
 		BasicAddonEvent: BasicAddonEvent{
 			ctx:      ctx,
@@ -78,7 +77,7 @@ type PostCodeUpdateEvent struct {
 }
 
 // NewPostCodeUpdateEvent creates a new PostCodeUpdateEvent instance
-func NewPostCodeUpdateEvent(ctx context.Context, path string, worktree internal.Worktree) *PostCodeUpdateEvent {
+func NewPostCodeUpdateEvent(ctx context.Context, path string, worktree Worktree) *PostCodeUpdateEvent {
 	evt := &PostCodeUpdateEvent{
 		BasicAddonEvent: BasicAddonEvent{
 			ctx:      ctx,
@@ -98,7 +97,7 @@ type PreSiteUpdateEvent struct {
 }
 
 // NewPostSiteUpdateEvent creates a new PreSiteUpdateEvent instance
-func NewPreSiteUpdateEvent(ctx context.Context, path string, worktree internal.Worktree, site string) *PreSiteUpdateEvent {
+func NewPreSiteUpdateEvent(ctx context.Context, path string, worktree Worktree, site string) *PreSiteUpdateEvent {
 	evt := &PreSiteUpdateEvent{
 		BasicAddonEvent: BasicAddonEvent{
 			ctx:      ctx,
@@ -124,7 +123,7 @@ type PostSiteUpdateEvent struct {
 }
 
 // NewPostSiteUpdateEvent creates a new PostSiteUpdateEvent instance
-func NewPostSiteUpdateEvent(ctx context.Context, path string, worktree internal.Worktree, site string) *PostSiteUpdateEvent {
+func NewPostSiteUpdateEvent(ctx context.Context, path string, worktree Worktree, site string) *PostSiteUpdateEvent {
 	evt := &PostSiteUpdateEvent{
 		BasicAddonEvent: BasicAddonEvent{
 			ctx:      ctx,

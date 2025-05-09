@@ -4,8 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/drupdater/drupdater/internal"
-	"github.com/drupdater/drupdater/pkg/composer"
+	"github.com/drupdater/drupdater/internal/services"
 	"github.com/go-git/go-git/v5"
 	"github.com/gookit/event"
 	"github.com/stretchr/testify/assert"
@@ -16,7 +15,7 @@ import (
 
 func TestDefaultComposerNormalize_SubscribedEvents(t *testing.T) {
 	logger := zap.NewNop()
-	composer := composer.NewMockRunner(t)
+	composer := NewMockComposer(t)
 
 	normalize := NewComposerNormalizer(logger, composer)
 	events := normalize.SubscribedEvents()
@@ -27,7 +26,7 @@ func TestDefaultComposerNormalize_SubscribedEvents(t *testing.T) {
 
 func TestDefaultComposerNormalize_PostComposerUpdateHandler_PackageInstalled(t *testing.T) {
 	logger := zap.NewNop()
-	composer := composer.NewMockRunner(t)
+	composer := NewMockComposer(t)
 
 	ctx := context.Background()
 	testPath := "/test/path"
@@ -39,7 +38,7 @@ func TestDefaultComposerNormalize_PostComposerUpdateHandler_PackageInstalled(t *
 
 	normalize := NewComposerNormalizer(logger, composer)
 
-	e := NewPostComposerUpdateEvent(ctx, testPath, worktree, internal.Config{})
+	e := services.NewPostComposerUpdateEvent(ctx, testPath, worktree)
 	err := normalize.postComposerUpdateHandler(e)
 
 	assert.NoError(t, err)
@@ -48,7 +47,7 @@ func TestDefaultComposerNormalize_PostComposerUpdateHandler_PackageInstalled(t *
 
 func TestDefaultComposerNormalize_PostComposerUpdateHandler_PackageNotInstalled(t *testing.T) {
 	logger := zap.NewNop()
-	composer := composer.NewMockRunner(t)
+	composer := NewMockComposer(t)
 
 	ctx := context.Background()
 	testPath := "/test/path"
@@ -59,7 +58,7 @@ func TestDefaultComposerNormalize_PostComposerUpdateHandler_PackageNotInstalled(
 
 	normalize := NewComposerNormalizer(logger, composer)
 
-	e := NewPostComposerUpdateEvent(ctx, testPath, worktree, internal.Config{})
+	e := services.NewPostComposerUpdateEvent(ctx, testPath, worktree)
 
 	err := normalize.postComposerUpdateHandler(e)
 
@@ -71,7 +70,7 @@ func TestDefaultComposerNormalize_PostComposerUpdateHandler_PackageNotInstalled(
 
 func TestDefaultComposerNormalize_RenderTemplate(t *testing.T) {
 	logger := zap.NewNop()
-	composer := composer.NewMockRunner(t)
+	composer := NewMockComposer(t)
 
 	normalize := NewComposerNormalizer(logger, composer)
 

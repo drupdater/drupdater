@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	internal "github.com/drupdater/drupdater/internal"
-	"github.com/drupdater/drupdater/pkg/composer"
+	"github.com/drupdater/drupdater/internal/services"
 	"github.com/drupdater/drupdater/pkg/rector"
 
 	"github.com/go-git/go-git/v5/plumbing"
@@ -15,18 +15,18 @@ import (
 
 func TestRemoveDeprecations(t *testing.T) {
 	logger := zap.NewNop()
-	worktree := internal.NewMockWorktree(t)
+	worktree := NewMockWorktree(t)
 	config := internal.Config{
 		SkipRector: false,
 	}
 
 	t.Run("Rector is not installed", func(t *testing.T) {
-		composer := composer.NewMockRunner(t)
+		composer := NewMockComposer(t)
 		composer.On("IsPackageInstalled", mock.Anything, "/path/to/repo", "palantirnet/drupal-rector").Return(false, assert.AnError)
 		composer.On("Require", mock.Anything, "/path/to/repo", []string{"palantirnet/drupal-rector"}).Return("", nil)
 		composer.On("GetCustomCodeDirectories", mock.Anything, "/path/to/repo").Return([]string{"web/modules/custom"}, nil)
 
-		runner := rector.NewMockRunner(t)
+		runner := NewMockRector(t)
 		runner.On("Run", mock.Anything, "/path/to/repo", []string{"web/modules/custom"}).Return(rector.ReturnOutput{
 			ChangedFiles: []string{},
 			FileDiffs:    []rector.ReturnOutputFillDiff{},
@@ -38,7 +38,7 @@ func TestRemoveDeprecations(t *testing.T) {
 		composer.On("Remove", mock.Anything, "/path/to/repo", []string{"palantirnet/drupal-rector"}).Return("", nil)
 
 		updateRemoveDeprecations := NewDeprecationsRemover(logger, runner, config, composer)
-		postCodeUpdate := NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", worktree, internal.Config{})
+		postCodeUpdate := services.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", worktree)
 		err := updateRemoveDeprecations.postCodeUpdateHandler(postCodeUpdate)
 		assert.NoError(t, err)
 		composer.AssertExpectations(t)
@@ -47,11 +47,11 @@ func TestRemoveDeprecations(t *testing.T) {
 	})
 
 	t.Run("Rector is installed and command executed successfully with one fix", func(t *testing.T) {
-		composer := composer.NewMockRunner(t)
+		composer := NewMockComposer(t)
 		composer.On("IsPackageInstalled", mock.Anything, "/path/to/repo", "palantirnet/drupal-rector").Return(true, nil)
 		composer.On("GetCustomCodeDirectories", mock.Anything, "/path/to/repo").Return([]string{"web/modules/custom"}, nil)
 
-		runner := rector.NewMockRunner(t)
+		runner := NewMockRector(t)
 		runner.On("Run", mock.Anything, "/path/to/repo", []string{"web/modules/custom"}).Return(rector.ReturnOutput{
 			ChangedFiles: []string{"tests/Drupal/FunctionalJavascriptTests/ThunderOrgTestHomePageTest.php"},
 			FileDiffs: []rector.ReturnOutputFillDiff{
@@ -74,7 +74,7 @@ func TestRemoveDeprecations(t *testing.T) {
 		worktree.On("Commit", "Remove deprecations", mock.Anything).Return(plumbing.NewHash(""), nil)
 
 		updateRemoveDeprecations := NewDeprecationsRemover(logger, runner, config, composer)
-		postCodeUpdate := NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", worktree, internal.Config{})
+		postCodeUpdate := services.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", worktree)
 		err := updateRemoveDeprecations.postCodeUpdateHandler(postCodeUpdate)
 		assert.NoError(t, err)
 		composer.AssertExpectations(t)
@@ -83,11 +83,11 @@ func TestRemoveDeprecations(t *testing.T) {
 	})
 
 	t.Run("Rector is installed and command executed successfully without fix", func(t *testing.T) {
-		composer := composer.NewMockRunner(t)
+		composer := NewMockComposer(t)
 		composer.On("IsPackageInstalled", mock.Anything, "/path/to/repo", "palantirnet/drupal-rector").Return(true, nil)
 		composer.On("GetCustomCodeDirectories", mock.Anything, "/path/to/repo").Return([]string{"web/modules/custom"}, nil)
 
-		runner := rector.NewMockRunner(t)
+		runner := NewMockRector(t)
 		runner.On("Run", mock.Anything, "/path/to/repo", []string{"web/modules/custom"}).Return(rector.ReturnOutput{
 			ChangedFiles: []string{},
 			FileDiffs:    []rector.ReturnOutputFillDiff{},
@@ -98,7 +98,7 @@ func TestRemoveDeprecations(t *testing.T) {
 		}, nil)
 
 		updateRemoveDeprecations := NewDeprecationsRemover(logger, runner, config, composer)
-		postCodeUpdate := NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", worktree, internal.Config{})
+		postCodeUpdate := services.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", worktree)
 		err := updateRemoveDeprecations.postCodeUpdateHandler(postCodeUpdate)
 		assert.NoError(t, err)
 		composer.AssertExpectations(t)
@@ -107,15 +107,15 @@ func TestRemoveDeprecations(t *testing.T) {
 	})
 
 	t.Run("Command execution fails", func(t *testing.T) {
-		composer := composer.NewMockRunner(t)
+		composer := NewMockComposer(t)
 		composer.On("IsPackageInstalled", mock.Anything, "/path/to/repo", "palantirnet/drupal-rector").Return(true, nil)
 		composer.On("GetCustomCodeDirectories", mock.Anything, "/path/to/repo").Return([]string{"web/modules/custom"}, nil)
 
-		runner := rector.NewMockRunner(t)
+		runner := NewMockRector(t)
 		runner.On("Run", mock.Anything, "/path/to/repo", []string{"web/modules/custom"}).Return(rector.ReturnOutput{}, assert.AnError)
 
 		updateRemoveDeprecations := NewDeprecationsRemover(logger, runner, config, composer)
-		postCodeUpdate := NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", worktree, internal.Config{})
+		postCodeUpdate := services.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", worktree)
 		err := updateRemoveDeprecations.postCodeUpdateHandler(postCodeUpdate)
 		assert.Error(t, err)
 		composer.AssertExpectations(t)

@@ -4,8 +4,6 @@ import (
 	"fmt"
 
 	"github.com/drupdater/drupdater/internal/services"
-	"github.com/drupdater/drupdater/pkg/drush"
-	"github.com/drupdater/drupdater/pkg/repo"
 	"github.com/go-git/go-git/v5"
 	"github.com/gookit/event"
 
@@ -15,12 +13,12 @@ import (
 // TranslationsUpdater handles updating translations for Drupal sites
 type TranslationsUpdater struct {
 	logger     *zap.Logger
-	drush      drush.Runner
-	repository repo.RepositoryService
+	drush      Drush
+	repository Repository
 }
 
 // NewTranslationsUpdater creates a new translations updater instance
-func NewTranslationsUpdater(logger *zap.Logger, drush drush.Runner, repository repo.RepositoryService) *TranslationsUpdater {
+func NewTranslationsUpdater(logger *zap.Logger, drush Drush, repository Repository) *TranslationsUpdater {
 	return &TranslationsUpdater{
 		logger:     logger,
 		drush:      drush,

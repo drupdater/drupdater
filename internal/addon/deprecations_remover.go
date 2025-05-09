@@ -3,8 +3,6 @@ package addon
 import (
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/services"
-	"github.com/drupdater/drupdater/pkg/composer"
-	"github.com/drupdater/drupdater/pkg/rector"
 	"github.com/gookit/event"
 
 	"github.com/go-git/go-git/v5"
@@ -14,13 +12,13 @@ import (
 // DeprecationsRemover handles the removal of deprecated code using Rector
 type DeprecationsRemover struct {
 	logger   *zap.Logger
-	rector   rector.Runner
+	rector   Rector
 	config   internal.Config
-	composer composer.Runner
+	composer Composer
 }
 
 // NewDeprecationsRemover creates a new deprecations remover instance
-func NewDeprecationsRemover(logger *zap.Logger, rector rector.Runner, config internal.Config, composer composer.Runner) *DeprecationsRemover {
+func NewDeprecationsRemover(logger *zap.Logger, rector Rector, config internal.Config, composer Composer) *DeprecationsRemover {
 	return &DeprecationsRemover{
 		logger:   logger,
 		rector:   rector,

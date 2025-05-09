@@ -8,29 +8,30 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/drupdater/drupdater/pkg/composer"
-	"github.com/drupdater/drupdater/pkg/drush"
 	"github.com/spf13/afero"
 	"gopkg.in/yaml.v3"
 
 	"go.uber.org/zap"
 )
 
-type InstallerService interface {
-	Install(ctx context.Context, path string, site string) error
-	ConfigureDatabase(ctx context.Context, dir string, site string) error
-	RemoveProfile(ctx context.Context, dir string, site string) error
+type Drush interface {
+	InstallSite(ctx context.Context, path string, site string) error
+	GetConfigSyncDir(ctx context.Context, path string, site string, create bool) (string, error)
 }
 
-type DefaultInstallerService struct {
+type Composer interface {
+	GetConfig(ctx context.Context, path string, key string) (string, error)
+}
+
+type Installer struct {
 	logger   *zap.Logger
-	drush    drush.Runner
-	composer composer.Runner
+	drush    Drush
+	composer Composer
 	fs       afero.Fs
 }
 
-func NewDefaultInstallerService(logger *zap.Logger, drush drush.Runner, composer composer.Runner) *DefaultInstallerService {
-	return &DefaultInstallerService{
+func NewInstaller(logger *zap.Logger, drush Drush, composer Composer) *Installer {
+	return &Installer{
 		logger:   logger,
 		drush:    drush,
 		composer: composer,
@@ -38,7 +39,7 @@ func NewDefaultInstallerService(logger *zap.Logger, drush drush.Runner, composer
 	}
 }
 
-func (is *DefaultInstallerService) Install(ctx context.Context, path string, site string) error {
+func (is *Installer) Install(ctx context.Context, path string, site string) error {
 
 	is.logger.Info("installing site", zap.String("site", site))
 
@@ -57,7 +58,7 @@ func (is *DefaultInstallerService) Install(ctx context.Context, path string, sit
 	return nil
 }
 
-func (is *DefaultInstallerService) ConfigureDatabase(ctx context.Context, dir string, site string) error {
+func (is *Installer) ConfigureDatabase(ctx context.Context, dir string, site string) error {
 
 	siteLogger := is.logger.With(zap.String("site", site))
 	siteLogger.Debug("configuring database", zap.String("dir", dir))
@@ -118,7 +119,7 @@ if (isset($settings['config_exclude_modules'])) {
 	return nil
 }
 
-func (is *DefaultInstallerService) isSqliteModuleEnabled(ctx context.Context, dir string, site string) (bool, error) {
+func (is *Installer) isSqliteModuleEnabled(ctx context.Context, dir string, site string) (bool, error) {
 	siteLogger := is.logger.With(zap.String("site", site))
 
 	configSyncDir, err := is.drush.GetConfigSyncDir(ctx, dir, site, false)
@@ -150,7 +151,7 @@ func (is *DefaultInstallerService) isSqliteModuleEnabled(ctx context.Context, di
 	return false, nil
 }
 
-func (is *DefaultInstallerService) addSqliteModule(ctx context.Context, dir string, site string) error {
+func (is *Installer) addSqliteModule(ctx context.Context, dir string, site string) error {
 
 	siteLogger := is.logger.With(zap.String("site", site))
 
@@ -188,7 +189,7 @@ func (is *DefaultInstallerService) addSqliteModule(ctx context.Context, dir stri
 	return nil
 }
 
-func (is *DefaultInstallerService) RemoveProfile(ctx context.Context, dir string, site string) error {
+func (is *Installer) RemoveProfile(ctx context.Context, dir string, site string) error {
 	siteLogger := is.logger.With(zap.String("site", site))
 
 	configSyncDir, err := is.drush.GetConfigSyncDir(ctx, dir, site, false)

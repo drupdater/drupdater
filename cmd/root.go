@@ -40,10 +40,10 @@ var rootCmd = &cobra.Command{
 		drush := drush.NewCLI(logger, cache)
 		composer := composer.NewCLI(logger)
 		drupalOrg := drupalorg.NewHTTPClient(logger)
-		installer := drupal.NewDefaultInstallerService(logger, drush, composer)
+		installer := drupal.NewInstaller(logger, drush, composer)
 		vcsProviderFactory := codehosting.NewDefaultVcsProviderFactory()
 		platform := vcsProviderFactory.Create(config.RepositoryURL, config.Token)
-		git := repo.NewGitRepositoryService(logger, platform)
+		git := repo.NewGitRepositoryService(logger)
 		workflow := services.NewWorkflowBaseService(logger, config, drush, platform, git, installer, composer)
 
 		var addonList []internal.Addon

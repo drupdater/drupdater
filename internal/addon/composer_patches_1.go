@@ -14,7 +14,6 @@ import (
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/services"
 	"github.com/drupdater/drupdater/pkg/composer"
-	"github.com/drupdater/drupdater/pkg/drupalorg"
 	git "github.com/go-git/go-git/v5"
 	"github.com/gookit/event"
 	gitlab "gitlab.com/gitlab-org/api/client-go"
@@ -56,13 +55,13 @@ type ConflictPatch struct {
 type ComposerPatches1 struct {
 	internal.BasicAddon
 	logger       *zap.Logger
-	composer     composer.Runner
-	drupalOrg    drupalorg.Client
+	composer     Composer
+	drupalOrg    DrupalOrg
 	gitlab       *gitlab.Client
 	patchUpdates PatchUpdates
 }
 
-func NewComposerPatches1(logger *zap.Logger, composer composer.Runner, drupalOrg drupalorg.Client) *ComposerPatches1 {
+func NewComposerPatches1(logger *zap.Logger, composer Composer, drupalOrg DrupalOrg) *ComposerPatches1 {
 
 	drupalOrgGitlab, err := gitlab.NewClient(os.Getenv("DRUPALCODE_ACCESS_TOKEN"), gitlab.WithBaseURL("https://git.drupalcode.org/api/v4"))
 	if err != nil {
@@ -147,7 +146,7 @@ func (h *ComposerPatches1) preComposerUpdateHandler(e event.Event) error {
 	return nil
 }
 
-func (h *ComposerPatches1) UpdatePatches(ctx context.Context, path string, worktree internal.Worktree, operations []composer.PackageChange, patches map[string]map[string]string) (PatchUpdates, map[string]map[string]string) {
+func (h *ComposerPatches1) UpdatePatches(ctx context.Context, path string, worktree Worktree, operations []composer.PackageChange, patches map[string]map[string]string) (PatchUpdates, map[string]map[string]string) {
 
 	updates := PatchUpdates{}
 	h.logger.Debug("composer patches", zap.Any("patches", patches))

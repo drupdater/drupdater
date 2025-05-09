@@ -5,7 +5,6 @@ import (
 
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/services"
-	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/gookit/event"
 	"go.uber.org/zap"
 )
@@ -13,12 +12,12 @@ import (
 type ComposerDiff struct {
 	internal.BasicAddon
 	logger   *zap.Logger
-	composer composer.Runner
+	composer Composer
 
 	table string
 }
 
-func NewComposerDiff(logger *zap.Logger, composer composer.Runner) *ComposerDiff {
+func NewComposerDiff(logger *zap.Logger, composer Composer) *ComposerDiff {
 	return &ComposerDiff{
 		logger:   logger,
 		composer: composer,

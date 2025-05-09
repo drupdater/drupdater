@@ -13,12 +13,12 @@ import (
 type UpdateHooks struct {
 	internal.BasicAddon
 	logger *zap.Logger
-	drush  drush.Runner
+	drush  Drush
 
 	hooks UpdateHooksPerSite
 }
 
-func NewUpdateHooks(logger *zap.Logger, drush drush.Runner) *UpdateHooks {
+func NewUpdateHooks(logger *zap.Logger, drush Drush) *UpdateHooks {
 	return &UpdateHooks{
 		logger: logger,
 		drush:  drush,

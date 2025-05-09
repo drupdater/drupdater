@@ -10,8 +10,6 @@ import (
 
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/services"
-	"github.com/drupdater/drupdater/pkg/composer"
-	"github.com/drupdater/drupdater/pkg/phpcs"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/gookit/event"
@@ -21,13 +19,13 @@ import (
 // CodeBeautifier handles PHP code style formatting and fixes
 type CodeBeautifier struct {
 	logger   *zap.Logger
-	phpcs    phpcs.Runner
+	phpcs    PHPCS
 	config   internal.Config
-	composer composer.Runner
+	composer Composer
 }
 
 // NewCodeBeautifier creates a new code beautifier instance
-func NewCodeBeautifier(logger *zap.Logger, phpcs phpcs.Runner, config internal.Config, composer composer.Runner) *CodeBeautifier {
+func NewCodeBeautifier(logger *zap.Logger, phpcs PHPCS, config internal.Config, composer Composer) *CodeBeautifier {
 	return &CodeBeautifier{
 		logger:   logger,
 		phpcs:    phpcs,
@@ -115,7 +113,7 @@ func (cb *CodeBeautifier) postCodeUpdateHandler(e event.Event) error {
 }
 
 // CreatePHPCSConfig generates a phpcs.xml configuration file
-func (cb *CodeBeautifier) CreatePHPCSConfig(ctx context.Context, path string, worktree internal.Worktree) (bool, error) {
+func (cb *CodeBeautifier) CreatePHPCSConfig(ctx context.Context, path string, worktree Worktree) (bool, error) {
 	cb.logger.Debug("no phpcs.xml or phpcs.xml.dist file found, creating phpcs.xml")
 
 	phpcsTemplate := `<?xml version="1.0" encoding="UTF-8"?>
@@ -181,7 +179,7 @@ func (cb *CodeBeautifier) CreatePHPCSConfig(ctx context.Context, path string, wo
 }
 
 // InstallCoder installs the drupal/coder package
-func (cb *CodeBeautifier) InstallCoder(ctx context.Context, path string, worktree internal.Worktree) error {
+func (cb *CodeBeautifier) InstallCoder(ctx context.Context, path string, worktree Worktree) error {
 	cb.logger.Debug("drupal/coder is not installed, installing")
 	if _, err := cb.composer.Require(ctx, path, "--dev", "drupal/coder"); err != nil {
 		return err

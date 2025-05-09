@@ -3,7 +3,6 @@ package addon
 import (
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/services"
-	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/gookit/event"
 	"go.uber.org/zap"
 )
@@ -11,10 +10,10 @@ import (
 type ComposerNormalizer struct {
 	internal.BasicAddon
 	logger   *zap.Logger
-	composer composer.Runner
+	composer Composer
 }
 
-func NewComposerNormalizer(logger *zap.Logger, composer composer.Runner) *ComposerNormalizer {
+func NewComposerNormalizer(logger *zap.Logger, composer Composer) *ComposerNormalizer {
 	return &ComposerNormalizer{
 		logger:   logger,
 		composer: composer,

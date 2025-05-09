@@ -6,10 +6,6 @@ import (
 
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/codehosting"
-	"github.com/drupdater/drupdater/pkg/composer"
-	"github.com/drupdater/drupdater/pkg/drupal"
-	"github.com/drupdater/drupdater/pkg/drush"
-	"github.com/drupdater/drupdater/pkg/repo"
 	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
 	"go.uber.org/zap"
@@ -17,12 +13,12 @@ import (
 
 func TestStartUpdate(t *testing.T) {
 	logger := zap.NewNop()
-	installer := drupal.NewMockInstallerService(t)
-	repositoryService := repo.NewMockRepositoryService(t)
+	installer := NewMockInstaller(t)
+	repositoryService := NewMockRepository(t)
 	vcsProvider := codehosting.NewMockPlatform(t)
-	repository := internal.NewMockRepository(t)
-	composer := composer.NewMockRunner(t)
-	drush := drush.NewMockRunner(t)
+	repository := NewMockGitRepository(t)
+	composer := NewMockComposer(t)
+	drush := NewMockDrush(t)
 
 	config := internal.Config{
 		RepositoryURL: "https://example.com/repo.git",
@@ -34,12 +30,12 @@ func TestStartUpdate(t *testing.T) {
 
 	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, composer)
 
-	worktree := internal.NewMockWorktree(t)
+	worktree := NewMockWorktree(t)
 	worktree.On("Checkout", mock.Anything).Return(nil)
 
 	installer.On("Install", mock.Anything, "/tmp", "site1").Return(nil)
 	//installer.On("InstallDrupal", mock.Anything, "/tmp", "site2").Return(nil)
-	repositoryService.On("CloneRepository", config.RepositoryURL, config.Branch, config.Token).Return(repository, worktree, "/tmp", nil)
+	repositoryService.On("CloneRepository", config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil)
 	repositoryService.On("BranchExists", mock.Anything, mock.Anything).Return(false, nil)
 	//updater.On("UpdateDependencies", mock.Anything, "/tmp", mock.Anything, false).Return(nil)
 	//updater.On("UpdateDrupal", mock.Anything, "/tmp", mock.Anything, "site1").Return(nil)
@@ -61,12 +57,12 @@ func TestStartUpdate(t *testing.T) {
 
 func TestStartUpdateWithDryRun(t *testing.T) {
 	logger := zap.NewNop()
-	installer := drupal.NewMockInstallerService(t)
-	drush := drush.NewMockRunner(t)
-	repositoryService := repo.NewMockRepositoryService(t)
+	installer := NewMockInstaller(t)
+	repositoryService := NewMockRepository(t)
 	vcsProvider := codehosting.NewMockPlatform(t)
-	repository := internal.NewMockRepository(t)
-	composer := composer.NewMockRunner(t)
+	repository := NewMockGitRepository(t)
+	composer := NewMockComposer(t)
+	drush := NewMockDrush(t)
 
 	config := internal.Config{
 		RepositoryURL: "https://example.com/repo.git",
@@ -78,12 +74,12 @@ func TestStartUpdateWithDryRun(t *testing.T) {
 
 	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, composer)
 
-	worktree := internal.NewMockWorktree(t)
+	worktree := NewMockWorktree(t)
 	worktree.On("Checkout", mock.Anything).Return(nil)
 
 	installer.On("Install", mock.Anything, "/tmp", "site1").Return(nil)
 	installer.On("Install", mock.Anything, "/tmp", "site2").Return(nil)
-	repositoryService.On("CloneRepository", config.RepositoryURL, config.Branch, config.Token).Return(repository, worktree, "/tmp", nil)
+	repositoryService.On("CloneRepository", config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil)
 	repositoryService.On("BranchExists", mock.Anything, mock.Anything).Return(false, nil)
 	//updater.On("UpdateDependencies", mock.Anything, "/tmp", mock.Anything, false).Return(nil)
 	//updater.On("UpdateDrupal", mock.Anything, "/tmp", mock.Anything, "site1").Return(nil)
@@ -96,7 +92,6 @@ func TestStartUpdateWithDryRun(t *testing.T) {
 	assert.NoError(t, err)
 	installer.AssertExpectations(t)
 	repositoryService.AssertExpectations(t)
-	updater.AssertExpectations(t)
 	vcsProvider.AssertExpectations(t)
 	vcsProvider.AssertExpectations(t)
 }

@@ -17,29 +17,6 @@ import (
 
 var execCommand = exec.CommandContext
 
-type Runner interface {
-	Update(ctx context.Context, dir string, packagesToUpdate []string, packagesToKeep []string, minimalChanges bool, dryRun bool) ([]PackageChange, error)
-	Install(ctx context.Context, dir string) error
-	Require(ctx context.Context, dir string, args ...string) (string, error)
-	Remove(ctx context.Context, dir string, packages ...string) (string, error)
-	Audit(ctx context.Context, dir string) (Audit, error)
-	Normalize(ctx context.Context, dir string) (string, error)
-	Diff(ctx context.Context, path string, withLinks bool) (string, error)
-
-	GetInstalledPackageVersion(ctx context.Context, dir string, packageName string) (string, error)
-	GetAllowPlugins(ctx context.Context, dir string) (map[string]bool, error)
-	SetAllowPlugins(ctx context.Context, dir string, plugins map[string]bool) error
-	GetConfig(ctx context.Context, dir string, key string) (string, error)
-	SetConfig(ctx context.Context, dir string, key string, value string) error
-
-	CheckIfPatchApplies(ctx context.Context, packageName string, packageVersion string, patchPath string) (bool, error)
-	GetInstalledPlugins(ctx context.Context, dir string) (map[string]interface{}, error)
-	IsPackageInstalled(ctx context.Context, dir string, packageToCheck string) (bool, error)
-	GetLockHash(dir string) (string, error)
-	UpdateLockHash(ctx context.Context, dir string) error
-	GetCustomCodeDirectories(ctx context.Context, dir string) ([]string, error)
-}
-
 type CLI struct {
 	fs     afero.Fs
 	logger *zap.Logger

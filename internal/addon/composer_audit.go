@@ -23,7 +23,7 @@ type SecurityReport struct {
 type ComposerAudit struct {
 	internal.BasicAddon
 	logger   *zap.Logger
-	composer composer.Runner
+	composer Composer
 	current  time.Time
 
 	beforeAudit composer.Audit
@@ -31,7 +31,7 @@ type ComposerAudit struct {
 }
 
 // NewComposerAudit creates a new translations updater instance
-func NewComposerAudit(logger *zap.Logger, composer composer.Runner) *ComposerAudit {
+func NewComposerAudit(logger *zap.Logger, composer Composer) *ComposerAudit {
 	return &ComposerAudit{
 		logger:   logger,
 		composer: composer,

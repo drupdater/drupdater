@@ -6,7 +6,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/drupalorg"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -23,10 +22,10 @@ func TestUpdatePatches(t *testing.T) {
 
 	t.Run("Local patch still applies", func(t *testing.T) {
 
-		composerService := composer.NewMockRunner(t)
-		drupalOrgService := drupalorg.NewMockClient(t)
+		composerService := NewMockComposer(t)
+		drupalOrgService := NewMockDrupalOrg(t)
 
-		worktree := internal.NewMockWorktree(t)
+		worktree := NewMockWorktree(t)
 
 		composerService.On("IsPackageInstalled", mock.Anything, "/tmp", "drupal/core").Return(true, nil)
 
@@ -63,10 +62,10 @@ func TestUpdatePatches(t *testing.T) {
 
 	t.Run("Local patch not applies", func(t *testing.T) {
 
-		composerService := composer.NewMockRunner(t)
-		drupalOrgService := drupalorg.NewMockClient(t)
+		composerService := NewMockComposer(t)
+		drupalOrgService := NewMockDrupalOrg(t)
 
-		worktree := internal.NewMockWorktree(t)
+		worktree := NewMockWorktree(t)
 
 		drupalOrgService.On("FindIssueNumber", "local patch without issue number").Return("", false)
 		drupalOrgService.On("FindIssueNumber", "patches/core/0001-local-patch.patch").Return("", false)
@@ -118,10 +117,10 @@ func TestUpdatePatches(t *testing.T) {
 
 	t.Run("Remote patch still applies", func(t *testing.T) {
 
-		composerService := composer.NewMockRunner(t)
-		drupalOrgService := drupalorg.NewMockClient(t)
+		composerService := NewMockComposer(t)
+		drupalOrgService := NewMockDrupalOrg(t)
 
-		worktree := internal.NewMockWorktree(t)
+		worktree := NewMockWorktree(t)
 
 		composerService.On("IsPackageInstalled", mock.Anything, "/tmp", "drupal/core").Return(true, nil)
 
@@ -169,12 +168,12 @@ func TestUpdatePatches(t *testing.T) {
 
 	t.Run("Current patch fails, remote patch still applies", func(t *testing.T) {
 
-		composerService := composer.NewMockRunner(t)
-		drupalOrgService := drupalorg.NewMockClient(t)
+		composerService := NewMockComposer(t)
+		drupalOrgService := NewMockDrupalOrg(t)
 
 		composerService.On("IsPackageInstalled", mock.Anything, "/tmp", "drupal/core").Return(true, nil)
 
-		worktree := internal.NewMockWorktree(t)
+		worktree := NewMockWorktree(t)
 		worktree.On("Add", "patches/drupal/123456-111111-alot_of_problems.diff").Return(plumbing.NewHash(""), nil)
 		worktree.On("Remove", "patches/remote/0001-remote.patch").Return(plumbing.NewHash(""), nil)
 
@@ -261,10 +260,10 @@ func TestUpdatePatches(t *testing.T) {
 
 	t.Run("Current patch fails, remote patch also fails", func(t *testing.T) {
 
-		composerService := composer.NewMockRunner(t)
-		drupalOrgService := drupalorg.NewMockClient(t)
+		composerService := NewMockComposer(t)
+		drupalOrgService := NewMockDrupalOrg(t)
 
-		worktree := internal.NewMockWorktree(t)
+		worktree := NewMockWorktree(t)
 
 		composerService.On("IsPackageInstalled", mock.Anything, "/tmp", "drupal/core").Return(true, nil)
 
@@ -362,10 +361,10 @@ func TestUpdatePatches(t *testing.T) {
 
 	t.Run("Remote patch was committed and released", func(t *testing.T) {
 
-		composerService := composer.NewMockRunner(t)
-		drupalOrgService := drupalorg.NewMockClient(t)
+		composerService := NewMockComposer(t)
+		drupalOrgService := NewMockDrupalOrg(t)
 
-		worktree := internal.NewMockWorktree(t)
+		worktree := NewMockWorktree(t)
 		worktree.On("Remove", "patches/remote/0001-remote.patch").Return(plumbing.NewHash(""), nil)
 
 		composerService.On("IsPackageInstalled", mock.Anything, "/tmp", "drupal/core").Return(true, nil)
@@ -434,10 +433,10 @@ func TestUpdatePatches(t *testing.T) {
 
 	t.Run("Remote patch was committed, but not yet releases", func(t *testing.T) {
 
-		composerService := composer.NewMockRunner(t)
-		drupalOrgService := drupalorg.NewMockClient(t)
+		composerService := NewMockComposer(t)
+		drupalOrgService := NewMockDrupalOrg(t)
 
-		worktree := internal.NewMockWorktree(t)
+		worktree := NewMockWorktree(t)
 
 		composerService.On("IsPackageInstalled", mock.Anything, "/tmp", "drupal/core").Return(true, nil)
 
@@ -508,10 +507,10 @@ func TestUpdatePatches(t *testing.T) {
 
 	t.Run("Module will be removed", func(t *testing.T) {
 
-		composerService := composer.NewMockRunner(t)
-		drupalOrgService := drupalorg.NewMockClient(t)
+		composerService := NewMockComposer(t)
+		drupalOrgService := NewMockDrupalOrg(t)
 
-		worktree := internal.NewMockWorktree(t)
+		worktree := NewMockWorktree(t)
 		worktree.On("Remove", "patches/core/0001-local-patch.patch").Return(plumbing.NewHash(""), nil)
 
 		composerService.On("IsPackageInstalled", mock.Anything, "/tmp", "drupal/core").Return(true, nil)
@@ -556,11 +555,10 @@ func TestUpdatePatches(t *testing.T) {
 	})
 
 	t.Run("Module not installed", func(t *testing.T) {
+		composerService := NewMockComposer(t)
+		drupalOrgService := NewMockDrupalOrg(t)
 
-		composerService := composer.NewMockRunner(t)
-		drupalOrgService := drupalorg.NewMockClient(t)
-
-		worktree := internal.NewMockWorktree(t)
+		worktree := NewMockWorktree(t)
 		worktree.On("Remove", "patches/core/0001-local-patch.patch").Return(plumbing.NewHash(""), nil)
 
 		composerService.On("IsPackageInstalled", mock.Anything, "/tmp", "drupal/core").Return(false, nil)

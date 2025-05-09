@@ -5,8 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/drupdater/drupdater/internal"
-	"github.com/drupdater/drupdater/pkg/composer"
+	"github.com/drupdater/drupdater/internal/services"
 	"github.com/go-git/go-git/v5"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
@@ -14,7 +13,7 @@ import (
 
 func TestNewDefaultAllowPlugins(t *testing.T) {
 	logger := zap.NewNop()
-	composerRunner := composer.NewMockRunner(t)
+	composerRunner := NewMockComposer(t)
 
 	ap := NewComposerAllowPlugins(logger, composerRunner)
 
@@ -25,7 +24,7 @@ func TestNewDefaultAllowPlugins(t *testing.T) {
 
 func TestDefaultAllowPlugins_SubscribedEvents(t *testing.T) {
 	logger := zap.NewNop()
-	composerRunner := composer.NewMockRunner(t)
+	composerRunner := NewMockComposer(t)
 
 	ap := NewComposerAllowPlugins(logger, composerRunner)
 	events := ap.SubscribedEvents()
@@ -37,7 +36,7 @@ func TestDefaultAllowPlugins_SubscribedEvents(t *testing.T) {
 
 func TestDefaultAllowPlugins_PreComposerUpdateHandler(t *testing.T) {
 	logger := zap.NewNop()
-	composerRunner := composer.NewMockRunner(t)
+	composerRunner := NewMockComposer(t)
 
 	ctx := context.Background()
 	path := "/some/path"
@@ -54,7 +53,7 @@ func TestDefaultAllowPlugins_PreComposerUpdateHandler(t *testing.T) {
 
 	ap := NewComposerAllowPlugins(logger, composerRunner)
 
-	e := NewPreComposerUpdateEvent(ctx, path, worktree, internal.Config{}, []string{}, []string{}, false)
+	e := services.NewPreComposerUpdateEvent(ctx, path, worktree, []string{}, []string{}, false)
 
 	err := ap.preComposerUpdateHandler(e)
 
@@ -65,7 +64,7 @@ func TestDefaultAllowPlugins_PreComposerUpdateHandler(t *testing.T) {
 
 func TestDefaultAllowPlugins_PostComposerUpdateHandler(t *testing.T) {
 	logger := zap.NewNop()
-	composerRunner := composer.NewMockRunner(t)
+	composerRunner := NewMockComposer(t)
 
 	ctx := context.Background()
 	path := "/some/path"
@@ -93,7 +92,7 @@ func TestDefaultAllowPlugins_PostComposerUpdateHandler(t *testing.T) {
 	ap := NewComposerAllowPlugins(logger, composerRunner)
 	ap.allowPlugins = existingPlugins
 
-	e := NewPostComposerUpdateEvent(ctx, path, worktree, internal.Config{})
+	e := services.NewPostComposerUpdateEvent(ctx, path, worktree)
 	err := ap.postComposerUpdateHandler(e)
 
 	assert.NoError(t, err)
@@ -107,7 +106,7 @@ func TestDefaultAllowPlugins_RenderTemplate(t *testing.T) {
 	expected := string(fixture)
 	logger := zap.NewNop()
 
-	composerRunner := composer.NewMockRunner(t)
+	composerRunner := NewMockComposer(t)
 	ap := NewComposerAllowPlugins(logger, composerRunner)
 	ap.newAllowPlugins = []string{"plugin1", "plugin2"}
 	result, err := ap.RenderTemplate()

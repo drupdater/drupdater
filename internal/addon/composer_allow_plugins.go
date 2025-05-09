@@ -5,7 +5,6 @@ import (
 
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/services"
-	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/gookit/event"
 	"go.uber.org/zap"
 )
@@ -14,14 +13,14 @@ import (
 type ComposerAllowPlugins struct {
 	internal.BasicAddon
 	logger   *zap.Logger
-	composer composer.Runner
+	composer Composer
 
 	allowPlugins    map[string]bool
 	newAllowPlugins []string
 }
 
 // NewComposerAllowPlugins creates a new DefaultAllowPlugins instance
-func NewComposerAllowPlugins(logger *zap.Logger, composer composer.Runner) *ComposerAllowPlugins {
+func NewComposerAllowPlugins(logger *zap.Logger, composer Composer) *ComposerAllowPlugins {
 	return &ComposerAllowPlugins{
 		logger:   logger,
 		composer: composer,
