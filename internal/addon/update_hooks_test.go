@@ -1,0 +1,152 @@
+package addon
+
+import (
+	"context"
+	"errors"
+	"os"
+	"testing"
+
+	"github.com/drupdater/drupdater/internal/services"
+	"github.com/drupdater/drupdater/pkg/drush"
+	"github.com/gookit/event"
+	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
+)
+
+func TestNewUpdateHooks(t *testing.T) {
+	// Setup
+	logger := zap.NewNop()
+	mockDrush := NewMockDrush(t)
+
+	// Execute
+	updateHooks := NewUpdateHooks(logger, mockDrush)
+
+	// Assert
+	assert.NotNil(t, updateHooks)
+	assert.Equal(t, logger, updateHooks.logger)
+	assert.Equal(t, mockDrush, updateHooks.drush)
+	assert.NotNil(t, updateHooks.hooks)
+	assert.Empty(t, updateHooks.hooks)
+}
+
+func TestUpdateHooks_SubscribedEvents(t *testing.T) {
+	// Setup
+	updateHooks := &UpdateHooks{}
+
+	// Execute
+	events := updateHooks.SubscribedEvents()
+
+	// Assert
+	assert.Contains(t, events, "pre-site-update")
+	assert.IsType(t, event.ListenerItem{}, events["pre-site-update"])
+}
+
+func TestUpdateHooks_RenderTemplate(t *testing.T) {
+
+	fixture, _ := os.ReadFile("testdata/update_hooks.md")
+	expected := string(fixture)
+	logger := zap.NewNop()
+	mockDrush := NewMockDrush(t)
+
+	// Setup
+	hooks := UpdateHooksPerSite{
+		"default": {
+			"hook": drush.UpdateHook{
+				Description: "description",
+			},
+		},
+	}
+
+	composerRunner := NewMockComposer(t)
+	ap := NewUpdateHooks(logger, mockDrush)
+	ap.hooks = hooks
+	result, err := ap.RenderTemplate()
+	assert.NoError(t, err)
+	assert.Equal(t, expected, result)
+	composerRunner.AssertExpectations(t)
+
+}
+
+func TestUpdateHooks_PreSiteUpdateHandler_Success(t *testing.T) {
+	// Setup
+	logger := zap.NewNop()
+	mockDrush := NewMockDrush(t)
+	updateHooks := NewUpdateHooks(logger, mockDrush)
+
+	ctx := context.Background()
+	testPath := "/test/path"
+	testSite := "default"
+	mockHooks := map[string]drush.UpdateHook{
+		"module1_update_8001": {
+			Module:      "module1",
+			Description: "Update description",
+		},
+	}
+
+	worktree := NewMockWorktree(t)
+	mockEvent := services.NewPreSiteUpdateEvent(ctx, testPath, worktree, testSite)
+
+	mockDrush.On("GetUpdateHooks", ctx, testPath, testSite).Return(mockHooks, nil)
+
+	// Execute
+	err := updateHooks.preSiteUpdateHandler(mockEvent)
+
+	// Assert
+	assert.NoError(t, err)
+	assert.Contains(t, updateHooks.hooks, testSite)
+	assert.Equal(t, mockHooks, updateHooks.hooks[testSite])
+	mockDrush.AssertExpectations(t)
+	worktree.AssertExpectations(t)
+}
+
+func TestUpdateHooks_PreSiteUpdateHandler_NoHooks(t *testing.T) {
+	// Setup
+	logger := zap.NewNop()
+	mockDrush := NewMockDrush(t)
+	updateHooks := NewUpdateHooks(logger, mockDrush)
+
+	ctx := context.Background()
+	testPath := "/test/path"
+	testSite := "default"
+	emptyHooks := map[string]drush.UpdateHook{}
+
+	worktree := NewMockWorktree(t)
+	mockEvent := services.NewPreSiteUpdateEvent(ctx, testPath, worktree, testSite)
+
+	mockDrush.On("GetUpdateHooks", ctx, testPath, testSite).Return(emptyHooks, nil)
+
+	// Execute
+	err := updateHooks.preSiteUpdateHandler(mockEvent)
+
+	// Assert
+	assert.NoError(t, err)
+	assert.NotContains(t, updateHooks.hooks, testSite)
+	mockDrush.AssertExpectations(t)
+	worktree.AssertExpectations(t)
+}
+
+func TestUpdateHooks_PreSiteUpdateHandler_Error(t *testing.T) {
+	// Setup
+	logger := zap.NewNop()
+	mockDrush := NewMockDrush(t)
+	updateHooks := NewUpdateHooks(logger, mockDrush)
+
+	ctx := context.Background()
+	testPath := "/test/path"
+	testSite := "default"
+	expectedError := errors.New("drush error")
+
+	worktree := NewMockWorktree(t)
+	mockEvent := services.NewPreSiteUpdateEvent(ctx, testPath, worktree, testSite)
+
+	mockDrush.On("GetUpdateHooks", ctx, testPath, testSite).Return(nil, expectedError)
+
+	// Execute
+	err := updateHooks.preSiteUpdateHandler(mockEvent)
+
+	// Assert
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to get update hooks")
+	mockDrush.AssertExpectations(t)
+	worktree.AssertExpectations(t)
+}

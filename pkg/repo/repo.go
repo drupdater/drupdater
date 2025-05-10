@@ -7,37 +7,45 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/drupdater/drupdater/internal"
-	"github.com/drupdater/drupdater/internal/codehosting"
 	"github.com/spf13/afero"
 
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/go-git/go-git/v5/plumbing/storer"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"go.uber.org/zap"
 )
 
-type RepositoryService interface {
-	CloneRepository(repository string, branch string, token string) (internal.Repository, internal.Worktree, string, error)
-	IsSomethingStagedInPath(worktree internal.Worktree, dir string) bool
-	BranchExists(repository internal.Repository, branch string) (bool, error)
+type Repository interface {
+	Push(o *git.PushOptions) error
+	Head() (*plumbing.Reference, error)
+	CommitObject(h plumbing.Hash) (*object.Commit, error)
+	References() (storer.ReferenceIter, error)
+}
+
+type Worktree interface {
+	Add(path string) (plumbing.Hash, error)
+	AddGlob(pattern string) error
+	Remove(path string) (plumbing.Hash, error)
+	Commit(msg string, opts *git.CommitOptions) (plumbing.Hash, error)
+	Status() (git.Status, error)
+	Checkout(opts *git.CheckoutOptions) error
 }
 
 type GitRepositoryService struct {
-	logger   *zap.Logger
-	fs       afero.Fs
-	platform codehosting.Platform
+	logger *zap.Logger
+	fs     afero.Fs
 }
 
-func NewGitRepositoryService(logger *zap.Logger, platform codehosting.Platform) *GitRepositoryService {
+func NewGitRepositoryService(logger *zap.Logger) *GitRepositoryService {
 	return &GitRepositoryService{
-		logger:   logger,
-		fs:       afero.NewOsFs(),
-		platform: platform,
+		logger: logger,
+		fs:     afero.NewOsFs(),
 	}
 }
 
-func (rs *GitRepositoryService) CloneRepository(repository string, branch string, token string) (internal.Repository, internal.Worktree, string, error) {
+func (rs *GitRepositoryService) CloneRepository(repository string, branch string, token string, username string, email string) (Repository, Worktree, string, error) {
 
 	hash := fmt.Sprintf("%x", md5.Sum([]byte(repository)))
 	projectDir := filepath.Join(os.TempDir(), hash)
@@ -64,8 +72,6 @@ func (rs *GitRepositoryService) CloneRepository(repository string, branch string
 		return nil, nil, "", fmt.Errorf("git clone: %w", err)
 	}
 
-	username, email := rs.platform.GetUser()
-
 	// Set the user name and email for the commit
 	config, _ := checkout.Config()
 	config.User.Name = username
@@ -89,18 +95,10 @@ func (rs *GitRepositoryService) CloneRepository(repository string, branch string
 		}
 	}
 
-	// Create initial temporary branch
-	if err := w.Checkout(&git.CheckoutOptions{
-		Branch: plumbing.NewBranchReferenceName(hash),
-		Create: true,
-	}); err != nil {
-		return checkout, w, "", fmt.Errorf("failed to checkout branch: %w", err)
-	}
-
 	return checkout, w, w.Filesystem.Root(), nil
 }
 
-func (rs *GitRepositoryService) BranchExists(repository internal.Repository, branch string) (bool, error) {
+func (rs *GitRepositoryService) BranchExists(repository Repository, branch string) (bool, error) {
 	// Get list of remote branches
 	remoteRefs, err := repository.References()
 	if err != nil {
@@ -123,7 +121,7 @@ func (rs *GitRepositoryService) BranchExists(repository internal.Repository, bra
 	return false, nil
 }
 
-func (rs *GitRepositoryService) IsSomethingStagedInPath(worktree internal.Worktree, dir string) bool {
+func (rs *GitRepositoryService) IsSomethingStagedInPath(worktree Worktree, dir string) bool {
 	status, err := worktree.Status()
 	if err != nil {
 		rs.logger.Error("failed to get worktree status", zap.Error(err))

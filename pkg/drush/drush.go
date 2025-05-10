@@ -14,19 +14,6 @@ import (
 
 var execCommand = exec.CommandContext
 
-// Runner interface for executing commands
-type Runner interface {
-	InstallSite(ctx context.Context, dir string, site string) error
-	GetConfigSyncDir(ctx context.Context, dir string, site string, relative bool) (string, error)
-	ExportConfiguration(ctx context.Context, dir string, site string) error
-	UpdateSite(ctx context.Context, dir string, site string) error
-	ConfigResave(ctx context.Context, dir string, site string) error
-	IsModuleEnabled(ctx context.Context, dir string, site string, module string) (bool, error)
-	LocalizeTranslations(ctx context.Context, dir string, site string) error
-	GetTranslationPath(ctx context.Context, dir string, site string, relative bool) (string, error)
-	GetUpdateHooks(ctx context.Context, dir string, site string) (map[string]UpdateHook, error)
-}
-
 // CLI is the default implementation of CommandExecutor
 type CLI struct {
 	logger *zap.Logger

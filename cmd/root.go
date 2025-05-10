@@ -40,36 +40,40 @@ var rootCmd = &cobra.Command{
 		drush := drush.NewCLI(logger, cache)
 		composer := composer.NewCLI(logger)
 		drupalOrg := drupalorg.NewHTTPClient(logger)
-		settings := drupal.NewDefaultSettingsService(logger, drush, composer)
-		installer := drupal.NewDefaultInstallerService(logger, drush, settings)
+		installer := drupal.NewInstaller(logger, drush, composer)
 		vcsProviderFactory := codehosting.NewDefaultVcsProviderFactory()
 		platform := vcsProviderFactory.Create(config.RepositoryURL, config.Token)
-		git := repo.NewGitRepositoryService(logger, platform)
-		updater := services.NewDefaultUpdater(logger, settings, git, config, composer, drupalOrg, drush)
-		workflow := services.NewWorkflowBaseService(logger, config, updater, platform, git, installer, composer)
+		git := repo.NewGitRepositoryService(logger)
+		workflow := services.NewWorkflowBaseService(logger, config, drush, platform, git, installer, composer)
 
-		var strategy services.WorkflowStrategy
-		strategy = services.NewDependencyUpdateStrategy(logger, config)
+		var addonList []internal.Addon
 		if config.Security {
-			strategy = services.NewSecurityUpdateStrategy(logger, config, composer)
+			addonList = append(addonList, addon.NewComposerAudit(logger, composer))
 		}
-
 		if !config.SkipCBF {
 			phpcsRunner := phpcs.NewCLI(logger)
-			phpcsPlugin := addon.NewUpdateCodingStyles(logger, phpcsRunner, config, composer)
-			event.AddSubscriber(phpcsPlugin)
+			addonList = append(addonList, addon.NewCodeBeautifier(logger, phpcsRunner, config, composer))
 		}
 
 		if !config.SkipRector {
 			rectorRunner := rector.NewCLI(logger)
-			rectorPlugin := addon.NewUpdateRemoveDeprecations(logger, rectorRunner, config, composer)
-			event.AddSubscriber(rectorPlugin)
+			addonList = append(addonList, addon.NewDeprecationsRemover(logger, rectorRunner, config, composer))
 		}
 
-		localeDeploy := addon.NewUpdateTranslations(logger, drush, git)
-		event.AddSubscriber(localeDeploy)
+		addonList = append(addonList,
+			addon.NewTranslationsUpdater(logger, drush, git),
+			addon.NewComposerAllowPlugins(logger, composer),
+			addon.NewComposerNormalizer(logger, composer),
+			addon.NewComposerPatches1(logger, composer, drupalOrg),
+			addon.NewComposerDiff(logger, composer),
+			addon.NewUpdateHooks(logger, drush),
+		)
 
-		err := workflow.StartUpdate(cmd.Context(), strategy)
+		for _, addon := range addonList {
+			event.AddSubscriber(addon)
+		}
+
+		err := workflow.StartUpdate(cmd.Context(), addonList)
 		if err != nil {
 			logger.Sugar().Error(err)
 			return err

@@ -4,10 +4,6 @@ import (
 	"strings"
 )
 
-type VcsProviderFactory interface {
-	Create(repositoryURL string, token string) Platform
-}
-
 type DefaultVcsProviderFactory struct {
 }
 

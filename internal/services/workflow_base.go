@@ -10,13 +10,10 @@ import (
 	"runtime"
 	"sync"
 	"text/template"
+	"time"
 
 	"github.com/drupdater/drupdater/internal"
-	"github.com/drupdater/drupdater/internal/codehosting"
-	"github.com/drupdater/drupdater/pkg/composer"
-	"github.com/drupdater/drupdater/pkg/drupal"
-	"github.com/drupdater/drupdater/pkg/drush"
-	"github.com/drupdater/drupdater/pkg/repo"
+	"github.com/gookit/event"
 
 	git "github.com/go-git/go-git/v5"
 	gitConfig "github.com/go-git/go-git/v5/config"
@@ -28,54 +25,50 @@ import (
 //go:embed templates
 var templates embed.FS
 
-type WorkflowService interface {
-	StartUpdate(ctx context.Context, strategy WorkflowStrategy) error
-}
-
-type WorkflowUpdateResult struct {
-	updateReport DependencyUpdateReport
-	table        string
+type TemplateData struct {
+	Addons []internal.Addon
 }
 
 type SharedUpdate struct {
-	Path                 string
-	Worktree             internal.Worktree
-	Repository           internal.Repository
-	WorkflowUpdateResult WorkflowUpdateResult
-	updateBranchName     string
+	Path             string
+	Worktree         Worktree
+	Repository       GitRepository
+	updateBranchName string
 }
 
 type WorkflowBaseService struct {
 	logger     *zap.Logger
 	config     internal.Config
-	updater    UpdaterService
-	platform   codehosting.Platform
-	repository repo.RepositoryService
-	installer  drupal.InstallerService
-	composer   composer.Runner
+	drush      Drush
+	platform   Platform
+	repository Repository
+	installer  Installer
+	composer   Composer
+	current    time.Time
 }
 
 func NewWorkflowBaseService(
 	logger *zap.Logger,
 	config internal.Config,
-	updater UpdaterService,
-	platform codehosting.Platform,
-	repository repo.RepositoryService,
-	installer drupal.InstallerService,
-	composerService composer.Runner,
+	drush Drush,
+	platform Platform,
+	repository Repository,
+	installer Installer,
+	composerService Composer,
 ) *WorkflowBaseService {
 	return &WorkflowBaseService{
 		logger:     logger,
 		config:     config,
-		updater:    updater,
+		drush:      drush,
 		platform:   platform,
 		repository: repository,
 		installer:  installer,
 		composer:   composerService,
+		current:    time.Now(),
 	}
 }
 
-func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, strategy WorkflowStrategy) error {
+func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []internal.Addon) error {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	defer func() {
@@ -99,7 +92,6 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, strategy Workflo
 
 	var sharedUpdate SharedUpdate
 	var updateDone = make(chan struct{})
-	var siteReports sync.Map // map[string]UpdateReport
 
 	// Limit concurrency to number of CPU cores
 	cpuLimit := runtime.NumCPU()
@@ -141,7 +133,7 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, strategy Workflo
 				// Put the path back for other goroutines
 				installCodeDone <- installPath
 
-				if err := ws.installer.InstallDrupal(ctx, installPath, site); err != nil {
+				if err := ws.installer.Install(ctx, installPath, site); err != nil {
 					errCh <- err
 					cancel()
 					return
@@ -163,7 +155,7 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, strategy Workflo
 		}()
 
 		var err error
-		update, err := ws.updateSharedCode(ctx, strategy)
+		update, err := ws.updateSharedCode(ctx)
 		if err != nil {
 			errCh <- err
 			cancel()
@@ -200,15 +192,12 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, strategy Workflo
 				return
 			}
 
-			// Update Drupal hooks
-			updateHooks, err := ws.updater.UpdateDrupal(ctx, sharedUpdate.Path, sharedUpdate.Worktree, site)
+			err := ws.updateSite(ctx, sharedUpdate, site)
 			if err != nil {
 				errCh <- err
 				cancel()
 				return
 			}
-
-			siteReports.Store(site, updateHooks)
 
 		}(site)
 	}
@@ -224,16 +213,7 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, strategy Workflo
 	case <-done:
 
 		if !ws.config.DryRun {
-
-			finalReports := make(UpdateHooksPerSite)
-			siteReports.Range(func(key, value any) bool {
-				site := key.(string)
-				report := value.(map[string]drush.UpdateHook)
-				finalReports[site] = report
-				return true
-			})
-
-			return ws.publishWork(sharedUpdate.Repository, sharedUpdate.updateBranchName, strategy, sharedUpdate.WorkflowUpdateResult, finalReports)
+			return ws.publishWork(sharedUpdate.Repository, sharedUpdate.updateBranchName, addons)
 		}
 		return nil
 	case err := <-errCh:
@@ -242,8 +222,9 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, strategy Workflo
 }
 
 func (ws *WorkflowBaseService) installCode(ctx context.Context) (string, error) {
+	username, email := ws.platform.GetUser()
 	ws.logger.Info("cloning repository for site-install", zap.String("repositoryURL", ws.config.RepositoryURL), zap.String("branch", ws.config.Branch))
-	_, _, path, err := ws.repository.CloneRepository(ws.config.RepositoryURL, ws.config.Branch, ws.config.Token)
+	_, _, path, err := ws.repository.CloneRepository(ws.config.RepositoryURL, ws.config.Branch, ws.config.Token, username, email)
 	if err != nil {
 		return "", fmt.Errorf("failed to clone repository: %w", err)
 	}
@@ -256,43 +237,58 @@ func (ws *WorkflowBaseService) installCode(ctx context.Context) (string, error) 
 	return path, nil
 }
 
-func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context, strategy WorkflowStrategy) (SharedUpdate, error) {
+func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context) (SharedUpdate, error) {
 	ws.logger.Info("cloning repository for update", zap.String("repositoryURL", ws.config.RepositoryURL), zap.String("branch", ws.config.Branch))
-	repository, worktree, path, err := ws.repository.CloneRepository(ws.config.RepositoryURL, ws.config.Branch, ws.config.Token)
+	username, email := ws.platform.GetUser()
+	repository, worktree, path, err := ws.repository.CloneRepository(ws.config.RepositoryURL, ws.config.Branch, ws.config.Token, username, email)
 	if err != nil {
 		return SharedUpdate{}, fmt.Errorf("failed to clone repository: %w", err)
 	}
 
-	// Use strategy to determine what to update
-	packagesToUpdate, minimalChanges, err := strategy.PreUpdate(ctx, path)
-	if err != nil {
-
-		return SharedUpdate{}, fmt.Errorf("failed to pre-update: %w", err)
-	}
-
-	// Check if we should continue with the update
-	if !strategy.ShouldContinue(packagesToUpdate) {
-		return SharedUpdate{}, fmt.Errorf("update skipped by strategy")
-	}
-
 	ws.logger.Info("updating dependencies")
-	updateReport, err := ws.updater.UpdateDependencies(ctx, path, packagesToUpdate, worktree, minimalChanges)
+
+	preComposerUpdateEvent := NewPreComposerUpdateEvent(ctx, path, worktree, []string{}, []string{}, false)
+	err = event.FireEvent(preComposerUpdateEvent)
+	if err != nil {
+		return SharedUpdate{}, fmt.Errorf("failed to fire event: %w", err)
+	}
+
+	changes, err := ws.composer.Update(ctx, path, preComposerUpdateEvent.PackagesToUpdate, preComposerUpdateEvent.PackagesToKeep, preComposerUpdateEvent.MinimalChanges, false)
 	if err != nil {
 		return SharedUpdate{}, fmt.Errorf("failed to update dependencies: %w", err)
 	}
+	if len(changes) == 0 {
+		ws.logger.Warn("no changes detected")
+		return SharedUpdate{}, nil
+	}
 
-	table, err := ws.composer.Diff(ctx, path, ws.config.Branch, true)
+	postComposerUpdateEvent := NewPostComposerUpdateEvent(ctx, path, worktree)
+	err = event.FireEvent(postComposerUpdateEvent)
 	if err != nil {
-		return SharedUpdate{}, fmt.Errorf("failed to get diff: %w", err)
+		return SharedUpdate{}, fmt.Errorf("failed to fire event: %w", err)
 	}
 
-	if table == "" {
-		return SharedUpdate{}, fmt.Errorf("no packages were updated, skipping update")
+	err = worktree.AddGlob("composer.*")
+	if err != nil {
+		return SharedUpdate{}, fmt.Errorf("failed to add composer.* files: %w", err)
+	}
+	if _, err := worktree.Commit("Update composer.json and composer.lock", &git.CommitOptions{}); err != nil {
+		return SharedUpdate{}, fmt.Errorf("failed to commit composer.json and composer.lock: %w", err)
 	}
 
-	ws.logger.Sugar().Info("composer diff table", fmt.Sprintf("\n%s", table))
+	postCodeUpdateEvent := NewPostCodeUpdateEvent(ctx, path, worktree)
+	err = event.FireEvent(postCodeUpdateEvent)
+	if err != nil {
+		return SharedUpdate{}, fmt.Errorf("failed to fire event: %w", err)
+	}
 
-	updateBranchName := strategy.GenerateBranchName(path)
+	// Get composer lock hash for branch name
+	composerLockHash, err := ws.composer.GetLockHash(path)
+	if err != nil {
+		return SharedUpdate{}, err
+	}
+
+	updateBranchName := fmt.Sprintf("update-%s", composerLockHash)
 
 	// Check if branch already exists
 	exists, err := ws.repository.BranchExists(repository, updateBranchName)
@@ -313,22 +309,51 @@ func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context, strategy Wo
 		return SharedUpdate{}, fmt.Errorf("failed to checkout branch: %w", err)
 	}
 
-	// Run post-update actions from strategy
-	if err := strategy.PostUpdate(ctx, path, worktree); err != nil {
-		return SharedUpdate{}, fmt.Errorf("failed to post-update: %w", err)
-	}
-
 	sharedUpdate := SharedUpdate{
-		Path:                 path,
-		Worktree:             worktree,
-		WorkflowUpdateResult: WorkflowUpdateResult{updateReport: updateReport, table: table},
-		Repository:           repository,
-		updateBranchName:     updateBranchName,
+		Path:             path,
+		Worktree:         worktree,
+		Repository:       repository,
+		updateBranchName: updateBranchName,
 	}
 	return sharedUpdate, nil
 }
 
-func (ws *WorkflowBaseService) publishWork(repository internal.Repository, updateBranchName string, strategy WorkflowStrategy, result WorkflowUpdateResult, updateHooks UpdateHooksPerSite) error {
+func (ws *WorkflowBaseService) updateSite(ctx context.Context, sharedUpdate SharedUpdate, site string) error {
+	ws.logger.Info("updating site", zap.String("site", site))
+
+	if err := ws.installer.ConfigureDatabase(ctx, sharedUpdate.Path, site); err != nil {
+		return fmt.Errorf("failed to configure database: %w", err)
+	}
+
+	preSiteUpdateEvent := NewPreSiteUpdateEvent(ctx, sharedUpdate.Path, sharedUpdate.Worktree, site)
+	if err := event.FireEvent(preSiteUpdateEvent); err != nil {
+		return fmt.Errorf("failed to fire event: %w", err)
+	}
+
+	if err := ws.drush.UpdateSite(ctx, sharedUpdate.Path, site); err != nil {
+		return fmt.Errorf("failed to update site: %w", err)
+
+	}
+
+	if err := ws.drush.ConfigResave(ctx, sharedUpdate.Path, site); err != nil {
+		return fmt.Errorf("failed to resave config: %w", err)
+
+	}
+
+	postSiteUpdateEvent := NewPostSiteUpdateEvent(ctx, sharedUpdate.Path, sharedUpdate.Worktree, site)
+	if err := event.FireEvent(postSiteUpdateEvent); err != nil {
+		return fmt.Errorf("failed to fire event: %w", err)
+	}
+
+	ws.logger.Info("export configuration", zap.String("site", site))
+	if err := ws.drush.ExportConfiguration(ctx, sharedUpdate.Path, site); err != nil {
+		return fmt.Errorf("failed to export configuration: %w", err)
+	}
+
+	return nil
+}
+
+func (ws *WorkflowBaseService) publishWork(repository GitRepository, updateBranchName string, addons []internal.Addon) error {
 	err := repository.Push(&git.PushOptions{
 		RemoteName: "origin",
 		RefSpecs: []gitConfig.RefSpec{
@@ -344,22 +369,25 @@ func (ws *WorkflowBaseService) publishWork(repository internal.Repository, updat
 		return fmt.Errorf("failed to push changes: %w", err)
 	}
 
-	// Use strategy to get PR details
-	title, templateName := strategy.GeneratePRDetails()
+	title := fmt.Sprintf("%s: Drupal Maintenance Updates", ws.current.Format("January 2006"))
 
-	// Get template data from strategy
-	data, err := strategy.GetTemplateData(result, updateHooks)
-	if err != nil {
-		return fmt.Errorf("failed to get template data: %w", err)
+	data := TemplateData{
+		Addons: addons,
 	}
 
 	// Generate description and create MR
-	description, err := ws.GenerateDescription(data, templateName)
+	description, err := ws.GenerateDescription(data, "dependency_update.go.tmpl")
 	if err != nil {
 		return fmt.Errorf("failed to generate description: %w", err)
 	}
 
-	mr, err := ws.platform.CreateMergeRequest(title, description, updateBranchName, ws.config.Branch)
+	e := NewPreMergeRequestCreateEvent(title)
+	err = event.FireEvent(e)
+	if err != nil {
+		return fmt.Errorf("failed to fire event: %w", err)
+	}
+
+	mr, err := ws.platform.CreateMergeRequest(e.Title, description, updateBranchName, ws.config.Branch)
 	if err != nil {
 		return fmt.Errorf("failed to create merge request: %w", err)
 	}

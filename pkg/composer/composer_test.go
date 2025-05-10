@@ -76,7 +76,7 @@ func TestGetComposerUpdates(t *testing.T) {
 	}
 	defer func() { execCommand = exec.CommandContext }()
 
-	changes, err := service.ListPendingUpdates(t.Context(), "/tmp", []string{}, false)
+	changes, err := service.Update(t.Context(), "/tmp", []string{}, []string{}, false, true)
 
 	assert.NoError(t, err)
 	assert.Len(t, changes, 5)
