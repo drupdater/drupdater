@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/drupdater/drupdater/internal"
-	"github.com/drupdater/drupdater/internal/codehosting"
 	"github.com/gookit/event"
 
 	git "github.com/go-git/go-git/v5"
@@ -41,7 +40,7 @@ type WorkflowBaseService struct {
 	logger     *zap.Logger
 	config     internal.Config
 	drush      Drush
-	platform   codehosting.Platform
+	platform   Platform
 	repository Repository
 	installer  Installer
 	composer   Composer
@@ -52,7 +51,7 @@ func NewWorkflowBaseService(
 	logger *zap.Logger,
 	config internal.Config,
 	drush Drush,
-	platform codehosting.Platform,
+	platform Platform,
 	repository Repository,
 	installer Installer,
 	composerService Composer,
