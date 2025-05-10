@@ -7,8 +7,6 @@ import (
 	"embed"
 	"fmt"
 	"os"
-	"runtime"
-	"sync"
 	"text/template"
 
 	"github.com/drupdater/drupdater/internal"
@@ -22,6 +20,7 @@ import (
 	gitConfig "github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
+	goflow "github.com/kamildrazkiewicz/go-flow"
 	"go.uber.org/zap"
 )
 
@@ -86,159 +85,56 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, strategy Workflo
 		cancel()
 	}()
 
-	var wg sync.WaitGroup
-	errCh := make(chan error, len(ws.config.Sites)*2+2) // site installs + site updates + installCode + updateCode
-
-	// Channels to coordinate
-	installCodeDone := make(chan string, 1) // carries installPath
-	installSiteDone := make(map[string]chan struct{})
-
-	for _, site := range ws.config.Sites {
-		installSiteDone[site] = make(chan struct{})
+	installCode := func(r map[string]interface{}) (interface{}, error) {
+		fmt.Println("function1 started")
+		return ws.installCode(ctx)
 	}
 
-	var sharedUpdate SharedUpdate
-	var updateDone = make(chan struct{})
-	var siteReports sync.Map // map[string]UpdateReport
+	updateSharedCode := func(r map[string]interface{}) (interface{}, error) {
+		fmt.Println("function2 started")
+		return ws.updateSharedCode(ctx, strategy)
+	}
 
-	// Limit concurrency to number of CPU cores
-	cpuLimit := runtime.NumCPU()
-	sem := make(chan struct{}, cpuLimit)
+	flow := goflow.New().
+		Add("installCode", nil, installCode).
+		Add("updateSharedCode", nil, updateSharedCode)
 
-	// 1. Run installCode()
-	wg.Add(1)
-	go func() {
-		sem <- struct{}{}
-		defer func() {
-			<-sem
-			wg.Done()
-		}()
+	for _, site := range ws.config.Sites {
+		installSite := func(r map[string]interface{}) (interface{}, error) {
+			fmt.Println("function2 started")
+			installPath := r["installCode"].(string)
+			return nil, ws.installer.InstallDrupal(ctx, installPath, site)
+		}
+		flow.Add("installSite"+site, []string{"installCode"}, installSite)
 
-		path, err := ws.installCode(ctx)
-		if err != nil {
-			errCh <- err
+		updateSite := func(r map[string]interface{}) (interface{}, error) {
+			fmt.Println("function3 started")
+			sharedUpdate := r["updateSharedCode"].(SharedUpdate)
+			return ws.updater.UpdateDrupal(ctx, sharedUpdate.Path, sharedUpdate.Worktree, site)
+		}
+		flow.Add("updateSite"+site, []string{"installSite" + site, "updateSharedCode"}, updateSite)
+	}
+
+	result, err := flow.Do()
+	if err != nil {
+		cancel()
+		return fmt.Errorf("failed to execute flow: %w", err)
+	}
+
+	// Get the result of the last function
+	sharedUpdate := result["updateSharedCode"].(SharedUpdate)
+	updateHooks := UpdateHooksPerSite{}
+	for _, site := range ws.config.Sites {
+		updateHooks[site] = result["updateSite"+site].(map[string]drush.UpdateHook)
+	}
+
+	if !ws.config.DryRun {
+		if err := ws.publishWork(sharedUpdate.Repository, sharedUpdate.updateBranchName, strategy, sharedUpdate.WorkflowUpdateResult, updateHooks); err != nil {
 			cancel()
-			return
+			return fmt.Errorf("failed to publish work: %w", err)
 		}
-
-		// Broadcast path to all waiting goroutines
-		installPath := path
-		installCodeDone <- installPath
-	}()
-
-	// 2. Run installSite(site) after installCode
-	for _, site := range ws.config.Sites {
-		wg.Add(1)
-		go func(site string) {
-			sem <- struct{}{}
-			defer func() {
-				<-sem
-				wg.Done()
-			}()
-
-			select {
-			case installPath := <-installCodeDone:
-				// Put the path back for other goroutines
-				installCodeDone <- installPath
-
-				if err := ws.installer.InstallDrupal(ctx, installPath, site); err != nil {
-					errCh <- err
-					cancel()
-					return
-				}
-				close(installSiteDone[site])
-			case <-ctx.Done():
-				return
-			}
-		}(site)
 	}
-
-	// 3. Run updateSharedCode() in parallel
-	wg.Add(1)
-	go func() {
-		sem <- struct{}{}
-		defer func() {
-			<-sem
-			wg.Done()
-		}()
-
-		var err error
-		update, err := ws.updateSharedCode(ctx, strategy)
-		if err != nil {
-			errCh <- err
-			cancel()
-			return
-		}
-
-		// Simply assign the update to sharedUpdate - no need for mutex
-		// since all readers will wait for updateDone channel before accessing
-		sharedUpdate = update
-		close(updateDone)
-	}()
-
-	// 4. Run updateSite(site) after installSite + updateSharedCode
-	for _, site := range ws.config.Sites {
-		wg.Add(1)
-		go func(site string) {
-			sem <- struct{}{}
-			defer func() {
-				<-sem
-				wg.Done()
-			}()
-
-			// Wait for install to finish
-			select {
-			case <-installSiteDone[site]:
-			case <-ctx.Done():
-				return
-			}
-
-			// Wait for shared update to be ready
-			select {
-			case <-updateDone:
-			case <-ctx.Done():
-				return
-			}
-
-			// Update Drupal hooks
-			updateHooks, err := ws.updater.UpdateDrupal(ctx, sharedUpdate.Path, sharedUpdate.Worktree, site)
-			if err != nil {
-				errCh <- err
-				cancel()
-				return
-			}
-
-			siteReports.Store(site, updateHooks)
-
-		}(site)
-	}
-
-	// 5. Wait for all routines
-	done := make(chan struct{})
-	go func() {
-		wg.Wait()
-		close(done)
-	}()
-
-	select {
-	case <-done:
-
-		if !ws.config.DryRun {
-
-			finalReports := make(UpdateHooksPerSite)
-			siteReports.Range(func(key, value any) bool {
-				site := key.(string)
-				report := value.(map[string]drush.UpdateHook)
-				finalReports[site] = report
-				return true
-			})
-
-			return ws.publishWork(sharedUpdate.Repository, sharedUpdate.updateBranchName, strategy, sharedUpdate.WorkflowUpdateResult, finalReports)
-		}
-		return nil
-	case err := <-errCh:
-		return err
-	}
+	return nil
 }
 
 func (ws *WorkflowBaseService) installCode(ctx context.Context) (string, error) {
