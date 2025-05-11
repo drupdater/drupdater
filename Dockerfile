@@ -20,6 +20,8 @@ RUN --mount=type=cache,target=/gomod-cache --mount=type=cache,target=/go-cache G
 # Build php image.
 FROM php:${PHP_VERSION}-cli-bookworm AS base
 
+RUN echo "memory_limit = -1" > $PHP_INI_DIR/conf.d/memory-limit.ini
+
 COPY --from=ghcr.io/mlocati/php-extension-installer:2 /usr/bin/install-php-extensions /usr/local/bin/
 RUN install-php-extensions pdo_mysql gd zip imagick intl
 
