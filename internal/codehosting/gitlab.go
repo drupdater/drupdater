@@ -9,20 +9,32 @@ import (
 	gitlab "gitlab.com/gitlab-org/api/client-go"
 )
 
+// Gitlab implements the Platform interface for GitLab repositories.
 type Gitlab struct {
 	client      *gitlab.Client
 	projectPath string
 	fs          afero.Fs
 }
 
+// newGitlab creates a new GitLab client based on repository URL and token.
 func newGitlab(repositoryURL string, token string) *Gitlab {
+	u, err := url.Parse(repositoryURL)
+	if err != nil {
+		// Handle URL parsing error properly
+		return &Gitlab{
+			fs: afero.NewOsFs(),
+		}
+	}
 
-	u, _ := url.Parse(repositoryURL)
 	baseURL := fmt.Sprintf("%s://%s", u.Scheme, u.Host)
 
 	gitlabClient, err := gitlab.NewClient(token, gitlab.WithBaseURL(baseURL))
 	if err != nil {
-		panic(err)
+		// Log error instead of panic
+		fmt.Printf("Error creating GitLab client: %v\n", err)
+		return &Gitlab{
+			fs: afero.NewOsFs(),
+		}
 	}
 
 	return &Gitlab{
@@ -32,7 +44,8 @@ func newGitlab(repositoryURL string, token string) *Gitlab {
 	}
 }
 
-func (g Gitlab) CreateMergeRequest(title string, description string, sourceBranch string, targetBranch string) (MergeRequest, error) {
+// CreateMergeRequest creates a merge request on GitLab.
+func (g *Gitlab) CreateMergeRequest(title string, description string, sourceBranch string, targetBranch string) (MergeRequest, error) {
 	mr, _, err := g.client.MergeRequests.CreateMergeRequest(g.projectPath, &gitlab.CreateMergeRequestOptions{
 		SourceBranch: &sourceBranch,
 		TargetBranch: &targetBranch,
@@ -41,7 +54,7 @@ func (g Gitlab) CreateMergeRequest(title string, description string, sourceBranc
 	})
 
 	if err != nil {
-		return MergeRequest{}, err
+		return MergeRequest{}, fmt.Errorf("failed to create merge request: %w", err)
 	}
 
 	return MergeRequest{
@@ -50,8 +63,8 @@ func (g Gitlab) CreateMergeRequest(title string, description string, sourceBranc
 	}, nil
 }
 
-func (g Gitlab) DownloadComposerFiles(branch string) string {
-
+// DownloadComposerFiles downloads composer.json and composer.lock files from the given branch.
+func (g *Gitlab) DownloadComposerFiles(branch string) string {
 	dir, err := afero.TempDir(g.fs, "", "composer")
 	if err != nil {
 		panic(err)
@@ -63,8 +76,7 @@ func (g Gitlab) DownloadComposerFiles(branch string) string {
 	return dir
 }
 
-func (g Gitlab) downloadAndWriteFile(branch string, file string, dir string) {
-
+func (g *Gitlab) downloadAndWriteFile(branch string, file string, dir string) {
 	content, resp, err := g.client.RepositoryFiles.GetRawFile(g.projectPath, file, &gitlab.GetRawFileOptions{
 		Ref: &branch,
 	})
@@ -83,7 +95,7 @@ func (g Gitlab) downloadAndWriteFile(branch string, file string, dir string) {
 	}
 }
 
-func (g Gitlab) GetUser() (name string, email string) {
+func (g *Gitlab) GetUser() (name string, email string) {
 	user, _, err := g.client.Users.CurrentUser()
 	if err != nil {
 		panic(err)

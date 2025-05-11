@@ -10,6 +10,10 @@ import (
 	"go.uber.org/zap"
 )
 
+// UpdateHooksPerSite maps site names to their update hooks
+type UpdateHooksPerSite map[string]map[string]drush.UpdateHook
+
+// UpdateHooks represents the update hooks addon
 type UpdateHooks struct {
 	internal.BasicAddon
 	logger *zap.Logger
@@ -18,6 +22,7 @@ type UpdateHooks struct {
 	hooks UpdateHooksPerSite
 }
 
+// NewUpdateHooks creates a new update hooks instance
 func NewUpdateHooks(logger *zap.Logger, drush Drush) *UpdateHooks {
 	return &UpdateHooks{
 		logger: logger,
@@ -26,34 +31,34 @@ func NewUpdateHooks(logger *zap.Logger, drush Drush) *UpdateHooks {
 	}
 }
 
-func (h *UpdateHooks) SubscribedEvents() map[string]interface{} {
+// SubscribedEvents returns the events this addon listens to
+func (uh *UpdateHooks) SubscribedEvents() map[string]interface{} {
 	return map[string]interface{}{
 		"pre-site-update": event.ListenerItem{
 			Priority: event.Min,
-			Listener: event.ListenerFunc(h.preSiteUpdateHandler),
+			Listener: event.ListenerFunc(uh.preSiteUpdateHandler),
 		},
 	}
 }
 
-func (h *UpdateHooks) RenderTemplate() (string, error) {
-	return h.Render("update_hooks.go.tmpl", h.hooks)
+// RenderTemplate returns the rendered template for this addon
+func (uh *UpdateHooks) RenderTemplate() (string, error) {
+	return uh.Render("update_hooks.go.tmpl", uh.hooks)
 }
 
-type UpdateHooksPerSite map[string]map[string]drush.UpdateHook
+func (uh *UpdateHooks) preSiteUpdateHandler(e event.Event) error {
+	evt := e.(*services.PreSiteUpdateEvent)
 
-func (h *UpdateHooks) preSiteUpdateHandler(e event.Event) error {
-	event := e.(*services.PreSiteUpdateEvent)
-
-	hooks, err := h.drush.GetUpdateHooks(event.Context(), event.Path(), event.Site())
-	h.logger.Debug("update hooks", zap.Any("hooks", hooks))
+	hooks, err := uh.drush.GetUpdateHooks(evt.Context(), evt.Path(), evt.Site())
+	uh.logger.Debug("update hooks", zap.Any("hooks", hooks))
 	if err != nil {
 		return fmt.Errorf("failed to get update hooks: %w", err)
 	}
 	if len(hooks) == 0 {
-		h.logger.Debug("no update hooks found")
+		uh.logger.Debug("no update hooks found")
 		return nil
 	}
-	h.hooks[event.Site()] = hooks
+	uh.hooks[evt.Site()] = hooks
 
-	return err
+	return nil
 }

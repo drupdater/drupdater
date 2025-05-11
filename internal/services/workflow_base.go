@@ -108,14 +108,13 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []interna
 
 		path, err := ws.installCode(ctx)
 		if err != nil {
-			errCh <- err
+			errCh <- fmt.Errorf("code installation failed: %w", err)
 			cancel()
 			return
 		}
 
-		// Broadcast path to all waiting goroutines
-		installPath := path
-		installCodeDone <- installPath
+		// Send path to all waiting goroutines
+		installCodeDone <- path
 	}()
 
 	// 2. Run installSite(site) after installCode
@@ -134,7 +133,7 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []interna
 				installCodeDone <- installPath
 
 				if err := ws.installer.Install(ctx, installPath, site); err != nil {
-					errCh <- err
+					errCh <- fmt.Errorf("site %s installation failed: %w", site, err)
 					cancel()
 					return
 				}

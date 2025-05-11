@@ -1,6 +1,7 @@
 package addon
 
 import (
+	"context"
 	"testing"
 
 	"github.com/drupdater/drupdater/internal/services"
@@ -13,56 +14,56 @@ import (
 )
 
 func TestUpdateTranslationsEventHandlerWithoutLocaleDeploy(t *testing.T) {
-	// Create mocks
+	// Setup - Create mocks and system under test
 	mockDrush := NewMockDrush(t)
 	mockRepository := NewMockRepository(t)
 	logger := zap.NewNop()
-
-	// Create an instance of UpdateTranslationsEventHandler with mocked dependencies
 	handler := NewTranslationsUpdater(logger, mockDrush, mockRepository)
 
 	worktree := NewMockWorktree(t)
 	path := "/tmp"
-	ctx := t.Context()
+	ctx := context.Background()
 
-	// Set up expectations
-	mockDrush.On("IsModuleEnabled", mock.Anything, "/tmp", "example.com", "locale_deploy").Return(false, nil)
+	// Configure mock expectations
+	mockDrush.EXPECT().IsModuleEnabled(mock.Anything, "/tmp", "example.com", "locale_deploy").Return(false, nil)
 
-	// Verify the results
+	// Execute
 	event := services.NewPostSiteUpdateEvent(ctx, path, worktree, "example.com")
-	assert.NoError(t, handler.postSiteUpdateHandler(event))
+	err := handler.postSiteUpdateHandler(event)
 
+	// Assert
+	assert.NoError(t, err)
 	mockDrush.AssertExpectations(t)
 }
 
-func TestUpdateTranslationsEventHandlerWitLocaleDeploy(t *testing.T) {
-	// Create mocks
+func TestUpdateTranslationsEventHandlerWithLocaleDeploy(t *testing.T) {
+	// Setup - Create mocks and system under test
 	mockDrush := NewMockDrush(t)
 	mockRepository := NewMockRepository(t)
 	logger := zap.NewNop()
-
-	// Create an instance of UpdateTranslationsEventHandler with mocked dependencies
 	handler := NewTranslationsUpdater(logger, mockDrush, mockRepository)
 
 	worktree := NewMockWorktree(t)
 	path := "/tmp"
-	ctx := t.Context()
+	ctx := context.Background()
 
-	// Set up expectations
-	mockDrush.On("IsModuleEnabled", mock.Anything, "/tmp", "example.com", "locale_deploy").Return(true, nil)
-	mockDrush.On("LocalizeTranslations", mock.Anything, "/tmp", "example.com").Return(nil)
-	mockDrush.On("GetTranslationPath", mock.Anything, "/tmp", "example.com", true).Return("translations", nil)
+	// Configure mock expectations
+	mockDrush.EXPECT().IsModuleEnabled(mock.Anything, "/tmp", "example.com", "locale_deploy").Return(true, nil)
+	mockDrush.EXPECT().LocalizeTranslations(mock.Anything, "/tmp", "example.com").Return(nil)
+	mockDrush.EXPECT().GetTranslationPath(mock.Anything, "/tmp", "example.com", true).Return("translations", nil)
 
-	mockRepository.On("IsSomethingStagedInPath", worktree, "translations").Return(true, nil)
+	mockRepository.EXPECT().IsSomethingStagedInPath(worktree, "translations").Return(true)
 
-	worktree.On("Add", "translations").Return(plumbing.NewHash(""), nil)
-	worktree.On("Commit", "Update translations", &git.CommitOptions{}).Return(plumbing.NewHash(""), nil)
-	worktree.On("Status").Return(git.Status{}, nil)
+	worktree.EXPECT().Add("translations").Return(plumbing.NewHash(""), nil)
+	worktree.EXPECT().Commit("Update translations", &git.CommitOptions{}).Return(plumbing.NewHash(""), nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil)
 
-	// Verify the results
+	// Execute
 	event := services.NewPostSiteUpdateEvent(ctx, path, worktree, "example.com")
-	assert.NoError(t, handler.postSiteUpdateHandler(event))
+	err := handler.postSiteUpdateHandler(event)
 
+	// Assert
+	assert.NoError(t, err)
 	mockDrush.AssertExpectations(t)
 	mockRepository.AssertExpectations(t)
 	worktree.AssertExpectations(t)

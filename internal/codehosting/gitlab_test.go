@@ -7,19 +7,8 @@ import (
 
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	gitlab "gitlab.com/gitlab-org/api/client-go"
 )
-
-// Mock implementation of GitlabClient
-type MockGitlabClient struct {
-	mock.Mock
-}
-
-func (m *MockGitlabClient) CreateMergeRequest(projectPath string, opts *gitlab.CreateMergeRequestOptions) (interface{}, interface{}, error) {
-	args := m.Called(projectPath, opts)
-	return args.Get(0), args.Get(1), args.Error(2)
-}
 
 func TestGitlab_CreateMergeRequest(t *testing.T) {
 

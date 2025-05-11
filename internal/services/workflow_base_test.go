@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"os"
 	"testing"
 
@@ -14,6 +15,7 @@ import (
 )
 
 func TestStartUpdate(t *testing.T) {
+	// Setup
 	logger := zap.NewNop()
 	installer := NewMockInstaller(t)
 	repositoryService := NewMockRepository(t)
@@ -21,6 +23,7 @@ func TestStartUpdate(t *testing.T) {
 	repository := NewMockGitRepository(t)
 	mockComposer := NewMockComposer(t)
 	drush := NewMockDrush(t)
+	ctx := context.Background()
 
 	config := internal.Config{
 		RepositoryURL: "https://example.com/repo.git",
@@ -30,6 +33,7 @@ func TestStartUpdate(t *testing.T) {
 		DryRun:        false,
 	}
 
+	// Configure mock expectations
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
@@ -47,9 +51,11 @@ func TestStartUpdate(t *testing.T) {
 
 	repository.EXPECT().Push(mock.Anything).Return(nil)
 
-	fixture, _ := os.ReadFile("testdata/dependency_update.md")
+	fixture, err := os.ReadFile("testdata/dependency_update.md")
+	assert.NoError(t, err, "Failed to read test fixture")
+
 	vcsProvider.EXPECT().GetUser().Return("user", "mail")
-	vcsProvider.On("CreateMergeRequest", mock.Anything, string(fixture), mock.Anything, config.Branch).Return(codehosting.MergeRequest{}, nil)
+	vcsProvider.EXPECT().CreateMergeRequest(mock.Anything, string(fixture), mock.Anything, config.Branch).Return(codehosting.MergeRequest{}, nil)
 
 	mockComposer.EXPECT().Update(mock.Anything, "/tmp", mock.Anything, mock.Anything, false, false).Return([]composer.PackageChange{
 		{
@@ -58,12 +64,14 @@ func TestStartUpdate(t *testing.T) {
 			To:      "9.1.0",
 		},
 	}, nil)
-	mockComposer.On("Install", mock.Anything, "/tmp").Return(nil)
-	mockComposer.On("GetLockHash", "/tmp").Return("dummy-hash", nil)
+	mockComposer.EXPECT().Install(mock.Anything, "/tmp").Return(nil)
+	mockComposer.EXPECT().GetLockHash("/tmp").Return("dummy-hash", nil)
 
+	// Execute
 	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
-	err := workflowService.StartUpdate(t.Context(), nil)
+	err = workflowService.StartUpdate(ctx, nil)
 
+	// Assert
 	assert.NoError(t, err)
 	installer.AssertExpectations(t)
 	repositoryService.AssertExpectations(t)
@@ -74,6 +82,7 @@ func TestStartUpdate(t *testing.T) {
 }
 
 func TestStartUpdateWithDryRun(t *testing.T) {
+	// Setup
 	logger := zap.NewNop()
 	installer := NewMockInstaller(t)
 	repositoryService := NewMockRepository(t)
@@ -81,6 +90,7 @@ func TestStartUpdateWithDryRun(t *testing.T) {
 	repository := NewMockGitRepository(t)
 	mockComposer := NewMockComposer(t)
 	drush := NewMockDrush(t)
+	ctx := context.Background()
 
 	config := internal.Config{
 		RepositoryURL: "https://example.com/repo.git",
@@ -90,6 +100,7 @@ func TestStartUpdateWithDryRun(t *testing.T) {
 		DryRun:        true,
 	}
 
+	// Configure mock expectations
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
@@ -114,12 +125,14 @@ func TestStartUpdateWithDryRun(t *testing.T) {
 			To:      "9.1.0",
 		},
 	}, nil)
-	mockComposer.On("Install", mock.Anything, "/tmp").Return(nil)
-	mockComposer.On("GetLockHash", "/tmp").Return("dummy-hash", nil)
+	mockComposer.EXPECT().Install(mock.Anything, "/tmp").Return(nil)
+	mockComposer.EXPECT().GetLockHash("/tmp").Return("dummy-hash", nil)
 
+	// Execute
 	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
-	err := workflowService.StartUpdate(t.Context(), nil)
+	err := workflowService.StartUpdate(ctx, nil)
 
+	// Assert
 	assert.NoError(t, err)
 	installer.AssertExpectations(t)
 	repositoryService.AssertExpectations(t)

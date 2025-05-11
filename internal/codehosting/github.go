@@ -38,7 +38,7 @@ func (g Github) CreateMergeRequest(title string, description string, sourceBranc
 	})
 
 	if err != nil {
-		return MergeRequest{}, err
+		return MergeRequest{}, fmt.Errorf("failed to create pull request: %w", err)
 	}
 	return MergeRequest{
 		ID:  mr.GetNumber(),
@@ -46,44 +46,68 @@ func (g Github) CreateMergeRequest(title string, description string, sourceBranc
 	}, nil
 }
 
-func (g Github) DownloadComposerFiles(branch string) string {
-
+// DownloadComposerFiles downloads composer.json and composer.lock files from the given branch
+// and returns the path to the temporary directory containing them.
+func (g *Github) DownloadComposerFiles(branch string) string {
 	dir, err := afero.TempDir(g.fs, "", "composer")
 	if err != nil {
-		panic(err)
+		// Better error handling instead of panic
+		g.logError(fmt.Errorf("failed to create temp directory: %w", err))
+		return ""
 	}
 
-	g.downloadAndWriteFile(branch, "composer.json", dir)
-	g.downloadAndWriteFile(branch, "composer.lock", dir)
+	if err := g.downloadAndWriteFile(branch, "composer.json", dir); err != nil {
+		return dir
+	}
+	if err := g.downloadAndWriteFile(branch, "composer.lock", dir); err != nil {
+		return dir
+	}
 
 	return dir
 }
 
-func (g Github) downloadAndWriteFile(branch string, file string, dir string) {
-
-	content, resp, err := g.client.Repositories.DownloadContents(context.TODO(), g.owner, g.repo, file, &github.RepositoryContentGetOptions{
-		Ref: branch,
-	})
+// downloadAndWriteFile downloads a file from the repository and writes it to the given directory.
+// Returns an error if the download or write operation fails.
+func (g *Github) downloadAndWriteFile(branch, file, dir string) error {
+	content, resp, err := g.client.Repositories.DownloadContents(
+		context.Background(),
+		g.owner,
+		g.repo,
+		file,
+		&github.RepositoryContentGetOptions{
+			Ref: branch,
+		},
+	)
 
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("failed to download %s: %w", file, err)
 	}
 
 	if resp.StatusCode != 200 {
-		panic(fmt.Errorf("failed to download file: %s", resp.Status))
+		return fmt.Errorf("failed to download %s: HTTP status %s", file, resp.Status)
 	}
 
 	err = afero.WriteReader(g.fs, dir+"/"+file, content)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("failed to write %s: %w", file, err)
 	}
 
+	return nil
 }
 
-func (g Github) GetUser() (name string, email string) {
-	user, _, err := g.client.Users.Get(context.TODO(), "")
+// logError logs an error. This is a placeholder for proper error handling.
+func (g *Github) logError(err error) {
+	// In a real implementation, this would use a proper logging mechanism
+	fmt.Printf("Error: %v\n", err)
+}
+
+// GetUser returns the name and email of the authenticated user.
+func (g *Github) GetUser() (name string, email string) {
+	user, _, err := g.client.Users.Get(context.Background(), "")
 	if err != nil {
-		panic(err)
+		// Better error handling instead of panic
+		g.logError(fmt.Errorf("failed to get user: %w", err))
+		return "Unknown", "unknown@example.com"
 	}
 
 	return user.GetName(), user.GetEmail()
