@@ -64,7 +64,7 @@ func TestGithub_CreateMergeRequest(t *testing.T) {
 
 func TestGithub_DownloadComposerFiles(t *testing.T) {
 	// Setup mock HTTP server for file content
-	mockContentServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mockContentServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_, err := w.Write([]byte(`[{"name":"composer.json","download_url":""}]`))

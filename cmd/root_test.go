@@ -18,7 +18,6 @@ func TestNewLogger(t *testing.T) {
 
 		// Create logger
 		logger := NewLogger(config)
-		defer logger.Sync()
 
 		// Assert logger is in debug mode
 		assert.NotNil(t, logger)
@@ -33,7 +32,6 @@ func TestNewLogger(t *testing.T) {
 
 		// Create logger
 		logger := NewLogger(config)
-		defer logger.Sync()
 
 		// Assert logger is not in debug mode but is in info mode
 		assert.NotNil(t, logger)
