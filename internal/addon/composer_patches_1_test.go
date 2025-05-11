@@ -52,7 +52,7 @@ func TestUpdatePatches(t *testing.T) {
 			},
 		}
 
-		report, newPatches := updater.UpdatePatches(t.Context(), "/tmp", worktree, operations, patches)
+		report, newPatches := updater.updatePatches(t.Context(), "/tmp", worktree, operations, patches)
 		assert.Equal(t, patches, newPatches)
 		assert.False(t, report.Changes())
 
@@ -92,7 +92,7 @@ func TestUpdatePatches(t *testing.T) {
 			},
 		}
 
-		report, newPatches := updater.UpdatePatches(t.Context(), "/tmp", worktree, operations, patches)
+		report, newPatches := updater.updatePatches(t.Context(), "/tmp", worktree, operations, patches)
 		assert.Equal(t, map[string]map[string]string{
 			"drupal/core": {
 				"local patch without issue number": "patches/core/0001-local-patch.patch",
@@ -154,7 +154,7 @@ func TestUpdatePatches(t *testing.T) {
 			},
 		}
 
-		report, newPatches := updater.UpdatePatches(t.Context(), "/tmp", worktree, operations, patches)
+		report, newPatches := updater.updatePatches(t.Context(), "/tmp", worktree, operations, patches)
 		assert.Equal(t, map[string]map[string]string{
 			"drupal/core": {
 				"Issue #123456: [Alot of problems](https://www.drupal.org/node/123456)": "patches/remote/0001-remote.patch",
@@ -246,7 +246,7 @@ func TestUpdatePatches(t *testing.T) {
 			},
 		}
 
-		report, newPatches := updater.UpdatePatches(t.Context(), "/tmp", worktree, operations, patches)
+		report, newPatches := updater.updatePatches(t.Context(), "/tmp", worktree, operations, patches)
 		assert.Equal(t, map[string]map[string]string{
 			"drupal/core": {
 				"Issue #123456: [Alot of problems](https://www.drupal.org/node/123456)": "patches/drupal/123456-111111-alot_of_problems.diff",
@@ -336,7 +336,7 @@ func TestUpdatePatches(t *testing.T) {
 			},
 		}
 
-		report, newPatches := updater.UpdatePatches(t.Context(), "/tmp", worktree, operations, patches)
+		report, newPatches := updater.updatePatches(t.Context(), "/tmp", worktree, operations, patches)
 		assert.Equal(t, map[string]map[string]string{
 			"drupal/core": {
 				"Issue #123456: [Alot of problems](https://www.drupal.org/node/123456)": "patches/remote/0001-remote.patch",
@@ -423,7 +423,7 @@ func TestUpdatePatches(t *testing.T) {
 			},
 		}
 
-		report, newPatches := updater.UpdatePatches(t.Context(), "/tmp", worktree, operations, patches)
+		report, newPatches := updater.updatePatches(t.Context(), "/tmp", worktree, operations, patches)
 		assert.Equal(t, map[string]map[string]string{}, newPatches)
 		assert.True(t, report.Changes())
 
@@ -493,7 +493,7 @@ func TestUpdatePatches(t *testing.T) {
 			},
 		}
 
-		report, newPatches := updater.UpdatePatches(t.Context(), "/tmp", worktree, operations, patches)
+		report, newPatches := updater.updatePatches(t.Context(), "/tmp", worktree, operations, patches)
 		assert.Equal(t, map[string]map[string]string{
 			"drupal/core": {
 				"Issue #123456: [Alot of problems](https://www.drupal.org/node/123456)": "patches/remote/0001-remote.patch",
@@ -542,7 +542,7 @@ func TestUpdatePatches(t *testing.T) {
 			},
 		}
 
-		report, newPatches := updater.UpdatePatches(t.Context(), "/tmp", worktree, operations, patches)
+		report, newPatches := updater.updatePatches(t.Context(), "/tmp", worktree, operations, patches)
 		assert.Equal(t, map[string]map[string]string{
 			"drupal/pathauto": {
 				"local patch without issue number": "patches/core/0001-local-patch.patch",
@@ -577,7 +577,7 @@ func TestUpdatePatches(t *testing.T) {
 			},
 		}
 
-		report, newPatches := updater.UpdatePatches(t.Context(), "/tmp", worktree, operations, patches)
+		report, newPatches := updater.updatePatches(t.Context(), "/tmp", worktree, operations, patches)
 		assert.Equal(t, map[string]map[string]string{}, newPatches)
 		assert.True(t, report.Changes())
 

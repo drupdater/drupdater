@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// ComposerDiff handles diffing composer dependency changes.
 type ComposerDiff struct {
 	internal.BasicAddon
 	logger   *zap.Logger
@@ -17,6 +18,7 @@ type ComposerDiff struct {
 	table string
 }
 
+// NewComposerDiff creates a new composer diff instance.
 func NewComposerDiff(logger *zap.Logger, composer Composer) *ComposerDiff {
 	return &ComposerDiff{
 		logger:   logger,
@@ -24,29 +26,31 @@ func NewComposerDiff(logger *zap.Logger, composer Composer) *ComposerDiff {
 	}
 }
 
-func (h *ComposerDiff) SubscribedEvents() map[string]interface{} {
+// SubscribedEvents returns the events this addon listens to.
+func (cd *ComposerDiff) SubscribedEvents() map[string]interface{} {
 	return map[string]interface{}{
 		"post-composer-update": event.ListenerItem{
 			Priority: event.Min,
-			Listener: event.ListenerFunc(h.postComposerUpdateHandler),
+			Listener: event.ListenerFunc(cd.postComposerUpdateHandler),
 		},
 	}
 }
 
-func (h *ComposerDiff) RenderTemplate() (string, error) {
-	return h.Render("composer_diff.go.tmpl", h.table)
+// RenderTemplate returns the rendered template for this addon.
+func (cd *ComposerDiff) RenderTemplate() (string, error) {
+	return cd.Render("composer_diff.go.tmpl", cd.table)
 }
 
-func (h *ComposerDiff) postComposerUpdateHandler(e event.Event) error {
-	event := e.(*services.PostComposerUpdateEvent)
+func (cd *ComposerDiff) postComposerUpdateHandler(e event.Event) error {
+	evt := e.(*services.PostComposerUpdateEvent)
 
-	table, err := h.composer.Diff(event.Context(), event.Path(), true)
+	table, err := cd.composer.Diff(evt.Context(), evt.Path(), true)
 	if err != nil {
 		return fmt.Errorf("failed to get diff: %w", err)
 	}
-	h.table = table
+	cd.table = table
 
-	h.logger.Sugar().Info("composer diff table", fmt.Sprintf("\n%s", table))
+	cd.logger.Sugar().Info("composer diff table", fmt.Sprintf("\n%s", table))
 
-	return err
+	return nil
 }

@@ -7,17 +7,43 @@ import (
 )
 
 func TestDefaultVcsProviderFactory_Create(t *testing.T) {
-	factory := NewDefaultVcsProviderFactory()
+	// Table-driven test approach
+	tests := []struct {
+		name          string
+		repositoryURL string
+		token         string
+		expectedType  interface{}
+	}{
+		{
+			name:          "returns gitlab platform for gitlab URLs",
+			repositoryURL: "https://gitlab.com/some/repo",
+			token:         "dummy-token",
+			expectedType:  &Gitlab{},
+		},
+		{
+			name:          "returns github platform for github URLs",
+			repositoryURL: "https://github.com/some/repo",
+			token:         "dummy-token",
+			expectedType:  &Github{},
+		},
+		{
+			name:          "defaults to gitlab platform for unknown providers",
+			repositoryURL: "https://gitfoo.com/some/repo",
+			token:         "dummy-token",
+			expectedType:  &Gitlab{},
+		},
+	}
 
-	t.Run("returns gitlab platform", func(t *testing.T) {
-		provider := factory.Create("https://gitlab.com", "dummy-token")
-		assert.IsType(t, &Gitlab{}, provider)
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Setup
+			factory := NewDefaultVcsProviderFactory()
 
-	t.Run("returns nil for unknown provider", func(t *testing.T) {
+			// Execute
+			provider := factory.Create(tt.repositoryURL, tt.token)
 
-		factory := NewDefaultVcsProviderFactory()
-		provider := factory.Create("https://gitfoo.com", "dummy-token")
-		assert.IsType(t, &Gitlab{}, provider)
-	})
+			// Assert
+			assert.IsType(t, tt.expectedType, provider)
+		})
+	}
 }

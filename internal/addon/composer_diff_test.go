@@ -14,7 +14,7 @@ import (
 func TestNewComposerDiff(t *testing.T) {
 	// Setup
 	logger := zap.NewNop()
-	mockComposer := new(MockComposer)
+	mockComposer := NewMockComposer(t)
 
 	// Execute
 	diff := NewComposerDiff(logger, mockComposer)
@@ -49,7 +49,8 @@ func TestComposerDiff_PostComposerUpdateHandler_Success(t *testing.T) {
 
 	mockEvent := services.NewPostComposerUpdateEvent(ctx, testPath, nil)
 
-	mockComposer.On("Diff", ctx, testPath, true).Return(expectedDiff, nil)
+	// Configure mock expectations
+	mockComposer.EXPECT().Diff(ctx, testPath, true).Return(expectedDiff, nil)
 
 	// Execute
 	err := diff.postComposerUpdateHandler(mockEvent)
@@ -61,17 +62,23 @@ func TestComposerDiff_PostComposerUpdateHandler_Success(t *testing.T) {
 }
 
 func TestComposerDiff_RenderTemplate(t *testing.T) {
+	// Setup - Read expected output from fixture file
+	fixture, err := os.ReadFile("testdata/composer_diff.md")
+	assert.NoError(t, err, "Failed to read test fixture")
 
-	fixture, _ := os.ReadFile("testdata/composer_diff.md")
 	expected := string(fixture)
 	logger := zap.NewNop()
 
+	// Create mock and system under test
 	composerRunner := NewMockComposer(t)
-	ap := NewComposerDiff(logger, composerRunner)
-	ap.table = "Dummy Table"
-	result, err := ap.RenderTemplate()
+	composerDiff := NewComposerDiff(logger, composerRunner)
+	composerDiff.table = "Dummy Table"
+
+	// Execute
+	result, err := composerDiff.RenderTemplate()
+
+	// Assert
 	assert.NoError(t, err)
 	assert.Equal(t, expected, result)
 	composerRunner.AssertExpectations(t)
-
 }

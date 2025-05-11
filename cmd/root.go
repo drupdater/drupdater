@@ -21,22 +21,29 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+// config holds the application configuration
 var config internal.Config
 
+// rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "drupdater repository-url token",
 	Short: "Drupal Updater",
 	Long:  `Drupal Updater is a tool to update Drupal dependencies and create merge requests.`,
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Silence default error handling
 		cmd.SilenceUsage = true
 		cmd.SilenceErrors = true
 
+		// Parse command line arguments
 		config.RepositoryURL = args[0]
 		config.Token = args[1]
 
+		// Initialize required services
 		logger := NewLogger(config)
 		cache := NewCache()
+
+		// Create core service instances
 		drush := drush.NewCLI(logger, cache)
 		composer := composer.NewCLI(logger)
 		drupalOrg := drupalorg.NewHTTPClient(logger)
@@ -46,34 +53,16 @@ var rootCmd = &cobra.Command{
 		git := repo.NewGitRepositoryService(logger)
 		workflow := services.NewWorkflowBaseService(logger, config, drush, platform, git, installer, composer)
 
-		var addonList []internal.Addon
-		if config.Security {
-			addonList = append(addonList, addon.NewComposerAudit(logger, composer))
-		}
-		if !config.SkipCBF {
-			phpcsRunner := phpcs.NewCLI(logger)
-			addonList = append(addonList, addon.NewCodeBeautifier(logger, phpcsRunner, config, composer))
-		}
+		// Register addons based on configuration
+		addons := createAddons(logger, config, drush, composer, drupalOrg, git)
 
-		if !config.SkipRector {
-			rectorRunner := rector.NewCLI(logger)
-			addonList = append(addonList, addon.NewDeprecationsRemover(logger, rectorRunner, config, composer))
-		}
-
-		addonList = append(addonList,
-			addon.NewTranslationsUpdater(logger, drush, git),
-			addon.NewComposerAllowPlugins(logger, composer),
-			addon.NewComposerNormalizer(logger, composer),
-			addon.NewComposerPatches1(logger, composer, drupalOrg),
-			addon.NewComposerDiff(logger, composer),
-			addon.NewUpdateHooks(logger, drush),
-		)
-
-		for _, addon := range addonList {
+		// Register all addons as event subscribers
+		for _, addon := range addons {
 			event.AddSubscriber(addon)
 		}
 
-		err := workflow.StartUpdate(cmd.Context(), addonList)
+		// Start the update workflow
+		err := workflow.StartUpdate(cmd.Context(), addons)
 		if err != nil {
 			logger.Sugar().Error(err)
 			return err
@@ -83,8 +72,44 @@ var rootCmd = &cobra.Command{
 	},
 }
 
-func init() {
+// createAddons creates and returns the list of addons to be used based on the configuration
+func createAddons(
+	logger *zap.Logger,
+	config internal.Config,
+	drush *drush.CLI,
+	composer *composer.CLI,
+	drupalOrg *drupalorg.HTTPClient,
+	git *repo.GitRepositoryService,
+) []internal.Addon {
+	var addons []internal.Addon
 
+	// Conditional addons
+	if config.Security {
+		addons = append(addons, addon.NewComposerAudit(logger, composer))
+	}
+	if !config.SkipCBF {
+		phpcsRunner := phpcs.NewCLI(logger)
+		addons = append(addons, addon.NewCodeBeautifier(logger, phpcsRunner, config, composer))
+	}
+	if !config.SkipRector {
+		rectorRunner := rector.NewCLI(logger)
+		addons = append(addons, addon.NewDeprecationsRemover(logger, rectorRunner, config, composer))
+	}
+
+	// Default addons
+	addons = append(addons,
+		addon.NewTranslationsUpdater(logger, drush, git),
+		addon.NewComposerAllowPlugins(logger, composer),
+		addon.NewComposerNormalizer(logger, composer),
+		addon.NewComposerPatches1(logger, composer, drupalOrg),
+		addon.NewComposerDiff(logger, composer),
+		addon.NewUpdateHooks(logger, drush),
+	)
+
+	return addons
+}
+
+func init() {
 	rootCmd.PersistentFlags().StringVar(&config.Branch, "branch", "main", "Branch")
 	rootCmd.PersistentFlags().StringArrayVar(&config.Sites, "sites", []string{"default"}, "Sites")
 	rootCmd.PersistentFlags().BoolVar(&config.Security, "security", false, "Only security updates. If true, only security updates will be applied.")
@@ -107,7 +132,6 @@ func NewCache() otter.Cache[string, string] {
 }
 
 func NewLogger(config internal.Config) *zap.Logger {
-
 	loggerConfig := zap.NewDevelopmentConfig()
 	loggerConfig.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 

@@ -13,13 +13,14 @@ import (
 	"go.uber.org/zap"
 )
 
+// SecurityReport contains information about security advisories before and after updates.
 type SecurityReport struct {
 	FixedAdvisories       []composer.Advisory
 	AfterUpdateAdvisories []composer.Advisory
 	NumUnresolvedIssues   int
 }
 
-// ComposerAudit handles updating translations for Drupal sites
+// ComposerAudit handles security auditing for Drupal sites.
 type ComposerAudit struct {
 	internal.BasicAddon
 	logger   *zap.Logger
@@ -30,7 +31,7 @@ type ComposerAudit struct {
 	afterAudit  composer.Audit
 }
 
-// NewComposerAudit creates a new translations updater instance
+// NewComposerAudit creates a new security auditor instance.
 func NewComposerAudit(logger *zap.Logger, composer Composer) *ComposerAudit {
 	return &ComposerAudit{
 		logger:   logger,
@@ -39,44 +40,44 @@ func NewComposerAudit(logger *zap.Logger, composer Composer) *ComposerAudit {
 	}
 }
 
-// SubscribedEvents returns the events this addon listens to
-func (tu *ComposerAudit) SubscribedEvents() map[string]interface{} {
+// SubscribedEvents returns the events this addon listens to.
+func (ca *ComposerAudit) SubscribedEvents() map[string]interface{} {
 	return map[string]interface{}{
 		"pre-composer-update": event.ListenerItem{
 			Priority: event.Max,
-			Listener: event.ListenerFunc(tu.preComposerUpdateHandler),
+			Listener: event.ListenerFunc(ca.preComposerUpdateHandler),
 		},
 		"post-code-update": event.ListenerItem{
 			Priority: event.Normal,
-			Listener: event.ListenerFunc(tu.postCodeUpdateHandler),
+			Listener: event.ListenerFunc(ca.postCodeUpdateHandler),
 		},
 		"pre-merge-request-create": event.ListenerItem{
 			Priority: event.Normal,
-			Listener: event.ListenerFunc(tu.preMergeRequestCreateHandler),
+			Listener: event.ListenerFunc(ca.preMergeRequestCreateHandler),
 		},
 	}
 }
 
-// RenderTemplate returns the rendered template for this addon
-func (tu *ComposerAudit) RenderTemplate() (string, error) {
-	return tu.Render("security_report.go.tmpl", SecurityReport{
-		FixedAdvisories:       tu.GetFixedAdvisories(),
-		AfterUpdateAdvisories: tu.afterAudit.Advisories,
-		NumUnresolvedIssues:   len(tu.afterAudit.Advisories),
+// RenderTemplate returns the rendered template for this addon.
+func (ca *ComposerAudit) RenderTemplate() (string, error) {
+	return ca.Render("security_report.go.tmpl", SecurityReport{
+		FixedAdvisories:       ca.GetFixedAdvisories(),
+		AfterUpdateAdvisories: ca.afterAudit.Advisories,
+		NumUnresolvedIssues:   len(ca.afterAudit.Advisories),
 	})
 }
 
-func (tu *ComposerAudit) preComposerUpdateHandler(e event.Event) error {
+func (ca *ComposerAudit) preComposerUpdateHandler(e event.Event) error {
 	evt := e.(*services.PreComposerUpdateEvent)
 	var err error
 
-	tu.beforeAudit, err = tu.composer.Audit(evt.Context(), evt.Path())
+	ca.beforeAudit, err = ca.composer.Audit(evt.Context(), evt.Path())
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to run composer audit: %w", err)
 	}
 
 	packagesToUpdate := make([]string, 0)
-	for _, advisory := range tu.beforeAudit.Advisories {
+	for _, advisory := range ca.beforeAudit.Advisories {
 		if slices.Contains(packagesToUpdate, advisory.PackageName) {
 			continue
 		}
@@ -92,31 +93,32 @@ func (tu *ComposerAudit) preComposerUpdateHandler(e event.Event) error {
 	evt.MinimalChanges = true
 
 	if len(packagesToUpdate) == 0 {
-		tu.logger.Warn("no security advisories found, skipping security update")
+		ca.logger.Warn("no security advisories found, skipping security update")
 		evt.Abort(true)
 	}
 
 	return nil
 }
 
-func (tu *ComposerAudit) postCodeUpdateHandler(e event.Event) error {
+func (ca *ComposerAudit) postCodeUpdateHandler(e event.Event) error {
 	evt := e.(*services.PostCodeUpdateEvent)
 
 	var err error
-	tu.afterAudit, err = tu.composer.Audit(evt.Context(), evt.Path())
+	ca.afterAudit, err = ca.composer.Audit(evt.Context(), evt.Path())
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to run composer audit after update: %w", err)
 	}
 
 	return nil
 }
 
-func (tu *ComposerAudit) GetFixedAdvisories() []composer.Advisory {
+// GetFixedAdvisories returns the list of security advisories that were fixed by the update.
+func (ca *ComposerAudit) GetFixedAdvisories() []composer.Advisory {
 	// Get advisories from before that are not present in after
 	var fixed = make([]composer.Advisory, 0)
-	for _, beforeAdvisory := range tu.beforeAudit.Advisories {
+	for _, beforeAdvisory := range ca.beforeAudit.Advisories {
 		found := false
-		for _, afterAdvisory := range tu.afterAudit.Advisories {
+		for _, afterAdvisory := range ca.afterAudit.Advisories {
 			if beforeAdvisory.CVE == afterAdvisory.CVE {
 				found = true
 				break
@@ -129,10 +131,10 @@ func (tu *ComposerAudit) GetFixedAdvisories() []composer.Advisory {
 	return fixed
 }
 
-func (tu *ComposerAudit) preMergeRequestCreateHandler(e event.Event) error {
+func (ca *ComposerAudit) preMergeRequestCreateHandler(e event.Event) error {
 	evt := e.(*services.PreMergeRequestCreateEvent)
 
-	evt.Title = fmt.Sprintf("%s: Drupal Security Updates", tu.current.Format("2006-01-02"))
+	evt.Title = fmt.Sprintf("%s: Drupal Security Updates", ca.current.Format("2006-01-02"))
 
 	return nil
 }

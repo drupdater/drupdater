@@ -98,6 +98,7 @@ func (h *ComposerPatches1) preComposerUpdateHandler(e event.Event) error {
 	minimalChanges := event.MinimalChanges
 	packagesToKeep := event.PackagesToKeep
 
+	// Initialize patches map
 	patches := make(map[string]map[string]string)
 	patchesString, err := h.composer.GetConfig(ctx, path, "extra.patches")
 	if err != nil {
@@ -113,32 +114,35 @@ func (h *ComposerPatches1) preComposerUpdateHandler(e event.Event) error {
 	if err != nil {
 		return fmt.Errorf("failed to get composer updates: %w", err)
 	}
-	patchUpdates, newPatches := h.UpdatePatches(ctx, path, worktree, operations, patches)
+
+	patchUpdates, newPatches := h.updatePatches(ctx, path, worktree, operations, patches)
 	h.patchUpdates = patchUpdates
+
 	if h.patchUpdates.Changes() {
-		// get patches json string
-		jsonString, err := json.Marshal(newPatches)
+		// Marshal updated patches to JSON
+		jsonBytes, err := json.Marshal(newPatches)
 		if err != nil {
 			return fmt.Errorf("failed to marshal patches: %w", err)
 		}
-		err = h.composer.SetConfig(ctx, path, "extra.patches", string(jsonString))
-		if err != nil {
+
+		if err := h.composer.SetConfig(ctx, path, "extra.patches", string(jsonBytes)); err != nil {
 			return fmt.Errorf("failed to set composer config: %w", err)
 		}
 
-		err = h.composer.UpdateLockHash(ctx, path)
-		if err != nil {
+		if err := h.composer.UpdateLockHash(ctx, path); err != nil {
 			return fmt.Errorf("failed to update composer lock hash: %w", err)
 		}
 
-		err = worktree.AddGlob("composer.*")
-		if err != nil {
+		if err := worktree.AddGlob("composer.*"); err != nil {
 			return fmt.Errorf("failed to add composer.* files: %w", err)
 		}
+
 		if _, err := worktree.Commit("Update patches", &git.CommitOptions{}); err != nil {
 			return fmt.Errorf("failed to commit patches: %w", err)
 		}
 	}
+
+	// Add fixed versions of packages with patch conflicts to keep list
 	for _, patchUpdate := range patchUpdates.Conflicts {
 		event.PackagesToKeep = append(event.PackagesToKeep, fmt.Sprintf("%s:%s", patchUpdate.Package, patchUpdate.FixedVersion))
 	}
@@ -146,10 +150,9 @@ func (h *ComposerPatches1) preComposerUpdateHandler(e event.Event) error {
 	return nil
 }
 
-func (h *ComposerPatches1) UpdatePatches(ctx context.Context, path string, worktree Worktree, operations []composer.PackageChange, patches map[string]map[string]string) (PatchUpdates, map[string]map[string]string) {
-
+func (h *ComposerPatches1) updatePatches(ctx context.Context, path string, worktree Worktree, operations []composer.PackageChange, patches map[string]map[string]string) (PatchUpdates, map[string]map[string]string) {
 	updates := PatchUpdates{}
-	h.logger.Debug("composer patches", zap.Any("patches", patches))
+	h.logger.Debug("processing composer patches", zap.Any("patches", patches))
 
 	// Remove patches for packages that are no longer installed
 	for packageName := range patches {

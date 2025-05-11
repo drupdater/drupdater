@@ -11,20 +11,22 @@ import (
 	"go.uber.org/zap"
 )
 
-// Other composer.Runner methods would be implemented here, but we only need these two for our tests
-
 func TestDefaultComposerNormalize_SubscribedEvents(t *testing.T) {
+	// Setup
 	logger := zap.NewNop()
 	composer := NewMockComposer(t)
 
+	// Execute
 	normalize := NewComposerNormalizer(logger, composer)
 	events := normalize.SubscribedEvents()
 
+	// Assert
 	assert.Contains(t, events, "post-composer-update", "Should subscribe to post-composer-update event")
-	assert.Equal(t, event.Min, events["post-composer-update"].(event.ListenerItem).Priority, "Should have maximum priority")
+	assert.Equal(t, event.Min, events["post-composer-update"].(event.ListenerItem).Priority, "Should have minimum priority")
 }
 
 func TestDefaultComposerNormalize_PostComposerUpdateHandler_PackageInstalled(t *testing.T) {
+	// Setup
 	logger := zap.NewNop()
 	composer := NewMockComposer(t)
 
@@ -32,20 +34,23 @@ func TestDefaultComposerNormalize_PostComposerUpdateHandler_PackageInstalled(t *
 	testPath := "/test/path"
 	worktree := &git.Worktree{}
 
-	// Mock expectations
-	composer.On("IsPackageInstalled", ctx, testPath, "ergebnis/composer-normalize").Return(true, nil)
-	composer.On("Normalize", ctx, testPath).Return("normalized", nil)
+	// Configure mock expectations
+	composer.EXPECT().IsPackageInstalled(ctx, testPath, "ergebnis/composer-normalize").Return(true, nil)
+	composer.EXPECT().Normalize(ctx, testPath).Return("normalized", nil)
 
 	normalize := NewComposerNormalizer(logger, composer)
 
+	// Execute
 	e := services.NewPostComposerUpdateEvent(ctx, testPath, worktree)
 	err := normalize.postComposerUpdateHandler(e)
 
+	// Assert
 	assert.NoError(t, err)
 	composer.AssertExpectations(t)
 }
 
 func TestDefaultComposerNormalize_PostComposerUpdateHandler_PackageNotInstalled(t *testing.T) {
+	// Setup
 	logger := zap.NewNop()
 	composer := NewMockComposer(t)
 
@@ -53,29 +58,30 @@ func TestDefaultComposerNormalize_PostComposerUpdateHandler_PackageNotInstalled(
 	testPath := "/test/path"
 	worktree := &git.Worktree{}
 
-	// Mock expectations - package not installed
-	composer.On("IsPackageInstalled", ctx, testPath, "ergebnis/composer-normalize").Return(false, nil)
+	// Configure mock expectations - package not installed
+	composer.EXPECT().IsPackageInstalled(ctx, testPath, "ergebnis/composer-normalize").Return(false, nil)
 
 	normalize := NewComposerNormalizer(logger, composer)
 
+	// Execute
 	e := services.NewPostComposerUpdateEvent(ctx, testPath, worktree)
-
 	err := normalize.postComposerUpdateHandler(e)
 
+	// Assert
 	assert.NoError(t, err)
 	composer.AssertExpectations(t)
-	// Normalize should not be called when package is not installed
-	composer.AssertNotCalled(t, "Normalize", ctx, testPath)
 }
 
 func TestDefaultComposerNormalize_RenderTemplate(t *testing.T) {
+	// Setup
 	logger := zap.NewNop()
 	composer := NewMockComposer(t)
-
 	normalize := NewComposerNormalizer(logger, composer)
 
+	// Execute
 	template, err := normalize.RenderTemplate()
 
+	// Assert
 	assert.NoError(t, err)
 	assert.Equal(t, "", template, "Template should be empty string")
 }

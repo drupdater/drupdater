@@ -1,18 +1,22 @@
 package addon
 
 import (
+	"fmt"
+
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/services"
 	"github.com/gookit/event"
 	"go.uber.org/zap"
 )
 
+// ComposerNormalizer handles normalization of composer.json files.
 type ComposerNormalizer struct {
 	internal.BasicAddon
 	logger   *zap.Logger
 	composer Composer
 }
 
+// NewComposerNormalizer creates a new composer normalizer instance.
 func NewComposerNormalizer(logger *zap.Logger, composer Composer) *ComposerNormalizer {
 	return &ComposerNormalizer{
 		logger:   logger,
@@ -20,31 +24,37 @@ func NewComposerNormalizer(logger *zap.Logger, composer Composer) *ComposerNorma
 	}
 }
 
-func (h *ComposerNormalizer) SubscribedEvents() map[string]interface{} {
+// SubscribedEvents returns the events this addon listens to.
+func (cn *ComposerNormalizer) SubscribedEvents() map[string]interface{} {
 	return map[string]interface{}{
 		"post-composer-update": event.ListenerItem{
 			Priority: event.Min,
-			Listener: event.ListenerFunc(h.postComposerUpdateHandler),
+			Listener: event.ListenerFunc(cn.postComposerUpdateHandler),
 		},
 	}
 }
 
-func (h *ComposerNormalizer) RenderTemplate() (string, error) {
+// RenderTemplate returns an empty string as this addon doesn't generate any reporting content.
+func (cn *ComposerNormalizer) RenderTemplate() (string, error) {
 	return "", nil
 }
 
-func (h *ComposerNormalizer) postComposerUpdateHandler(e event.Event) error {
-	event := e.(*services.PostComposerUpdateEvent)
+func (cn *ComposerNormalizer) postComposerUpdateHandler(e event.Event) error {
+	evt := e.(*services.PostComposerUpdateEvent)
 
-	installed, err := h.composer.IsPackageInstalled(event.Context(), event.Path(), "ergebnis/composer-normalize")
+	installed, err := cn.composer.IsPackageInstalled(evt.Context(), evt.Path(), "ergebnis/composer-normalize")
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to check if composer-normalize is installed: %w", err)
 	}
 	if !installed {
-		h.logger.Warn("composer-normalize not installed, skipping")
+		cn.logger.Warn("composer-normalize not installed, skipping")
 		return nil
 	}
 
-	_, err = h.composer.Normalize(event.Context(), event.Path())
-	return err
+	_, err = cn.composer.Normalize(evt.Context(), evt.Path())
+	if err != nil {
+		return fmt.Errorf("failed to normalize composer.json: %w", err)
+	}
+
+	return nil
 }
