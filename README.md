@@ -1,6 +1,6 @@
 # Drupdater
 
-Drupdater is a standalone tool for updating Drupal sites. It is designed to streamline the process of updating Drupal core, contributed modules, and configurations. It also provides tools for fixing PHP code style issues and removing deprecated code.
+Drupdater is a standalone tool for updating Drupal sites. It is designed to streamline the process of updating Drupal core, contributed modules, and configurations. It also provides tools for fixing PHP code style issues and removing deprecated code. After completing updates, Drupdater automatically creates a merge request (GitLab) or pull request (GitHub) with detailed changelogs and security-related updates highlighted.
 
 ## Table of Contents
 - [Features](#features)
@@ -19,7 +19,10 @@ Drupdater is a standalone tool for updating Drupal sites. It is designed to stre
 - Update translations for multilingual sites.
 - Fix PHP code style issues using `phpcs` and `phpcbf`.
 - Remove deprecated code using `drupal-rector`.
+- Detects new composer plugins and adds them to the `composer.json` file.
+- Runs `composer normalize` if available to ensure consistent formatting of the `composer.json` file.
 - Multisite support for updating multiple Drupal sites in one merge request.
+- Automatic creation of merge/pull requests with detailed changelogs for both GitLab and GitHub.
 
 ## Prerequisites
 - Your Drupal site must be installable from configuration.
