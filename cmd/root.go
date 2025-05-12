@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"os"
 
 	"github.com/drupdater/drupdater/internal"
@@ -64,8 +65,12 @@ var rootCmd = &cobra.Command{
 		// Start the update workflow
 		err := workflow.StartUpdate(cmd.Context(), addons)
 		if err != nil {
-			logger.Sugar().Error(err)
-			return err
+			if errors.As(err, &services.AbortError{}) {
+				logger.Sugar().Warn(errors.Unwrap(err))
+			} else {
+				logger.Sugar().Error(err)
+				return err
+			}
 		}
 		logger.Info("update finished")
 		return nil

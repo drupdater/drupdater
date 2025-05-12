@@ -131,3 +131,19 @@ func TestDefaultAllowPlugins_RenderTemplate(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, expected, result)
 }
+
+func TestDefaultAllowPlugins_RenderTemplate_Empty(t *testing.T) {
+	logger := zap.NewNop()
+	composerRunner := NewMockComposer(t)
+
+	// Initialize system under test
+	ap := NewComposerAllowPlugins(logger, composerRunner)
+	ap.newAllowPlugins = []string{}
+
+	// Execute
+	result, err := ap.RenderTemplate()
+
+	// Verify
+	assert.NoError(t, err)
+	assert.Equal(t, "", result)
+}

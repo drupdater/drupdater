@@ -43,6 +43,9 @@ func (ap *ComposerAllowPlugins) SubscribedEvents() map[string]interface{} {
 
 // RenderTemplate returns the rendered template for this addon
 func (ap *ComposerAllowPlugins) RenderTemplate() (string, error) {
+	if len(ap.newAllowPlugins) == 0 {
+		return "", nil
+	}
 	return ap.Render("allowplugins.go.tmpl", struct {
 		NewAllowPlugins []string
 	}{

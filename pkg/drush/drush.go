@@ -43,8 +43,10 @@ func (e *CLI) execDrush(ctx context.Context, dir string, site string, args ...st
 }
 
 func (e *CLI) InstallSite(ctx context.Context, dir string, site string) error {
-	_, err := e.execDrush(ctx, dir, site, "--existing-config", "--yes", "site:install", "--sites-subdir="+site)
-
+	out, err := e.execDrush(ctx, dir, site, "--existing-config", "--yes", "site:install", "--sites-subdir="+site, "--verbose")
+	if err != nil {
+		return fmt.Errorf("failed to install %s: %w, output: %s", site, err, out)
+	}
 	return err
 }
 

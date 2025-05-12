@@ -83,7 +83,7 @@ func TestComposerAudit_PreComposerUpdateHandler_WithAdvisories(t *testing.T) {
 
 	mockEvent := services.NewPreComposerUpdateEvent(ctx, path, worktree, []string{}, []string{}, true)
 
-	mockComposer.On("Audit", ctx, path).Return(mockAudit, nil)
+	mockComposer.EXPECT().Audit(ctx, path).Return(mockAudit, nil)
 
 	// Execute
 	err := audit.preComposerUpdateHandler(mockEvent)
@@ -94,8 +94,6 @@ func TestComposerAudit_PreComposerUpdateHandler_WithAdvisories(t *testing.T) {
 	assert.Equal(t, []string{"drupal/core", "other/package", "drupal/core-recommended", "drupal/core-composer-scaffold"}, mockEvent.PackagesToUpdate)
 	assert.True(t, mockEvent.MinimalChanges)
 	assert.False(t, mockEvent.IsAborted())
-
-	mockComposer.AssertExpectations(t)
 }
 
 // TestComposerAudit_PreComposerUpdateHandler_NoAdvisories tests when no security advisories are found
@@ -115,17 +113,16 @@ func TestComposerAudit_PreComposerUpdateHandler_NoAdvisories(t *testing.T) {
 
 	mockEvent := services.NewPreComposerUpdateEvent(ctx, path, worktree, []string{}, []string{}, true)
 
-	mockComposer.On("Audit", ctx, path).Return(mockAudit, nil)
+	mockComposer.EXPECT().Audit(ctx, path).Return(mockAudit, nil)
 
 	// Execute
 	err := audit.preComposerUpdateHandler(mockEvent)
 
 	// Assert
-	assert.NoError(t, err)
+	assert.ErrorAs(t, err, &services.AbortError{})
+	assert.Equal(t, "No security advisories found", err.Error())
 	assert.Equal(t, mockAudit, audit.beforeAudit)
 	assert.Empty(t, mockEvent.PackagesToUpdate)
-
-	mockComposer.AssertExpectations(t)
 }
 
 // TestComposerAudit_PostCodeUpdateHandler tests the post-code-update handler
@@ -151,7 +148,7 @@ func TestComposerAudit_PostCodeUpdateHandler(t *testing.T) {
 
 	mockEvent := services.NewPostCodeUpdateEvent(ctx, path, worktree)
 
-	mockComposer.On("Audit", ctx, path).Return(mockAudit, nil)
+	mockComposer.EXPECT().Audit(ctx, path).Return(mockAudit, nil)
 
 	// Execute
 	err := audit.postCodeUpdateHandler(mockEvent)
@@ -159,8 +156,6 @@ func TestComposerAudit_PostCodeUpdateHandler(t *testing.T) {
 	// Assert
 	assert.NoError(t, err)
 	assert.Equal(t, mockAudit, audit.afterAudit)
-
-	mockComposer.AssertExpectations(t)
 }
 
 // TestComposerAudit_GetFixedAdvisories tests the method that compares before/after advisories
@@ -252,11 +247,11 @@ func TestComposerAudit_RenderTemplate(t *testing.T) {
 		},
 	}
 
-	fixture, _ := os.ReadFile("testdata/composer_audit.md")
+	fixture, err := os.ReadFile("testdata/composer_audit.md")
+	assert.NoError(t, err)
 	expected := string(fixture)
 
 	result, err := audit.RenderTemplate()
 	assert.NoError(t, err)
 	assert.Equal(t, expected, result)
-	mockComposer.AssertExpectations(t)
 }

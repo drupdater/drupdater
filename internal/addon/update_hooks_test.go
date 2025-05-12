@@ -42,13 +42,14 @@ func TestUpdateHooks_SubscribedEvents(t *testing.T) {
 }
 
 func TestUpdateHooks_RenderTemplate(t *testing.T) {
-
-	fixture, _ := os.ReadFile("testdata/update_hooks.md")
+	// Setup
+	fixture, err := os.ReadFile("testdata/update_hooks.md")
+	assert.NoError(t, err)
 	expected := string(fixture)
+
 	logger := zap.NewNop()
 	mockDrush := NewMockDrush(t)
 
-	// Setup
 	hooks := UpdateHooksPerSite{
 		"default": {
 			"hook": drush.UpdateHook{
@@ -57,14 +58,32 @@ func TestUpdateHooks_RenderTemplate(t *testing.T) {
 		},
 	}
 
-	composerRunner := NewMockComposer(t)
 	ap := NewUpdateHooks(logger, mockDrush)
 	ap.hooks = hooks
+
+	// Execute
 	result, err := ap.RenderTemplate()
+
+	// Assert
 	assert.NoError(t, err)
 	assert.Equal(t, expected, result)
-	composerRunner.AssertExpectations(t)
+}
 
+func TestUpdateHooks_RenderTemplate_Empty(t *testing.T) {
+	// Setup
+	logger := zap.NewNop()
+	mockDrush := NewMockDrush(t)
+	hooks := UpdateHooksPerSite{}
+
+	ap := NewUpdateHooks(logger, mockDrush)
+	ap.hooks = hooks
+
+	// Execute
+	result, err := ap.RenderTemplate()
+
+	// Assert
+	assert.NoError(t, err)
+	assert.Equal(t, "", result)
 }
 
 func TestUpdateHooks_PreSiteUpdateHandler_Success(t *testing.T) {
@@ -86,7 +105,7 @@ func TestUpdateHooks_PreSiteUpdateHandler_Success(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	mockEvent := services.NewPreSiteUpdateEvent(ctx, testPath, worktree, testSite)
 
-	mockDrush.On("GetUpdateHooks", ctx, testPath, testSite).Return(mockHooks, nil)
+	mockDrush.EXPECT().GetUpdateHooks(ctx, testPath, testSite).Return(mockHooks, nil)
 
 	// Execute
 	err := updateHooks.preSiteUpdateHandler(mockEvent)
@@ -95,8 +114,6 @@ func TestUpdateHooks_PreSiteUpdateHandler_Success(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Contains(t, updateHooks.hooks, testSite)
 	assert.Equal(t, mockHooks, updateHooks.hooks[testSite])
-	mockDrush.AssertExpectations(t)
-	worktree.AssertExpectations(t)
 }
 
 func TestUpdateHooks_PreSiteUpdateHandler_NoHooks(t *testing.T) {
@@ -113,7 +130,7 @@ func TestUpdateHooks_PreSiteUpdateHandler_NoHooks(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	mockEvent := services.NewPreSiteUpdateEvent(ctx, testPath, worktree, testSite)
 
-	mockDrush.On("GetUpdateHooks", ctx, testPath, testSite).Return(emptyHooks, nil)
+	mockDrush.EXPECT().GetUpdateHooks(ctx, testPath, testSite).Return(emptyHooks, nil)
 
 	// Execute
 	err := updateHooks.preSiteUpdateHandler(mockEvent)
@@ -121,8 +138,6 @@ func TestUpdateHooks_PreSiteUpdateHandler_NoHooks(t *testing.T) {
 	// Assert
 	assert.NoError(t, err)
 	assert.NotContains(t, updateHooks.hooks, testSite)
-	mockDrush.AssertExpectations(t)
-	worktree.AssertExpectations(t)
 }
 
 func TestUpdateHooks_PreSiteUpdateHandler_Error(t *testing.T) {
@@ -139,7 +154,7 @@ func TestUpdateHooks_PreSiteUpdateHandler_Error(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	mockEvent := services.NewPreSiteUpdateEvent(ctx, testPath, worktree, testSite)
 
-	mockDrush.On("GetUpdateHooks", ctx, testPath, testSite).Return(nil, expectedError)
+	mockDrush.EXPECT().GetUpdateHooks(ctx, testPath, testSite).Return(nil, expectedError)
 
 	// Execute
 	err := updateHooks.preSiteUpdateHandler(mockEvent)
@@ -147,6 +162,4 @@ func TestUpdateHooks_PreSiteUpdateHandler_Error(t *testing.T) {
 	// Assert
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to get update hooks")
-	mockDrush.AssertExpectations(t)
-	worktree.AssertExpectations(t)
 }
