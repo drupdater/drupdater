@@ -86,7 +86,10 @@ func (h *ComposerPatches1) SubscribedEvents() map[string]interface{} {
 }
 
 func (h *ComposerPatches1) RenderTemplate() (string, error) {
-	return h.Render("composerpatches.go.tmpl", h.patchUpdates)
+	if len(h.patchUpdates.Removed) == 0 && len(h.patchUpdates.Updated) == 0 && len(h.patchUpdates.Conflicts) == 0 {
+		return "", nil
+	}
+	return h.Render("composer_patches_1.go.tmpl", h.patchUpdates)
 }
 
 func (h *ComposerPatches1) preComposerUpdateHandler(e event.Event) error {

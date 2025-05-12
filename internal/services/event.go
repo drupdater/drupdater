@@ -6,6 +6,14 @@ import (
 	"github.com/gookit/event"
 )
 
+type AbortError struct {
+	Msg string
+}
+
+func (e AbortError) Error() string {
+	return e.Msg
+}
+
 type BasicAddonEvent struct {
 	ctx      context.Context
 	path     string

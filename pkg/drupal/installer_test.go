@@ -12,7 +12,7 @@ import (
 )
 
 func TestInstallDrupal(t *testing.T) {
-
+	// Setup common test data
 	logger := zap.NewNop()
 	fs := afero.NewMemMapFs()
 
@@ -43,6 +43,7 @@ profile: thunder
 	}
 
 	t.Run("Success", func(t *testing.T) {
+		// Setup mocks
 		drush := NewMockDrush(t)
 		drush.EXPECT().InstallSite(mock.Anything, "/tmp", "site1").Return(nil)
 		drush.EXPECT().GetConfigSyncDir(mock.Anything, "/tmp", "site1", false).Return(configSyncDir, nil)
@@ -56,12 +57,14 @@ profile: thunder
 			composer: composer,
 			fs:       fs,
 		}
+
+		// Execute
 		err := installer.Install(t.Context(), "/tmp", "site1")
 		if err != nil {
 			t.Fatalf("Failed to install Drupal: %v", err)
 		}
 
-		// Read the updated file content
+		// Assert
 		settingsContent, err := afero.ReadFile(fs, settingsPath)
 		if err != nil {
 			t.Fatalf("Failed to read updated content from settings.php: %v", err)
@@ -79,16 +82,13 @@ $settings['file_private_path'] = '/private/site1';
 $settings['hash_salt'] = 'changeme';
 `
 
-		// Check if the SQLite module was added correctly
 		if string(settingsContent) != updatedContent {
-			t.Fatalf("Expected content: %s, got: %s", updatedContent, settingsContent)
+			t.Fatalf("Expected content: %s, got: %s", updatedContent, string(settingsContent))
 		}
-
-		drush.AssertExpectations(t)
-		composer.AssertExpectations(t)
 	})
 
 	t.Run("Failure", func(t *testing.T) {
+		// Setup mocks
 		drush := NewMockDrush(t)
 		drush.EXPECT().InstallSite(mock.Anything, "/tmp", "site1").Return(errors.New("failed to install site"))
 		drush.EXPECT().GetConfigSyncDir(mock.Anything, "/tmp", "site1", false).Return(configSyncDir, nil)
@@ -102,19 +102,19 @@ $settings['hash_salt'] = 'changeme';
 			composer: composer,
 			fs:       fs,
 		}
+
+		// Execute
 		err := installer.Install(t.Context(), "/tmp", "site1")
+
+		// Assert
 		if err == nil {
 			t.Fatalf("Expected an error but got nil")
 		}
-
-		drush.AssertExpectations(t)
-		composer.AssertExpectations(t)
 	})
-
 }
 
 func TestAddSqliteModule(t *testing.T) {
-
+	// Setup
 	logger := zap.NewNop()
 	drush := NewMockDrush(t)
 	fs := afero.NewMemMapFs()
@@ -147,20 +147,20 @@ profile: thunder
 		t.Fatalf("Failed to close temp file: %v", err)
 	}
 
+	drush.EXPECT().GetConfigSyncDir(mock.Anything, "/tmp", "default", false).Return("/tmp", nil)
+
 	installer := &Installer{
 		logger: logger,
 		drush:  drush,
 		fs:     fs,
 	}
 
-	drush.On("GetConfigSyncDir", mock.Anything, "/tmp", "default", false).Return("/tmp", nil)
-
-	// Call the function to add the SQLite module
+	// Execute
 	if err := installer.addSqliteModule(t.Context(), "/tmp", "default"); err != nil {
 		t.Fatalf("Failed to add SQLite module: %v", err)
 	}
 
-	// Read the updated file content
+	// Assert
 	updatedContent, err := afero.ReadFile(fs, tempFile.Name())
 	if err != nil {
 		t.Fatalf("Failed to read updated content from temp file: %v", err)
@@ -188,7 +188,7 @@ profile: thunder
 }
 
 func TestRemoveProfile(t *testing.T) {
-
+	// Setup
 	logger := zap.NewNop()
 	drush := NewMockDrush(t)
 	fs := afero.NewMemMapFs()
@@ -221,19 +221,20 @@ profile: standard
 		t.Fatalf("Failed to close temp file: %v", err)
 	}
 
+	drush.EXPECT().GetConfigSyncDir(mock.Anything, "/tmp", "default", false).Return("/tmp", nil)
+
 	installer := &Installer{
 		logger: logger,
 		drush:  drush,
 		fs:     fs,
 	}
 
-	drush.On("GetConfigSyncDir", mock.Anything, "/tmp", "default", false).Return("/tmp", nil)
-
-	// Call the function to add the SQLite module
+	// Execute
 	if err := installer.RemoveProfile(t.Context(), "/tmp", "default"); err != nil {
 		t.Fatalf("Failed to remove profile: %v", err)
 	}
 
+	// Assert
 	expectedContent := `
 _core:
   default_config_hash: 4GIX5Esnc_umpXUBj4IIocRX7Mt5fPhm4AgXfE3E56E
@@ -245,15 +246,12 @@ theme:
   gin: 0
 `
 
-	// Read the updated file content
 	updatedContent, err := afero.ReadFile(fs, tempFile.Name())
 	if err != nil {
 		t.Fatalf("Failed to read updated content from temp file: %v", err)
 	}
 
 	if string(updatedContent) != expectedContent {
-		t.Fatalf("Expected content: %s, got: %s", expectedContent, updatedContent)
+		t.Fatalf("Expected content: %s, got: %s", expectedContent, string(updatedContent))
 	}
-
-	drush.AssertExpectations(t)
 }

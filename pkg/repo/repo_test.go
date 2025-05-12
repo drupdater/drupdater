@@ -16,6 +16,7 @@ type mockWorktree struct {
 }
 
 func TestIsSomethingStaged(t *testing.T) {
+	// Setup
 	logger := zap.NewNop()
 	service := NewGitRepositoryService(logger)
 
@@ -47,7 +48,7 @@ func TestIsSomethingStaged(t *testing.T) {
 			expected: true,
 		},
 		{
-			name: "something staged",
+			name: "something staged in directory",
 			worktree: mockWorktree{
 				status: git.Status{
 					"foo/file1.txt": &git.FileStatus{Staging: git.Modified},
@@ -58,7 +59,7 @@ func TestIsSomethingStaged(t *testing.T) {
 			expected: true,
 		},
 		{
-			name: "nothing staged",
+			name: "nothing staged in root",
 			worktree: mockWorktree{
 				status: git.Status{
 					"foo/file1.txt": &git.FileStatus{Staging: git.Unmodified},
@@ -69,7 +70,7 @@ func TestIsSomethingStaged(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "nothing staged",
+			name: "nothing staged in specific directory",
 			worktree: mockWorktree{
 				status: git.Status{
 					"bar/file1.txt": &git.FileStatus{Staging: git.Modified},
@@ -92,9 +93,14 @@ func TestIsSomethingStaged(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Setup mock for each test case
 			worktree := NewMockWorktree(t)
-			worktree.On("Status").Return(tt.worktree.status, tt.worktree.err)
+			worktree.EXPECT().Status().Return(tt.worktree.status, tt.worktree.err)
+
+			// Execute
 			result := service.IsSomethingStagedInPath(worktree, tt.worktree.dir)
+
+			// Assert
 			assert.Equal(t, tt.expected, result)
 		})
 	}

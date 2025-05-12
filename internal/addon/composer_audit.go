@@ -93,8 +93,7 @@ func (ca *ComposerAudit) preComposerUpdateHandler(e event.Event) error {
 	evt.MinimalChanges = true
 
 	if len(packagesToUpdate) == 0 {
-		ca.logger.Warn("no security advisories found, skipping security update")
-		evt.Abort(true)
+		return services.AbortError{Msg: "No security advisories found"}
 	}
 
 	return nil

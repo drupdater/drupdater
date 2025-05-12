@@ -31,3 +31,4 @@ The following patches were removed as they are no longer needed:
   - Description: description
   - Patch: `patch3`
   - Reason: Patch is not compatible with the new version 3.0 and a newer patch that is compatible with the new version is not available
+

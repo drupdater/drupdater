@@ -43,6 +43,9 @@ func (uh *UpdateHooks) SubscribedEvents() map[string]interface{} {
 
 // RenderTemplate returns the rendered template for this addon
 func (uh *UpdateHooks) RenderTemplate() (string, error) {
+	if len(uh.hooks) == 0 {
+		return "", nil
+	}
 	return uh.Render("update_hooks.go.tmpl", uh.hooks)
 }
 
