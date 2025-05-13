@@ -362,6 +362,9 @@ func (ws *WorkflowBaseService) publishWork(repository GitRepository, updateBranc
 			Username: "du", // yes, this can be anything except an empty string
 			Password: ws.config.Token,
 		},
+		Options: map[string]string{
+			"ci.skip": "",
+		},
 	})
 
 	if err != nil {
