@@ -67,7 +67,6 @@ Drupdater supports the following flags:
 - `--branch`: The branch to update (default: `main`).
 - `--sites`: A list of Drupal site directories to update (default: `default`).
 - `--security`: Only update vulnerable dependencies.
-- `--auto-merge`: Automatically merge the update branch if set to `true`.
 - `--skip-cbf`: Skip running `phpcbf` for fixing code style issues.
 - `--skip-rector`: Skip running `drupal-rector` for removing deprecated code.
 - `--dry-run`: Perform a dry run without creating branches or merge requests.

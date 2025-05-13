@@ -1,21 +1,36 @@
 # Development
 
-## Build mocks
+This document provides instructions for developers working on the Drupdater project.
 
-To build mocks, you need `mockery`:
+## Using the Makefile
 
-```bash
-docker run -v "$PWD":/src -w /src -e GOFLAGS="-buildvcs=false" vektra/mockery:3.2
-```
-
-## Execute tests
+The project includes a Makefile to simplify common development tasks:
 
 ```bash
-go test -v ./...
-```
+# Build the binary
+make build
 
-## Execute programm
+# Run tests
+make test
 
-```bash
-go run main.go <repository> <token> 
+# Generate mocks
+make mock
+
+# Run linters
+make fmt lint
+
+# Run the application
+make run REPO=<repository_url> TOKEN=<your_token>
+
+# Build Docker image
+make docker-build
+
+# Run using Docker
+make docker-run REPO=<repository_url> TOKEN=<your_token>
+
+# Update dependencies
+make update
+
+# Get help on available commands
+make help
 ```

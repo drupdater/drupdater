@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"errors"
+	"net/url"
 	"os"
 
 	"github.com/drupdater/drupdater/internal"
@@ -31,6 +32,18 @@ var rootCmd = &cobra.Command{
 	Short: "Drupal Updater",
 	Long:  `Drupal Updater is a tool to update Drupal dependencies and create merge requests.`,
 	Args:  cobra.ExactArgs(2),
+	PreRunE: func(_ *cobra.Command, args []string) error {
+		// Validate command line arguments
+		if len(args) != 2 {
+			return errors.New("repository URL and token are required")
+		}
+		// Validate that repository URL is a valid URL
+		_, err := url.ParseRequestURI(args[0])
+		if err != nil {
+			return errors.New("invalid repository URL")
+		}
+		return nil
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Silence default error handling
 		cmd.SilenceUsage = true
@@ -118,7 +131,6 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&config.Branch, "branch", "main", "Branch")
 	rootCmd.PersistentFlags().StringArrayVar(&config.Sites, "sites", []string{"default"}, "Sites")
 	rootCmd.PersistentFlags().BoolVar(&config.Security, "security", false, "Only security updates. If true, only security updates will be applied.")
-	rootCmd.PersistentFlags().BoolVar(&config.AutoMerge, "auto-merge", false, "Auto merge. If true, the merge request will be merged automatically.")
 	rootCmd.PersistentFlags().BoolVar(&config.SkipCBF, "skip-cbf", false, "Skip CBF. If true, the PHPCBF will not be run.")
 	rootCmd.PersistentFlags().BoolVar(&config.SkipRector, "skip-rector", false, "Skip Rector. If true, the Rector will not run to remove deprecated code.")
 	rootCmd.PersistentFlags().BoolVar(&config.DryRun, "dry-run", false, "Dry run. If true, no branch and merge request will be created.")

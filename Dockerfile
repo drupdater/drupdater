@@ -1,7 +1,7 @@
 ARG PHP_VERSION=8.3
 
 # Build go binary.
-FROM golang:1.24.2-bookworm AS build
+FROM golang:1.24.3-bookworm AS build
 
 RUN mkdir -p /build/
 
@@ -10,8 +10,8 @@ COPY . /build/
 
 WORKDIR /build/
 
-RUN go env -w GOCACHE=/go-cache
-RUN go env -w GOMODCACHE=/gomod-cache
+RUN go env -w GOCACHE=/go-cache; \
+    go env -w GOMODCACHE=/gomod-cache
 
 RUN --mount=type=cache,target=/gomod-cache go mod download
 RUN --mount=type=cache,target=/gomod-cache --mount=type=cache,target=/go-cache GOOS=linux go build -o /build/drupdater .
@@ -20,7 +20,7 @@ RUN --mount=type=cache,target=/gomod-cache --mount=type=cache,target=/go-cache G
 # Build php image.
 FROM php:${PHP_VERSION}-cli-bookworm AS base
 
-RUN echo "memory_limit = -1" > $PHP_INI_DIR/conf.d/memory-limit.ini
+RUN echo "memory_limit = -1" > "$PHP_INI_DIR/conf.d/memory-limit.ini"
 
 COPY --from=ghcr.io/mlocati/php-extension-installer:2 /usr/bin/install-php-extensions /usr/local/bin/
 RUN install-php-extensions pdo_mysql gd zip imagick intl
