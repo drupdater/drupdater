@@ -3,6 +3,7 @@ package repo
 import (
 	"crypto/md5"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -110,8 +111,11 @@ func (rs *GitRepositoryService) BranchExists(repository Repository, branch strin
 
 	for {
 		ref, err := remoteRefs.Next()
+		if err == io.EOF {
+			break
+		}
 		if err != nil {
-			break // End of refs
+			return false, fmt.Errorf("iterating remote refs: %w", err)
 		}
 
 		if ref.Name().String() == remoteBranchRef {
