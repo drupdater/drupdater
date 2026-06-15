@@ -30,9 +30,9 @@ func NewCLI(logger *zap.Logger, cache otter.Cache[string, string]) *CLI {
 func (e *CLI) execDrush(ctx context.Context, dir string, site string, args ...string) (string, error) {
 	command := execCommand(ctx, "composer", append([]string{"exec", "--", "drush"}, args...)...)
 	command.Dir = dir
-	// os.Environ() preserves the current environment variables
-	command.Env = append(command.Env, "SITE_NAME="+site)
-	command.Env = append(command.Env, os.Environ()...)
+	// System env first, then our override so SITE_NAME always wins even if
+	// the parent process has SITE_NAME set in its environment.
+	command.Env = append(os.Environ(), "SITE_NAME="+site)
 
 	out, err := command.CombinedOutput()
 	output := strings.TrimSuffix(string(out), "\n")

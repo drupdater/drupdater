@@ -19,12 +19,14 @@ func TestExecDrush(t *testing.T) {
 	executor := NewCLI(logger, cache)
 
 	t.Run("successful execution", func(t *testing.T) {
+		// execDrush builds cmd.Env from os.Environ(), so control vars must be
+		// in the real process environment via t.Setenv.
+		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
+		t.Setenv("GOCOVERDIR", "/tmp")
 		execCommand = func(_ context.Context, name string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", name}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
-			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
-			return cmd
+			return exec.Command(os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
 
@@ -33,13 +35,42 @@ func TestExecDrush(t *testing.T) {
 		assert.Equal(t, "[composer exec -- drush status]", output)
 	})
 
-	t.Run("execution failure", func(t *testing.T) {
+	t.Run("SITE_NAME override wins over inherited env", func(t *testing.T) {
+		// Ensure that even when SITE_NAME is already present in the process
+		// environment, our value is the last (and therefore winning) entry.
+		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
+		t.Setenv("GOCOVERDIR", "/tmp")
+		t.Setenv("SITE_NAME", "inherited_site")
+
+		// Capture the *exec.Cmd that execDrush builds so we can inspect its
+		// Env slice after execDrush has mutated it.
+		var cmdRef *exec.Cmd
 		execCommand = func(_ context.Context, name string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", name}
 			cs = append(cs, arg...)
 			cmd := exec.Command(os.Args[0], cs...)
-			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
+			cmdRef = cmd
 			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+
+		_, err := executor.execDrush(t.Context(), "/tmp", "expected_site", "status")
+		assert.NoError(t, err)
+
+		// The last element must be our intended SITE_NAME, not the inherited one.
+		assert.NotNil(t, cmdRef)
+		last := cmdRef.Env[len(cmdRef.Env)-1]
+		assert.Equal(t, "SITE_NAME=expected_site", last, "SITE_NAME must be the last env entry so it wins over any inherited value")
+	})
+
+	t.Run("execution failure", func(t *testing.T) {
+		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
+		t.Setenv("GO_HELPER_PROCESS_ERROR", "1")
+		t.Setenv("GOCOVERDIR", "/tmp")
+		execCommand = func(_ context.Context, name string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", name}
+			cs = append(cs, arg...)
+			return exec.Command(os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
 
@@ -81,12 +112,13 @@ func TestGetUpdateHooks(t *testing.T) {
 					}
 				}`
 
+		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
+		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
+		t.Setenv("GOCOVERDIR", "/tmp")
 		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", data}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
-			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_RAW=1", "GOCOVERDIR=/tmp"}
-			return cmd
+			return exec.Command(os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
 
@@ -133,12 +165,12 @@ func TestGetUpdateHooks(t *testing.T) {
 	t.Run("No updates", func(t *testing.T) {
 		data := ` [success] No database updates required.`
 
+		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
+		t.Setenv("GOCOVERDIR", "/tmp")
 		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", data}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
-			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
-			return cmd
+			return exec.Command(os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
 
