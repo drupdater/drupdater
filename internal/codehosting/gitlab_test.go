@@ -125,3 +125,65 @@ func TestDownloadComposerFiles(t *testing.T) {
 	_, err = gitlab.fs.Stat(dir + "/composer.lock")
 	assert.NoError(t, err)
 }
+
+func TestGetUser_ReturnsEmptyStringsOnError(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer mockServer.Close()
+
+	client, _ := gitlab.NewClient("bad-token", gitlab.WithBaseURL(mockServer.URL))
+
+	g := &Gitlab{
+		client:      client,
+		projectPath: "test_project",
+		fs:          afero.NewMemMapFs(),
+	}
+
+	name, email := g.GetUser()
+	assert.Equal(t, "", name)
+	assert.Equal(t, "", email)
+}
+
+func TestDownloadComposerFiles_ReturnsEmptyOnComposerJsonError(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer mockServer.Close()
+
+	client, _ := gitlab.NewClient("", gitlab.WithBaseURL(mockServer.URL))
+
+	g := &Gitlab{
+		client:      client,
+		projectPath: "test_project",
+		fs:          afero.NewMemMapFs(),
+	}
+
+	dir := g.DownloadComposerFiles("main")
+	assert.Empty(t, dir)
+}
+
+func TestDownloadComposerFiles_ReturnsEmptyOnComposerLockError(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/api/v4/projects/test_project/repository/files/composer.json/raw":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("{}"))
+		default:
+			w.WriteHeader(http.StatusServiceUnavailable)
+		}
+	}))
+	defer mockServer.Close()
+
+	client, _ := gitlab.NewClient("", gitlab.WithBaseURL(mockServer.URL))
+
+	g := &Gitlab{
+		client:      client,
+		projectPath: "test_project",
+		fs:          afero.NewMemMapFs(),
+	}
+
+	dir := g.DownloadComposerFiles("main")
+	assert.Empty(t, dir)
+}
