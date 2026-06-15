@@ -7,6 +7,7 @@ import (
 	"embed"
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
 	"sync"
 	"text/template"
@@ -73,7 +74,7 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []interna
 
 	defer func() {
 		// Clean up the temporary directory
-		tmpDirName := fmt.Sprintf("/tmp/%x", md5.Sum([]byte(ws.config.RepositoryURL)))
+		tmpDirName := filepath.Join(os.TempDir(), fmt.Sprintf("%x", md5.Sum([]byte(ws.config.RepositoryURL))))
 		os.RemoveAll(tmpDirName)
 
 		cancel()
