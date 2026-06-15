@@ -1,13 +1,32 @@
 package repo
 
 import (
+	"errors"
 	"testing"
 
 	git "github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/storer"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
+
+// errorReferenceIter is a storer.ReferenceIter that always returns an error from Next.
+type errorReferenceIter struct {
+	err error
+}
+
+func (e *errorReferenceIter) Next() (*plumbing.Reference, error) {
+	return nil, e.err
+}
+
+func (e *errorReferenceIter) ForEach(func(*plumbing.Reference) error) error {
+	return e.err
+}
+
+func (e *errorReferenceIter) Close() {}
 
 type mockWorktree struct {
 	status git.Status
@@ -104,4 +123,67 @@ func TestIsSomethingStaged(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+func TestBranchExists(t *testing.T) {
+	logger := zap.NewNop()
+	service := NewGitRepositoryService(logger)
+
+	const targetBranch = "my-feature"
+	const remoteBranchRef = "refs/remotes/origin/my-feature"
+	const otherRef = "refs/remotes/origin/main"
+
+	t.Run("branch found", func(t *testing.T) {
+		refs := []*plumbing.Reference{
+			plumbing.NewReferenceFromStrings(otherRef, "abc123"),
+			plumbing.NewReferenceFromStrings(remoteBranchRef, "def456"),
+		}
+		iter := storer.NewReferenceSliceIter(refs)
+
+		repo := NewMockRepository(t)
+		repo.EXPECT().References().Return(iter, nil)
+
+		found, err := service.BranchExists(repo, targetBranch)
+		require.NoError(t, err)
+		assert.True(t, found)
+	})
+
+	t.Run("branch not found", func(t *testing.T) {
+		refs := []*plumbing.Reference{
+			plumbing.NewReferenceFromStrings(otherRef, "abc123"),
+		}
+		iter := storer.NewReferenceSliceIter(refs)
+
+		repo := NewMockRepository(t)
+		repo.EXPECT().References().Return(iter, nil)
+
+		found, err := service.BranchExists(repo, targetBranch)
+		require.NoError(t, err)
+		assert.False(t, found)
+	})
+
+	t.Run("iterator error", func(t *testing.T) {
+		iterErr := errors.New("storage corruption")
+		iter := &errorReferenceIter{err: iterErr}
+
+		repo := NewMockRepository(t)
+		repo.EXPECT().References().Return(iter, nil)
+
+		found, err := service.BranchExists(repo, targetBranch)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, iterErr)
+		assert.False(t, found)
+	})
+
+	t.Run("references error", func(t *testing.T) {
+		refsErr := errors.New("network failure")
+
+		repo := NewMockRepository(t)
+		repo.EXPECT().References().Return(nil, refsErr)
+
+		found, err := service.BranchExists(repo, targetBranch)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, refsErr)
+		assert.False(t, found)
+	})
 }
