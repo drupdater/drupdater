@@ -273,6 +273,9 @@ func (s *CLI) GetInstalledPackageVersion(ctx context.Context, dir string, packag
 		return "", err
 	}
 
+	if len(composerShow.Versions) == 0 {
+		return "", fmt.Errorf("no versions found for package %s", packageName)
+	}
 	return composerShow.Versions[0], nil
 }
 
@@ -341,6 +344,10 @@ func (s *CLI) initTempDir() {
 	s.initErr = afero.WriteFile(s.fs, s.tempDir+"/composer.json", []byte(composerJSON), 0644)
 }
 
+type patchTestConfig struct {
+	Patches map[string]map[string]string `json:"patches"`
+}
+
 func (s *CLI) CheckIfPatchApplies(ctx context.Context, packageName string, packageVersion string, patchPath string) (bool, error) {
 
 	s.initOnce.Do(s.initTempDir)
@@ -348,14 +355,20 @@ func (s *CLI) CheckIfPatchApplies(ctx context.Context, packageName string, packa
 		return false, s.initErr
 	}
 
-	// Create a composer.patches.json file
-	patchesJSON := `{
-	"patches": {
-		"` + packageName + `": {
-			"` + packageVersion + `": "` + patchPath + `"
-		}
+	// Create a composer.patches.json file using json.Marshal to safely handle
+	// special characters in packageName, packageVersion, and patchPath.
+	patchConfig := patchTestConfig{
+		Patches: map[string]map[string]string{
+			packageName: {
+				packageVersion: patchPath,
+			},
+		},
 	}
-}`
+	patchesJSONBytes, err := json.Marshal(patchConfig)
+	if err != nil {
+		return false, fmt.Errorf("failed to marshal patch config: %w", err)
+	}
+	patchesJSON := string(patchesJSONBytes)
 
 	// Write the composer.patches.json file to the temporary directory
 	if err := afero.WriteFile(s.fs, s.tempDir+"/composer.patches.json", []byte(patchesJSON), 0644); err != nil {
