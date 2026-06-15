@@ -269,6 +269,48 @@ func TestGetComposerLockHash(t *testing.T) {
 	assert.Equal(t, "d3d29b1f6a1d8f2c3b9b8e1e4f5f9e3e", hash)
 }
 
+func TestGetInstalledPackageVersion(t *testing.T) {
+
+	service := &CLI{
+		logger: zap.NewNop(),
+	}
+
+	t.Run("returns version when versions array is non-empty", func(t *testing.T) {
+		data := `{"versions":["1.2.3"]}`
+
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", data}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+
+		version, err := service.GetInstalledPackageVersion(t.Context(), "/tmp", "drupal/core")
+		assert.NoError(t, err)
+		assert.Equal(t, "1.2.3", version)
+	})
+
+	t.Run("returns error when versions array is empty", func(t *testing.T) {
+		data := `{"versions":[]}`
+
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", data}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+
+		version, err := service.GetInstalledPackageVersion(t.Context(), "/tmp", "drupal/core")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "no versions found for package drupal/core")
+		assert.Empty(t, version)
+	})
+}
+
 func TestCheckPatchApplies(t *testing.T) {
 
 	t.Run("Patch applies", func(t *testing.T) {
