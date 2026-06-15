@@ -258,8 +258,7 @@ func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context) (SharedUpda
 		return SharedUpdate{}, fmt.Errorf("failed to update dependencies: %w", err)
 	}
 	if len(changes) == 0 {
-		ws.logger.Warn("no changes detected")
-		return SharedUpdate{}, nil
+		return SharedUpdate{}, AbortError{Msg: "no changes detected"}
 	}
 
 	postComposerUpdateEvent := NewPostComposerUpdateEvent(ctx, path, worktree)
