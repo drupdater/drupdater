@@ -2,6 +2,8 @@ package addon
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/drupdater/drupdater/internal"
@@ -14,6 +16,149 @@ import (
 	"github.com/stretchr/testify/mock"
 	"go.uber.org/zap"
 )
+
+func TestCreatePHPCSConfig(t *testing.T) {
+	logger := zap.NewNop()
+
+	t.Run("Returns error when os.Create fails", func(t *testing.T) {
+		composer := NewMockComposer(t)
+		worktree := NewMockWorktree(t)
+
+		cb := NewCodeBeautifier(logger, nil, internal.Config{}, composer)
+
+		// Use a path that cannot be written to (root-owned directory)
+		_, err := cb.CreatePHPCSConfig(context.Background(), "/proc/nonexistent", worktree)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to create phpcs.xml")
+	})
+
+	t.Run("Returns false and no error when no custom code directories found", func(t *testing.T) {
+		composer := NewMockComposer(t)
+		worktree := NewMockWorktree(t)
+
+		tmpDir := t.TempDir()
+
+		composer.EXPECT().GetInstalledPackageVersion(mock.Anything, tmpDir, "drupal/core").Return("10.1.0", nil)
+		composer.EXPECT().GetCustomCodeDirectories(mock.Anything, tmpDir).Return([]string{}, nil)
+
+		cb := NewCodeBeautifier(logger, nil, internal.Config{}, composer)
+
+		created, err := cb.CreatePHPCSConfig(context.Background(), tmpDir, worktree)
+		assert.NoError(t, err)
+		assert.False(t, created)
+	})
+
+	t.Run("Creates phpcs.xml and commits when custom code directories found", func(t *testing.T) {
+		composer := NewMockComposer(t)
+		worktree := NewMockWorktree(t)
+
+		tmpDir := t.TempDir()
+
+		composer.EXPECT().GetInstalledPackageVersion(mock.Anything, tmpDir, "drupal/core").Return("10.1.0", nil)
+		composer.EXPECT().GetCustomCodeDirectories(mock.Anything, tmpDir).Return([]string{"web/modules/custom"}, nil)
+		worktree.EXPECT().Add("phpcs.xml").Return(plumbing.NewHash(""), nil)
+		worktree.EXPECT().Commit("Add PHPCS config", &git.CommitOptions{}).Return(plumbing.NewHash(""), nil)
+
+		cb := NewCodeBeautifier(logger, nil, internal.Config{}, composer)
+
+		created, err := cb.CreatePHPCSConfig(context.Background(), tmpDir, worktree)
+		assert.NoError(t, err)
+		assert.True(t, created)
+	})
+
+	t.Run("Returns error when template parsing fails", func(t *testing.T) {
+		composer := NewMockComposer(t)
+		worktree := NewMockWorktree(t)
+
+		tmpDir := t.TempDir()
+
+		oldTemplate := phpcsTemplateStr
+		phpcsTemplateStr = "{{ invalid template syntax"
+		defer func() { phpcsTemplateStr = oldTemplate }()
+
+		cb := NewCodeBeautifier(logger, nil, internal.Config{}, composer)
+
+		_, err := cb.CreatePHPCSConfig(context.Background(), tmpDir, worktree)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to parse phpcs template")
+	})
+
+	t.Run("Returns error when template execution fails", func(t *testing.T) {
+		if _, statErr := os.Stat("/dev/full"); os.IsNotExist(statErr) {
+			t.Skip("/dev/full not available")
+		}
+
+		composer := NewMockComposer(t)
+		worktree := NewMockWorktree(t)
+
+		tmpDir := t.TempDir()
+
+		// Symlink phpcs.xml to /dev/full so any write fails with ENOSPC
+		if err := os.Symlink("/dev/full", filepath.Join(tmpDir, "phpcs.xml")); err != nil {
+			t.Skip("cannot create symlink to /dev/full: " + err.Error())
+		}
+
+		composer.EXPECT().GetInstalledPackageVersion(mock.Anything, tmpDir, "drupal/core").Return("10.1.0", nil)
+		composer.EXPECT().GetCustomCodeDirectories(mock.Anything, tmpDir).Return([]string{"web/modules/custom"}, nil)
+
+		cb := NewCodeBeautifier(logger, nil, internal.Config{}, composer)
+
+		_, err := cb.CreatePHPCSConfig(context.Background(), tmpDir, worktree)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to execute phpcs template")
+	})
+
+	t.Run("Returns error when GetCustomCodeDirectories fails", func(t *testing.T) {
+		composer := NewMockComposer(t)
+		worktree := NewMockWorktree(t)
+
+		tmpDir := t.TempDir()
+
+		composer.EXPECT().GetInstalledPackageVersion(mock.Anything, tmpDir, "drupal/core").Return("10.1.0", nil)
+		composer.EXPECT().GetCustomCodeDirectories(mock.Anything, tmpDir).Return(nil, assert.AnError)
+
+		cb := NewCodeBeautifier(logger, nil, internal.Config{}, composer)
+
+		_, err := cb.CreatePHPCSConfig(context.Background(), tmpDir, worktree)
+		assert.Error(t, err)
+		assert.Equal(t, assert.AnError, err)
+	})
+
+	t.Run("Returns error when worktree.Add fails", func(t *testing.T) {
+		composer := NewMockComposer(t)
+		worktree := NewMockWorktree(t)
+
+		tmpDir := t.TempDir()
+
+		composer.EXPECT().GetInstalledPackageVersion(mock.Anything, tmpDir, "drupal/core").Return("10.1.0", nil)
+		composer.EXPECT().GetCustomCodeDirectories(mock.Anything, tmpDir).Return([]string{"web/modules/custom"}, nil)
+		worktree.EXPECT().Add("phpcs.xml").Return(plumbing.NewHash(""), assert.AnError)
+
+		cb := NewCodeBeautifier(logger, nil, internal.Config{}, composer)
+
+		_, err := cb.CreatePHPCSConfig(context.Background(), tmpDir, worktree)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to add file to commit")
+	})
+
+	t.Run("Returns error when worktree.Commit fails", func(t *testing.T) {
+		composer := NewMockComposer(t)
+		worktree := NewMockWorktree(t)
+
+		tmpDir := t.TempDir()
+
+		composer.EXPECT().GetInstalledPackageVersion(mock.Anything, tmpDir, "drupal/core").Return("10.1.0", nil)
+		composer.EXPECT().GetCustomCodeDirectories(mock.Anything, tmpDir).Return([]string{"web/modules/custom"}, nil)
+		worktree.EXPECT().Add("phpcs.xml").Return(plumbing.NewHash(""), nil)
+		worktree.EXPECT().Commit("Add PHPCS config", &git.CommitOptions{}).Return(plumbing.NewHash(""), assert.AnError)
+
+		cb := NewCodeBeautifier(logger, nil, internal.Config{}, composer)
+
+		_, err := cb.CreatePHPCSConfig(context.Background(), tmpDir, worktree)
+		assert.Error(t, err)
+		assert.Equal(t, assert.AnError, err)
+	})
+}
 
 func TestCodingStyles(t *testing.T) {
 	// Create reusable test dependencies

@@ -125,3 +125,119 @@ func TestDownloadComposerFiles(t *testing.T) {
 	_, err = gitlab.fs.Stat(dir + "/composer.lock")
 	assert.NoError(t, err)
 }
+
+func TestGetUser_ReturnsEmptyStringsOnError(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer mockServer.Close()
+
+	client, _ := gitlab.NewClient("bad-token", gitlab.WithBaseURL(mockServer.URL))
+
+	g := &Gitlab{
+		client:      client,
+		projectPath: "test_project",
+		fs:          afero.NewMemMapFs(),
+	}
+
+	name, email := g.GetUser()
+	assert.Equal(t, "", name)
+	assert.Equal(t, "", email)
+}
+
+func TestDownloadComposerFiles_ReturnsEmptyOnComposerJsonError(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer mockServer.Close()
+
+	client, _ := gitlab.NewClient("", gitlab.WithBaseURL(mockServer.URL))
+
+	g := &Gitlab{
+		client:      client,
+		projectPath: "test_project",
+		fs:          afero.NewMemMapFs(),
+	}
+
+	dir := g.DownloadComposerFiles("main")
+	assert.Empty(t, dir)
+}
+
+func TestDownloadComposerFiles_ReturnsEmptyOnComposerLockError(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/api/v4/projects/test_project/repository/files/composer.json/raw":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("{}"))
+		default:
+			w.WriteHeader(http.StatusServiceUnavailable)
+		}
+	}))
+	defer mockServer.Close()
+
+	client, _ := gitlab.NewClient("", gitlab.WithBaseURL(mockServer.URL))
+
+	g := &Gitlab{
+		client:      client,
+		projectPath: "test_project",
+		fs:          afero.NewMemMapFs(),
+	}
+
+	dir := g.DownloadComposerFiles("main")
+	assert.Empty(t, dir)
+}
+
+func TestDownloadComposerFiles_ReturnsEmptyOnTempDirError(t *testing.T) {
+	client, _ := gitlab.NewClient("", gitlab.WithBaseURL("http://localhost"))
+
+	g := &Gitlab{
+		client:      client,
+		projectPath: "test_project",
+		fs:          afero.NewReadOnlyFs(afero.NewMemMapFs()),
+	}
+
+	dir := g.DownloadComposerFiles("main")
+	assert.Empty(t, dir)
+}
+
+func TestDownloadAndWriteFile_ReturnsErrorOnNonOKStatus(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		// 201 is a 2xx success so the client won't return an error, but it's not 200
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte("{}"))
+	}))
+	defer mockServer.Close()
+
+	client, _ := gitlab.NewClient("", gitlab.WithBaseURL(mockServer.URL))
+
+	g := &Gitlab{
+		client:      client,
+		projectPath: "test_project",
+		fs:          afero.NewMemMapFs(),
+	}
+
+	err := g.downloadAndWriteFile("main", "composer.json", "/tmp/dir")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "HTTP status")
+}
+
+func TestDownloadAndWriteFile_ReturnsErrorOnWriteFileFailure(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("{}"))
+	}))
+	defer mockServer.Close()
+
+	client, _ := gitlab.NewClient("", gitlab.WithBaseURL(mockServer.URL))
+
+	g := &Gitlab{
+		client:      client,
+		projectPath: "test_project",
+		fs:          afero.NewReadOnlyFs(afero.NewMemMapFs()),
+	}
+
+	err := g.downloadAndWriteFile("main", "composer.json", "/tmp/dir")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to write")
+}
