@@ -273,6 +273,9 @@ func (s *CLI) GetInstalledPackageVersion(ctx context.Context, dir string, packag
 		return "", err
 	}
 
+	if len(composerShow.Versions) == 0 {
+		return "", fmt.Errorf("no versions found for package %s", packageName)
+	}
 	return composerShow.Versions[0], nil
 }
 
