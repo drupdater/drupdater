@@ -131,13 +131,14 @@ func (cb *CodeBeautifier) CreatePHPCSConfig(ctx context.Context, path string, wo
 
 	tmpl, err := template.New("ruleset").Parse(phpcsTemplate)
 	if err != nil {
-		panic(err)
+		return false, fmt.Errorf("failed to parse phpcs template: %w", err)
 	}
 
 	outputFile, err := os.Create(filepath.Join(path, "phpcs.xml"))
 	if err != nil {
-		panic(err)
+		return false, fmt.Errorf("failed to create phpcs.xml: %w", err)
 	}
+	defer outputFile.Close()
 
 	drupalVersion, _ := cb.composer.GetInstalledPackageVersion(ctx, path, "drupal/core")
 	majorVersion := strings.Split(drupalVersion, ".")[0]
@@ -162,10 +163,8 @@ func (cb *CodeBeautifier) CreatePHPCSConfig(ctx context.Context, path string, wo
 
 	err = tmpl.Execute(outputFile, data)
 	if err != nil {
-		panic(err)
+		return false, fmt.Errorf("failed to execute phpcs template: %w", err)
 	}
-
-	outputFile.Close()
 
 	if _, err := worktree.Add("phpcs.xml"); err != nil {
 		return false, fmt.Errorf("failed to add file to commit: %w", err)
