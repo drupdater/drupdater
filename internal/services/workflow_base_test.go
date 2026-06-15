@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"os"
 	"testing"
 
@@ -138,6 +139,74 @@ func TestStartUpdateWithDryRun(t *testing.T) {
 	repositoryService.AssertExpectations(t)
 	repository.AssertExpectations(t)
 	drush.AssertExpectations(t)
+	mockComposer.AssertExpectations(t)
+	vcsProvider.AssertExpectations(t)
+}
+
+func TestStartUpdateSiteInstallError(t *testing.T) {
+	// Setup
+	logger := zap.NewNop()
+	installer := NewMockInstaller(t)
+	repositoryService := NewMockRepository(t)
+	vcsProvider := NewMockPlatform(t)
+	repository := NewMockGitRepository(t)
+	mockComposer := NewMockComposer(t)
+	drush := NewMockDrush(t)
+	ctx := context.Background()
+
+	config := internal.Config{
+		RepositoryURL: "https://example.com/repo.git",
+		Branch:        "main",
+		Token:         "token",
+		Sites:         []string{"site1"},
+		DryRun:        false,
+	}
+
+	installErr := errors.New("site install failed")
+
+	// installCode and updateSharedCode both call CloneRepository.
+	// updateSharedCode runs concurrently with installSite; when installSite errors
+	// and cancels the context, updateSharedCode may be at different stages depending
+	// on scheduling. Mark late-stage calls as Maybe() so they are optional.
+	worktree := NewMockWorktree(t)
+	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil).Maybe()
+	worktree.EXPECT().AddGlob(mock.Anything).Return(nil).Maybe()
+	worktree.EXPECT().Checkout(mock.Anything).Return(nil).Maybe()
+
+	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil).Times(2)
+	repositoryService.EXPECT().BranchExists(repository, mock.Anything).Return(false, nil).Maybe()
+
+	vcsProvider.EXPECT().GetUser().Return("user", "mail")
+
+	// composer.Install is called by installCode, composer.Update by updateSharedCode.
+	// GetLockHash and late steps of updateSharedCode may not run if context is cancelled.
+	mockComposer.EXPECT().Install(mock.Anything, "/tmp").Return(nil)
+	mockComposer.EXPECT().Update(mock.Anything, "/tmp", mock.Anything, mock.Anything, false, false).Return([]composer.PackageChange{
+		{
+			Package: "drupal/core",
+			From:    "9.0.0",
+			To:      "9.1.0",
+		},
+	}, nil).Maybe()
+	mockComposer.EXPECT().GetLockHash("/tmp").Return("dummy-hash", nil).Maybe()
+
+	// installer.Install returns an error for site1
+	installer.EXPECT().Install(mock.Anything, "/tmp", "site1").Return(installErr)
+
+	// Execute
+	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
+	err := workflowService.StartUpdate(ctx, nil)
+
+	// Assert: the install error must not be swallowed
+	assert.Error(t, err)
+	assert.ErrorContains(t, err, "site install failed")
+
+	// No push or merge request should be called
+	repository.AssertNotCalled(t, "Push", mock.Anything)
+	vcsProvider.AssertNotCalled(t, "CreateMergeRequest", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+
+	installer.AssertExpectations(t)
+	repositoryService.AssertExpectations(t)
 	mockComposer.AssertExpectations(t)
 	vcsProvider.AssertExpectations(t)
 }

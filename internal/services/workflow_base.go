@@ -210,7 +210,12 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []interna
 
 	select {
 	case <-done:
-
+		// Drain any error a goroutine wrote before its wg.Done()
+		select {
+		case err := <-errCh:
+			return err
+		default:
+		}
 		if !ws.config.DryRun {
 			return ws.publishWork(sharedUpdate.Repository, sharedUpdate.updateBranchName, addons)
 		}
