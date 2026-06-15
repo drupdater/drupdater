@@ -127,7 +127,7 @@ func TestDownloadComposerFiles(t *testing.T) {
 }
 
 func TestGetUser_ReturnsEmptyStringsOnError(t *testing.T) {
-	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 	}))
 	defer mockServer.Close()
@@ -146,7 +146,7 @@ func TestGetUser_ReturnsEmptyStringsOnError(t *testing.T) {
 }
 
 func TestDownloadComposerFiles_ReturnsEmptyOnComposerJsonError(t *testing.T) {
-	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}))
 	defer mockServer.Close()
@@ -202,7 +202,7 @@ func TestDownloadComposerFiles_ReturnsEmptyOnTempDirError(t *testing.T) {
 }
 
 func TestDownloadAndWriteFile_ReturnsErrorOnNonOKStatus(t *testing.T) {
-	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		// 201 is a 2xx success so the client won't return an error, but it's not 200
 		w.WriteHeader(http.StatusCreated)
 		_, _ = w.Write([]byte("{}"))
