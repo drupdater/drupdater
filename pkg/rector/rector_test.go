@@ -15,7 +15,7 @@ func TestRectorRun(t *testing.T) {
 	cli := NewCLI(zap.NewNop())
 
 	t.Run("empty directories skips exec", func(t *testing.T) {
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(_ context.Context, _ string, _ ...string) *exec.Cmd {
 			t.Fatal("exec should not be called with empty directories")
 			return nil
 		}
