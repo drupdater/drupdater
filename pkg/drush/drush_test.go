@@ -159,6 +159,317 @@ func TestGetUpdateHooks(t *testing.T) {
 
 }
 
+func TestInstallSite(t *testing.T) {
+	logger := zap.NewNop()
+	cache, _ := otter.MustBuilder[string, string](100).Build()
+	cli := NewCLI(logger, cache)
+
+	t.Run("success", func(t *testing.T) {
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", "ok"}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_RAW=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+		assert.NoError(t, cli.InstallSite(t.Context(), "/tmp", "default"))
+	})
+
+	t.Run("error", func(t *testing.T) {
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--"}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+		err := cli.InstallSite(t.Context(), "/tmp", "default")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "default")
+	})
+}
+
+func TestGetConfigSyncDir(t *testing.T) {
+	logger := zap.NewNop()
+
+	t.Run("absolute path", func(t *testing.T) {
+		cache, _ := otter.MustBuilder[string, string](100).Build()
+		cli := NewCLI(logger, cache)
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", "/tmp/config/sync"}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_RAW=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+		dir, err := cli.GetConfigSyncDir(t.Context(), "/tmp", "site1", false)
+		assert.NoError(t, err)
+		assert.Equal(t, "/tmp/config/sync", dir)
+	})
+
+	t.Run("relative path", func(t *testing.T) {
+		cache, _ := otter.MustBuilder[string, string](100).Build()
+		cli := NewCLI(logger, cache)
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", "/tmp/config/sync"}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_RAW=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+		dir, err := cli.GetConfigSyncDir(t.Context(), "/tmp", "site1", true)
+		assert.NoError(t, err)
+		assert.Equal(t, "config/sync", dir)
+	})
+
+	t.Run("cache hit", func(t *testing.T) {
+		cache, _ := otter.MustBuilder[string, string](100).Build()
+		cli := NewCLI(logger, cache)
+		callCount := 0
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			callCount++
+			cs := []string{"-test.run=TestHelperProcess", "--", "/cached/path"}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_RAW=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+		v1, _ := cli.GetConfigSyncDir(t.Context(), "/tmp", "site1", false)
+		v2, _ := cli.GetConfigSyncDir(t.Context(), "/tmp", "site1", false)
+		assert.Equal(t, v1, v2)
+		assert.Equal(t, 1, callCount)
+	})
+
+	t.Run("error", func(t *testing.T) {
+		cache, _ := otter.MustBuilder[string, string](100).Build()
+		cli := NewCLI(logger, cache)
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--"}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+		_, err := cli.GetConfigSyncDir(t.Context(), "/tmp", "site1", false)
+		assert.Error(t, err)
+	})
+}
+
+func TestExportConfiguration(t *testing.T) {
+	logger := zap.NewNop()
+	cache, _ := otter.MustBuilder[string, string](100).Build()
+	cli := NewCLI(logger, cache)
+
+	t.Run("success", func(t *testing.T) {
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", "ok"}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_RAW=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+		assert.NoError(t, cli.ExportConfiguration(t.Context(), "/tmp", "site1"))
+	})
+
+	t.Run("error", func(t *testing.T) {
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--"}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+		assert.Error(t, cli.ExportConfiguration(t.Context(), "/tmp", "site1"))
+	})
+}
+
+func TestUpdateSite(t *testing.T) {
+	logger := zap.NewNop()
+	cache, _ := otter.MustBuilder[string, string](100).Build()
+	cli := NewCLI(logger, cache)
+
+	t.Run("success", func(t *testing.T) {
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", "ok"}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_RAW=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+		assert.NoError(t, cli.UpdateSite(t.Context(), "/tmp", "site1"))
+	})
+
+	t.Run("error", func(t *testing.T) {
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--"}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+		assert.Error(t, cli.UpdateSite(t.Context(), "/tmp", "site1"))
+	})
+}
+
+func TestConfigResave(t *testing.T) {
+	logger := zap.NewNop()
+	cache, _ := otter.MustBuilder[string, string](100).Build()
+	cli := NewCLI(logger, cache)
+
+	t.Run("success", func(t *testing.T) {
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", "ok"}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_RAW=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+		assert.NoError(t, cli.ConfigResave(t.Context(), "/tmp", "site1"))
+	})
+
+	t.Run("error", func(t *testing.T) {
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--"}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+		assert.Error(t, cli.ConfigResave(t.Context(), "/tmp", "site1"))
+	})
+}
+
+func TestIsModuleEnabled(t *testing.T) {
+	logger := zap.NewNop()
+	cache, _ := otter.MustBuilder[string, string](100).Build()
+	cli := NewCLI(logger, cache)
+
+	t.Run("enabled", func(t *testing.T) {
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", "mymodule"}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_RAW=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+		enabled, err := cli.IsModuleEnabled(t.Context(), "/tmp", "site1", "mymodule")
+		assert.NoError(t, err)
+		assert.True(t, enabled)
+	})
+
+	t.Run("not enabled", func(t *testing.T) {
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", ""}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_RAW=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+		enabled, err := cli.IsModuleEnabled(t.Context(), "/tmp", "site1", "mymodule")
+		assert.NoError(t, err)
+		assert.False(t, enabled)
+	})
+}
+
+func TestLocalizeTranslations(t *testing.T) {
+	logger := zap.NewNop()
+	cache, _ := otter.MustBuilder[string, string](100).Build()
+	cli := NewCLI(logger, cache)
+
+	t.Run("success", func(t *testing.T) {
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", "ok"}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_RAW=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+		assert.NoError(t, cli.LocalizeTranslations(t.Context(), "/tmp", "site1"))
+	})
+
+	t.Run("error", func(t *testing.T) {
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--"}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+		assert.Error(t, cli.LocalizeTranslations(t.Context(), "/tmp", "site1"))
+	})
+}
+
+func TestGetTranslationPath(t *testing.T) {
+	logger := zap.NewNop()
+
+	t.Run("absolute path", func(t *testing.T) {
+		cache, _ := otter.MustBuilder[string, string](100).Build()
+		cli := NewCLI(logger, cache)
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", "/tmp/translations"}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_RAW=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+		path, err := cli.GetTranslationPath(t.Context(), "/tmp", "site1", false)
+		assert.NoError(t, err)
+		assert.Equal(t, "/tmp/translations", path)
+	})
+
+	t.Run("relative path", func(t *testing.T) {
+		cache, _ := otter.MustBuilder[string, string](100).Build()
+		cli := NewCLI(logger, cache)
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", "/tmp/translations"}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_RAW=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+		path, err := cli.GetTranslationPath(t.Context(), "/tmp", "site1", true)
+		assert.NoError(t, err)
+		assert.Equal(t, "translations", path)
+	})
+
+	t.Run("cache hit", func(t *testing.T) {
+		cache, _ := otter.MustBuilder[string, string](100).Build()
+		cli := NewCLI(logger, cache)
+		callCount := 0
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			callCount++
+			cs := []string{"-test.run=TestHelperProcess", "--", "/cached/translations"}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_RAW=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+		v1, _ := cli.GetTranslationPath(t.Context(), "/tmp", "site1", false)
+		v2, _ := cli.GetTranslationPath(t.Context(), "/tmp", "site1", false)
+		assert.Equal(t, v1, v2)
+		assert.Equal(t, 1, callCount)
+	})
+}
+
 func TestHelperProcess(*testing.T) {
 	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
 		return
