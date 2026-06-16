@@ -160,12 +160,116 @@ func TestCreatePHPCSConfig(t *testing.T) {
 	})
 }
 
+func TestHasPHPCSPathDefinitions(t *testing.T) {
+	t.Run("returns false when neither file exists", func(t *testing.T) {
+		result, err := hasPHPCSPathDefinitions("/nonexistent/path")
+		assert.NoError(t, err)
+		assert.False(t, result)
+	})
+
+	t.Run("returns true when phpcs.xml has file definitions", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		content := `<?xml version="1.0" encoding="UTF-8"?>
+<ruleset name="test">
+    <file>web/modules/custom</file>
+</ruleset>`
+		err := os.WriteFile(filepath.Join(tmpDir, "phpcs.xml"), []byte(content), 0600)
+		assert.NoError(t, err)
+
+		result, err := hasPHPCSPathDefinitions(tmpDir)
+		assert.NoError(t, err)
+		assert.True(t, result)
+	})
+
+	t.Run("returns false when phpcs.xml has no file definitions", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		content := `<?xml version="1.0" encoding="UTF-8"?>
+<ruleset name="test">
+    <rule ref="Drupal"/>
+</ruleset>`
+		err := os.WriteFile(filepath.Join(tmpDir, "phpcs.xml"), []byte(content), 0600)
+		assert.NoError(t, err)
+
+		result, err := hasPHPCSPathDefinitions(tmpDir)
+		assert.NoError(t, err)
+		assert.False(t, result)
+	})
+
+	t.Run("returns true when phpcs.xml.dist has file definitions", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		content := `<?xml version="1.0" encoding="UTF-8"?>
+<ruleset name="test">
+    <file>web/themes/custom</file>
+</ruleset>`
+		err := os.WriteFile(filepath.Join(tmpDir, "phpcs.xml.dist"), []byte(content), 0600)
+		assert.NoError(t, err)
+
+		result, err := hasPHPCSPathDefinitions(tmpDir)
+		assert.NoError(t, err)
+		assert.True(t, result)
+	})
+
+	t.Run("returns error when phpcs.xml is not valid XML", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		err := os.WriteFile(filepath.Join(tmpDir, "phpcs.xml"), []byte("not valid xml"), 0600)
+		assert.NoError(t, err)
+
+		result, err := hasPHPCSPathDefinitions(tmpDir)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to parse phpcs config")
+		assert.False(t, result)
+	})
+}
+
 func TestCodingStyles(t *testing.T) {
 	// Create reusable test dependencies
 	logger := zap.NewNop()
 	worktree := NewMockWorktree(t)
 
 	// Subtests using table-driven approach
+	t.Run("Config file exists but no path definitions", func(t *testing.T) {
+		fileExists = func(_ string) bool {
+			return true
+		}
+		oldFn := hasPHPCSPathDefinitions
+		hasPHPCSPathDefinitions = func(_ string) (bool, error) {
+			return false, nil
+		}
+		defer func() { hasPHPCSPathDefinitions = oldFn }()
+
+		runner := NewMockPHPCS(t)
+		composer := NewMockComposer(t)
+
+		updateCodingStyles := NewCodeBeautifier(logger, runner, internal.Config{SkipCBF: false}, composer)
+		postCodeUpdate := services.NewPostCodeUpdateEvent(t.Context(), "/tmp", worktree)
+
+		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
+		assert.NoError(t, err)
+
+		runner.AssertExpectations(t)
+		composer.AssertExpectations(t)
+	})
+
+	t.Run("Config file exists but hasPHPCSPathDefinitions returns error", func(t *testing.T) {
+		fileExists = func(_ string) bool {
+			return true
+		}
+		oldFn := hasPHPCSPathDefinitions
+		hasPHPCSPathDefinitions = func(_ string) (bool, error) {
+			return false, assert.AnError
+		}
+		defer func() { hasPHPCSPathDefinitions = oldFn }()
+
+		runner := NewMockPHPCS(t)
+		composer := NewMockComposer(t)
+
+		updateCodingStyles := NewCodeBeautifier(logger, runner, internal.Config{SkipCBF: false}, composer)
+		postCodeUpdate := services.NewPostCodeUpdateEvent(t.Context(), "/tmp", worktree)
+
+		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
+		assert.Error(t, err)
+	})
+
 	t.Run("No config file found", func(t *testing.T) {
 		// Setup test environment
 		fileExists = func(_ string) bool {
@@ -209,6 +313,9 @@ func TestCodingStyles(t *testing.T) {
 		fileExists = func(_ string) bool {
 			return true
 		}
+		oldFn := hasPHPCSPathDefinitions
+		hasPHPCSPathDefinitions = func(_ string) (bool, error) { return true, nil }
+		defer func() { hasPHPCSPathDefinitions = oldFn }()
 
 		runner := NewMockPHPCS(t)
 		runner.EXPECT().Run(mock.Anything, "/tmp").Return(phpcs.ReturnOutput{
@@ -240,6 +347,9 @@ func TestCodingStyles(t *testing.T) {
 		fileExists = func(_ string) bool {
 			return true
 		}
+		oldFn := hasPHPCSPathDefinitions
+		hasPHPCSPathDefinitions = func(_ string) (bool, error) { return true, nil }
+		defer func() { hasPHPCSPathDefinitions = oldFn }()
 
 		runner := NewMockPHPCS(t)
 		runner.EXPECT().Run(mock.Anything, "/path/to/repo").Return(phpcs.ReturnOutput{
@@ -266,6 +376,9 @@ func TestCodingStyles(t *testing.T) {
 		fileExists = func(_ string) bool {
 			return true
 		}
+		oldFn := hasPHPCSPathDefinitions
+		hasPHPCSPathDefinitions = func(_ string) (bool, error) { return true, nil }
+		defer func() { hasPHPCSPathDefinitions = oldFn }()
 
 		runner := NewMockPHPCS(t)
 		runner.EXPECT().Run(mock.Anything, "/path/to/repo").Return(phpcs.ReturnOutput{
@@ -314,6 +427,9 @@ func TestCodingStyles(t *testing.T) {
 		fileExists = func(_ string) bool {
 			return true
 		}
+		oldFn := hasPHPCSPathDefinitions
+		hasPHPCSPathDefinitions = func(_ string) (bool, error) { return true, nil }
+		defer func() { hasPHPCSPathDefinitions = oldFn }()
 
 		runner := NewMockPHPCS(t)
 		runner.EXPECT().Run(mock.Anything, "/path/to/repo").Return(phpcs.ReturnOutput{
