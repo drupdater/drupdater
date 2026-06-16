@@ -102,12 +102,17 @@ func (g *Github) logError(err error) {
 }
 
 // GetUser returns the name and email of the authenticated user.
+// When called with a GITHUB_TOKEN (Actions bot), GET /user returns 403; in that
+// case we fall back to the well-known github-actions[bot] identity so that git
+// commits are attributed correctly without requiring a PAT.
 func (g *Github) GetUser() (name string, email string) {
-	user, _, err := g.client.Users.Get(context.Background(), "")
+	user, resp, err := g.client.Users.Get(context.Background(), "")
 	if err != nil {
-		// Better error handling instead of panic
+		if resp != nil && resp.StatusCode == 403 {
+			return "github-actions[bot]", "41898282+github-actions[bot]@users.noreply.github.com"
+		}
 		g.logError(fmt.Errorf("failed to get user: %w", err))
-		return "Unknown", "unknown@example.com"
+		return "github-actions[bot]", "41898282+github-actions[bot]@users.noreply.github.com"
 	}
 
 	return user.GetName(), user.GetEmail()
