@@ -82,6 +82,10 @@ on:
     - cron: "0 4 * * 1"  # every Monday at 04:00 UTC
   workflow_dispatch:
 
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   drupdater:
     runs-on: ubuntu-latest
@@ -89,8 +93,10 @@ jobs:
       image: ghcr.io/drupdater/drupdater-php8.3:latest
     steps:
       - name: Run Drupdater
-        run: /opt/drupdater/bin ${{ github.server_url }}/${{ github.repository }} ${{ secrets.DRUPDATER_TOKEN }}
+        run: /opt/drupdater/bin ${{ github.server_url }}/${{ github.repository }} ${{ secrets.GITHUB_TOKEN }}
 ```
+
+> **Note:** `GITHUB_TOKEN` is sufficient to push a branch and open a pull request. However, GitHub prevents workflows triggered by `GITHUB_TOKEN` from starting other workflows, so CI will not run automatically on the resulting PR. To have CI trigger on the Drupdater PR, use a [personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens) or a [GitHub App token](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-an-installation-access-token-for-a-github-app) stored as a repository secret instead.
 
 ## Configuration
 
