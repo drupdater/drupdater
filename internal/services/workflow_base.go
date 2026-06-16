@@ -7,6 +7,7 @@ import (
 	"embed"
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
 	"sync"
 	"text/template"
@@ -73,7 +74,7 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []interna
 
 	defer func() {
 		// Clean up the temporary directory
-		tmpDirName := fmt.Sprintf("/tmp/%x", md5.Sum([]byte(ws.config.RepositoryURL)))
+		tmpDirName := filepath.Join(os.TempDir(), fmt.Sprintf("%x", md5.Sum([]byte(ws.config.RepositoryURL))))
 		os.RemoveAll(tmpDirName)
 
 		cancel()
@@ -257,8 +258,7 @@ func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context) (SharedUpda
 		return SharedUpdate{}, fmt.Errorf("failed to update dependencies: %w", err)
 	}
 	if len(changes) == 0 {
-		ws.logger.Warn("no changes detected")
-		return SharedUpdate{}, nil
+		return SharedUpdate{}, AbortError{Msg: "no changes detected"}
 	}
 
 	postComposerUpdateEvent := NewPostComposerUpdateEvent(ctx, path, worktree)

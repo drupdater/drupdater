@@ -2,6 +2,7 @@ package composer
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -268,6 +269,48 @@ func TestGetComposerLockHash(t *testing.T) {
 	assert.Equal(t, "d3d29b1f6a1d8f2c3b9b8e1e4f5f9e3e", hash)
 }
 
+func TestGetInstalledPackageVersion(t *testing.T) {
+
+	service := &CLI{
+		logger: zap.NewNop(),
+	}
+
+	t.Run("returns version when versions array is non-empty", func(t *testing.T) {
+		data := `{"versions":["1.2.3"]}`
+
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", data}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+
+		version, err := service.GetInstalledPackageVersion(t.Context(), "/tmp", "drupal/core")
+		assert.NoError(t, err)
+		assert.Equal(t, "1.2.3", version)
+	})
+
+	t.Run("returns error when versions array is empty", func(t *testing.T) {
+		data := `{"versions":[]}`
+
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", data}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+
+		version, err := service.GetInstalledPackageVersion(t.Context(), "/tmp", "drupal/core")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "no versions found for package drupal/core")
+		assert.Empty(t, version)
+	})
+}
+
 func TestCheckPatchApplies(t *testing.T) {
 
 	t.Run("Patch applies", func(t *testing.T) {
@@ -326,6 +369,44 @@ Using version ^11.1 for drupal/core`
 		applies, err := service.CheckIfPatchApplies(t.Context(), "drupal/core", "1.0.0", "path/to/patch")
 		assert.NoError(t, err)
 		assert.False(t, applies)
+	})
+
+	t.Run("Package name with special JSON characters produces valid JSON", func(t *testing.T) {
+		// This test verifies that packageName, packageVersion, and patchPath
+		// containing double-quotes or backslashes are safely marshaled via
+		// json.Marshal rather than string concatenation, which would produce
+		// invalid JSON.
+		fs := afero.NewMemMapFs()
+
+		capturedPatchesJSON := ""
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", "ok"}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+
+		service := &CLI{
+			logger: zap.NewNop(),
+			fs:     fs,
+		}
+
+		// Use a package name that contains a double-quote and a backslash —
+		// these would break raw string concatenation but must be escaped by
+		// json.Marshal, resulting in valid JSON.
+		_, err := service.CheckIfPatchApplies(t.Context(), `drupal/"core"`, `1.0\0`, `path/to/"patch"`)
+		assert.NoError(t, err)
+
+		// Read back the written composer.patches.json and confirm it is valid JSON.
+		data, err := afero.ReadFile(fs, service.tempDir+"/composer.patches.json")
+		assert.NoError(t, err)
+		capturedPatchesJSON = string(data)
+
+		var parsed map[string]interface{}
+		assert.NoError(t, json.Unmarshal([]byte(capturedPatchesJSON), &parsed),
+			"composer.patches.json must be valid JSON even when values contain special characters")
 	})
 
 }
