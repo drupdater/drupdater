@@ -130,7 +130,32 @@ docker run \
 
 ### How do I update multiple Drupal sites in one repository?
 
-Use the `--sites` flag once per site directory:
+**1. Add the following snippet to your `web/sites/sites.php`** (or a file included by it) to resolve the active site directory from the `SITE_NAME` environment variable:
+
+```php
+$site_name = getenv('SITE_NAME');
+if (is_string($site_name) && $site_name !== "") {
+  $scheme = $request->getScheme();
+  $port = $request->getPort();
+  $site = $request->getHost();
+
+  if ($site !== '') {
+    // Add the port if using a non-standard port for http or https.
+    if (('http' === $scheme && 80 != $port) || ('https' === $scheme && 443 != $port)) {
+      $site = $port . '.' . $site;
+    }
+    // Do not override existing entries in the $sites array.
+    if (!isset($sites[$site])) {
+      $sites[$site] = $site_name;
+    }
+  }
+  else {
+    $sites[str_replace('/', '.', dirname($script_name))] = $site_name;
+  }
+}
+```
+
+**2. Pass each site directory name via `--sites`:**
 
 ```bash
 docker run ghcr.io/drupdater/drupdater-php8.3:latest \
