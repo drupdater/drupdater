@@ -79,7 +79,7 @@ var rootCmd = &cobra.Command{
 		err := workflow.StartUpdate(cmd.Context(), addons)
 		if err != nil {
 			if errors.As(err, &services.AbortError{}) {
-				logger.Sugar().Warn(errors.Unwrap(err))
+				logger.Sugar().Warn(err)
 			} else {
 				logger.Sugar().Error(err)
 				return err
