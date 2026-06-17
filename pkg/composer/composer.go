@@ -191,7 +191,7 @@ type Audit struct {
 // UnmarshalJSON flattens nested advisories into a single list.
 func (c *Audit) UnmarshalJSON(data []byte) error {
 	// Temporary map to parse nested structure
-	var raw map[string]interface{}
+	var raw map[string]any
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
@@ -204,10 +204,10 @@ func (c *Audit) UnmarshalJSON(data []byte) error {
 
 	// Flatten advisories
 	var advisories []Advisory
-	if advMap, ok := advisoriesData.(map[string]interface{}); ok {
+	if advMap, ok := advisoriesData.(map[string]any); ok {
 		for _, value := range advMap {
 			switch v := value.(type) {
-			case []interface{}: // Simple advisory list
+			case []any: // Simple advisory list
 				for _, item := range v {
 					var adv Advisory
 					itemBytes, _ := json.Marshal(item)
@@ -216,7 +216,7 @@ func (c *Audit) UnmarshalJSON(data []byte) error {
 					}
 					advisories = append(advisories, adv)
 				}
-			case map[string]interface{}: // Nested map (e.g., drupal/core)
+			case map[string]any: // Nested map (e.g., drupal/core)
 				for _, nestedItem := range v {
 					var adv Advisory
 					nestedBytes, _ := json.Marshal(nestedItem)
@@ -383,14 +383,14 @@ func (s *CLI) CheckIfPatchApplies(ctx context.Context, packageName string, packa
 	return true, nil
 }
 
-func (s *CLI) GetInstalledPlugins(ctx context.Context, dir string) (map[string]interface{}, error) {
+func (s *CLI) GetInstalledPlugins(ctx context.Context, dir string) (map[string]any, error) {
 
 	out, err := s.execComposer(ctx, dir, "depends", "composer-plugin-api", "--locked")
 	if err != nil {
 		return nil, err
 	}
 
-	var packages = make(map[string]interface{})
+	var packages = make(map[string]any)
 	reg := regexp.MustCompile(`(?m)^(\S+)\s+v?[\d\.]+\s+requires`)
 	matches := reg.FindAllStringSubmatch(out, -1)
 

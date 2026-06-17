@@ -41,8 +41,8 @@ func NewComposerAudit(logger *zap.Logger, composer Composer) *ComposerAudit {
 }
 
 // SubscribedEvents returns the events this addon listens to.
-func (ca *ComposerAudit) SubscribedEvents() map[string]interface{} {
-	return map[string]interface{}{
+func (ca *ComposerAudit) SubscribedEvents() map[string]any {
+	return map[string]any{
 		"pre-composer-update": event.ListenerItem{
 			Priority: event.Max,
 			Listener: event.ListenerFunc(ca.preComposerUpdateHandler),

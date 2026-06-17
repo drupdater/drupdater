@@ -167,13 +167,13 @@ profile: thunder
 	}
 
 	// Unmarshal the updated content
-	var updatedConfig map[string]interface{}
+	var updatedConfig map[string]any
 	if err := yaml.Unmarshal(updatedContent, &updatedConfig); err != nil {
 		t.Fatalf("Failed to unmarshal updated content: %v", err)
 	}
 
 	// Check if the SQLite module was added correctly
-	modules, ok := updatedConfig["module"].(map[string]interface{})
+	modules, ok := updatedConfig["module"].(map[string]any)
 	if !ok {
 		t.Fatalf("Modules key is not a map")
 	}

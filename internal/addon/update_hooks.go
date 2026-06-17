@@ -32,8 +32,8 @@ func NewUpdateHooks(logger *zap.Logger, drush Drush) *UpdateHooks {
 }
 
 // SubscribedEvents returns the events this addon listens to
-func (uh *UpdateHooks) SubscribedEvents() map[string]interface{} {
-	return map[string]interface{}{
+func (uh *UpdateHooks) SubscribedEvents() map[string]any {
+	return map[string]any{
 		"pre-site-update": event.ListenerItem{
 			Priority: event.Min,
 			Listener: event.ListenerFunc(uh.preSiteUpdateHandler),

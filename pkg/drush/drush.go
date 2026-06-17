@@ -112,10 +112,10 @@ func (e *CLI) GetTranslationPath(ctx context.Context, dir string, site string, r
 }
 
 type UpdateHook struct {
-	Module      string      `json:"module"`
-	UpdateID    interface{} `json:"update_id"`
-	Description string      `json:"description"`
-	Type        string      `json:"type"`
+	Module      string `json:"module"`
+	UpdateID    any    `json:"update_id"`
+	Description string `json:"description"`
+	Type        string `json:"type"`
 }
 
 func (e *CLI) GetUpdateHooks(ctx context.Context, dir string, site string) (map[string]UpdateHook, error) {

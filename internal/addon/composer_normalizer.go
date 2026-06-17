@@ -25,8 +25,8 @@ func NewComposerNormalizer(logger *zap.Logger, composer Composer) *ComposerNorma
 }
 
 // SubscribedEvents returns the events this addon listens to.
-func (cn *ComposerNormalizer) SubscribedEvents() map[string]interface{} {
-	return map[string]interface{}{
+func (cn *ComposerNormalizer) SubscribedEvents() map[string]any {
+	return map[string]any{
 		"post-composer-update": event.ListenerItem{
 			Priority: event.Min,
 			Listener: event.ListenerFunc(cn.postComposerUpdateHandler),

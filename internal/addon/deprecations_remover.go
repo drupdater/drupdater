@@ -28,8 +28,8 @@ func NewDeprecationsRemover(logger *zap.Logger, rector Rector, config internal.C
 }
 
 // SubscribedEvents returns the events this addon listens to
-func (dr *DeprecationsRemover) SubscribedEvents() map[string]interface{} {
-	return map[string]interface{}{
+func (dr *DeprecationsRemover) SubscribedEvents() map[string]any {
+	return map[string]any{
 		"post-code-update": event.ListenerItem{
 			Priority: event.Normal,
 			Listener: event.ListenerFunc(dr.postCodeUpdateHandler),
