@@ -70,7 +70,7 @@ func NewWorkflowBaseService(
 }
 
 func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []internal.Addon) error {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(ctx)
 
 	defer func() {
 		// Clean up the temporary directory
