@@ -62,6 +62,40 @@ func TestGithub_CreateMergeRequest(t *testing.T) {
 	assert.Equal(t, "http://example.com", mr.URL)
 }
 
+func TestGithub_GetUser_Returns403FallbackSilently(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"message":"Resource not accessible by integration","errors":[]}`))
+	}))
+	defer mockServer.Close()
+
+	client, _ := github.NewClient(nil).WithEnterpriseURLs(mockServer.URL, "")
+	gh := &Github{client: client, owner: "o", repo: "r", fs: afero.NewMemMapFs()}
+
+	name, email := gh.GetUser()
+
+	assert.Equal(t, "github-actions[bot]", name)
+	assert.Equal(t, "41898282+github-actions[bot]@users.noreply.github.com", email)
+}
+
+func TestGithub_GetUser_ReturnsUserOnSuccess(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"login":"octocat","name":"The Octocat","email":"octocat@github.com"}`))
+	}))
+	defer mockServer.Close()
+
+	client, _ := github.NewClient(nil).WithEnterpriseURLs(mockServer.URL, "")
+	gh := &Github{client: client, owner: "o", repo: "r", fs: afero.NewMemMapFs()}
+
+	name, email := gh.GetUser()
+
+	assert.Equal(t, "The Octocat", name)
+	assert.Equal(t, "octocat@github.com", email)
+}
+
 func TestGithub_DownloadComposerFiles(t *testing.T) {
 	// Setup mock HTTP server for file content
 	mockContentServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

@@ -2,6 +2,7 @@ package codehosting
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -108,7 +109,7 @@ func (g *Github) logError(err error) {
 func (g *Github) GetUser() (name string, email string) {
 	user, resp, err := g.client.Users.Get(context.Background(), "")
 	if err != nil {
-		if resp != nil && resp.StatusCode == 403 {
+		if is403(resp, err) {
 			return "github-actions[bot]", "41898282+github-actions[bot]@users.noreply.github.com"
 		}
 		g.logError(fmt.Errorf("failed to get user: %w", err))
@@ -116,4 +117,15 @@ func (g *Github) GetUser() (name string, email string) {
 	}
 
 	return user.GetName(), user.GetEmail()
+}
+
+// is403 reports whether an error (or the accompanying response) represents an
+// HTTP 403. go-github can return the status code either on the *Response or
+// wrapped inside a *github.ErrorResponse, so we check both.
+func is403(resp *github.Response, err error) bool {
+	if resp != nil && resp.StatusCode == 403 {
+		return true
+	}
+	var ghErr *github.ErrorResponse
+	return errors.As(err, &ghErr) && ghErr.Response != nil && ghErr.Response.StatusCode == 403
 }
