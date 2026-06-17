@@ -411,6 +411,314 @@ Using version ^11.1 for drupal/core`
 
 }
 
+func TestInstall(t *testing.T) {
+	service := &CLI{logger: zap.NewNop()}
+
+	t.Run("success", func(t *testing.T) {
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", "ok"}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+		assert.NoError(t, service.Install(t.Context(), "/tmp"))
+	})
+
+	t.Run("error", func(t *testing.T) {
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--"}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+		err := service.Install(t.Context(), "/tmp")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to install dependencies")
+	})
+}
+
+func TestRemove(t *testing.T) {
+	service := &CLI{logger: zap.NewNop()}
+
+	t.Run("success", func(t *testing.T) {
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", "ok"}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+		_, err := service.Remove(t.Context(), "/tmp", "drupal/core")
+		assert.NoError(t, err)
+	})
+
+	t.Run("error", func(t *testing.T) {
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--"}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+		_, err := service.Remove(t.Context(), "/tmp", "drupal/core")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to remove package")
+	})
+}
+
+func TestNormalize(t *testing.T) {
+	service := &CLI{logger: zap.NewNop()}
+
+	execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		cs := []string{"-test.run=TestHelperProcess", "--", "normalized"}
+		cs = append(cs, arg...)
+		cmd := exec.Command(os.Args[0], cs...)
+		cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
+		return cmd
+	}
+	defer func() { execCommand = exec.CommandContext }()
+
+	out, err := service.Normalize(t.Context(), "/tmp")
+	assert.NoError(t, err)
+	assert.Equal(t, "normalized", out)
+}
+
+func TestDiff(t *testing.T) {
+	service := &CLI{logger: zap.NewNop()}
+
+	t.Run("without links", func(t *testing.T) {
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", "diff output"}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+		out, err := service.Diff(t.Context(), "/tmp", false)
+		assert.NoError(t, err)
+		assert.Equal(t, "diff output", out)
+	})
+
+	t.Run("with links", func(t *testing.T) {
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", "diff with links"}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+		out, err := service.Diff(t.Context(), "/tmp", true)
+		assert.NoError(t, err)
+		assert.Equal(t, "diff with links", out)
+	})
+}
+
+func TestGetConfig(t *testing.T) {
+	service := &CLI{logger: zap.NewNop()}
+
+	execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		cs := []string{"-test.run=TestHelperProcess", "--", `"8.3"`}
+		cs = append(cs, arg...)
+		cmd := exec.Command(os.Args[0], cs...)
+		cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
+		return cmd
+	}
+	defer func() { execCommand = exec.CommandContext }()
+
+	val, err := service.GetConfig(t.Context(), "/tmp", "platform.php")
+	assert.NoError(t, err)
+	assert.Equal(t, `"8.3"`, val)
+}
+
+func TestSetConfig(t *testing.T) {
+	service := &CLI{logger: zap.NewNop()}
+
+	t.Run("success", func(t *testing.T) {
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", "ok"}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+		assert.NoError(t, service.SetConfig(t.Context(), "/tmp", "platform.php", "8.3"))
+	})
+
+	t.Run("error", func(t *testing.T) {
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--"}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+		assert.Error(t, service.SetConfig(t.Context(), "/tmp", "platform.php", "8.3"))
+	})
+}
+
+func TestIsPackageInstalled(t *testing.T) {
+	service := &CLI{logger: zap.NewNop()}
+
+	t.Run("installed", func(t *testing.T) {
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", "ok"}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+		installed, err := service.IsPackageInstalled(t.Context(), "/tmp", "drupal/core")
+		assert.NoError(t, err)
+		assert.True(t, installed)
+	})
+
+	t.Run("not installed", func(t *testing.T) {
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--"}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+		installed, err := service.IsPackageInstalled(t.Context(), "/tmp", "drupal/core")
+		assert.NoError(t, err)
+		assert.False(t, installed)
+	})
+}
+
+func TestUpdateLockHash(t *testing.T) {
+	service := &CLI{logger: zap.NewNop()}
+
+	t.Run("success", func(t *testing.T) {
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", "ok"}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+		assert.NoError(t, service.UpdateLockHash(t.Context(), "/tmp"))
+	})
+
+	t.Run("error", func(t *testing.T) {
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--"}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+		assert.Error(t, service.UpdateLockHash(t.Context(), "/tmp"))
+	})
+}
+
+func TestGetAllowPlugins(t *testing.T) {
+	service := &CLI{logger: zap.NewNop()}
+
+	t.Run("success", func(t *testing.T) {
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", `{"drupal/core-composer-scaffold":true,"phpro/grumphp-shim":false}`}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+		plugins, err := service.GetAllowPlugins(t.Context(), "/tmp")
+		assert.NoError(t, err)
+		assert.Equal(t, map[string]bool{
+			"drupal/core-composer-scaffold": true,
+			"phpro/grumphp-shim":            false,
+		}, plugins)
+	})
+
+	t.Run("invalid JSON", func(t *testing.T) {
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", "not-json"}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+		_, err := service.GetAllowPlugins(t.Context(), "/tmp")
+		assert.Error(t, err)
+	})
+}
+
+func TestSetAllowPlugins(t *testing.T) {
+	service := &CLI{logger: zap.NewNop()}
+
+	t.Run("success", func(t *testing.T) {
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", "ok"}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+		err := service.SetAllowPlugins(t.Context(), "/tmp", map[string]bool{"drupal/core-composer-scaffold": true})
+		assert.NoError(t, err)
+	})
+
+	t.Run("empty map", func(t *testing.T) {
+		err := service.SetAllowPlugins(t.Context(), "/tmp", map[string]bool{})
+		assert.NoError(t, err)
+	})
+}
+
+func TestGetCustomCodeDirectories(t *testing.T) {
+	t.Run("returns existing directories", func(t *testing.T) {
+		fs := afero.NewMemMapFs()
+		_ = fs.MkdirAll("/tmp/web/modules/custom", 0755)
+		_ = fs.MkdirAll("/tmp/web/themes/custom", 0755)
+
+		service := &CLI{logger: zap.NewNop(), fs: fs}
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", "web/"}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+
+		dirs, err := service.GetCustomCodeDirectories(t.Context(), "/tmp")
+		assert.NoError(t, err)
+		assert.ElementsMatch(t, []string{"web/modules/custom", "web/themes/custom"}, dirs)
+	})
+
+	t.Run("GetConfig error", func(t *testing.T) {
+		service := &CLI{logger: zap.NewNop(), fs: afero.NewMemMapFs()}
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--"}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+
+		_, err := service.GetCustomCodeDirectories(t.Context(), "/project")
+		assert.Error(t, err)
+	})
+}
+
 func TestHelperProcess(*testing.T) {
 	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
 		return

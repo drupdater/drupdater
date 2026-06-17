@@ -2,6 +2,7 @@ package addon
 
 import (
 	"context"
+	"encoding/xml"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -59,6 +60,35 @@ var fileExists = func(path string) bool {
 	return true
 }
 
+type phpcsRuleset struct {
+	XMLName xml.Name `xml:"ruleset"`
+	Files   []string `xml:"file"`
+}
+
+// hasPHPCSPathDefinitions checks if phpcs.xml or phpcs.xml.dist contains <file> path definitions
+var hasPHPCSPathDefinitions = func(path string) (bool, error) {
+	var configPath string
+	if _, err := os.Stat(filepath.Join(path, "phpcs.xml")); err == nil {
+		configPath = filepath.Join(path, "phpcs.xml")
+	} else if _, err := os.Stat(filepath.Join(path, "phpcs.xml.dist")); err == nil {
+		configPath = filepath.Join(path, "phpcs.xml.dist")
+	} else {
+		return false, nil
+	}
+
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return false, fmt.Errorf("failed to read phpcs config: %w", err)
+	}
+
+	var ruleset phpcsRuleset
+	if err := xml.Unmarshal(data, &ruleset); err != nil {
+		return false, fmt.Errorf("failed to parse phpcs config: %w", err)
+	}
+
+	return len(ruleset.Files) > 0, nil
+}
+
 func (cb *CodeBeautifier) postCodeUpdateHandler(e event.Event) error {
 	event := e.(*services.PostCodeUpdateEvent)
 	cb.logger.Info("updating coding styles")
@@ -70,6 +100,15 @@ func (cb *CodeBeautifier) postCodeUpdateHandler(e event.Event) error {
 		}
 		if !created {
 			cb.logger.Debug("no phpcs.xml created, skipping coding style update")
+			return nil
+		}
+	} else {
+		hasPaths, err := hasPHPCSPathDefinitions(event.Path())
+		if err != nil {
+			return err
+		}
+		if !hasPaths {
+			cb.logger.Warn("phpcs.xml found but no file path definitions, skipping coding style update")
 			return nil
 		}
 	}

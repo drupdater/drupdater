@@ -295,7 +295,7 @@ func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context) (SharedUpda
 		return SharedUpdate{}, fmt.Errorf("failed to check if branch exists: %w", err)
 	}
 	if exists {
-		return SharedUpdate{}, fmt.Errorf("branch %s already exists, skipping", updateBranchName)
+		return SharedUpdate{}, AbortError{Msg: fmt.Sprintf("branch %s already exists, skipping", updateBranchName)}
 	}
 
 	// Create final branch for changes
