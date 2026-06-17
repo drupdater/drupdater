@@ -101,13 +101,9 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []interna
 	sem := make(chan struct{}, cpuLimit)
 
 	// 1. Run installCode()
-	wg.Add(1)
-	go func() {
+	wg.Go(func() {
 		sem <- struct{}{}
-		defer func() {
-			<-sem
-			wg.Done()
-		}()
+		defer func() { <-sem }()
 
 		path, err := ws.installCode(ctx)
 		if err != nil {
@@ -118,17 +114,13 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []interna
 
 		// Send path to all waiting goroutines
 		installCodeDone <- path
-	}()
+	})
 
 	// 2. Run installSite(site) after installCode
 	for _, site := range ws.config.Sites {
-		wg.Add(1)
-		go func(site string) {
+		wg.Go(func() {
 			sem <- struct{}{}
-			defer func() {
-				<-sem
-				wg.Done()
-			}()
+			defer func() { <-sem }()
 
 			select {
 			case installPath := <-installCodeDone:
@@ -144,19 +136,14 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []interna
 			case <-ctx.Done():
 				return
 			}
-		}(site)
+		})
 	}
 
 	// 3. Run updateSharedCode() in parallel
-	wg.Add(1)
-	go func() {
+	wg.Go(func() {
 		sem <- struct{}{}
-		defer func() {
-			<-sem
-			wg.Done()
-		}()
+		defer func() { <-sem }()
 
-		var err error
 		update, err := ws.updateSharedCode(ctx)
 		if err != nil {
 			errCh <- err
@@ -164,21 +151,15 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []interna
 			return
 		}
 
-		// Simply assign the update to sharedUpdate - no need for mutex
-		// since all readers will wait for updateDone channel before accessing
 		sharedUpdate = update
 		close(updateDone)
-	}()
+	})
 
 	// 4. Run updateSite(site) after installSite + updateSharedCode
 	for _, site := range ws.config.Sites {
-		wg.Add(1)
-		go func(site string) {
+		wg.Go(func() {
 			sem <- struct{}{}
-			defer func() {
-				<-sem
-				wg.Done()
-			}()
+			defer func() { <-sem }()
 
 			// Wait for install to finish
 			select {
@@ -194,14 +175,11 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []interna
 				return
 			}
 
-			err := ws.updateSite(ctx, sharedUpdate, site)
-			if err != nil {
+			if err := ws.updateSite(ctx, sharedUpdate, site); err != nil {
 				errCh <- err
 				cancel()
-				return
 			}
-
-		}(site)
+		})
 	}
 
 	// 5. Wait for all routines
