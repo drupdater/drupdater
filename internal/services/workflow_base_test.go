@@ -135,6 +135,61 @@ func TestStartUpdateNoChanges(t *testing.T) {
 	vcsProvider.AssertExpectations(t)
 }
 
+func TestStartUpdateBranchAlreadyExists(t *testing.T) {
+	// Setup
+	logger := zap.NewNop()
+	installer := NewMockInstaller(t)
+	repositoryService := NewMockRepository(t)
+	vcsProvider := NewMockPlatform(t)
+	repository := NewMockGitRepository(t)
+	mockComposer := NewMockComposer(t)
+	drush := NewMockDrush(t)
+	ctx := context.Background()
+
+	config := internal.Config{
+		RepositoryURL: "https://example.com/repo.git",
+		Branch:        "main",
+		Token:         "token",
+		Sites:         []string{"site1"},
+		DryRun:        false,
+	}
+
+	worktree := NewMockWorktree(t)
+	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
+	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+
+	vcsProvider.EXPECT().GetUser().Return("user", "mail")
+
+	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil).Times(2)
+	repositoryService.EXPECT().BranchExists(repository, mock.Anything).Return(true, nil)
+
+	mockComposer.EXPECT().Install(mock.Anything, "/tmp").Return(nil)
+	mockComposer.EXPECT().Update(mock.Anything, "/tmp", mock.Anything, mock.Anything, false, false).Return([]composer.PackageChange{
+		{
+			Package: "drupal/core",
+			From:    "9.0.0",
+			To:      "9.1.0",
+		},
+	}, nil)
+	mockComposer.EXPECT().GetLockHash("/tmp").Return("dummy-hash", nil)
+
+	installer.EXPECT().Install(mock.Anything, "/tmp", "site1").Return(nil).Maybe()
+	installer.EXPECT().ConfigureDatabase(mock.Anything, "/tmp", "site1").Return(nil).Maybe()
+	drush.EXPECT().UpdateSite(mock.Anything, "/tmp", "site1").Return(nil).Maybe()
+	drush.EXPECT().ExportConfiguration(mock.Anything, "/tmp", "site1").Return(nil).Maybe()
+	drush.EXPECT().ConfigResave(mock.Anything, "/tmp", "site1").Return(nil).Maybe()
+
+	// Execute
+	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
+	err := workflowService.StartUpdate(ctx, nil)
+
+	// Assert: should get an AbortError, not a nil or other error
+	var abortErr AbortError
+	assert.ErrorAs(t, err, &abortErr)
+	assert.Contains(t, err.Error(), "already exists")
+	repositoryService.AssertExpectations(t)
+}
+
 func TestStartUpdateWithDryRun(t *testing.T) {
 	// Setup
 	logger := zap.NewNop()
