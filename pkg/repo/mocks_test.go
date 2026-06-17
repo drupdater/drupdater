@@ -73,14 +73,20 @@ type MockRepository_CommitObject_Call struct {
 }
 
 // CommitObject is a helper method to define mock.On call
-//   - h
+//   - h plumbing.Hash
 func (_e *MockRepository_Expecter) CommitObject(h interface{}) *MockRepository_CommitObject_Call {
 	return &MockRepository_CommitObject_Call{Call: _e.mock.On("CommitObject", h)}
 }
 
 func (_c *MockRepository_CommitObject_Call) Run(run func(h plumbing.Hash)) *MockRepository_CommitObject_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(plumbing.Hash))
+		var arg0 plumbing.Hash
+		if args[0] != nil {
+			arg0 = args[0].(plumbing.Hash)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }
@@ -173,14 +179,20 @@ type MockRepository_Push_Call struct {
 }
 
 // Push is a helper method to define mock.On call
-//   - o
+//   - o *git.PushOptions
 func (_e *MockRepository_Expecter) Push(o interface{}) *MockRepository_Push_Call {
 	return &MockRepository_Push_Call{Call: _e.mock.On("Push", o)}
 }
 
 func (_c *MockRepository_Push_Call) Run(run func(o *git.PushOptions)) *MockRepository_Push_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(*git.PushOptions))
+		var arg0 *git.PushOptions
+		if args[0] != nil {
+			arg0 = args[0].(*git.PushOptions)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }
@@ -311,14 +323,20 @@ type MockWorktree_Add_Call struct {
 }
 
 // Add is a helper method to define mock.On call
-//   - path
+//   - path string
 func (_e *MockWorktree_Expecter) Add(path interface{}) *MockWorktree_Add_Call {
 	return &MockWorktree_Add_Call{Call: _e.mock.On("Add", path)}
 }
 
 func (_c *MockWorktree_Add_Call) Run(run func(path string)) *MockWorktree_Add_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string))
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }
@@ -356,14 +374,20 @@ type MockWorktree_AddGlob_Call struct {
 }
 
 // AddGlob is a helper method to define mock.On call
-//   - pattern
+//   - pattern string
 func (_e *MockWorktree_Expecter) AddGlob(pattern interface{}) *MockWorktree_AddGlob_Call {
 	return &MockWorktree_AddGlob_Call{Call: _e.mock.On("AddGlob", pattern)}
 }
 
 func (_c *MockWorktree_AddGlob_Call) Run(run func(pattern string)) *MockWorktree_AddGlob_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string))
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }
@@ -401,14 +425,20 @@ type MockWorktree_Checkout_Call struct {
 }
 
 // Checkout is a helper method to define mock.On call
-//   - opts
+//   - opts *git.CheckoutOptions
 func (_e *MockWorktree_Expecter) Checkout(opts interface{}) *MockWorktree_Checkout_Call {
 	return &MockWorktree_Checkout_Call{Call: _e.mock.On("Checkout", opts)}
 }
 
 func (_c *MockWorktree_Checkout_Call) Run(run func(opts *git.CheckoutOptions)) *MockWorktree_Checkout_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(*git.CheckoutOptions))
+		var arg0 *git.CheckoutOptions
+		if args[0] != nil {
+			arg0 = args[0].(*git.CheckoutOptions)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }
@@ -457,15 +487,26 @@ type MockWorktree_Commit_Call struct {
 }
 
 // Commit is a helper method to define mock.On call
-//   - msg
-//   - opts
+//   - msg string
+//   - opts *git.CommitOptions
 func (_e *MockWorktree_Expecter) Commit(msg interface{}, opts interface{}) *MockWorktree_Commit_Call {
 	return &MockWorktree_Commit_Call{Call: _e.mock.On("Commit", msg, opts)}
 }
 
 func (_c *MockWorktree_Commit_Call) Run(run func(msg string, opts *git.CommitOptions)) *MockWorktree_Commit_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(*git.CommitOptions))
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		var arg1 *git.CommitOptions
+		if args[1] != nil {
+			arg1 = args[1].(*git.CommitOptions)
+		}
+		run(
+			arg0,
+			arg1,
+		)
 	})
 	return _c
 }
@@ -514,14 +555,20 @@ type MockWorktree_Remove_Call struct {
 }
 
 // Remove is a helper method to define mock.On call
-//   - path
+//   - path string
 func (_e *MockWorktree_Expecter) Remove(path interface{}) *MockWorktree_Remove_Call {
 	return &MockWorktree_Remove_Call{Call: _e.mock.On("Remove", path)}
 }
 
 func (_c *MockWorktree_Remove_Call) Run(run func(path string)) *MockWorktree_Remove_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string))
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }

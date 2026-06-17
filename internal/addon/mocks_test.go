@@ -77,15 +77,26 @@ type MockComposer_Audit_Call struct {
 }
 
 // Audit is a helper method to define mock.On call
-//   - ctx
-//   - dir
+//   - ctx context.Context
+//   - dir string
 func (_e *MockComposer_Expecter) Audit(ctx interface{}, dir interface{}) *MockComposer_Audit_Call {
 	return &MockComposer_Audit_Call{Call: _e.mock.On("Audit", ctx, dir)}
 }
 
 func (_c *MockComposer_Audit_Call) Run(run func(ctx context.Context, dir string)) *MockComposer_Audit_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
 	})
 	return _c
 }
@@ -132,17 +143,38 @@ type MockComposer_CheckIfPatchApplies_Call struct {
 }
 
 // CheckIfPatchApplies is a helper method to define mock.On call
-//   - ctx
-//   - packageName
-//   - packageVersion
-//   - patchPath
+//   - ctx context.Context
+//   - packageName string
+//   - packageVersion string
+//   - patchPath string
 func (_e *MockComposer_Expecter) CheckIfPatchApplies(ctx interface{}, packageName interface{}, packageVersion interface{}, patchPath interface{}) *MockComposer_CheckIfPatchApplies_Call {
 	return &MockComposer_CheckIfPatchApplies_Call{Call: _e.mock.On("CheckIfPatchApplies", ctx, packageName, packageVersion, patchPath)}
 }
 
 func (_c *MockComposer_CheckIfPatchApplies_Call) Run(run func(ctx context.Context, packageName string, packageVersion string, patchPath string)) *MockComposer_CheckIfPatchApplies_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
 	})
 	return _c
 }
@@ -189,16 +221,32 @@ type MockComposer_Diff_Call struct {
 }
 
 // Diff is a helper method to define mock.On call
-//   - ctx
-//   - path
-//   - withLinks
+//   - ctx context.Context
+//   - path string
+//   - withLinks bool
 func (_e *MockComposer_Expecter) Diff(ctx interface{}, path interface{}, withLinks interface{}) *MockComposer_Diff_Call {
 	return &MockComposer_Diff_Call{Call: _e.mock.On("Diff", ctx, path, withLinks)}
 }
 
 func (_c *MockComposer_Diff_Call) Run(run func(ctx context.Context, path string, withLinks bool)) *MockComposer_Diff_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(bool))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 bool
+		if args[2] != nil {
+			arg2 = args[2].(bool)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
 	})
 	return _c
 }
@@ -247,15 +295,26 @@ type MockComposer_GetAllowPlugins_Call struct {
 }
 
 // GetAllowPlugins is a helper method to define mock.On call
-//   - ctx
-//   - dir
+//   - ctx context.Context
+//   - dir string
 func (_e *MockComposer_Expecter) GetAllowPlugins(ctx interface{}, dir interface{}) *MockComposer_GetAllowPlugins_Call {
 	return &MockComposer_GetAllowPlugins_Call{Call: _e.mock.On("GetAllowPlugins", ctx, dir)}
 }
 
 func (_c *MockComposer_GetAllowPlugins_Call) Run(run func(ctx context.Context, dir string)) *MockComposer_GetAllowPlugins_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
 	})
 	return _c
 }
@@ -302,16 +361,32 @@ type MockComposer_GetConfig_Call struct {
 }
 
 // GetConfig is a helper method to define mock.On call
-//   - ctx
-//   - dir
-//   - key
+//   - ctx context.Context
+//   - dir string
+//   - key string
 func (_e *MockComposer_Expecter) GetConfig(ctx interface{}, dir interface{}, key interface{}) *MockComposer_GetConfig_Call {
 	return &MockComposer_GetConfig_Call{Call: _e.mock.On("GetConfig", ctx, dir, key)}
 }
 
 func (_c *MockComposer_GetConfig_Call) Run(run func(ctx context.Context, dir string, key string)) *MockComposer_GetConfig_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
 	})
 	return _c
 }
@@ -360,15 +435,26 @@ type MockComposer_GetCustomCodeDirectories_Call struct {
 }
 
 // GetCustomCodeDirectories is a helper method to define mock.On call
-//   - ctx
-//   - dir
+//   - ctx context.Context
+//   - dir string
 func (_e *MockComposer_Expecter) GetCustomCodeDirectories(ctx interface{}, dir interface{}) *MockComposer_GetCustomCodeDirectories_Call {
 	return &MockComposer_GetCustomCodeDirectories_Call{Call: _e.mock.On("GetCustomCodeDirectories", ctx, dir)}
 }
 
 func (_c *MockComposer_GetCustomCodeDirectories_Call) Run(run func(ctx context.Context, dir string)) *MockComposer_GetCustomCodeDirectories_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
 	})
 	return _c
 }
@@ -415,16 +501,32 @@ type MockComposer_GetInstalledPackageVersion_Call struct {
 }
 
 // GetInstalledPackageVersion is a helper method to define mock.On call
-//   - ctx
-//   - dir
-//   - packageName
+//   - ctx context.Context
+//   - dir string
+//   - packageName string
 func (_e *MockComposer_Expecter) GetInstalledPackageVersion(ctx interface{}, dir interface{}, packageName interface{}) *MockComposer_GetInstalledPackageVersion_Call {
 	return &MockComposer_GetInstalledPackageVersion_Call{Call: _e.mock.On("GetInstalledPackageVersion", ctx, dir, packageName)}
 }
 
 func (_c *MockComposer_GetInstalledPackageVersion_Call) Run(run func(ctx context.Context, dir string, packageName string)) *MockComposer_GetInstalledPackageVersion_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
 	})
 	return _c
 }
@@ -473,15 +575,26 @@ type MockComposer_GetInstalledPlugins_Call struct {
 }
 
 // GetInstalledPlugins is a helper method to define mock.On call
-//   - ctx
-//   - dir
+//   - ctx context.Context
+//   - dir string
 func (_e *MockComposer_Expecter) GetInstalledPlugins(ctx interface{}, dir interface{}) *MockComposer_GetInstalledPlugins_Call {
 	return &MockComposer_GetInstalledPlugins_Call{Call: _e.mock.On("GetInstalledPlugins", ctx, dir)}
 }
 
 func (_c *MockComposer_GetInstalledPlugins_Call) Run(run func(ctx context.Context, dir string)) *MockComposer_GetInstalledPlugins_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
 	})
 	return _c
 }
@@ -528,16 +641,32 @@ type MockComposer_IsPackageInstalled_Call struct {
 }
 
 // IsPackageInstalled is a helper method to define mock.On call
-//   - ctx
-//   - dir
-//   - packageToCheck
+//   - ctx context.Context
+//   - dir string
+//   - packageToCheck string
 func (_e *MockComposer_Expecter) IsPackageInstalled(ctx interface{}, dir interface{}, packageToCheck interface{}) *MockComposer_IsPackageInstalled_Call {
 	return &MockComposer_IsPackageInstalled_Call{Call: _e.mock.On("IsPackageInstalled", ctx, dir, packageToCheck)}
 }
 
 func (_c *MockComposer_IsPackageInstalled_Call) Run(run func(ctx context.Context, dir string, packageToCheck string)) *MockComposer_IsPackageInstalled_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
 	})
 	return _c
 }
@@ -584,15 +713,26 @@ type MockComposer_Normalize_Call struct {
 }
 
 // Normalize is a helper method to define mock.On call
-//   - ctx
-//   - dir
+//   - ctx context.Context
+//   - dir string
 func (_e *MockComposer_Expecter) Normalize(ctx interface{}, dir interface{}) *MockComposer_Normalize_Call {
 	return &MockComposer_Normalize_Call{Call: _e.mock.On("Normalize", ctx, dir)}
 }
 
 func (_c *MockComposer_Normalize_Call) Run(run func(ctx context.Context, dir string)) *MockComposer_Normalize_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
 	})
 	return _c
 }
@@ -645,9 +785,9 @@ type MockComposer_Remove_Call struct {
 }
 
 // Remove is a helper method to define mock.On call
-//   - ctx
-//   - dir
-//   - packages
+//   - ctx context.Context
+//   - dir string
+//   - packages ...string
 func (_e *MockComposer_Expecter) Remove(ctx interface{}, dir interface{}, packages ...interface{}) *MockComposer_Remove_Call {
 	return &MockComposer_Remove_Call{Call: _e.mock.On("Remove",
 		append([]interface{}{ctx, dir}, packages...)...)}
@@ -655,8 +795,25 @@ func (_e *MockComposer_Expecter) Remove(ctx interface{}, dir interface{}, packag
 
 func (_c *MockComposer_Remove_Call) Run(run func(ctx context.Context, dir string, packages ...string)) *MockComposer_Remove_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := args[2].([]string)
-		run(args[0].(context.Context), args[1].(string), variadicArgs...)
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 []string
+		var variadicArgs []string
+		if len(args) > 2 {
+			variadicArgs = args[2].([]string)
+		}
+		arg2 = variadicArgs
+		run(
+			arg0,
+			arg1,
+			arg2...,
+		)
 	})
 	return _c
 }
@@ -709,9 +866,9 @@ type MockComposer_Require_Call struct {
 }
 
 // Require is a helper method to define mock.On call
-//   - ctx
-//   - dir
-//   - args
+//   - ctx context.Context
+//   - dir string
+//   - args ...string
 func (_e *MockComposer_Expecter) Require(ctx interface{}, dir interface{}, args ...interface{}) *MockComposer_Require_Call {
 	return &MockComposer_Require_Call{Call: _e.mock.On("Require",
 		append([]interface{}{ctx, dir}, args...)...)}
@@ -719,8 +876,25 @@ func (_e *MockComposer_Expecter) Require(ctx interface{}, dir interface{}, args 
 
 func (_c *MockComposer_Require_Call) Run(run func(ctx context.Context, dir string, args ...string)) *MockComposer_Require_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		variadicArgs := args[2].([]string)
-		run(args[0].(context.Context), args[1].(string), variadicArgs...)
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 []string
+		var variadicArgs []string
+		if len(args) > 2 {
+			variadicArgs = args[2].([]string)
+		}
+		arg2 = variadicArgs
+		run(
+			arg0,
+			arg1,
+			arg2...,
+		)
 	})
 	return _c
 }
@@ -758,16 +932,32 @@ type MockComposer_SetAllowPlugins_Call struct {
 }
 
 // SetAllowPlugins is a helper method to define mock.On call
-//   - ctx
-//   - dir
-//   - plugins
+//   - ctx context.Context
+//   - dir string
+//   - plugins map[string]bool
 func (_e *MockComposer_Expecter) SetAllowPlugins(ctx interface{}, dir interface{}, plugins interface{}) *MockComposer_SetAllowPlugins_Call {
 	return &MockComposer_SetAllowPlugins_Call{Call: _e.mock.On("SetAllowPlugins", ctx, dir, plugins)}
 }
 
 func (_c *MockComposer_SetAllowPlugins_Call) Run(run func(ctx context.Context, dir string, plugins map[string]bool)) *MockComposer_SetAllowPlugins_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(map[string]bool))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 map[string]bool
+		if args[2] != nil {
+			arg2 = args[2].(map[string]bool)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
 	})
 	return _c
 }
@@ -805,17 +995,38 @@ type MockComposer_SetConfig_Call struct {
 }
 
 // SetConfig is a helper method to define mock.On call
-//   - ctx
-//   - dir
-//   - key
-//   - value
+//   - ctx context.Context
+//   - dir string
+//   - key string
+//   - value string
 func (_e *MockComposer_Expecter) SetConfig(ctx interface{}, dir interface{}, key interface{}, value interface{}) *MockComposer_SetConfig_Call {
 	return &MockComposer_SetConfig_Call{Call: _e.mock.On("SetConfig", ctx, dir, key, value)}
 }
 
 func (_c *MockComposer_SetConfig_Call) Run(run func(ctx context.Context, dir string, key string, value string)) *MockComposer_SetConfig_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
 	})
 	return _c
 }
@@ -864,19 +1075,50 @@ type MockComposer_Update_Call struct {
 }
 
 // Update is a helper method to define mock.On call
-//   - ctx
-//   - dir
-//   - packagesToUpdate
-//   - packagesToKeep
-//   - minimalChanges
-//   - dryRun
+//   - ctx context.Context
+//   - dir string
+//   - packagesToUpdate []string
+//   - packagesToKeep []string
+//   - minimalChanges bool
+//   - dryRun bool
 func (_e *MockComposer_Expecter) Update(ctx interface{}, dir interface{}, packagesToUpdate interface{}, packagesToKeep interface{}, minimalChanges interface{}, dryRun interface{}) *MockComposer_Update_Call {
 	return &MockComposer_Update_Call{Call: _e.mock.On("Update", ctx, dir, packagesToUpdate, packagesToKeep, minimalChanges, dryRun)}
 }
 
 func (_c *MockComposer_Update_Call) Run(run func(ctx context.Context, dir string, packagesToUpdate []string, packagesToKeep []string, minimalChanges bool, dryRun bool)) *MockComposer_Update_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].([]string), args[3].([]string), args[4].(bool), args[5].(bool))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 []string
+		if args[2] != nil {
+			arg2 = args[2].([]string)
+		}
+		var arg3 []string
+		if args[3] != nil {
+			arg3 = args[3].([]string)
+		}
+		var arg4 bool
+		if args[4] != nil {
+			arg4 = args[4].(bool)
+		}
+		var arg5 bool
+		if args[5] != nil {
+			arg5 = args[5].(bool)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+			arg5,
+		)
 	})
 	return _c
 }
@@ -914,15 +1156,26 @@ type MockComposer_UpdateLockHash_Call struct {
 }
 
 // UpdateLockHash is a helper method to define mock.On call
-//   - ctx
-//   - dir
+//   - ctx context.Context
+//   - dir string
 func (_e *MockComposer_Expecter) UpdateLockHash(ctx interface{}, dir interface{}) *MockComposer_UpdateLockHash_Call {
 	return &MockComposer_UpdateLockHash_Call{Call: _e.mock.On("UpdateLockHash", ctx, dir)}
 }
 
 func (_c *MockComposer_UpdateLockHash_Call) Run(run func(ctx context.Context, dir string)) *MockComposer_UpdateLockHash_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
 	})
 	return _c
 }
@@ -996,17 +1249,38 @@ type MockDrush_GetTranslationPath_Call struct {
 }
 
 // GetTranslationPath is a helper method to define mock.On call
-//   - ctx
-//   - dir
-//   - site
-//   - relative
+//   - ctx context.Context
+//   - dir string
+//   - site string
+//   - relative bool
 func (_e *MockDrush_Expecter) GetTranslationPath(ctx interface{}, dir interface{}, site interface{}, relative interface{}) *MockDrush_GetTranslationPath_Call {
 	return &MockDrush_GetTranslationPath_Call{Call: _e.mock.On("GetTranslationPath", ctx, dir, site, relative)}
 }
 
 func (_c *MockDrush_GetTranslationPath_Call) Run(run func(ctx context.Context, dir string, site string, relative bool)) *MockDrush_GetTranslationPath_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(bool))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 bool
+		if args[3] != nil {
+			arg3 = args[3].(bool)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
 	})
 	return _c
 }
@@ -1055,16 +1329,32 @@ type MockDrush_GetUpdateHooks_Call struct {
 }
 
 // GetUpdateHooks is a helper method to define mock.On call
-//   - ctx
-//   - dir
-//   - site
+//   - ctx context.Context
+//   - dir string
+//   - site string
 func (_e *MockDrush_Expecter) GetUpdateHooks(ctx interface{}, dir interface{}, site interface{}) *MockDrush_GetUpdateHooks_Call {
 	return &MockDrush_GetUpdateHooks_Call{Call: _e.mock.On("GetUpdateHooks", ctx, dir, site)}
 }
 
 func (_c *MockDrush_GetUpdateHooks_Call) Run(run func(ctx context.Context, dir string, site string)) *MockDrush_GetUpdateHooks_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
 	})
 	return _c
 }
@@ -1111,17 +1401,38 @@ type MockDrush_IsModuleEnabled_Call struct {
 }
 
 // IsModuleEnabled is a helper method to define mock.On call
-//   - ctx
-//   - dir
-//   - site
-//   - module
+//   - ctx context.Context
+//   - dir string
+//   - site string
+//   - module string
 func (_e *MockDrush_Expecter) IsModuleEnabled(ctx interface{}, dir interface{}, site interface{}, module interface{}) *MockDrush_IsModuleEnabled_Call {
 	return &MockDrush_IsModuleEnabled_Call{Call: _e.mock.On("IsModuleEnabled", ctx, dir, site, module)}
 }
 
 func (_c *MockDrush_IsModuleEnabled_Call) Run(run func(ctx context.Context, dir string, site string, module string)) *MockDrush_IsModuleEnabled_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(string))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
 	})
 	return _c
 }
@@ -1159,16 +1470,32 @@ type MockDrush_LocalizeTranslations_Call struct {
 }
 
 // LocalizeTranslations is a helper method to define mock.On call
-//   - ctx
-//   - dir
-//   - site
+//   - ctx context.Context
+//   - dir string
+//   - site string
 func (_e *MockDrush_Expecter) LocalizeTranslations(ctx interface{}, dir interface{}, site interface{}) *MockDrush_LocalizeTranslations_Call {
 	return &MockDrush_LocalizeTranslations_Call{Call: _e.mock.On("LocalizeTranslations", ctx, dir, site)}
 }
 
 func (_c *MockDrush_LocalizeTranslations_Call) Run(run func(ctx context.Context, dir string, site string)) *MockDrush_LocalizeTranslations_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
 	})
 	return _c
 }
@@ -1242,15 +1569,26 @@ type MockPHPCS_Run_Call struct {
 }
 
 // Run is a helper method to define mock.On call
-//   - ctx
-//   - path
+//   - ctx context.Context
+//   - path string
 func (_e *MockPHPCS_Expecter) Run(ctx interface{}, path interface{}) *MockPHPCS_Run_Call {
 	return &MockPHPCS_Run_Call{Call: _e.mock.On("Run", ctx, path)}
 }
 
 func (_c *MockPHPCS_Run_Call) Run(run func(ctx context.Context, path string)) *MockPHPCS_Run_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
 	})
 	return _c
 }
@@ -1288,15 +1626,26 @@ type MockPHPCS_RunCBF_Call struct {
 }
 
 // RunCBF is a helper method to define mock.On call
-//   - ctx
-//   - path
+//   - ctx context.Context
+//   - path string
 func (_e *MockPHPCS_Expecter) RunCBF(ctx interface{}, path interface{}) *MockPHPCS_RunCBF_Call {
 	return &MockPHPCS_RunCBF_Call{Call: _e.mock.On("RunCBF", ctx, path)}
 }
 
 func (_c *MockPHPCS_RunCBF_Call) Run(run func(ctx context.Context, path string)) *MockPHPCS_RunCBF_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
 	})
 	return _c
 }
@@ -1361,15 +1710,26 @@ type MockRepository_IsSomethingStagedInPath_Call struct {
 }
 
 // IsSomethingStagedInPath is a helper method to define mock.On call
-//   - worktree
-//   - dir
+//   - worktree repo.Worktree
+//   - dir string
 func (_e *MockRepository_Expecter) IsSomethingStagedInPath(worktree interface{}, dir interface{}) *MockRepository_IsSomethingStagedInPath_Call {
 	return &MockRepository_IsSomethingStagedInPath_Call{Call: _e.mock.On("IsSomethingStagedInPath", worktree, dir)}
 }
 
 func (_c *MockRepository_IsSomethingStagedInPath_Call) Run(run func(worktree repo.Worktree, dir string)) *MockRepository_IsSomethingStagedInPath_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(repo.Worktree), args[1].(string))
+		var arg0 repo.Worktree
+		if args[0] != nil {
+			arg0 = args[0].(repo.Worktree)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
 	})
 	return _c
 }
@@ -1443,14 +1803,20 @@ type MockDrupalOrg_FindIssueNumber_Call struct {
 }
 
 // FindIssueNumber is a helper method to define mock.On call
-//   - text
+//   - text string
 func (_e *MockDrupalOrg_Expecter) FindIssueNumber(text interface{}) *MockDrupalOrg_FindIssueNumber_Call {
 	return &MockDrupalOrg_FindIssueNumber_Call{Call: _e.mock.On("FindIssueNumber", text)}
 }
 
 func (_c *MockDrupalOrg_FindIssueNumber_Call) Run(run func(text string)) *MockDrupalOrg_FindIssueNumber_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string))
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }
@@ -1499,14 +1865,20 @@ type MockDrupalOrg_GetIssue_Call struct {
 }
 
 // GetIssue is a helper method to define mock.On call
-//   - issueID
+//   - issueID string
 func (_e *MockDrupalOrg_Expecter) GetIssue(issueID interface{}) *MockDrupalOrg_GetIssue_Call {
 	return &MockDrupalOrg_GetIssue_Call{Call: _e.mock.On("GetIssue", issueID)}
 }
 
 func (_c *MockDrupalOrg_GetIssue_Call) Run(run func(issueID string)) *MockDrupalOrg_GetIssue_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string))
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }
@@ -1580,16 +1952,32 @@ type MockRector_Run_Call struct {
 }
 
 // Run is a helper method to define mock.On call
-//   - ctx
-//   - dir
-//   - customCodeDirectories
+//   - ctx context.Context
+//   - dir string
+//   - customCodeDirectories []string
 func (_e *MockRector_Expecter) Run(ctx interface{}, dir interface{}, customCodeDirectories interface{}) *MockRector_Run_Call {
 	return &MockRector_Run_Call{Call: _e.mock.On("Run", ctx, dir, customCodeDirectories)}
 }
 
 func (_c *MockRector_Run_Call) Run(run func(ctx context.Context, dir string, customCodeDirectories []string)) *MockRector_Run_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].([]string))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 []string
+		if args[2] != nil {
+			arg2 = args[2].([]string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
 	})
 	return _c
 }
@@ -1665,14 +2053,20 @@ type MockWorktree_Add_Call struct {
 }
 
 // Add is a helper method to define mock.On call
-//   - path
+//   - path string
 func (_e *MockWorktree_Expecter) Add(path interface{}) *MockWorktree_Add_Call {
 	return &MockWorktree_Add_Call{Call: _e.mock.On("Add", path)}
 }
 
 func (_c *MockWorktree_Add_Call) Run(run func(path string)) *MockWorktree_Add_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string))
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }
@@ -1710,14 +2104,20 @@ type MockWorktree_AddGlob_Call struct {
 }
 
 // AddGlob is a helper method to define mock.On call
-//   - pattern
+//   - pattern string
 func (_e *MockWorktree_Expecter) AddGlob(pattern interface{}) *MockWorktree_AddGlob_Call {
 	return &MockWorktree_AddGlob_Call{Call: _e.mock.On("AddGlob", pattern)}
 }
 
 func (_c *MockWorktree_AddGlob_Call) Run(run func(pattern string)) *MockWorktree_AddGlob_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string))
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }
@@ -1755,14 +2155,20 @@ type MockWorktree_Checkout_Call struct {
 }
 
 // Checkout is a helper method to define mock.On call
-//   - opts
+//   - opts *git.CheckoutOptions
 func (_e *MockWorktree_Expecter) Checkout(opts interface{}) *MockWorktree_Checkout_Call {
 	return &MockWorktree_Checkout_Call{Call: _e.mock.On("Checkout", opts)}
 }
 
 func (_c *MockWorktree_Checkout_Call) Run(run func(opts *git.CheckoutOptions)) *MockWorktree_Checkout_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(*git.CheckoutOptions))
+		var arg0 *git.CheckoutOptions
+		if args[0] != nil {
+			arg0 = args[0].(*git.CheckoutOptions)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }
@@ -1811,15 +2217,26 @@ type MockWorktree_Commit_Call struct {
 }
 
 // Commit is a helper method to define mock.On call
-//   - msg
-//   - opts
+//   - msg string
+//   - opts *git.CommitOptions
 func (_e *MockWorktree_Expecter) Commit(msg interface{}, opts interface{}) *MockWorktree_Commit_Call {
 	return &MockWorktree_Commit_Call{Call: _e.mock.On("Commit", msg, opts)}
 }
 
 func (_c *MockWorktree_Commit_Call) Run(run func(msg string, opts *git.CommitOptions)) *MockWorktree_Commit_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(*git.CommitOptions))
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		var arg1 *git.CommitOptions
+		if args[1] != nil {
+			arg1 = args[1].(*git.CommitOptions)
+		}
+		run(
+			arg0,
+			arg1,
+		)
 	})
 	return _c
 }
@@ -1868,14 +2285,20 @@ type MockWorktree_Remove_Call struct {
 }
 
 // Remove is a helper method to define mock.On call
-//   - path
+//   - path string
 func (_e *MockWorktree_Expecter) Remove(path interface{}) *MockWorktree_Remove_Call {
 	return &MockWorktree_Remove_Call{Call: _e.mock.On("Remove", path)}
 }
 
 func (_c *MockWorktree_Remove_Call) Run(run func(path string)) *MockWorktree_Remove_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string))
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }

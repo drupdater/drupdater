@@ -67,17 +67,38 @@ type MockPlatform_CreateMergeRequest_Call struct {
 }
 
 // CreateMergeRequest is a helper method to define mock.On call
-//   - title
-//   - description
-//   - sourceBranch
-//   - targetBranch
+//   - title string
+//   - description string
+//   - sourceBranch string
+//   - targetBranch string
 func (_e *MockPlatform_Expecter) CreateMergeRequest(title interface{}, description interface{}, sourceBranch interface{}, targetBranch interface{}) *MockPlatform_CreateMergeRequest_Call {
 	return &MockPlatform_CreateMergeRequest_Call{Call: _e.mock.On("CreateMergeRequest", title, description, sourceBranch, targetBranch)}
 }
 
 func (_c *MockPlatform_CreateMergeRequest_Call) Run(run func(title string, description string, sourceBranch string, targetBranch string)) *MockPlatform_CreateMergeRequest_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(string), args[2].(string), args[3].(string))
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
 	})
 	return _c
 }
@@ -115,14 +136,20 @@ type MockPlatform_DownloadComposerFiles_Call struct {
 }
 
 // DownloadComposerFiles is a helper method to define mock.On call
-//   - branch
+//   - branch string
 func (_e *MockPlatform_Expecter) DownloadComposerFiles(branch interface{}) *MockPlatform_DownloadComposerFiles_Call {
 	return &MockPlatform_DownloadComposerFiles_Call{Call: _e.mock.On("DownloadComposerFiles", branch)}
 }
 
 func (_c *MockPlatform_DownloadComposerFiles_Call) Run(run func(branch string)) *MockPlatform_DownloadComposerFiles_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string))
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }
