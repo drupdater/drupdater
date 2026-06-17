@@ -197,24 +197,24 @@ func TestInstallSite(t *testing.T) {
 	cli := NewCLI(logger, cache)
 
 	t.Run("success", func(t *testing.T) {
+		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
+		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
 		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", "ok"}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
-			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_RAW=1", "GOCOVERDIR=/tmp"}
-			return cmd
+			return exec.Command(os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
 		assert.NoError(t, cli.InstallSite(t.Context(), "/tmp", "default"))
 	})
 
 	t.Run("error", func(t *testing.T) {
+		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
+		t.Setenv("GO_HELPER_PROCESS_ERROR", "1")
 		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--"}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
-			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
-			return cmd
+			return exec.Command(os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
 		err := cli.InstallSite(t.Context(), "/tmp", "default")
@@ -229,12 +229,12 @@ func TestGetConfigSyncDir(t *testing.T) {
 	t.Run("absolute path", func(t *testing.T) {
 		cache, _ := otter.MustBuilder[string, string](100).Build()
 		cli := NewCLI(logger, cache)
+		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
+		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
 		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", "/tmp/config/sync"}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
-			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_RAW=1", "GOCOVERDIR=/tmp"}
-			return cmd
+			return exec.Command(os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
 		dir, err := cli.GetConfigSyncDir(t.Context(), "/tmp", "site1", false)
@@ -245,12 +245,12 @@ func TestGetConfigSyncDir(t *testing.T) {
 	t.Run("relative path", func(t *testing.T) {
 		cache, _ := otter.MustBuilder[string, string](100).Build()
 		cli := NewCLI(logger, cache)
+		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
+		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
 		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", "/tmp/config/sync"}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
-			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_RAW=1", "GOCOVERDIR=/tmp"}
-			return cmd
+			return exec.Command(os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
 		dir, err := cli.GetConfigSyncDir(t.Context(), "/tmp", "site1", true)
@@ -261,14 +261,14 @@ func TestGetConfigSyncDir(t *testing.T) {
 	t.Run("cache hit", func(t *testing.T) {
 		cache, _ := otter.MustBuilder[string, string](100).Build()
 		cli := NewCLI(logger, cache)
+		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
+		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
 		callCount := 0
 		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
 			callCount++
 			cs := []string{"-test.run=TestHelperProcess", "--", "/cached/path"}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
-			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_RAW=1", "GOCOVERDIR=/tmp"}
-			return cmd
+			return exec.Command(os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
 		v1, _ := cli.GetConfigSyncDir(t.Context(), "/tmp", "site1", false)
@@ -280,12 +280,12 @@ func TestGetConfigSyncDir(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
 		cache, _ := otter.MustBuilder[string, string](100).Build()
 		cli := NewCLI(logger, cache)
+		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
+		t.Setenv("GO_HELPER_PROCESS_ERROR", "1")
 		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--"}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
-			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
-			return cmd
+			return exec.Command(os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
 		_, err := cli.GetConfigSyncDir(t.Context(), "/tmp", "site1", false)
@@ -299,24 +299,24 @@ func TestExportConfiguration(t *testing.T) {
 	cli := NewCLI(logger, cache)
 
 	t.Run("success", func(t *testing.T) {
+		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
+		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
 		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", "ok"}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
-			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_RAW=1", "GOCOVERDIR=/tmp"}
-			return cmd
+			return exec.Command(os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
 		assert.NoError(t, cli.ExportConfiguration(t.Context(), "/tmp", "site1"))
 	})
 
 	t.Run("error", func(t *testing.T) {
+		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
+		t.Setenv("GO_HELPER_PROCESS_ERROR", "1")
 		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--"}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
-			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
-			return cmd
+			return exec.Command(os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
 		assert.Error(t, cli.ExportConfiguration(t.Context(), "/tmp", "site1"))
@@ -329,24 +329,24 @@ func TestUpdateSite(t *testing.T) {
 	cli := NewCLI(logger, cache)
 
 	t.Run("success", func(t *testing.T) {
+		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
+		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
 		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", "ok"}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
-			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_RAW=1", "GOCOVERDIR=/tmp"}
-			return cmd
+			return exec.Command(os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
 		assert.NoError(t, cli.UpdateSite(t.Context(), "/tmp", "site1"))
 	})
 
 	t.Run("error", func(t *testing.T) {
+		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
+		t.Setenv("GO_HELPER_PROCESS_ERROR", "1")
 		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--"}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
-			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
-			return cmd
+			return exec.Command(os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
 		assert.Error(t, cli.UpdateSite(t.Context(), "/tmp", "site1"))
@@ -359,24 +359,24 @@ func TestConfigResave(t *testing.T) {
 	cli := NewCLI(logger, cache)
 
 	t.Run("success", func(t *testing.T) {
+		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
+		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
 		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", "ok"}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
-			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_RAW=1", "GOCOVERDIR=/tmp"}
-			return cmd
+			return exec.Command(os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
 		assert.NoError(t, cli.ConfigResave(t.Context(), "/tmp", "site1"))
 	})
 
 	t.Run("error", func(t *testing.T) {
+		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
+		t.Setenv("GO_HELPER_PROCESS_ERROR", "1")
 		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--"}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
-			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
-			return cmd
+			return exec.Command(os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
 		assert.Error(t, cli.ConfigResave(t.Context(), "/tmp", "site1"))
@@ -389,12 +389,12 @@ func TestIsModuleEnabled(t *testing.T) {
 	cli := NewCLI(logger, cache)
 
 	t.Run("enabled", func(t *testing.T) {
+		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
+		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
 		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", "mymodule"}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
-			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_RAW=1", "GOCOVERDIR=/tmp"}
-			return cmd
+			return exec.Command(os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
 		enabled, err := cli.IsModuleEnabled(t.Context(), "/tmp", "site1", "mymodule")
@@ -403,12 +403,12 @@ func TestIsModuleEnabled(t *testing.T) {
 	})
 
 	t.Run("not enabled", func(t *testing.T) {
+		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
+		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
 		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", ""}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
-			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_RAW=1", "GOCOVERDIR=/tmp"}
-			return cmd
+			return exec.Command(os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
 		enabled, err := cli.IsModuleEnabled(t.Context(), "/tmp", "site1", "mymodule")
@@ -423,24 +423,24 @@ func TestLocalizeTranslations(t *testing.T) {
 	cli := NewCLI(logger, cache)
 
 	t.Run("success", func(t *testing.T) {
+		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
+		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
 		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", "ok"}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
-			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_RAW=1", "GOCOVERDIR=/tmp"}
-			return cmd
+			return exec.Command(os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
 		assert.NoError(t, cli.LocalizeTranslations(t.Context(), "/tmp", "site1"))
 	})
 
 	t.Run("error", func(t *testing.T) {
+		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
+		t.Setenv("GO_HELPER_PROCESS_ERROR", "1")
 		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--"}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
-			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
-			return cmd
+			return exec.Command(os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
 		assert.Error(t, cli.LocalizeTranslations(t.Context(), "/tmp", "site1"))
@@ -453,12 +453,12 @@ func TestGetTranslationPath(t *testing.T) {
 	t.Run("absolute path", func(t *testing.T) {
 		cache, _ := otter.MustBuilder[string, string](100).Build()
 		cli := NewCLI(logger, cache)
+		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
+		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
 		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", "/tmp/translations"}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
-			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_RAW=1", "GOCOVERDIR=/tmp"}
-			return cmd
+			return exec.Command(os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
 		path, err := cli.GetTranslationPath(t.Context(), "/tmp", "site1", false)
@@ -469,12 +469,12 @@ func TestGetTranslationPath(t *testing.T) {
 	t.Run("relative path", func(t *testing.T) {
 		cache, _ := otter.MustBuilder[string, string](100).Build()
 		cli := NewCLI(logger, cache)
+		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
+		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
 		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", "/tmp/translations"}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
-			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_RAW=1", "GOCOVERDIR=/tmp"}
-			return cmd
+			return exec.Command(os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
 		path, err := cli.GetTranslationPath(t.Context(), "/tmp", "site1", true)
@@ -485,14 +485,14 @@ func TestGetTranslationPath(t *testing.T) {
 	t.Run("cache hit", func(t *testing.T) {
 		cache, _ := otter.MustBuilder[string, string](100).Build()
 		cli := NewCLI(logger, cache)
+		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
+		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
 		callCount := 0
 		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
 			callCount++
 			cs := []string{"-test.run=TestHelperProcess", "--", "/cached/translations"}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
-			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_RAW=1", "GOCOVERDIR=/tmp"}
-			return cmd
+			return exec.Command(os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
 		v1, _ := cli.GetTranslationPath(t.Context(), "/tmp", "site1", false)
