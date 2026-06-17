@@ -27,8 +27,8 @@ func NewTranslationsUpdater(logger *zap.Logger, drush Drush, repository Reposito
 }
 
 // SubscribedEvents returns the events this addon listens to
-func (tu *TranslationsUpdater) SubscribedEvents() map[string]interface{} {
-	return map[string]interface{}{
+func (tu *TranslationsUpdater) SubscribedEvents() map[string]any {
+	return map[string]any{
 		"post-site-update": event.ListenerItem{
 			Priority: event.Normal,
 			Listener: event.ListenerFunc(tu.postSiteUpdateHandler),

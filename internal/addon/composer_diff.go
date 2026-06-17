@@ -27,8 +27,8 @@ func NewComposerDiff(logger *zap.Logger, composer Composer) *ComposerDiff {
 }
 
 // SubscribedEvents returns the events this addon listens to.
-func (cd *ComposerDiff) SubscribedEvents() map[string]interface{} {
-	return map[string]interface{}{
+func (cd *ComposerDiff) SubscribedEvents() map[string]any {
+	return map[string]any{
 		"post-composer-update": event.ListenerItem{
 			Priority: event.Min,
 			Listener: event.ListenerFunc(cd.postComposerUpdateHandler),

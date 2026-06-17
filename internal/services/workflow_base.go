@@ -375,7 +375,7 @@ func (ws *WorkflowBaseService) publishWork(repository GitRepository, updateBranc
 	return nil
 }
 
-func (ws *WorkflowBaseService) GenerateDescription(data interface{}, filename string) (string, error) {
+func (ws *WorkflowBaseService) GenerateDescription(data any, filename string) (string, error) {
 	tmpl, err := template.ParseFS(templates, "templates/*.go.tmpl")
 	if err != nil {
 		return "", fmt.Errorf("failed to parse template: %w", err)

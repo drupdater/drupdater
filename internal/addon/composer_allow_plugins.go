@@ -28,8 +28,8 @@ func NewComposerAllowPlugins(logger *zap.Logger, composer Composer) *ComposerAll
 }
 
 // SubscribedEvents returns the events this addon subscribes to
-func (ap *ComposerAllowPlugins) SubscribedEvents() map[string]interface{} {
-	return map[string]interface{}{
+func (ap *ComposerAllowPlugins) SubscribedEvents() map[string]any {
+	return map[string]any{
 		"pre-composer-update": event.ListenerItem{
 			Priority: event.Normal,
 			Listener: event.ListenerFunc(ap.preComposerUpdateHandler),
