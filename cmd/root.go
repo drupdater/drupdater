@@ -65,15 +65,12 @@ var rootCmd = &cobra.Command{
 		vcsProviderFactory := codehosting.NewDefaultVcsProviderFactory()
 		platform := vcsProviderFactory.Create(config.RepositoryURL, config.Token)
 		git := repo.NewGitRepositoryService(logger)
-		workflow := services.NewWorkflowBaseService(logger, config, drush, platform, git, installer, composer)
 
-		// Register addons based on configuration
+		// Create the event dispatcher and register addons as subscribers
 		addons := createAddons(logger, config, drush, composer, drupalOrg, git)
+		dispatcher := createDispatcher(addons)
 
-		// Register all addons as event subscribers
-		for _, addon := range addons {
-			event.AddSubscriber(addon)
-		}
+		workflow := services.NewWorkflowBaseService(logger, config, drush, platform, git, installer, composer, dispatcher)
 
 		// Start the update workflow
 		err := workflow.StartUpdate(cmd.Context(), addons)
@@ -122,6 +119,15 @@ func createAddons(
 	)
 
 	return addons
+}
+
+// createDispatcher creates a new event manager and subscribes all addons to it.
+func createDispatcher(addons []internal.Addon) *event.Manager {
+	dispatcher := event.NewManager("")
+	for _, addon := range addons {
+		dispatcher.AddSubscriber(addon)
+	}
+	return dispatcher
 }
 
 // handleWorkflowError logs AbortErrors as warnings (non-fatal) and all others as errors (fatal).

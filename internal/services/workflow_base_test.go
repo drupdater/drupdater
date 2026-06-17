@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"os"
 	"testing"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/drupdater/drupdater/internal/codehosting"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/gookit/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"go.uber.org/zap"
@@ -68,7 +70,7 @@ func TestStartUpdate(t *testing.T) {
 	mockComposer.EXPECT().GetLockHash("/tmp").Return("dummy-hash", nil)
 
 	// Execute
-	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
+	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
 	err = workflowService.StartUpdate(ctx, nil)
 
 	// Assert
@@ -121,7 +123,7 @@ func TestStartUpdateNoChanges(t *testing.T) {
 	drush.EXPECT().ConfigResave(mock.Anything, "/tmp", "site1").Return(nil).Maybe()
 
 	// Execute
-	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
+	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
 	err := workflowService.StartUpdate(ctx, nil)
 
 	// Assert: should get an AbortError, not a nil or other error
@@ -180,7 +182,7 @@ func TestStartUpdateBranchAlreadyExists(t *testing.T) {
 	drush.EXPECT().ConfigResave(mock.Anything, "/tmp", "site1").Return(nil).Maybe()
 
 	// Execute
-	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
+	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
 	err := workflowService.StartUpdate(ctx, nil)
 
 	// Assert: should get an AbortError, not a nil or other error
@@ -238,7 +240,7 @@ func TestStartUpdateWithDryRun(t *testing.T) {
 	mockComposer.EXPECT().GetLockHash("/tmp").Return("dummy-hash", nil)
 
 	// Execute
-	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
+	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
 	err := workflowService.StartUpdate(ctx, nil)
 
 	// Assert
@@ -249,4 +251,52 @@ func TestStartUpdateWithDryRun(t *testing.T) {
 	drush.AssertExpectations(t)
 	mockComposer.AssertExpectations(t)
 	vcsProvider.AssertExpectations(t)
+}
+
+func TestStartUpdateFireEventError(t *testing.T) {
+	// Verify that a FireEvent error is propagated out of StartUpdate.
+	logger := zap.NewNop()
+	installer := NewMockInstaller(t)
+	repositoryService := NewMockRepository(t)
+	vcsProvider := NewMockPlatform(t)
+	repository := NewMockGitRepository(t)
+	mockComposer := NewMockComposer(t)
+	drush := NewMockDrush(t)
+	dispatcher := NewMockEventDispatcher(t)
+	ctx := context.Background()
+
+	config := internal.Config{
+		RepositoryURL: "https://example.com/repo.git",
+		Branch:        "main",
+		Token:         "token",
+		Sites:         []string{"site1"},
+		DryRun:        false,
+	}
+
+	worktree := NewMockWorktree(t)
+
+	vcsProvider.EXPECT().GetUser().Return("user", "mail")
+
+	// installCode and updateSharedCode each clone the repository.
+	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").
+		Return(repository, worktree, "/tmp", nil).Times(2)
+
+	mockComposer.EXPECT().Install(mock.Anything, "/tmp").Return(nil)
+
+	// The dispatcher returns an error on the first FireEvent call (PreComposerUpdateEvent).
+	fireErr := errors.New("event bus unavailable")
+	dispatcher.EXPECT().FireEvent(mock.Anything).Return(fireErr)
+
+	// installSite may or may not run before the context is cancelled.
+	installer.EXPECT().Install(mock.Anything, "/tmp", "site1").Return(nil).Maybe()
+	installer.EXPECT().ConfigureDatabase(mock.Anything, "/tmp", "site1").Return(nil).Maybe()
+	drush.EXPECT().UpdateSite(mock.Anything, "/tmp", "site1").Return(nil).Maybe()
+	drush.EXPECT().ExportConfiguration(mock.Anything, "/tmp", "site1").Return(nil).Maybe()
+	drush.EXPECT().ConfigResave(mock.Anything, "/tmp", "site1").Return(nil).Maybe()
+
+	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, dispatcher)
+	err := workflowService.StartUpdate(ctx, nil)
+
+	assert.ErrorContains(t, err, "failed to fire event")
+	assert.ErrorContains(t, err, "event bus unavailable")
 }
