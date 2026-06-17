@@ -79,6 +79,23 @@ func TestGithub_GetUser_Returns403FallbackSilently(t *testing.T) {
 	assert.Equal(t, "41898282+github-actions[bot]@users.noreply.github.com", email)
 }
 
+func TestGithub_GetUser_Returns403ErrorForBadCredentials(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"message":"Bad credentials","documentation_url":"https://docs.github.com/rest"}`))
+	}))
+	defer mockServer.Close()
+
+	client, _ := github.NewClient(nil).WithEnterpriseURLs(mockServer.URL, "")
+	gh := &Github{client: client, owner: "o", repo: "r", fs: afero.NewMemMapFs()}
+
+	name, email := gh.GetUser()
+
+	assert.Empty(t, name)
+	assert.Empty(t, email)
+}
+
 func TestGithub_GetUser_ReturnsUserOnSuccess(t *testing.T) {
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
