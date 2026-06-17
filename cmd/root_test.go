@@ -1,12 +1,16 @@
 package cmd
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/internal/services"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 func TestNewLogger(t *testing.T) {
@@ -53,6 +57,39 @@ func TestNewCache(t *testing.T) {
 
 	assert.True(t, found)
 	assert.Equal(t, "test_value", value)
+}
+
+func TestHandleWorkflowError(t *testing.T) {
+	t.Run("AbortError logs warning with message not nil", func(t *testing.T) {
+		core, logs := observer.New(zap.WarnLevel)
+		logger := zap.New(core)
+
+		abortErr := services.AbortError{Msg: "branch already exists, skipping"}
+		result := handleWorkflowError(logger, abortErr)
+
+		assert.NoError(t, result)
+		assert.Equal(t, 1, logs.Len())
+		assert.Equal(t, zap.WarnLevel, logs.All()[0].Level)
+		assert.Equal(t, abortErr.Error(), logs.All()[0].Message)
+	})
+
+	t.Run("regular error logs at error level and is returned", func(t *testing.T) {
+		core, logs := observer.New(zap.ErrorLevel)
+		logger := zap.New(core)
+
+		regularErr := errors.New("something went wrong")
+		result := handleWorkflowError(logger, regularErr)
+
+		assert.ErrorIs(t, result, regularErr)
+		assert.Equal(t, 1, logs.Len())
+		assert.Equal(t, zap.ErrorLevel, logs.All()[0].Level)
+	})
+
+	t.Run("errors.Unwrap returns nil for AbortError confirming fix is needed", func(t *testing.T) {
+		abortErr := services.AbortError{Msg: "no changes detected"}
+		assert.Nil(t, errors.Unwrap(abortErr), "AbortError has no wrapped error, so Unwrap returns nil")
+		assert.Equal(t, "no changes detected", abortErr.Error())
+	})
 }
 
 func TestCreateAddons(t *testing.T) {
