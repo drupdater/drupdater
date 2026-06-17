@@ -65,15 +65,15 @@ var rootCmd = &cobra.Command{
 		vcsProviderFactory := codehosting.NewDefaultVcsProviderFactory()
 		platform := vcsProviderFactory.Create(config.RepositoryURL, config.Token)
 		git := repo.NewGitRepositoryService(logger)
-		workflow := services.NewWorkflowBaseService(logger, config, drush, platform, git, installer, composer)
 
-		// Register addons based on configuration
+		// Create the event dispatcher and register addons as subscribers
 		addons := createAddons(logger, config, drush, composer, drupalOrg, git)
-
-		// Register all addons as event subscribers
+		dispatcher := event.NewManager("")
 		for _, addon := range addons {
-			event.AddSubscriber(addon)
+			dispatcher.AddSubscriber(addon)
 		}
+
+		workflow := services.NewWorkflowBaseService(logger, config, drush, platform, git, installer, composer, dispatcher)
 
 		// Start the update workflow
 		err := workflow.StartUpdate(cmd.Context(), addons)

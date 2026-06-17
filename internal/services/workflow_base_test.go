@@ -9,6 +9,7 @@ import (
 	"github.com/drupdater/drupdater/internal/codehosting"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/gookit/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"go.uber.org/zap"
@@ -68,7 +69,7 @@ func TestStartUpdate(t *testing.T) {
 	mockComposer.EXPECT().GetLockHash("/tmp").Return("dummy-hash", nil)
 
 	// Execute
-	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
+	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
 	err = workflowService.StartUpdate(ctx, nil)
 
 	// Assert
@@ -121,7 +122,7 @@ func TestStartUpdateNoChanges(t *testing.T) {
 	drush.EXPECT().ConfigResave(mock.Anything, "/tmp", "site1").Return(nil).Maybe()
 
 	// Execute
-	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
+	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
 	err := workflowService.StartUpdate(ctx, nil)
 
 	// Assert: should get an AbortError, not a nil or other error
@@ -180,7 +181,7 @@ func TestStartUpdateBranchAlreadyExists(t *testing.T) {
 	drush.EXPECT().ConfigResave(mock.Anything, "/tmp", "site1").Return(nil).Maybe()
 
 	// Execute
-	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
+	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
 	err := workflowService.StartUpdate(ctx, nil)
 
 	// Assert: should get an AbortError, not a nil or other error
@@ -238,7 +239,7 @@ func TestStartUpdateWithDryRun(t *testing.T) {
 	mockComposer.EXPECT().GetLockHash("/tmp").Return("dummy-hash", nil)
 
 	// Execute
-	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
+	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
 	err := workflowService.StartUpdate(ctx, nil)
 
 	// Assert
