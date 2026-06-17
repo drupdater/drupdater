@@ -42,7 +42,7 @@ func (g Github) CreateMergeRequest(title string, description string, sourceBranc
 		return MergeRequest{}, fmt.Errorf("failed to create pull request: %w", err)
 	}
 	return MergeRequest{
-		ID:  mr.GetNumber(),
+		ID:  int64(mr.GetNumber()),
 		URL: mr.GetHTMLURL(),
 	}, nil
 }

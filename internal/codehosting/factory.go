@@ -18,7 +18,7 @@ type Platform interface {
 
 // MergeRequest represents a merge or pull request on a code hosting platform.
 type MergeRequest struct {
-	ID  int    `json:"id"`
+	ID  int64  `json:"id"`
 	URL string `json:"url"`
 }
 
