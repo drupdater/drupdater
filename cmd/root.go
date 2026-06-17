@@ -88,10 +88,10 @@ var rootCmd = &cobra.Command{
 func createAddons(
 	logger *zap.Logger,
 	config internal.Config,
-	drush *drush.CLI,
-	composer *composer.CLI,
-	drupalOrg *drupalorg.HTTPClient,
-	git *repo.GitRepositoryService,
+	drush addon.Drush,
+	composer addon.Composer,
+	drupalOrg addon.DrupalOrg,
+	git addon.Repository,
 ) []internal.Addon {
 	var addons []internal.Addon
 
@@ -122,7 +122,7 @@ func createAddons(
 }
 
 // createDispatcher creates a new event manager and subscribes all addons to it.
-func createDispatcher(addons []internal.Addon) *event.Manager {
+func createDispatcher(addons []internal.Addon) services.EventDispatcher {
 	dispatcher := event.NewManager("")
 	for _, addon := range addons {
 		dispatcher.AddSubscriber(addon)
