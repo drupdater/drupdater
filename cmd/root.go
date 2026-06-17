@@ -78,10 +78,7 @@ var rootCmd = &cobra.Command{
 		// Start the update workflow
 		err := workflow.StartUpdate(cmd.Context(), addons)
 		if err != nil {
-			if errors.As(err, &services.AbortError{}) {
-				logger.Sugar().Warn(errors.Unwrap(err))
-			} else {
-				logger.Sugar().Error(err)
+			if err := handleWorkflowError(logger, err); err != nil {
 				return err
 			}
 		}
@@ -125,6 +122,16 @@ func createAddons(
 	)
 
 	return addons
+}
+
+// handleWorkflowError logs AbortErrors as warnings (non-fatal) and all others as errors (fatal).
+func handleWorkflowError(logger *zap.Logger, err error) error {
+	if errors.As(err, &services.AbortError{}) {
+		logger.Sugar().Warn(err)
+		return nil
+	}
+	logger.Sugar().Error(err)
+	return err
 }
 
 func init() {
