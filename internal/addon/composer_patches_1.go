@@ -268,7 +268,7 @@ func (h *ComposerPatches1) updatePatches(ctx context.Context, path string, workt
 							// and we need to use the fork project as source project.
 							opt := struct {
 								gitlab.ListProjectMergeRequestsOptions
-								SourceProjectID int `url:"source_project_id"`
+								SourceProjectID int64 `url:"source_project_id"`
 							}{
 								SourceProjectID: forkProject.ID,
 							}

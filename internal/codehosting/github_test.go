@@ -59,7 +59,7 @@ func TestGithub_CreateMergeRequest(t *testing.T) {
 
 	// Assert
 	assert.NoError(t, err)
-	assert.Equal(t, 1, mr.ID)
+	assert.Equal(t, int64(1), mr.ID)
 	assert.Equal(t, "http://example.com", mr.URL)
 }
 
