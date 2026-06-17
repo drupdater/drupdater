@@ -119,7 +119,11 @@ func (g *Github) GetUser() (name string, email string) {
 		return "", ""
 	}
 
-	return user.GetName(), user.GetEmail()
+	email = user.GetEmail()
+	if email == "" {
+		email = fmt.Sprintf("%d+%s@users.noreply.github.com", user.GetID(), user.GetLogin())
+	}
+	return user.GetName(), email
 }
 
 // isGitHubActionsToken403 reports whether the error is the specific 403 returned
