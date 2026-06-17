@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/drupdater/drupdater/internal"
-	"github.com/gookit/event"
 
 	git "github.com/go-git/go-git/v5"
 	gitConfig "github.com/go-git/go-git/v5/config"
@@ -45,6 +44,7 @@ type WorkflowBaseService struct {
 	repository Repository
 	installer  Installer
 	composer   Composer
+	dispatcher EventDispatcher
 	current    time.Time
 }
 
@@ -56,6 +56,7 @@ func NewWorkflowBaseService(
 	repository Repository,
 	installer Installer,
 	composerService Composer,
+	dispatcher EventDispatcher,
 ) *WorkflowBaseService {
 	return &WorkflowBaseService{
 		logger:     logger,
@@ -65,6 +66,7 @@ func NewWorkflowBaseService(
 		repository: repository,
 		installer:  installer,
 		composer:   composerService,
+		dispatcher: dispatcher,
 		current:    time.Now(),
 	}
 }
@@ -248,7 +250,7 @@ func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context) (SharedUpda
 	ws.logger.Info("updating dependencies")
 
 	preComposerUpdateEvent := NewPreComposerUpdateEvent(ctx, path, worktree, []string{}, []string{}, false)
-	err = event.FireEvent(preComposerUpdateEvent)
+	err = ws.dispatcher.FireEvent(preComposerUpdateEvent)
 	if err != nil {
 		return SharedUpdate{}, fmt.Errorf("failed to fire event: %w", err)
 	}
@@ -262,7 +264,7 @@ func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context) (SharedUpda
 	}
 
 	postComposerUpdateEvent := NewPostComposerUpdateEvent(ctx, path, worktree)
-	err = event.FireEvent(postComposerUpdateEvent)
+	err = ws.dispatcher.FireEvent(postComposerUpdateEvent)
 	if err != nil {
 		return SharedUpdate{}, fmt.Errorf("failed to fire event: %w", err)
 	}
@@ -276,7 +278,7 @@ func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context) (SharedUpda
 	}
 
 	postCodeUpdateEvent := NewPostCodeUpdateEvent(ctx, path, worktree)
-	err = event.FireEvent(postCodeUpdateEvent)
+	err = ws.dispatcher.FireEvent(postCodeUpdateEvent)
 	if err != nil {
 		return SharedUpdate{}, fmt.Errorf("failed to fire event: %w", err)
 	}
@@ -325,7 +327,7 @@ func (ws *WorkflowBaseService) updateSite(ctx context.Context, sharedUpdate Shar
 	}
 
 	preSiteUpdateEvent := NewPreSiteUpdateEvent(ctx, sharedUpdate.Path, sharedUpdate.Worktree, site)
-	if err := event.FireEvent(preSiteUpdateEvent); err != nil {
+	if err := ws.dispatcher.FireEvent(preSiteUpdateEvent); err != nil {
 		return fmt.Errorf("failed to fire event: %w", err)
 	}
 
@@ -340,7 +342,7 @@ func (ws *WorkflowBaseService) updateSite(ctx context.Context, sharedUpdate Shar
 	}
 
 	postSiteUpdateEvent := NewPostSiteUpdateEvent(ctx, sharedUpdate.Path, sharedUpdate.Worktree, site)
-	if err := event.FireEvent(postSiteUpdateEvent); err != nil {
+	if err := ws.dispatcher.FireEvent(postSiteUpdateEvent); err != nil {
 		return fmt.Errorf("failed to fire event: %w", err)
 	}
 
@@ -381,7 +383,7 @@ func (ws *WorkflowBaseService) publishWork(repository GitRepository, updateBranc
 	}
 
 	e := NewPreMergeRequestCreateEvent(title)
-	err = event.FireEvent(e)
+	err = ws.dispatcher.FireEvent(e)
 	if err != nil {
 		return fmt.Errorf("failed to fire event: %w", err)
 	}

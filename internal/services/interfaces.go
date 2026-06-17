@@ -6,6 +6,7 @@ import (
 	"github.com/drupdater/drupdater/internal/codehosting"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/repo"
+	"github.com/gookit/event"
 )
 
 type Composer interface {
@@ -40,4 +41,10 @@ type Platform interface {
 	CreateMergeRequest(title string, description string, sourceBranch string, targetBranch string) (codehosting.MergeRequest, error)
 	DownloadComposerFiles(branch string) string
 	GetUser() (name string, email string)
+}
+
+// EventDispatcher abstracts the event bus so it can be injected and tested independently.
+type EventDispatcher interface {
+	FireEvent(e event.Event) error
+	AddSubscriber(subscriber event.Subscriber)
 }

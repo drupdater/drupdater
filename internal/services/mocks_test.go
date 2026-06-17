@@ -14,6 +14,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/storer"
+	"github.com/gookit/event"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -76,14 +77,20 @@ type MockComposer_GetLockHash_Call struct {
 }
 
 // GetLockHash is a helper method to define mock.On call
-//   - dir
+//   - dir string
 func (_e *MockComposer_Expecter) GetLockHash(dir interface{}) *MockComposer_GetLockHash_Call {
 	return &MockComposer_GetLockHash_Call{Call: _e.mock.On("GetLockHash", dir)}
 }
 
 func (_c *MockComposer_GetLockHash_Call) Run(run func(dir string)) *MockComposer_GetLockHash_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string))
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }
@@ -121,15 +128,26 @@ type MockComposer_Install_Call struct {
 }
 
 // Install is a helper method to define mock.On call
-//   - ctx
-//   - dir
+//   - ctx context.Context
+//   - dir string
 func (_e *MockComposer_Expecter) Install(ctx interface{}, dir interface{}) *MockComposer_Install_Call {
 	return &MockComposer_Install_Call{Call: _e.mock.On("Install", ctx, dir)}
 }
 
 func (_c *MockComposer_Install_Call) Run(run func(ctx context.Context, dir string)) *MockComposer_Install_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
 	})
 	return _c
 }
@@ -178,19 +196,50 @@ type MockComposer_Update_Call struct {
 }
 
 // Update is a helper method to define mock.On call
-//   - ctx
-//   - dir
-//   - packagesToUpdate
-//   - packagesToKeep
-//   - minimalChanges
-//   - dryRun
+//   - ctx context.Context
+//   - dir string
+//   - packagesToUpdate []string
+//   - packagesToKeep []string
+//   - minimalChanges bool
+//   - dryRun bool
 func (_e *MockComposer_Expecter) Update(ctx interface{}, dir interface{}, packagesToUpdate interface{}, packagesToKeep interface{}, minimalChanges interface{}, dryRun interface{}) *MockComposer_Update_Call {
 	return &MockComposer_Update_Call{Call: _e.mock.On("Update", ctx, dir, packagesToUpdate, packagesToKeep, minimalChanges, dryRun)}
 }
 
 func (_c *MockComposer_Update_Call) Run(run func(ctx context.Context, dir string, packagesToUpdate []string, packagesToKeep []string, minimalChanges bool, dryRun bool)) *MockComposer_Update_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].([]string), args[3].([]string), args[4].(bool), args[5].(bool))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 []string
+		if args[2] != nil {
+			arg2 = args[2].([]string)
+		}
+		var arg3 []string
+		if args[3] != nil {
+			arg3 = args[3].([]string)
+		}
+		var arg4 bool
+		if args[4] != nil {
+			arg4 = args[4].(bool)
+		}
+		var arg5 bool
+		if args[5] != nil {
+			arg5 = args[5].(bool)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+			arg5,
+		)
 	})
 	return _c
 }
@@ -255,16 +304,32 @@ type MockDrush_ConfigResave_Call struct {
 }
 
 // ConfigResave is a helper method to define mock.On call
-//   - ctx
-//   - dir
-//   - site
+//   - ctx context.Context
+//   - dir string
+//   - site string
 func (_e *MockDrush_Expecter) ConfigResave(ctx interface{}, dir interface{}, site interface{}) *MockDrush_ConfigResave_Call {
 	return &MockDrush_ConfigResave_Call{Call: _e.mock.On("ConfigResave", ctx, dir, site)}
 }
 
 func (_c *MockDrush_ConfigResave_Call) Run(run func(ctx context.Context, dir string, site string)) *MockDrush_ConfigResave_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
 	})
 	return _c
 }
@@ -302,16 +367,32 @@ type MockDrush_ExportConfiguration_Call struct {
 }
 
 // ExportConfiguration is a helper method to define mock.On call
-//   - ctx
-//   - dir
-//   - site
+//   - ctx context.Context
+//   - dir string
+//   - site string
 func (_e *MockDrush_Expecter) ExportConfiguration(ctx interface{}, dir interface{}, site interface{}) *MockDrush_ExportConfiguration_Call {
 	return &MockDrush_ExportConfiguration_Call{Call: _e.mock.On("ExportConfiguration", ctx, dir, site)}
 }
 
 func (_c *MockDrush_ExportConfiguration_Call) Run(run func(ctx context.Context, dir string, site string)) *MockDrush_ExportConfiguration_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
 	})
 	return _c
 }
@@ -349,16 +430,32 @@ type MockDrush_UpdateSite_Call struct {
 }
 
 // UpdateSite is a helper method to define mock.On call
-//   - ctx
-//   - dir
-//   - site
+//   - ctx context.Context
+//   - dir string
+//   - site string
 func (_e *MockDrush_Expecter) UpdateSite(ctx interface{}, dir interface{}, site interface{}) *MockDrush_UpdateSite_Call {
 	return &MockDrush_UpdateSite_Call{Call: _e.mock.On("UpdateSite", ctx, dir, site)}
 }
 
 func (_c *MockDrush_UpdateSite_Call) Run(run func(ctx context.Context, dir string, site string)) *MockDrush_UpdateSite_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
 	})
 	return _c
 }
@@ -432,15 +529,26 @@ type MockRepository_BranchExists_Call struct {
 }
 
 // BranchExists is a helper method to define mock.On call
-//   - repository
-//   - branch
+//   - repository repo.Repository
+//   - branch string
 func (_e *MockRepository_Expecter) BranchExists(repository interface{}, branch interface{}) *MockRepository_BranchExists_Call {
 	return &MockRepository_BranchExists_Call{Call: _e.mock.On("BranchExists", repository, branch)}
 }
 
 func (_c *MockRepository_BranchExists_Call) Run(run func(repository repo.Repository, branch string)) *MockRepository_BranchExists_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(repo.Repository), args[1].(string))
+		var arg0 repo.Repository
+		if args[0] != nil {
+			arg0 = args[0].(repo.Repository)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
 	})
 	return _c
 }
@@ -503,18 +611,44 @@ type MockRepository_CloneRepository_Call struct {
 }
 
 // CloneRepository is a helper method to define mock.On call
-//   - repository
-//   - branch
-//   - token
-//   - username
-//   - email
+//   - repository string
+//   - branch string
+//   - token string
+//   - username string
+//   - email string
 func (_e *MockRepository_Expecter) CloneRepository(repository interface{}, branch interface{}, token interface{}, username interface{}, email interface{}) *MockRepository_CloneRepository_Call {
 	return &MockRepository_CloneRepository_Call{Call: _e.mock.On("CloneRepository", repository, branch, token, username, email)}
 }
 
 func (_c *MockRepository_CloneRepository_Call) Run(run func(repository string, branch string, token string, username string, email string)) *MockRepository_CloneRepository_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(string), args[2].(string), args[3].(string), args[4].(string))
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		var arg4 string
+		if args[4] != nil {
+			arg4 = args[4].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+			arg4,
+		)
 	})
 	return _c
 }
@@ -590,14 +724,20 @@ type MockGitRepository_CommitObject_Call struct {
 }
 
 // CommitObject is a helper method to define mock.On call
-//   - h
+//   - h plumbing.Hash
 func (_e *MockGitRepository_Expecter) CommitObject(h interface{}) *MockGitRepository_CommitObject_Call {
 	return &MockGitRepository_CommitObject_Call{Call: _e.mock.On("CommitObject", h)}
 }
 
 func (_c *MockGitRepository_CommitObject_Call) Run(run func(h plumbing.Hash)) *MockGitRepository_CommitObject_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(plumbing.Hash))
+		var arg0 plumbing.Hash
+		if args[0] != nil {
+			arg0 = args[0].(plumbing.Hash)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }
@@ -690,14 +830,20 @@ type MockGitRepository_Push_Call struct {
 }
 
 // Push is a helper method to define mock.On call
-//   - o
+//   - o *git.PushOptions
 func (_e *MockGitRepository_Expecter) Push(o interface{}) *MockGitRepository_Push_Call {
 	return &MockGitRepository_Push_Call{Call: _e.mock.On("Push", o)}
 }
 
 func (_c *MockGitRepository_Push_Call) Run(run func(o *git.PushOptions)) *MockGitRepository_Push_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(*git.PushOptions))
+		var arg0 *git.PushOptions
+		if args[0] != nil {
+			arg0 = args[0].(*git.PushOptions)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }
@@ -828,14 +974,20 @@ type MockWorktree_Add_Call struct {
 }
 
 // Add is a helper method to define mock.On call
-//   - path
+//   - path string
 func (_e *MockWorktree_Expecter) Add(path interface{}) *MockWorktree_Add_Call {
 	return &MockWorktree_Add_Call{Call: _e.mock.On("Add", path)}
 }
 
 func (_c *MockWorktree_Add_Call) Run(run func(path string)) *MockWorktree_Add_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string))
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }
@@ -873,14 +1025,20 @@ type MockWorktree_AddGlob_Call struct {
 }
 
 // AddGlob is a helper method to define mock.On call
-//   - pattern
+//   - pattern string
 func (_e *MockWorktree_Expecter) AddGlob(pattern interface{}) *MockWorktree_AddGlob_Call {
 	return &MockWorktree_AddGlob_Call{Call: _e.mock.On("AddGlob", pattern)}
 }
 
 func (_c *MockWorktree_AddGlob_Call) Run(run func(pattern string)) *MockWorktree_AddGlob_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string))
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }
@@ -918,14 +1076,20 @@ type MockWorktree_Checkout_Call struct {
 }
 
 // Checkout is a helper method to define mock.On call
-//   - opts
+//   - opts *git.CheckoutOptions
 func (_e *MockWorktree_Expecter) Checkout(opts interface{}) *MockWorktree_Checkout_Call {
 	return &MockWorktree_Checkout_Call{Call: _e.mock.On("Checkout", opts)}
 }
 
 func (_c *MockWorktree_Checkout_Call) Run(run func(opts *git.CheckoutOptions)) *MockWorktree_Checkout_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(*git.CheckoutOptions))
+		var arg0 *git.CheckoutOptions
+		if args[0] != nil {
+			arg0 = args[0].(*git.CheckoutOptions)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }
@@ -974,15 +1138,26 @@ type MockWorktree_Commit_Call struct {
 }
 
 // Commit is a helper method to define mock.On call
-//   - msg
-//   - opts
+//   - msg string
+//   - opts *git.CommitOptions
 func (_e *MockWorktree_Expecter) Commit(msg interface{}, opts interface{}) *MockWorktree_Commit_Call {
 	return &MockWorktree_Commit_Call{Call: _e.mock.On("Commit", msg, opts)}
 }
 
 func (_c *MockWorktree_Commit_Call) Run(run func(msg string, opts *git.CommitOptions)) *MockWorktree_Commit_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(*git.CommitOptions))
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		var arg1 *git.CommitOptions
+		if args[1] != nil {
+			arg1 = args[1].(*git.CommitOptions)
+		}
+		run(
+			arg0,
+			arg1,
+		)
 	})
 	return _c
 }
@@ -1031,14 +1206,20 @@ type MockWorktree_Remove_Call struct {
 }
 
 // Remove is a helper method to define mock.On call
-//   - path
+//   - path string
 func (_e *MockWorktree_Expecter) Remove(path interface{}) *MockWorktree_Remove_Call {
 	return &MockWorktree_Remove_Call{Call: _e.mock.On("Remove", path)}
 }
 
 func (_c *MockWorktree_Remove_Call) Run(run func(path string)) *MockWorktree_Remove_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string))
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }
@@ -1158,16 +1339,32 @@ type MockInstaller_ConfigureDatabase_Call struct {
 }
 
 // ConfigureDatabase is a helper method to define mock.On call
-//   - ctx
-//   - dir
-//   - site
+//   - ctx context.Context
+//   - dir string
+//   - site string
 func (_e *MockInstaller_Expecter) ConfigureDatabase(ctx interface{}, dir interface{}, site interface{}) *MockInstaller_ConfigureDatabase_Call {
 	return &MockInstaller_ConfigureDatabase_Call{Call: _e.mock.On("ConfigureDatabase", ctx, dir, site)}
 }
 
 func (_c *MockInstaller_ConfigureDatabase_Call) Run(run func(ctx context.Context, dir string, site string)) *MockInstaller_ConfigureDatabase_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
 	})
 	return _c
 }
@@ -1205,16 +1402,32 @@ type MockInstaller_Install_Call struct {
 }
 
 // Install is a helper method to define mock.On call
-//   - ctx
-//   - dir
-//   - site
+//   - ctx context.Context
+//   - dir string
+//   - site string
 func (_e *MockInstaller_Expecter) Install(ctx interface{}, dir interface{}, site interface{}) *MockInstaller_Install_Call {
 	return &MockInstaller_Install_Call{Call: _e.mock.On("Install", ctx, dir, site)}
 }
 
 func (_c *MockInstaller_Install_Call) Run(run func(ctx context.Context, dir string, site string)) *MockInstaller_Install_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
 	})
 	return _c
 }
@@ -1288,17 +1501,38 @@ type MockPlatform_CreateMergeRequest_Call struct {
 }
 
 // CreateMergeRequest is a helper method to define mock.On call
-//   - title
-//   - description
-//   - sourceBranch
-//   - targetBranch
+//   - title string
+//   - description string
+//   - sourceBranch string
+//   - targetBranch string
 func (_e *MockPlatform_Expecter) CreateMergeRequest(title interface{}, description interface{}, sourceBranch interface{}, targetBranch interface{}) *MockPlatform_CreateMergeRequest_Call {
 	return &MockPlatform_CreateMergeRequest_Call{Call: _e.mock.On("CreateMergeRequest", title, description, sourceBranch, targetBranch)}
 }
 
 func (_c *MockPlatform_CreateMergeRequest_Call) Run(run func(title string, description string, sourceBranch string, targetBranch string)) *MockPlatform_CreateMergeRequest_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string), args[1].(string), args[2].(string), args[3].(string))
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
 	})
 	return _c
 }
@@ -1336,14 +1570,20 @@ type MockPlatform_DownloadComposerFiles_Call struct {
 }
 
 // DownloadComposerFiles is a helper method to define mock.On call
-//   - branch
+//   - branch string
 func (_e *MockPlatform_Expecter) DownloadComposerFiles(branch interface{}) *MockPlatform_DownloadComposerFiles_Call {
 	return &MockPlatform_DownloadComposerFiles_Call{Call: _e.mock.On("DownloadComposerFiles", branch)}
 }
 
 func (_c *MockPlatform_DownloadComposerFiles_Call) Run(run func(branch string)) *MockPlatform_DownloadComposerFiles_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(string))
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }
@@ -1407,6 +1647,124 @@ func (_c *MockPlatform_GetUser_Call) Return(name string, email string) *MockPlat
 }
 
 func (_c *MockPlatform_GetUser_Call) RunAndReturn(run func() (string, string)) *MockPlatform_GetUser_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// NewMockEventDispatcher creates a new instance of MockEventDispatcher. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
+// The first argument is typically a *testing.T value.
+func NewMockEventDispatcher(t interface {
+	mock.TestingT
+	Cleanup(func())
+}) *MockEventDispatcher {
+	mock := &MockEventDispatcher{}
+	mock.Mock.Test(t)
+
+	t.Cleanup(func() { mock.AssertExpectations(t) })
+
+	return mock
+}
+
+// MockEventDispatcher is an autogenerated mock type for the EventDispatcher type
+type MockEventDispatcher struct {
+	mock.Mock
+}
+
+type MockEventDispatcher_Expecter struct {
+	mock *mock.Mock
+}
+
+func (_m *MockEventDispatcher) EXPECT() *MockEventDispatcher_Expecter {
+	return &MockEventDispatcher_Expecter{mock: &_m.Mock}
+}
+
+// AddSubscriber provides a mock function for the type MockEventDispatcher
+func (_mock *MockEventDispatcher) AddSubscriber(subscriber event.Subscriber) {
+	_mock.Called(subscriber)
+	return
+}
+
+// MockEventDispatcher_AddSubscriber_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AddSubscriber'
+type MockEventDispatcher_AddSubscriber_Call struct {
+	*mock.Call
+}
+
+// AddSubscriber is a helper method to define mock.On call
+//   - subscriber event.Subscriber
+func (_e *MockEventDispatcher_Expecter) AddSubscriber(subscriber interface{}) *MockEventDispatcher_AddSubscriber_Call {
+	return &MockEventDispatcher_AddSubscriber_Call{Call: _e.mock.On("AddSubscriber", subscriber)}
+}
+
+func (_c *MockEventDispatcher_AddSubscriber_Call) Run(run func(subscriber event.Subscriber)) *MockEventDispatcher_AddSubscriber_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 event.Subscriber
+		if args[0] != nil {
+			arg0 = args[0].(event.Subscriber)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockEventDispatcher_AddSubscriber_Call) Return() *MockEventDispatcher_AddSubscriber_Call {
+	_c.Call.Return()
+	return _c
+}
+
+func (_c *MockEventDispatcher_AddSubscriber_Call) RunAndReturn(run func(subscriber event.Subscriber)) *MockEventDispatcher_AddSubscriber_Call {
+	_c.Run(run)
+	return _c
+}
+
+// FireEvent provides a mock function for the type MockEventDispatcher
+func (_mock *MockEventDispatcher) FireEvent(e event.Event) error {
+	ret := _mock.Called(e)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FireEvent")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(event.Event) error); ok {
+		r0 = returnFunc(e)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockEventDispatcher_FireEvent_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FireEvent'
+type MockEventDispatcher_FireEvent_Call struct {
+	*mock.Call
+}
+
+// FireEvent is a helper method to define mock.On call
+//   - e event.Event
+func (_e *MockEventDispatcher_Expecter) FireEvent(e interface{}) *MockEventDispatcher_FireEvent_Call {
+	return &MockEventDispatcher_FireEvent_Call{Call: _e.mock.On("FireEvent", e)}
+}
+
+func (_c *MockEventDispatcher_FireEvent_Call) Run(run func(e event.Event)) *MockEventDispatcher_FireEvent_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 event.Event
+		if args[0] != nil {
+			arg0 = args[0].(event.Event)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockEventDispatcher_FireEvent_Call) Return(err error) *MockEventDispatcher_FireEvent_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockEventDispatcher_FireEvent_Call) RunAndReturn(run func(e event.Event) error) *MockEventDispatcher_FireEvent_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -69,17 +69,38 @@ type MockDrush_GetConfigSyncDir_Call struct {
 }
 
 // GetConfigSyncDir is a helper method to define mock.On call
-//   - ctx
-//   - path
-//   - site
-//   - create
+//   - ctx context.Context
+//   - path string
+//   - site string
+//   - create bool
 func (_e *MockDrush_Expecter) GetConfigSyncDir(ctx interface{}, path interface{}, site interface{}, create interface{}) *MockDrush_GetConfigSyncDir_Call {
 	return &MockDrush_GetConfigSyncDir_Call{Call: _e.mock.On("GetConfigSyncDir", ctx, path, site, create)}
 }
 
 func (_c *MockDrush_GetConfigSyncDir_Call) Run(run func(ctx context.Context, path string, site string, create bool)) *MockDrush_GetConfigSyncDir_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string), args[3].(bool))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 bool
+		if args[3] != nil {
+			arg3 = args[3].(bool)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
 	})
 	return _c
 }
@@ -117,16 +138,32 @@ type MockDrush_InstallSite_Call struct {
 }
 
 // InstallSite is a helper method to define mock.On call
-//   - ctx
-//   - path
-//   - site
+//   - ctx context.Context
+//   - path string
+//   - site string
 func (_e *MockDrush_Expecter) InstallSite(ctx interface{}, path interface{}, site interface{}) *MockDrush_InstallSite_Call {
 	return &MockDrush_InstallSite_Call{Call: _e.mock.On("InstallSite", ctx, path, site)}
 }
 
 func (_c *MockDrush_InstallSite_Call) Run(run func(ctx context.Context, path string, site string)) *MockDrush_InstallSite_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
 	})
 	return _c
 }
@@ -200,16 +237,32 @@ type MockComposer_GetConfig_Call struct {
 }
 
 // GetConfig is a helper method to define mock.On call
-//   - ctx
-//   - path
-//   - key
+//   - ctx context.Context
+//   - path string
+//   - key string
 func (_e *MockComposer_Expecter) GetConfig(ctx interface{}, path interface{}, key interface{}) *MockComposer_GetConfig_Call {
 	return &MockComposer_GetConfig_Call{Call: _e.mock.On("GetConfig", ctx, path, key)}
 }
 
 func (_c *MockComposer_GetConfig_Call) Run(run func(ctx context.Context, path string, key string)) *MockComposer_GetConfig_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
 	})
 	return _c
 }
