@@ -1,6 +1,7 @@
 package codehosting
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -62,6 +63,57 @@ func TestGithub_CreateMergeRequest(t *testing.T) {
 	assert.Equal(t, "http://example.com", mr.URL)
 }
 
+func TestGithub_GetUser_Returns403FallbackSilently(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"message":"Resource not accessible by integration","errors":[]}`))
+	}))
+	defer mockServer.Close()
+
+	client, _ := github.NewClient(nil).WithEnterpriseURLs(mockServer.URL, "")
+	gh := &Github{client: client, owner: "o", repo: "r", fs: afero.NewMemMapFs()}
+
+	name, email := gh.GetUser()
+
+	assert.Equal(t, "github-actions[bot]", name)
+	assert.Equal(t, "41898282+github-actions[bot]@users.noreply.github.com", email)
+}
+
+func TestGithub_GetUser_Returns403ErrorForBadCredentials(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"message":"Bad credentials","documentation_url":"https://docs.github.com/rest"}`))
+	}))
+	defer mockServer.Close()
+
+	client, _ := github.NewClient(nil).WithEnterpriseURLs(mockServer.URL, "")
+	gh := &Github{client: client, owner: "o", repo: "r", fs: afero.NewMemMapFs()}
+
+	name, email := gh.GetUser()
+
+	assert.Empty(t, name)
+	assert.Empty(t, email)
+}
+
+func TestGithub_GetUser_ReturnsUserOnSuccess(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"login":"octocat","name":"The Octocat","email":"octocat@github.com"}`))
+	}))
+	defer mockServer.Close()
+
+	client, _ := github.NewClient(nil).WithEnterpriseURLs(mockServer.URL, "")
+	gh := &Github{client: client, owner: "o", repo: "r", fs: afero.NewMemMapFs()}
+
+	name, email := gh.GetUser()
+
+	assert.Equal(t, "The Octocat", name)
+	assert.Equal(t, "octocat@github.com", email)
+}
+
 func TestGithub_DownloadComposerFiles(t *testing.T) {
 	// Setup mock HTTP server for file content
 	mockContentServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -115,4 +167,19 @@ func TestGithub_DownloadComposerFiles(t *testing.T) {
 
 	_, err = gh.fs.Stat(dir + "/composer.lock")
 	assert.NoError(t, err)
+}
+
+func TestIsGitHubActionsToken403_ReturnsFalseForNonGitHubError(t *testing.T) {
+	result := isGitHubActionsToken403(nil, errors.New("plain network error"))
+	assert.False(t, result)
+}
+
+func TestIsGitHubActionsToken403_ReturnsTrueWhenRespFallback(t *testing.T) {
+	// github.ErrorResponse with nil Response but matching integration message —
+	// status code comes from the resp fallback parameter.
+	ghErr := &github.ErrorResponse{
+		Message: "Resource not accessible by integration",
+	}
+	resp := &github.Response{Response: &http.Response{StatusCode: http.StatusForbidden}}
+	assert.True(t, isGitHubActionsToken403(resp, ghErr))
 }

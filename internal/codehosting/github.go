@@ -2,6 +2,7 @@ package codehosting
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -102,18 +103,43 @@ func (g *Github) logError(err error) {
 }
 
 // GetUser returns the name and email of the authenticated user.
-// When called with a GITHUB_TOKEN (Actions bot), GET /user returns 403; in that
-// case we fall back to the well-known github-actions[bot] identity so that git
-// commits are attributed correctly without requiring a PAT.
+// When called with a GITHUB_TOKEN (Actions bot), GET /user returns 403 with the
+// message "Resource not accessible by integration"; in that case we fall back to
+// the well-known github-actions[bot] identity so that git commits are attributed
+// correctly without requiring a PAT.
+// Any other error (including a 403 from bad user credentials) is logged and
+// returns empty strings so callers can detect the failure.
 func (g *Github) GetUser() (name string, email string) {
 	user, resp, err := g.client.Users.Get(context.Background(), "")
 	if err != nil {
-		if resp != nil && resp.StatusCode == 403 {
+		if isGitHubActionsToken403(resp, err) {
 			return "github-actions[bot]", "41898282+github-actions[bot]@users.noreply.github.com"
 		}
 		g.logError(fmt.Errorf("failed to get user: %w", err))
-		return "github-actions[bot]", "41898282+github-actions[bot]@users.noreply.github.com"
+		return "", ""
 	}
 
 	return user.GetName(), user.GetEmail()
+}
+
+// isGitHubActionsToken403 reports whether the error is the specific 403 returned
+// by GitHub for an Actions integration token (GITHUB_TOKEN) that cannot access
+// the /user endpoint. Such responses carry the message
+// "Resource not accessible by integration".
+//
+// A real user whose credentials are wrong or whose PAT lacks the required scope
+// also receives a 403, but with a different message; those errors must NOT be
+// suppressed so callers can detect and surface them.
+func isGitHubActionsToken403(resp *github.Response, err error) bool {
+	var ghErr *github.ErrorResponse
+	if !errors.As(err, &ghErr) {
+		return false
+	}
+	statusCode := 0
+	if ghErr.Response != nil {
+		statusCode = ghErr.Response.StatusCode
+	} else if resp != nil {
+		statusCode = resp.StatusCode
+	}
+	return statusCode == 403 && strings.Contains(ghErr.Message, "Resource not accessible by integration")
 }
