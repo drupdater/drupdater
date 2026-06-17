@@ -92,6 +92,22 @@ func TestHandleWorkflowError(t *testing.T) {
 	})
 }
 
+func TestCreateDispatcher(t *testing.T) {
+	logger := zaptest.NewLogger(t)
+
+	t.Run("returns a non-nil dispatcher with addons subscribed", func(t *testing.T) {
+		config := internal.Config{SkipCBF: true, SkipRector: true}
+		addons := createAddons(logger, config, nil, nil, nil, nil)
+		dispatcher := createDispatcher(addons)
+		assert.NotNil(t, dispatcher)
+	})
+
+	t.Run("works with an empty addon list", func(t *testing.T) {
+		dispatcher := createDispatcher(nil)
+		assert.NotNil(t, dispatcher)
+	})
+}
+
 func TestCreateAddons(t *testing.T) {
 	// Setup minimal test dependencies
 	logger := zaptest.NewLogger(t)

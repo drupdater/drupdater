@@ -68,10 +68,7 @@ var rootCmd = &cobra.Command{
 
 		// Create the event dispatcher and register addons as subscribers
 		addons := createAddons(logger, config, drush, composer, drupalOrg, git)
-		dispatcher := event.NewManager("")
-		for _, addon := range addons {
-			dispatcher.AddSubscriber(addon)
-		}
+		dispatcher := createDispatcher(addons)
 
 		workflow := services.NewWorkflowBaseService(logger, config, drush, platform, git, installer, composer, dispatcher)
 
@@ -122,6 +119,15 @@ func createAddons(
 	)
 
 	return addons
+}
+
+// createDispatcher creates a new event manager and subscribes all addons to it.
+func createDispatcher(addons []internal.Addon) *event.Manager {
+	dispatcher := event.NewManager("")
+	for _, addon := range addons {
+		dispatcher.AddSubscriber(addon)
+	}
+	return dispatcher
 }
 
 // handleWorkflowError logs AbortErrors as warnings (non-fatal) and all others as errors (fatal).
