@@ -219,6 +219,32 @@ func TestHasPHPCSPathDefinitions(t *testing.T) {
 		assert.Contains(t, err.Error(), "failed to parse phpcs config")
 		assert.False(t, result)
 	})
+
+	t.Run("returns error when phpcs.xml cannot be read", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		// Create phpcs.xml as a directory so Stat succeeds but ReadFile fails
+		err := os.MkdirAll(filepath.Join(tmpDir, "phpcs.xml"), 0755)
+		assert.NoError(t, err)
+
+		result, err := hasPHPCSPathDefinitions(tmpDir)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to read phpcs config")
+		assert.False(t, result)
+	})
+
+	t.Run("returns false when phpcs.xml.dist has no file definitions", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		content := `<?xml version="1.0" encoding="UTF-8"?>
+<ruleset name="test">
+    <rule ref="Drupal"/>
+</ruleset>`
+		err := os.WriteFile(filepath.Join(tmpDir, "phpcs.xml.dist"), []byte(content), 0600)
+		assert.NoError(t, err)
+
+		result, err := hasPHPCSPathDefinitions(tmpDir)
+		assert.NoError(t, err)
+		assert.False(t, result)
+	})
 }
 
 func TestCodingStyles(t *testing.T) {
