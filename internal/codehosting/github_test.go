@@ -114,6 +114,23 @@ func TestGithub_GetUser_ReturnsUserOnSuccess(t *testing.T) {
 	assert.Equal(t, "octocat@github.com", email)
 }
 
+func TestGithub_GetUser_NoEmailFallsBackToNoreply(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"id":1234567,"login":"octocat","name":"The Octocat","email":""}`))
+	}))
+	defer mockServer.Close()
+
+	client, _ := github.NewClient(nil).WithEnterpriseURLs(mockServer.URL, "")
+	gh := &Github{client: client, owner: "o", repo: "r", fs: afero.NewMemMapFs()}
+
+	name, email := gh.GetUser()
+
+	assert.Equal(t, "The Octocat", name)
+	assert.Equal(t, "1234567+octocat@users.noreply.github.com", email)
+}
+
 func TestGithub_DownloadComposerFiles(t *testing.T) {
 	// Setup mock HTTP server for file content
 	mockContentServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
