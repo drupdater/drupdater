@@ -9,8 +9,6 @@ import (
 	"github.com/drupdater/drupdater/pkg/phpcs"
 	"github.com/drupdater/drupdater/pkg/rector"
 	"github.com/drupdater/drupdater/pkg/repo"
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing"
 )
 
 type Composer interface {
@@ -59,11 +57,5 @@ type Rector interface {
 	Run(ctx context.Context, dir string, customCodeDirectories []string) (rector.ReturnOutput, error)
 }
 
-type Worktree interface {
-	Add(path string) (plumbing.Hash, error)
-	AddGlob(pattern string) error
-	Remove(path string) (plumbing.Hash, error)
-	Commit(msg string, opts *git.CommitOptions) (plumbing.Hash, error)
-	Status() (git.Status, error)
-	Checkout(opts *git.CheckoutOptions) error
-}
+// Worktree is an alias for repo.Worktree to avoid duplication.
+type Worktree = repo.Worktree
