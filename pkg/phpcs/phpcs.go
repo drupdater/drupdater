@@ -28,7 +28,7 @@ func (s *CLI) execComposer(ctx context.Context, dir string, args ...string) (str
 	out, err := command.CombinedOutput()
 	output := strings.TrimSuffix(string(out), "\n")
 
-	s.logger.Sugar().Debugf("%s\n%s", command.String(), output)
+	s.logger.Debug(command.String() + "\n" + output)
 
 	return output, err
 }

@@ -66,7 +66,7 @@ func (tu *TranslationsUpdater) postSiteUpdateHandler(e event.Event) error {
 	}
 
 	status, _ := evt.Worktree().Status()
-	tu.logger.Debug("Git status", zap.Any("status", status))
+	tu.logger.Debug("git status", zap.Any("status", status))
 	if !tu.repository.IsSomethingStagedInPath(evt.Worktree(), translationPath) {
 		tu.logger.Debug("nothing to commit")
 		return nil

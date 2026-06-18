@@ -70,7 +70,8 @@ func TestHandleWorkflowError(t *testing.T) {
 		assert.NoError(t, result)
 		assert.Equal(t, 1, logs.Len())
 		assert.Equal(t, zap.WarnLevel, logs.All()[0].Level)
-		assert.Equal(t, abortErr.Error(), logs.All()[0].Message)
+		assert.Equal(t, "update aborted", logs.All()[0].Message)
+		assert.Equal(t, abortErr.Error(), logs.All()[0].ContextMap()["error"])
 	})
 
 	t.Run("regular error logs at error level and is returned", func(t *testing.T) {
