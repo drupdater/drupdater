@@ -763,3 +763,41 @@ func TestHelperProcess(*testing.T) {
 	fmt.Fprintf(os.Stdout, "%v\n", os.Args[3])
 	os.Exit(0)
 }
+
+func TestGetDependencyPatches(t *testing.T) {
+	// A dependency provides a patch; another package has empty extra serialized as [].
+	data := `{
+		"packages": [
+			{
+				"name": "drupal/lightning_core",
+				"extra": {
+					"patches": {
+						"drupal/core": {
+							"2869592 - Disabled update module": "https://example.com/2869592.patch"
+						}
+					}
+				}
+			},
+			{ "name": "drupal/empty_extra", "extra": [] },
+			{ "name": "drupal/no_extra" }
+		],
+		"packages-dev": [
+			{
+				"name": "drupal/devtools",
+				"extra": { "patches": { "drupal/views": { "fix": "https://example.com/views.patch" } } }
+			}
+		]
+	}`
+
+	fs := afero.NewMemMapFs()
+	assert.NoError(t, afero.WriteFile(fs, "/test/composer.lock", []byte(data), 0644))
+
+	service := &CLI{logger: zap.NewNop(), fs: fs}
+	patches, err := service.GetDependencyPatches(context.Background(), "/test")
+
+	assert.NoError(t, err)
+	assert.Equal(t, map[string]map[string]bool{
+		"drupal/core":  {"https://example.com/2869592.patch": true},
+		"drupal/views": {"https://example.com/views.patch": true},
+	}, patches)
+}
