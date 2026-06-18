@@ -151,7 +151,7 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []interna
 
 func (ws *WorkflowBaseService) installCode(ctx context.Context) (string, error) {
 	username, email := ws.platform.GetUser(ctx)
-	ws.logger.Info("cloning repository for site-install", zap.String("repositoryURL", ws.config.RepositoryURL), zap.String("branch", ws.config.Branch))
+	ws.logger.Info("cloning repository for site-install", zap.String("url", ws.config.RepositoryURL), zap.String("branch", ws.config.Branch))
 	_, _, path, err := ws.repository.CloneRepository(ws.config.RepositoryURL, ws.config.Branch, ws.config.Token, username, email)
 	if err != nil {
 		return "", fmt.Errorf("failed to clone repository: %w", err)
@@ -166,7 +166,7 @@ func (ws *WorkflowBaseService) installCode(ctx context.Context) (string, error) 
 }
 
 func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context) (SharedUpdate, error) {
-	ws.logger.Info("cloning repository for update", zap.String("repositoryURL", ws.config.RepositoryURL), zap.String("branch", ws.config.Branch))
+	ws.logger.Info("cloning repository for update", zap.String("url", ws.config.RepositoryURL), zap.String("branch", ws.config.Branch))
 	username, email := ws.platform.GetUser(ctx)
 	repository, worktree, path, err := ws.repository.CloneRepository(ws.config.RepositoryURL, ws.config.Branch, ws.config.Token, username, email)
 	if err != nil {
@@ -278,7 +278,7 @@ func (ws *WorkflowBaseService) updateSite(ctx context.Context, sharedUpdate Shar
 		return fmt.Errorf("failed to fire event: %w", err)
 	}
 
-	ws.logger.Info("export configuration", zap.String("site", site))
+	ws.logger.Info("exporting configuration", zap.String("site", site))
 	if err := ws.drush.ExportConfiguration(ctx, sharedUpdate.Path, site); err != nil {
 		return fmt.Errorf("failed to export configuration: %w", err)
 	}

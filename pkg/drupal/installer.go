@@ -201,7 +201,7 @@ func (is *Installer) RemoveProfile(ctx context.Context, dir string, site string)
 	// Open the file for reading
 	fileToRead, err := is.fs.Open(coreExtensionPath)
 	if err != nil {
-		siteLogger.Error("Error opening file:", zap.Error(err))
+		siteLogger.Error("failed to open file", zap.Error(err))
 		return err
 	}
 	defer fileToRead.Close()

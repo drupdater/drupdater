@@ -139,10 +139,10 @@ func createDispatcher(addons []internal.Addon) services.EventDispatcher {
 // handleWorkflowError logs AbortErrors as warnings (non-fatal) and all others as errors (fatal).
 func handleWorkflowError(logger *zap.Logger, err error) error {
 	if errors.As(err, &services.AbortError{}) {
-		logger.Sugar().Warn(err)
+		logger.Warn("update aborted", zap.Error(err))
 		return nil
 	}
-	logger.Sugar().Error(err)
+	logger.Error("update failed", zap.Error(err))
 	return err
 }
 
@@ -181,6 +181,6 @@ func NewLogger(config internal.Config) *zap.Logger {
 		loggerConfig.DisableCaller = true
 		loggerConfig.DisableStacktrace = true
 	}
-	log, _ := loggerConfig.Build()
+	log, _ := loggerConfig.Build(zap.AddStacktrace(zapcore.ErrorLevel))
 	return log
 }

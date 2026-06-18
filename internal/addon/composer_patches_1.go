@@ -170,7 +170,7 @@ func (h *ComposerPatches1) updatePatches(ctx context.Context, path string, workt
 						h.logger.Error("failed to remove patch", zap.String("patch", patchPath), zap.Error(err))
 					}
 				}
-				h.logger.Info("removing patch, because it's no longer needed", zap.String("package", packageName), zap.String("patch", patchPath))
+				h.logger.Info("removing patch: package no longer installed", zap.String("package", packageName), zap.String("patch", patchPath))
 				updates.Removed = append(updates.Removed, RemovedPatch{Package: packageName, PatchPath: patchPath, PatchDescription: description, Reason: fmt.Sprintf("%s is not installed in the project", packageName)})
 			}
 			delete(patches, packageName)
@@ -192,16 +192,16 @@ func (h *ComposerPatches1) updatePatches(ctx context.Context, path string, workt
 						issue, err := h.drupalOrg.GetIssue(issueNumber)
 
 						if err != nil {
-							h.logger.Error("failed to get issue", zap.Error(err))
+							h.logger.Error("failed to get issue", zap.String("issue", issueNumber), zap.Error(err))
 							continue
 						}
 
-						h.logger.Debug("issue", zap.Any("issue", issue))
+						h.logger.Debug("fetched issue details", zap.Any("issue", issue))
 
 						delete(patches[operation.Package], description)
 
 						if os.Getenv("DRUPALCODE_ACCESS_TOKEN") == "" {
-							h.logger.Debug("skipping issue check, because DRUPALCODE_ACCESS_TOKEN is not set")
+							h.logger.Debug("skipping issue check: DRUPALCODE_ACCESS_TOKEN not set")
 						} else {
 
 							// 2 = Fixed, 7 = Closed (fixed), 15 = Patch (to be ported)
@@ -219,12 +219,12 @@ func (h *ComposerPatches1) updatePatches(ctx context.Context, path string, workt
 										h.logger.Debug("issue is fixed", zap.String("issue", issue.ID))
 										_, err := worktree.Remove(patchPath)
 										if err != nil {
-											h.logger.Error("failed to remove patch", zap.Error(err))
+											h.logger.Error("failed to remove patch", zap.String("patch", patchPath), zap.Error(err))
 										} else {
 											if len(patches[operation.Package]) == 0 {
 												delete(patches, operation.Package)
 											}
-											h.logger.Debug("removing patch, because it's no longer needed", zap.String("package", operation.Package), zap.String("patch", patchPath))
+											h.logger.Info("removing patch: issue fixed in new version", zap.String("package", operation.Package), zap.String("patch", patchPath))
 											updates.Removed = append(updates.Removed, RemovedPatch{Package: operation.Package, PatchPath: patchPath, Reason: fmt.Sprintf("Issue [#%s](%s) is fixed in %s %s", issue.ID, issue.Title, operation.Package, operation.To), PatchDescription: description})
 										}
 										continue
@@ -256,7 +256,7 @@ func (h *ComposerPatches1) updatePatches(ctx context.Context, path string, workt
 							// Download latest patch and try to apply it
 							issue, err := h.drupalOrg.GetIssue(issueNumber)
 							if err != nil {
-								h.logger.Error("failed to get issue", zap.Error(err))
+								h.logger.Error("failed to get issue for patch update", zap.String("issue", issueNumber), zap.Error(err))
 							}
 
 							forkProject, _, err := h.gitlab.Projects.GetProject("issue/"+issue.Project.MaschineName+"-"+issue.ID, &gitlab.GetProjectOptions{})
@@ -264,7 +264,7 @@ func (h *ComposerPatches1) updatePatches(ctx context.Context, path string, workt
 								h.logger.Error("failed to get fork project", zap.Error(err))
 							}
 
-							h.logger.Debug("fork project", zap.Any("project", forkProject))
+							h.logger.Debug("fetched fork project", zap.Any("project", forkProject))
 
 							// We can't use ListMergeRequests here, because it doesn't support filtering by source project
 							// and we need to use the fork project as source project.
@@ -293,7 +293,7 @@ func (h *ComposerPatches1) updatePatches(ctx context.Context, path string, workt
 								//notify
 							} else {
 								webURL := mergeRequests[0].WebURL
-								h.logger.Debug("merge request", zap.String("url", webURL))
+								h.logger.Debug("found open merge request", zap.String("url", webURL))
 
 								diff := webURL + ".diff"
 								newPatchPath := fmt.Sprintf("patches/%s", issue.Project.MaschineName)
@@ -304,12 +304,12 @@ func (h *ComposerPatches1) updatePatches(ctx context.Context, path string, workt
 								}
 
 								if ok, err := h.composer.CheckIfPatchApplies(ctx, operation.Package, operation.To, path+"/"+newPatchPath+"/"+newPatchFile); err != nil {
-									h.logger.Debug("failed to check if patch applies", zap.Error(err))
+									h.logger.Debug("failed to check if patch applies", zap.String("patch", newPatchPath+"/"+newPatchFile), zap.Error(err))
 								} else if ok {
 									if !externalPatch {
 										_, err := worktree.Remove(patchPath)
 										if err != nil {
-											h.logger.Debug("failed to remove patch", zap.Error(err))
+											h.logger.Debug("failed to remove old patch file", zap.String("patch", patchPath), zap.Error(err))
 											continue
 										}
 									}
@@ -319,7 +319,7 @@ func (h *ComposerPatches1) updatePatches(ctx context.Context, path string, workt
 										h.logger.Debug("failed to add patch", zap.Error(err))
 										continue
 									}
-									h.logger.Info("replacing patch", zap.String("package", operation.Package), zap.String("previous patch", patchPath), zap.String("new patch", newPatchPath+"/"+newPatchFile))
+									h.logger.Info("replacing patch", zap.String("package", operation.Package), zap.String("previous_patch", patchPath), zap.String("new_patch", newPatchPath+"/"+newPatchFile))
 									updates.Updated = append(updates.Updated, UpdatedPatch{Package: operation.Package, PreviousPatchPath: patchPath, NewPatchPath: newPatchPath + "/" + newPatchFile, PatchDescription: description})
 								} else {
 									h.logger.Info("merge request does not apply, keeping current package version", zap.String("package", operation.Package), zap.String("version", operation.To), zap.String("patch", path+"/"+newPatchPath))
@@ -344,15 +344,13 @@ func (h *ComposerPatches1) updatePatches(ctx context.Context, path string, workt
 				if err != nil {
 					_, err := worktree.Remove(patches[operation.Package][description])
 					if err != nil {
-						h.logger.Error("failed to remove patch", zap.Error(err))
+						h.logger.Error("failed to remove patch", zap.String("patch", patches[operation.Package][description]), zap.Error(err))
 					}
 				}
 			}
 			delete(patches, operation.Package)
 		}
 	}
-	h.logger.Debug("composer patches", zap.Any("patches", patches))
-
 	return updates, patches
 }
 

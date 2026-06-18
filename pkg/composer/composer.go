@@ -39,7 +39,7 @@ func (s *CLI) execComposer(ctx context.Context, dir string, args ...string) (str
 
 	out, err := command.CombinedOutput()
 	output := strings.TrimSuffix(string(out), "\n")
-	s.logger.Sugar().Debugf("%s\n%s", command.String(), output)
+	s.logger.Debug(command.String() + "\n" + output)
 
 	return output, err
 }
@@ -151,8 +151,6 @@ func (s *CLI) Audit(ctx context.Context, dir string) (Audit, error) {
 		// Some errors are expected for audit and don't affect the parsing
 		s.logger.Debug("composer audit returned error", zap.Error(err))
 	}
-
-	s.logger.Sugar().Info(out)
 
 	if err := json.Unmarshal([]byte(out), &composerAudit); err != nil {
 		return Audit{}, fmt.Errorf("failed to parse composer audit output: %w, output: %s", err, out)

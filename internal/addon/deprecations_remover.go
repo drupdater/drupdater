@@ -45,7 +45,7 @@ func (dr *DeprecationsRemover) RenderTemplate() (string, error) {
 func (dr *DeprecationsRemover) postCodeUpdateHandler(e event.Event) error {
 	evt := e.(*services.PostCodeUpdateEvent)
 
-	dr.logger.Info("remove deprecations")
+	dr.logger.Info("removing deprecations")
 
 	// Check if rector is installed.
 	installed, _ := dr.composer.IsPackageInstalled(evt.Context(), evt.Path(), "palantirnet/drupal-rector")
@@ -84,7 +84,7 @@ func (dr *DeprecationsRemover) postCodeUpdateHandler(e event.Event) error {
 		}
 	}
 
-	dr.logger.Debug("committing remove deprecations")
+	dr.logger.Debug("committing deprecation removals")
 	_, err = evt.Worktree().Commit("Remove deprecations", &git.CommitOptions{})
 
 	return err

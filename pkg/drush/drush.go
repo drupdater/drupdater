@@ -37,7 +37,7 @@ func (e *CLI) execDrush(ctx context.Context, dir string, site string, args ...st
 	out, err := command.CombinedOutput()
 	output := strings.TrimSuffix(string(out), "\n")
 
-	e.logger.Sugar().Debugf("%s\n%s", command.String(), output)
+	e.logger.Debug(command.String() + "\n" + output)
 
 	return output, err
 }
