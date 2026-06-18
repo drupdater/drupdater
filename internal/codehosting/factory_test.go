@@ -12,7 +12,7 @@ func TestDefaultVcsProviderFactory_Create(t *testing.T) {
 		name          string
 		repositoryURL string
 		token         string
-		expectedType  interface{}
+		expectedType  any
 	}{
 		{
 			name:          "returns gitlab platform for gitlab URLs",

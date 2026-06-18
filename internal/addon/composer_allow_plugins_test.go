@@ -84,7 +84,7 @@ func TestDefaultAllowPlugins_PostComposerUpdateHandler(t *testing.T) {
 	}
 
 	// Configure mock expectations
-	allPlugins := map[string]interface{}{
+	allPlugins := map[string]any{
 		"existing/plugin": struct{}{},
 		"new/plugin":      struct{}{},
 	}

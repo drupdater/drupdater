@@ -76,8 +76,8 @@ func NewComposerPatches1(logger *zap.Logger, composer Composer, drupalOrg Drupal
 	}
 }
 
-func (h *ComposerPatches1) SubscribedEvents() map[string]interface{} {
-	return map[string]interface{}{
+func (h *ComposerPatches1) SubscribedEvents() map[string]any {
+	return map[string]any{
 		"pre-composer-update": event.ListenerItem{
 			Priority: event.Normal,
 			Listener: event.ListenerFunc(h.preComposerUpdateHandler),

@@ -36,8 +36,8 @@ func NewCodeBeautifier(logger *zap.Logger, phpcs PHPCS, config internal.Config, 
 }
 
 // SubscribedEvents returns the events this addon listens to
-func (cb *CodeBeautifier) SubscribedEvents() map[string]interface{} {
-	return map[string]interface{}{
+func (cb *CodeBeautifier) SubscribedEvents() map[string]any {
+	return map[string]any{
 		"post-code-update": event.ListenerItem{
 			Priority: event.Normal,
 			Listener: event.ListenerFunc(cb.postCodeUpdateHandler),

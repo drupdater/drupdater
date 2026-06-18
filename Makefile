@@ -1,4 +1,4 @@
-.PHONY: build test clean mock lint fmt run docker-build docker-run help
+.PHONY: build test clean mock lint fmt fix run docker-build docker-run help
 
 # Variables
 BINARY_NAME=drupdater
@@ -31,6 +31,9 @@ lint: ## Run linters
 
 fmt: ## Format code
 	go fmt ./...
+
+fix: ## Apply go fix modernizers (interface{} → any, strings.Cut, etc.)
+	go fix ./...
 
 run: ## Run the application (requires REPO and TOKEN args)
 	@if [ -z "$(REPO)" ] || [ -z "$(TOKEN)" ]; then \

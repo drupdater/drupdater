@@ -136,13 +136,13 @@ func (is *Installer) isSqliteModuleEnabled(ctx context.Context, dir string, site
 	}
 
 	// Unmarshal the YAML data
-	var config map[string]interface{}
+	var config map[string]any
 	if err := yaml.Unmarshal(file, &config); err != nil {
 		return false, fmt.Errorf("failed to unmarshal core extension file: %w", err)
 	}
 
 	// Check if the sqlite module is enabled
-	if enabled, exists := config["module"].(map[string]interface{})["sqlite"]; exists && enabled == 0 {
+	if enabled, exists := config["module"].(map[string]any)["sqlite"]; exists && enabled == 0 {
 		siteLogger.Debug("sqlite module is enabled")
 		return true, nil
 	}
@@ -167,12 +167,12 @@ func (is *Installer) addSqliteModule(ctx context.Context, dir string, site strin
 	}
 
 	// Unmarshal the YAML data
-	var config map[string]interface{}
+	var config map[string]any
 	if err := yaml.Unmarshal(file, &config); err != nil {
 		return fmt.Errorf("failed to unmarshal core extension file: %w", err)
 	}
 
-	config["module"].(map[string]interface{})["sqlite"] = 0
+	config["module"].(map[string]any)["sqlite"] = 0
 
 	// Marshal the updated config back to YAML
 	updatedConfig, err := yaml.Marshal(config)

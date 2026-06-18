@@ -140,7 +140,7 @@ zaporylie/composer-drupal-optimizations        1.2.0   requires composer-plugin-
 		plugins, err := service.GetInstalledPlugins(t.Context(), "/tmp")
 
 		assert.NoError(t, err)
-		assert.Equal(t, map[string]interface{}{
+		assert.Equal(t, map[string]any{
 			"composer/installers":                            nil,
 			"cweagans/composer-patches":                      nil,
 			"dealerdirect/phpcodesniffer-composer-installer": nil,
@@ -404,7 +404,7 @@ Using version ^11.1 for drupal/core`
 		assert.NoError(t, err)
 		capturedPatchesJSON = string(data)
 
-		var parsed map[string]interface{}
+		var parsed map[string]any
 		assert.NoError(t, json.Unmarshal([]byte(capturedPatchesJSON), &parsed),
 			"composer.patches.json must be valid JSON even when values contain special characters")
 	})
