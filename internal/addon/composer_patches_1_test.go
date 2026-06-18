@@ -684,7 +684,7 @@ func TestDownloadFile(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		const content = "--- a/file\n+++ b/file\n@@ -1 +1 @@\n-old\n+new\n"
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = io.WriteString(w, content)
 		}))
