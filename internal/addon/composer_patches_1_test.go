@@ -82,6 +82,88 @@ func TestUpdatePatches(t *testing.T) {
 		drupalOrgService.AssertExpectations(t)
 	})
 
+	t.Run("Local patch is not deduplicated against dependencies", func(t *testing.T) {
+		// A local (relative) path that happens to match a dependency string must NOT be
+		// removed: local paths are package-relative, so they are not the same file.
+		composerService := NewMockComposer(t)
+		drupalOrgService := NewMockDrupalOrg(t)
+		worktree := NewMockWorktree(t)
+
+		composerService.EXPECT().IsPackageInstalled(mock.Anything, "/tmp", "drupal/core").Return(true, nil)
+		composerService.EXPECT().GetDependencyPatches(mock.Anything, "/tmp").Return(map[string]map[string]bool{
+			"drupal/core": {"patches/local.patch": true},
+		}, nil)
+		drupalOrgService.EXPECT().FindIssueNumber(mock.Anything).Return("", false)
+		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/local.patch").Return(true, nil)
+
+		updater := &ComposerPatches1{logger: logger, composer: composerService, drupalOrg: drupalOrgService}
+		operations := []composer.PackageChange{{Action: "Upgrade", Package: "drupal/core", To: "8.8.0"}}
+		patches := map[string]map[string]string{"drupal/core": {"local": "patches/local.patch"}}
+
+		report, newPatches := updater.updatePatches(t.Context(), "/tmp", worktree, operations, patches)
+		assert.Equal(t, "patches/local.patch", newPatches["drupal/core"]["local"])
+		assert.Empty(t, report.Removed)
+	})
+
+	t.Run("GetDependencyPatches error is non-fatal", func(t *testing.T) {
+		composerService := NewMockComposer(t)
+		drupalOrgService := NewMockDrupalOrg(t)
+		worktree := NewMockWorktree(t)
+
+		composerService.EXPECT().IsPackageInstalled(mock.Anything, "/tmp", "drupal/core").Return(true, nil)
+		composerService.EXPECT().GetDependencyPatches(mock.Anything, "/tmp").Return(nil, assert.AnError)
+		drupalOrgService.EXPECT().FindIssueNumber(mock.Anything).Return("", false)
+		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/local.patch").Return(true, nil)
+
+		updater := &ComposerPatches1{logger: logger, composer: composerService, drupalOrg: drupalOrgService}
+		operations := []composer.PackageChange{{Action: "Upgrade", Package: "drupal/core", To: "8.8.0"}}
+		patches := map[string]map[string]string{"drupal/core": {"local": "patches/local.patch"}}
+
+		report, newPatches := updater.updatePatches(t.Context(), "/tmp", worktree, operations, patches)
+		assert.Equal(t, "patches/local.patch", newPatches["drupal/core"]["local"])
+		assert.False(t, report.Changes())
+	})
+
+	t.Run("Multiple patches apply together", func(t *testing.T) {
+		composerService := NewMockComposer(t)
+		drupalOrgService := NewMockDrupalOrg(t)
+		worktree := NewMockWorktree(t)
+
+		composerService.EXPECT().IsPackageInstalled(mock.Anything, "/tmp", "drupal/core").Return(true, nil)
+		composerService.EXPECT().GetDependencyPatches(mock.Anything, "/tmp").Return(nil, nil)
+		drupalOrgService.EXPECT().FindIssueNumber(mock.Anything).Return("", false)
+		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/a.patch").Return(true, nil)
+		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/b.patch").Return(true, nil)
+		composerService.EXPECT().CheckIfPatchesApply(mock.Anything, "drupal/core", "8.8.0", mock.Anything).Return(true, nil)
+
+		updater := &ComposerPatches1{logger: logger, composer: composerService, drupalOrg: drupalOrgService}
+		operations := []composer.PackageChange{{Action: "Upgrade", Package: "drupal/core", To: "8.8.0"}}
+		patches := map[string]map[string]string{"drupal/core": {"a": "patches/a.patch", "b": "patches/b.patch"}}
+
+		report, _ := updater.updatePatches(t.Context(), "/tmp", worktree, operations, patches)
+		assert.False(t, report.Changes())
+	})
+
+	t.Run("Combined patch check error is non-fatal", func(t *testing.T) {
+		composerService := NewMockComposer(t)
+		drupalOrgService := NewMockDrupalOrg(t)
+		worktree := NewMockWorktree(t)
+
+		composerService.EXPECT().IsPackageInstalled(mock.Anything, "/tmp", "drupal/core").Return(true, nil)
+		composerService.EXPECT().GetDependencyPatches(mock.Anything, "/tmp").Return(nil, nil)
+		drupalOrgService.EXPECT().FindIssueNumber(mock.Anything).Return("", false)
+		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/a.patch").Return(true, nil)
+		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/b.patch").Return(true, nil)
+		composerService.EXPECT().CheckIfPatchesApply(mock.Anything, "drupal/core", "8.8.0", mock.Anything).Return(false, assert.AnError)
+
+		updater := &ComposerPatches1{logger: logger, composer: composerService, drupalOrg: drupalOrgService}
+		operations := []composer.PackageChange{{Action: "Upgrade", Package: "drupal/core", To: "8.8.0"}}
+		patches := map[string]map[string]string{"drupal/core": {"a": "patches/a.patch", "b": "patches/b.patch"}}
+
+		report, _ := updater.updatePatches(t.Context(), "/tmp", worktree, operations, patches)
+		assert.Empty(t, report.Conflicts)
+	})
+
 	t.Run("Patch already provided by a dependency is removed", func(t *testing.T) {
 		composerService := NewMockComposer(t)
 		drupalOrgService := NewMockDrupalOrg(t)
