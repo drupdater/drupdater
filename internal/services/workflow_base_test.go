@@ -50,6 +50,7 @@ func TestStartUpdate(t *testing.T) {
 	drush.EXPECT().ConfigResave(mock.Anything, "/tmp", "site1").Return(nil)
 
 	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil).Times(2)
+	mockComposer.EXPECT().CheckPlatformReqs(mock.Anything, "/tmp").Return("", nil)
 	repositoryService.EXPECT().BranchExists(repository, mock.Anything).Return(false, nil)
 
 	repository.EXPECT().Push(mock.Anything).Return(nil)
@@ -110,6 +111,7 @@ func TestStartUpdateSiteFailureDoesNotPublish(t *testing.T) {
 	worktree.EXPECT().Checkout(mock.Anything).Return(nil)
 
 	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil).Times(2)
+	mockComposer.EXPECT().CheckPlatformReqs(mock.Anything, "/tmp").Return("", nil)
 	repositoryService.EXPECT().BranchExists(repository, mock.Anything).Return(false, nil)
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
@@ -161,6 +163,7 @@ func TestStartUpdateTimeout(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
 	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil).Times(2)
+	mockComposer.EXPECT().CheckPlatformReqs(mock.Anything, "/tmp").Return("", nil)
 
 	// Both phases block on the context, simulating a wedged subprocess; the run
 	// timeout is what releases them.
@@ -179,6 +182,47 @@ func TestStartUpdateTimeout(t *testing.T) {
 
 	// Assert: the deadline propagates and nothing is published.
 	assert.ErrorIs(t, err, context.DeadlineExceeded)
+	repository.AssertNotCalled(t, "Push", mock.Anything)
+	vcsProvider.AssertNotCalled(t, "CreateMergeRequest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestStartUpdatePlatformReqsFail(t *testing.T) {
+	// If the runtime PHP does not satisfy the project's platform requirements, the run
+	// aborts before composer update and nothing is published.
+	logger := zap.NewNop()
+	installer := NewMockInstaller(t)
+	repositoryService := NewMockRepository(t)
+	vcsProvider := NewMockPlatform(t)
+	repository := NewMockGitRepository(t)
+	mockComposer := NewMockComposer(t)
+	drush := NewMockDrush(t)
+	ctx := context.Background()
+
+	config := internal.Config{
+		RepositoryURL: "https://example.com/repo.git",
+		Branch:        "main",
+		Token:         "token",
+		Sites:         []string{"site1"},
+	}
+
+	worktree := NewMockWorktree(t)
+	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
+	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil)
+
+	// The platform check fails → updateSharedCode aborts.
+	mockComposer.EXPECT().CheckPlatformReqs(mock.Anything, "/tmp").Return("php 8.1.0 failed", errors.New("unmet platform requirements"))
+
+	// installCode (and a site install) may run concurrently before the cancel propagates.
+	mockComposer.EXPECT().Install(mock.Anything, "/tmp").Return(nil).Maybe()
+	installer.EXPECT().Install(mock.Anything, "/tmp", "site1").Return(nil).Maybe()
+
+	// Execute
+	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
+	err := workflowService.StartUpdate(ctx, nil)
+
+	// Assert: aborts with a clear message and never updates or publishes.
+	assert.ErrorContains(t, err, "PHP platform requirements not satisfied")
+	mockComposer.AssertNotCalled(t, "Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	repository.AssertNotCalled(t, "Push", mock.Anything)
 	vcsProvider.AssertNotCalled(t, "CreateMergeRequest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
@@ -211,6 +255,7 @@ func TestStartUpdateNoChanges(t *testing.T) {
 	// installCode: one CloneRepository + Install
 	// updateSharedCode: one CloneRepository + Update (returns empty → AbortError)
 	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil).Times(2)
+	mockComposer.EXPECT().CheckPlatformReqs(mock.Anything, "/tmp").Return("", nil)
 
 	mockComposer.EXPECT().Install(mock.Anything, "/tmp").Return(nil)
 	mockComposer.EXPECT().Update(mock.Anything, "/tmp", mock.Anything, mock.Anything, false, false).Return([]composer.PackageChange{}, nil)
@@ -263,6 +308,7 @@ func TestStartUpdateBranchAlreadyExists(t *testing.T) {
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
 
 	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil).Times(2)
+	mockComposer.EXPECT().CheckPlatformReqs(mock.Anything, "/tmp").Return("", nil)
 	repositoryService.EXPECT().BranchExists(repository, mock.Anything).Return(true, nil)
 
 	mockComposer.EXPECT().Install(mock.Anything, "/tmp").Return(nil)
@@ -325,6 +371,7 @@ func TestStartUpdateWithDryRun(t *testing.T) {
 	drush.EXPECT().ConfigResave(mock.Anything, "/tmp", "site1").Return(nil)
 
 	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil).Times(2)
+	mockComposer.EXPECT().CheckPlatformReqs(mock.Anything, "/tmp").Return("", nil)
 	repositoryService.EXPECT().BranchExists(repository, mock.Anything).Return(false, nil)
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
@@ -391,6 +438,7 @@ func TestStartUpdateFireEventError(t *testing.T) {
 		Return(repository, worktree, "/tmp", nil).Times(2)
 
 	mockComposer.EXPECT().Install(mock.Anything, "/tmp").Return(nil)
+	mockComposer.EXPECT().CheckPlatformReqs(mock.Anything, "/tmp").Return("", nil)
 
 	// The dispatcher returns an error on the first FireEvent call (PreComposerUpdateEvent).
 	fireErr := errors.New("event bus unavailable")

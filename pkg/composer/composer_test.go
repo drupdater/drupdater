@@ -489,6 +489,39 @@ func TestNormalize(t *testing.T) {
 	assert.Equal(t, "normalized", out)
 }
 
+func TestCheckPlatformReqs(t *testing.T) {
+	service := &CLI{logger: zap.NewNop()}
+
+	t.Run("requirements satisfied", func(t *testing.T) {
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", "php 8.3.0 success"}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+
+		out, err := service.CheckPlatformReqs(t.Context(), "/tmp")
+		assert.NoError(t, err)
+		assert.Equal(t, "php 8.3.0 success", out)
+	})
+
+	t.Run("requirements not satisfied", func(t *testing.T) {
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", "php 8.1.0 failed"}
+			cs = append(cs, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+
+		_, err := service.CheckPlatformReqs(t.Context(), "/tmp")
+		assert.Error(t, err)
+	})
+}
+
 func TestDiff(t *testing.T) {
 	service := &CLI{logger: zap.NewNop()}
 
