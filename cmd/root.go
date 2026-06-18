@@ -83,8 +83,9 @@ var rootCmd = &cobra.Command{
 			if err := handleWorkflowError(logger, err); err != nil {
 				return err
 			}
+		} else {
+			logger.Info("update finished")
 		}
-		logger.Info("update finished")
 		return nil
 	},
 }
