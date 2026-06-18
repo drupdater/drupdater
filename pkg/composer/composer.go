@@ -233,6 +233,14 @@ func (c *Audit) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// CheckPlatformReqs verifies the platform (PHP version and extensions) satisfies the
+// requirements in composer.lock. `composer update` enforces the same checks, so this lets
+// us fail fast with a clear message instead of mid-update. A non-nil error means a
+// requirement is unmet; the returned output names the offending requirement(s).
+func (s *CLI) CheckPlatformReqs(ctx context.Context, dir string) (string, error) {
+	return s.execComposer(ctx, dir, "check-platform-reqs", "--lock", "--no-ansi")
+}
+
 func (s *CLI) Normalize(ctx context.Context, dir string) (string, error) {
 	return s.execComposer(ctx, dir, "normalize")
 }

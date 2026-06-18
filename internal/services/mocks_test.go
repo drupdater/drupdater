@@ -44,6 +44,72 @@ func (_m *MockComposer) EXPECT() *MockComposer_Expecter {
 	return &MockComposer_Expecter{mock: &_m.Mock}
 }
 
+// CheckPlatformReqs provides a mock function for the type MockComposer
+func (_mock *MockComposer) CheckPlatformReqs(ctx context.Context, dir string) (string, error) {
+	ret := _mock.Called(ctx, dir)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CheckPlatformReqs")
+	}
+
+	var r0 string
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (string, error)); ok {
+		return returnFunc(ctx, dir)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) string); ok {
+		r0 = returnFunc(ctx, dir)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, dir)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockComposer_CheckPlatformReqs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CheckPlatformReqs'
+type MockComposer_CheckPlatformReqs_Call struct {
+	*mock.Call
+}
+
+// CheckPlatformReqs is a helper method to define mock.On call
+//   - ctx context.Context
+//   - dir string
+func (_e *MockComposer_Expecter) CheckPlatformReqs(ctx any, dir any) *MockComposer_CheckPlatformReqs_Call {
+	return &MockComposer_CheckPlatformReqs_Call{Call: _e.mock.On("CheckPlatformReqs", ctx, dir)}
+}
+
+func (_c *MockComposer_CheckPlatformReqs_Call) Run(run func(ctx context.Context, dir string)) *MockComposer_CheckPlatformReqs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockComposer_CheckPlatformReqs_Call) Return(s string, err error) *MockComposer_CheckPlatformReqs_Call {
+	_c.Call.Return(s, err)
+	return _c
+}
+
+func (_c *MockComposer_CheckPlatformReqs_Call) RunAndReturn(run func(ctx context.Context, dir string) (string, error)) *MockComposer_CheckPlatformReqs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetLockHash provides a mock function for the type MockComposer
 func (_mock *MockComposer) GetLockHash(dir string) (string, error) {
 	ret := _mock.Called(dir)

@@ -13,6 +13,7 @@ type Composer interface {
 	Install(ctx context.Context, dir string) error
 	Update(ctx context.Context, dir string, packagesToUpdate []string, packagesToKeep []string, minimalChanges bool, dryRun bool) ([]composer.PackageChange, error)
 	GetLockHash(dir string) (string, error)
+	CheckPlatformReqs(ctx context.Context, dir string) (string, error)
 }
 
 type Drush interface {

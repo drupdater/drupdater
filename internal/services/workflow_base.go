@@ -173,6 +173,12 @@ func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context) (SharedUpda
 		return SharedUpdate{}, fmt.Errorf("failed to clone repository: %w", err)
 	}
 
+	// Fail fast if the runtime PHP/extensions don't satisfy the project's platform
+	// requirements; composer update would otherwise fail mid-run with confusing output.
+	if out, err := ws.composer.CheckPlatformReqs(ctx, path); err != nil {
+		return SharedUpdate{}, fmt.Errorf("PHP platform requirements not satisfied:\n%s", out)
+	}
+
 	ws.logger.Info("updating dependencies")
 
 	preComposerUpdateEvent := NewPreComposerUpdateEvent(ctx, path, worktree, []string{}, []string{}, false)
