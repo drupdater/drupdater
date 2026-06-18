@@ -83,6 +83,60 @@ func TestStartUpdate(t *testing.T) {
 	vcsProvider.AssertExpectations(t)
 }
 
+func TestStartUpdateSiteFailureDoesNotPublish(t *testing.T) {
+	// A failing site update must propagate the error and never push a branch or open an MR.
+	logger := zap.NewNop()
+	installer := NewMockInstaller(t)
+	repositoryService := NewMockRepository(t)
+	vcsProvider := NewMockPlatform(t)
+	repository := NewMockGitRepository(t)
+	mockComposer := NewMockComposer(t)
+	drush := NewMockDrush(t)
+	ctx := context.Background()
+
+	config := internal.Config{
+		RepositoryURL: "https://example.com/repo.git",
+		Branch:        "main",
+		Token:         "token",
+		Sites:         []string{"site1"},
+		DryRun:        false,
+	}
+
+	// updateSharedCode completes fully (site updates only start once it's done).
+	worktree := NewMockWorktree(t)
+	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
+	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Checkout(mock.Anything).Return(nil)
+
+	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil).Times(2)
+	repositoryService.EXPECT().BranchExists(repository, mock.Anything).Return(false, nil)
+
+	vcsProvider.EXPECT().GetUser().Return("user", "mail")
+
+	mockComposer.EXPECT().Install(mock.Anything, "/tmp").Return(nil)
+	mockComposer.EXPECT().Update(mock.Anything, "/tmp", mock.Anything, mock.Anything, false, false).Return([]composer.PackageChange{
+		{Package: "drupal/core", From: "9.0.0", To: "9.1.0"},
+	}, nil)
+	mockComposer.EXPECT().GetLockHash("/tmp").Return("dummy-hash", nil)
+
+	installer.EXPECT().Install(mock.Anything, "/tmp", "site1").Return(nil)
+	installer.EXPECT().ConfigureDatabase(mock.Anything, "/tmp", "site1").Return(nil)
+
+	// The site update fails. ConfigResave/ExportConfiguration are left unexpected on
+	// purpose: if the failure didn't short-circuit, those calls would fail the test.
+	updateErr := errors.New("drush updatedb crashed")
+	drush.EXPECT().UpdateSite(mock.Anything, "/tmp", "site1").Return(updateErr)
+
+	// Execute
+	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
+	err := workflowService.StartUpdate(ctx, nil)
+
+	// Assert: the error surfaces and no MR was published.
+	assert.ErrorIs(t, err, updateErr)
+	repository.AssertNotCalled(t, "Push", mock.Anything)
+	vcsProvider.AssertNotCalled(t, "CreateMergeRequest", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+}
+
 func TestStartUpdateNoChanges(t *testing.T) {
 	// Setup
 	logger := zap.NewNop()

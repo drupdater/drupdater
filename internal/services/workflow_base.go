@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"sync"
 	"text/template"
 	"time"
 
@@ -20,6 +19,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 )
 
 //go:embed templates
@@ -72,133 +72,74 @@ func NewWorkflowBaseService(
 }
 
 func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []internal.Addon) error {
-	ctx, cancel := context.WithCancel(ctx)
-
 	defer func() {
 		// Clean up the temporary directory
 		tmpDirName := filepath.Join(os.TempDir(), fmt.Sprintf("%x", md5.Sum([]byte(ws.config.RepositoryURL))))
 		os.RemoveAll(tmpDirName)
-
-		cancel()
 	}()
 
-	var wg sync.WaitGroup
-	errCh := make(chan error, len(ws.config.Sites)*2+2) // site installs + site updates + installCode + updateCode
+	// errgroup cancels ctx on the first error and bounds concurrency to the CPU count.
+	// publishWork runs only after Wait() returns nil, so a failed phase can never publish an MR.
+	g, ctx := errgroup.WithContext(ctx)
+	g.SetLimit(runtime.NumCPU())
 
-	// Channels to coordinate
-	installCodeDone := make(chan string, 1) // carries installPath
-	installSiteDone := make(map[string]chan struct{})
-
-	for _, site := range ws.config.Sites {
-		installSiteDone[site] = make(chan struct{})
-	}
-
-	var sharedUpdate SharedUpdate
-	var updateDone = make(chan struct{})
-
-	// Limit concurrency to number of CPU cores
-	cpuLimit := runtime.NumCPU()
-	sem := make(chan struct{}, cpuLimit)
-
-	// 1. Run installCode()
-	wg.Go(func() {
-		sem <- struct{}{}
-		defer func() { <-sem }()
-
+	// installCode and updateSharedCode are independent; site work waits on these signals.
+	// Closing a channel after assigning the result establishes a happens-before edge for the read.
+	var installPath string
+	installCodeDone := make(chan struct{})
+	g.Go(func() error {
 		path, err := ws.installCode(ctx)
 		if err != nil {
-			errCh <- fmt.Errorf("code installation failed: %w", err)
-			cancel()
-			return
+			return fmt.Errorf("code installation failed: %w", err)
 		}
-
-		// Send path to all waiting goroutines
-		installCodeDone <- path
+		installPath = path
+		close(installCodeDone)
+		return nil
 	})
 
-	// 2. Run installSite(site) after installCode
-	for _, site := range ws.config.Sites {
-		wg.Go(func() {
-			sem <- struct{}{}
-			defer func() { <-sem }()
-
-			select {
-			case installPath := <-installCodeDone:
-				// Put the path back for other goroutines
-				installCodeDone <- installPath
-
-				if err := ws.installer.Install(ctx, installPath, site); err != nil {
-					errCh <- fmt.Errorf("site %s installation failed: %w", site, err)
-					cancel()
-					return
-				}
-				close(installSiteDone[site])
-			case <-ctx.Done():
-				return
-			}
-		})
-	}
-
-	// 3. Run updateSharedCode() in parallel
-	wg.Go(func() {
-		sem <- struct{}{}
-		defer func() { <-sem }()
-
+	var sharedUpdate SharedUpdate
+	updateDone := make(chan struct{})
+	g.Go(func() error {
 		update, err := ws.updateSharedCode(ctx)
 		if err != nil {
-			errCh <- err
-			cancel()
-			return
+			return err
 		}
-
 		sharedUpdate = update
 		close(updateDone)
+		return nil
 	})
 
-	// 4. Run updateSite(site) after installSite + updateSharedCode
+	// Per site: install (after installCode), then update (after install + shared update).
 	for _, site := range ws.config.Sites {
-		wg.Go(func() {
-			sem <- struct{}{}
-			defer func() { <-sem }()
-
-			// Wait for install to finish
+		g.Go(func() error {
 			select {
-			case <-installSiteDone[site]:
+			case <-installCodeDone:
 			case <-ctx.Done():
-				return
+				return ctx.Err()
 			}
 
-			// Wait for shared update to be ready
+			if err := ws.installer.Install(ctx, installPath, site); err != nil {
+				return fmt.Errorf("site %s installation failed: %w", site, err)
+			}
+
 			select {
 			case <-updateDone:
 			case <-ctx.Done():
-				return
+				return ctx.Err()
 			}
 
-			if err := ws.updateSite(ctx, sharedUpdate, site); err != nil {
-				errCh <- err
-				cancel()
-			}
+			return ws.updateSite(ctx, sharedUpdate, site)
 		})
 	}
 
-	// 5. Wait for all routines
-	done := make(chan struct{})
-	go func() {
-		wg.Wait()
-		close(done)
-	}()
-
-	select {
-	case <-done:
-
-		if !ws.config.DryRun {
-			return ws.publishWork(sharedUpdate.Repository, sharedUpdate.updateBranchName, addons)
-		}
-		return nil
-	case err := <-errCh:
+	if err := g.Wait(); err != nil {
 		return err
 	}
+
+	if !ws.config.DryRun {
+		return ws.publishWork(sharedUpdate.Repository, sharedUpdate.updateBranchName, addons)
+	}
+	return nil
 }
 
 func (ws *WorkflowBaseService) installCode(ctx context.Context) (string, error) {
