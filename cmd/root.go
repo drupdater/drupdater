@@ -1,10 +1,14 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/url"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/addon"
@@ -79,8 +83,9 @@ var rootCmd = &cobra.Command{
 			if err := handleWorkflowError(logger, err); err != nil {
 				return err
 			}
+		} else {
+			logger.Info("update finished")
 		}
-		logger.Info("update finished")
 		return nil
 	},
 }
@@ -149,10 +154,15 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&config.SkipRector, "skip-rector", false, "Skip Rector. If true, the Rector will not run to remove deprecated code.")
 	rootCmd.PersistentFlags().BoolVar(&config.DryRun, "dry-run", false, "Dry run. If true, no branch and merge request will be created.")
 	rootCmd.PersistentFlags().BoolVar(&config.Verbose, "verbose", false, "Verbose")
+	rootCmd.PersistentFlags().DurationVar(&config.Timeout, "timeout", 30*time.Minute, "Overall run timeout. Set to 0 to disable.")
 }
 
 func Execute() {
-	if err := rootCmd.Execute(); err != nil {
+	// Cancel the workflow context on SIGINT/SIGTERM so cleanup runs on termination.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	if err := rootCmd.ExecuteContext(ctx); err != nil {
 		os.Exit(1)
 	}
 }

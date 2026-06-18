@@ -30,8 +30,8 @@ func newGithub(repositoryURL string, token string) *Github {
 	}
 }
 
-func (g Github) CreateMergeRequest(title string, description string, sourceBranch string, targetBranch string) (MergeRequest, error) {
-	mr, _, err := g.client.PullRequests.Create(context.TODO(), g.owner, g.repo, &github.NewPullRequest{
+func (g Github) CreateMergeRequest(ctx context.Context, title string, description string, sourceBranch string, targetBranch string) (MergeRequest, error) {
+	mr, _, err := g.client.PullRequests.Create(ctx, g.owner, g.repo, &github.NewPullRequest{
 		Head:  &sourceBranch,
 		Base:  &targetBranch,
 		Title: &title,
@@ -60,8 +60,8 @@ func (g *Github) logError(err error) {
 // correctly without requiring a PAT.
 // Any other error (including a 403 from bad user credentials) is logged and
 // returns empty strings so callers can detect the failure.
-func (g *Github) GetUser() (name string, email string) {
-	user, resp, err := g.client.Users.Get(context.Background(), "")
+func (g *Github) GetUser(ctx context.Context) (name string, email string) {
+	user, resp, err := g.client.Users.Get(ctx, "")
 	if err != nil {
 		if isGitHubActionsToken403(resp, err) {
 			return "github-actions[bot]", "41898282+github-actions[bot]@users.noreply.github.com"

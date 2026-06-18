@@ -1,5 +1,7 @@
 package internal
 
+import "time"
+
 type Config struct {
 	RepositoryURL string
 	Branch        string
@@ -10,4 +12,5 @@ type Config struct {
 	SkipRector    bool
 	DryRun        bool
 	Verbose       bool
+	Timeout       time.Duration
 }

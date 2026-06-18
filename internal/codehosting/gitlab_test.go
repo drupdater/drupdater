@@ -1,6 +1,7 @@
 package codehosting
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -21,7 +22,7 @@ func TestGitlab_CreateMergeRequest(t *testing.T) {
 
 	t.Run("failed to get create mr", func(t *testing.T) {
 
-		_, err := gitlab.CreateMergeRequest(title, description, sourceBranch, targetBranch)
+		_, err := gitlab.CreateMergeRequest(context.Background(), title, description, sourceBranch, targetBranch)
 		assert.Error(t, err)
 	})
 
@@ -77,10 +78,32 @@ func TestCreateMergeRequest(t *testing.T) {
 		fs:          afero.NewMemMapFs(),
 	}
 
-	mr, err := gitlab.CreateMergeRequest("Test MR", "This is a test MR", "source-branch", "target-branch")
+	mr, err := gitlab.CreateMergeRequest(context.Background(), "Test MR", "This is a test MR", "source-branch", "target-branch")
 	assert.NoError(t, err)
 	assert.Equal(t, int64(1), mr.ID)
 	assert.Equal(t, "http://example.com", mr.URL)
+}
+
+func TestGitlab_CreateMergeRequest_HonorsContext(t *testing.T) {
+	// A cancelled context must abort before the request is sent.
+	g := newGitlab("https://gitlab.com/user/repo", "dummy-token")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err := g.CreateMergeRequest(ctx, "Test MR", "body", "source", "target")
+	assert.ErrorIs(t, err, context.Canceled)
+}
+
+func TestGitlab_GetUser_HonorsContext(t *testing.T) {
+	g := newGitlab("https://gitlab.com/user/repo", "dummy-token")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	name, email := g.GetUser(ctx)
+	assert.Empty(t, name)
+	assert.Empty(t, email)
 }
 
 func TestGetUser_ReturnsEmptyStringsOnError(t *testing.T) {
@@ -97,8 +120,7 @@ func TestGetUser_ReturnsEmptyStringsOnError(t *testing.T) {
 		fs:          afero.NewMemMapFs(),
 	}
 
-	name, email := g.GetUser()
+	name, email := g.GetUser(context.Background())
 	assert.Equal(t, "", name)
 	assert.Equal(t, "", email)
 }
-
