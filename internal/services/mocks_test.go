@@ -78,7 +78,7 @@ type MockComposer_GetLockHash_Call struct {
 
 // GetLockHash is a helper method to define mock.On call
 //   - dir string
-func (_e *MockComposer_Expecter) GetLockHash(dir interface{}) *MockComposer_GetLockHash_Call {
+func (_e *MockComposer_Expecter) GetLockHash(dir any) *MockComposer_GetLockHash_Call {
 	return &MockComposer_GetLockHash_Call{Call: _e.mock.On("GetLockHash", dir)}
 }
 
@@ -130,7 +130,7 @@ type MockComposer_Install_Call struct {
 // Install is a helper method to define mock.On call
 //   - ctx context.Context
 //   - dir string
-func (_e *MockComposer_Expecter) Install(ctx interface{}, dir interface{}) *MockComposer_Install_Call {
+func (_e *MockComposer_Expecter) Install(ctx any, dir any) *MockComposer_Install_Call {
 	return &MockComposer_Install_Call{Call: _e.mock.On("Install", ctx, dir)}
 }
 
@@ -202,7 +202,7 @@ type MockComposer_Update_Call struct {
 //   - packagesToKeep []string
 //   - minimalChanges bool
 //   - dryRun bool
-func (_e *MockComposer_Expecter) Update(ctx interface{}, dir interface{}, packagesToUpdate interface{}, packagesToKeep interface{}, minimalChanges interface{}, dryRun interface{}) *MockComposer_Update_Call {
+func (_e *MockComposer_Expecter) Update(ctx any, dir any, packagesToUpdate any, packagesToKeep any, minimalChanges any, dryRun any) *MockComposer_Update_Call {
 	return &MockComposer_Update_Call{Call: _e.mock.On("Update", ctx, dir, packagesToUpdate, packagesToKeep, minimalChanges, dryRun)}
 }
 
@@ -307,7 +307,7 @@ type MockDrush_ConfigResave_Call struct {
 //   - ctx context.Context
 //   - dir string
 //   - site string
-func (_e *MockDrush_Expecter) ConfigResave(ctx interface{}, dir interface{}, site interface{}) *MockDrush_ConfigResave_Call {
+func (_e *MockDrush_Expecter) ConfigResave(ctx any, dir any, site any) *MockDrush_ConfigResave_Call {
 	return &MockDrush_ConfigResave_Call{Call: _e.mock.On("ConfigResave", ctx, dir, site)}
 }
 
@@ -370,7 +370,7 @@ type MockDrush_ExportConfiguration_Call struct {
 //   - ctx context.Context
 //   - dir string
 //   - site string
-func (_e *MockDrush_Expecter) ExportConfiguration(ctx interface{}, dir interface{}, site interface{}) *MockDrush_ExportConfiguration_Call {
+func (_e *MockDrush_Expecter) ExportConfiguration(ctx any, dir any, site any) *MockDrush_ExportConfiguration_Call {
 	return &MockDrush_ExportConfiguration_Call{Call: _e.mock.On("ExportConfiguration", ctx, dir, site)}
 }
 
@@ -433,7 +433,7 @@ type MockDrush_UpdateSite_Call struct {
 //   - ctx context.Context
 //   - dir string
 //   - site string
-func (_e *MockDrush_Expecter) UpdateSite(ctx interface{}, dir interface{}, site interface{}) *MockDrush_UpdateSite_Call {
+func (_e *MockDrush_Expecter) UpdateSite(ctx any, dir any, site any) *MockDrush_UpdateSite_Call {
 	return &MockDrush_UpdateSite_Call{Call: _e.mock.On("UpdateSite", ctx, dir, site)}
 }
 
@@ -531,7 +531,7 @@ type MockRepository_BranchExists_Call struct {
 // BranchExists is a helper method to define mock.On call
 //   - repository repo.Repository
 //   - branch string
-func (_e *MockRepository_Expecter) BranchExists(repository interface{}, branch interface{}) *MockRepository_BranchExists_Call {
+func (_e *MockRepository_Expecter) BranchExists(repository any, branch any) *MockRepository_BranchExists_Call {
 	return &MockRepository_BranchExists_Call{Call: _e.mock.On("BranchExists", repository, branch)}
 }
 
@@ -616,7 +616,7 @@ type MockRepository_CloneRepository_Call struct {
 //   - token string
 //   - username string
 //   - email string
-func (_e *MockRepository_Expecter) CloneRepository(repository interface{}, branch interface{}, token interface{}, username interface{}, email interface{}) *MockRepository_CloneRepository_Call {
+func (_e *MockRepository_Expecter) CloneRepository(repository any, branch any, token any, username any, email any) *MockRepository_CloneRepository_Call {
 	return &MockRepository_CloneRepository_Call{Call: _e.mock.On("CloneRepository", repository, branch, token, username, email)}
 }
 
@@ -725,7 +725,7 @@ type MockGitRepository_CommitObject_Call struct {
 
 // CommitObject is a helper method to define mock.On call
 //   - h plumbing.Hash
-func (_e *MockGitRepository_Expecter) CommitObject(h interface{}) *MockGitRepository_CommitObject_Call {
+func (_e *MockGitRepository_Expecter) CommitObject(h any) *MockGitRepository_CommitObject_Call {
 	return &MockGitRepository_CommitObject_Call{Call: _e.mock.On("CommitObject", h)}
 }
 
@@ -831,7 +831,7 @@ type MockGitRepository_Push_Call struct {
 
 // Push is a helper method to define mock.On call
 //   - o *git.PushOptions
-func (_e *MockGitRepository_Expecter) Push(o interface{}) *MockGitRepository_Push_Call {
+func (_e *MockGitRepository_Expecter) Push(o any) *MockGitRepository_Push_Call {
 	return &MockGitRepository_Push_Call{Call: _e.mock.On("Push", o)}
 }
 
@@ -975,7 +975,7 @@ type MockWorktree_Add_Call struct {
 
 // Add is a helper method to define mock.On call
 //   - path string
-func (_e *MockWorktree_Expecter) Add(path interface{}) *MockWorktree_Add_Call {
+func (_e *MockWorktree_Expecter) Add(path any) *MockWorktree_Add_Call {
 	return &MockWorktree_Add_Call{Call: _e.mock.On("Add", path)}
 }
 
@@ -1026,7 +1026,7 @@ type MockWorktree_AddGlob_Call struct {
 
 // AddGlob is a helper method to define mock.On call
 //   - pattern string
-func (_e *MockWorktree_Expecter) AddGlob(pattern interface{}) *MockWorktree_AddGlob_Call {
+func (_e *MockWorktree_Expecter) AddGlob(pattern any) *MockWorktree_AddGlob_Call {
 	return &MockWorktree_AddGlob_Call{Call: _e.mock.On("AddGlob", pattern)}
 }
 
@@ -1077,7 +1077,7 @@ type MockWorktree_Checkout_Call struct {
 
 // Checkout is a helper method to define mock.On call
 //   - opts *git.CheckoutOptions
-func (_e *MockWorktree_Expecter) Checkout(opts interface{}) *MockWorktree_Checkout_Call {
+func (_e *MockWorktree_Expecter) Checkout(opts any) *MockWorktree_Checkout_Call {
 	return &MockWorktree_Checkout_Call{Call: _e.mock.On("Checkout", opts)}
 }
 
@@ -1140,7 +1140,7 @@ type MockWorktree_Commit_Call struct {
 // Commit is a helper method to define mock.On call
 //   - msg string
 //   - opts *git.CommitOptions
-func (_e *MockWorktree_Expecter) Commit(msg interface{}, opts interface{}) *MockWorktree_Commit_Call {
+func (_e *MockWorktree_Expecter) Commit(msg any, opts any) *MockWorktree_Commit_Call {
 	return &MockWorktree_Commit_Call{Call: _e.mock.On("Commit", msg, opts)}
 }
 
@@ -1207,7 +1207,7 @@ type MockWorktree_Remove_Call struct {
 
 // Remove is a helper method to define mock.On call
 //   - path string
-func (_e *MockWorktree_Expecter) Remove(path interface{}) *MockWorktree_Remove_Call {
+func (_e *MockWorktree_Expecter) Remove(path any) *MockWorktree_Remove_Call {
 	return &MockWorktree_Remove_Call{Call: _e.mock.On("Remove", path)}
 }
 
@@ -1342,7 +1342,7 @@ type MockInstaller_ConfigureDatabase_Call struct {
 //   - ctx context.Context
 //   - dir string
 //   - site string
-func (_e *MockInstaller_Expecter) ConfigureDatabase(ctx interface{}, dir interface{}, site interface{}) *MockInstaller_ConfigureDatabase_Call {
+func (_e *MockInstaller_Expecter) ConfigureDatabase(ctx any, dir any, site any) *MockInstaller_ConfigureDatabase_Call {
 	return &MockInstaller_ConfigureDatabase_Call{Call: _e.mock.On("ConfigureDatabase", ctx, dir, site)}
 }
 
@@ -1405,7 +1405,7 @@ type MockInstaller_Install_Call struct {
 //   - ctx context.Context
 //   - dir string
 //   - site string
-func (_e *MockInstaller_Expecter) Install(ctx interface{}, dir interface{}, site interface{}) *MockInstaller_Install_Call {
+func (_e *MockInstaller_Expecter) Install(ctx any, dir any, site any) *MockInstaller_Install_Call {
 	return &MockInstaller_Install_Call{Call: _e.mock.On("Install", ctx, dir, site)}
 }
 
@@ -1505,7 +1505,7 @@ type MockPlatform_CreateMergeRequest_Call struct {
 //   - description string
 //   - sourceBranch string
 //   - targetBranch string
-func (_e *MockPlatform_Expecter) CreateMergeRequest(title interface{}, description interface{}, sourceBranch interface{}, targetBranch interface{}) *MockPlatform_CreateMergeRequest_Call {
+func (_e *MockPlatform_Expecter) CreateMergeRequest(title any, description any, sourceBranch any, targetBranch any) *MockPlatform_CreateMergeRequest_Call {
 	return &MockPlatform_CreateMergeRequest_Call{Call: _e.mock.On("CreateMergeRequest", title, description, sourceBranch, targetBranch)}
 }
 
@@ -1571,7 +1571,7 @@ type MockPlatform_DownloadComposerFiles_Call struct {
 
 // DownloadComposerFiles is a helper method to define mock.On call
 //   - branch string
-func (_e *MockPlatform_Expecter) DownloadComposerFiles(branch interface{}) *MockPlatform_DownloadComposerFiles_Call {
+func (_e *MockPlatform_Expecter) DownloadComposerFiles(branch any) *MockPlatform_DownloadComposerFiles_Call {
 	return &MockPlatform_DownloadComposerFiles_Call{Call: _e.mock.On("DownloadComposerFiles", branch)}
 }
 
@@ -1691,7 +1691,7 @@ type MockEventDispatcher_AddSubscriber_Call struct {
 
 // AddSubscriber is a helper method to define mock.On call
 //   - subscriber event.Subscriber
-func (_e *MockEventDispatcher_Expecter) AddSubscriber(subscriber interface{}) *MockEventDispatcher_AddSubscriber_Call {
+func (_e *MockEventDispatcher_Expecter) AddSubscriber(subscriber any) *MockEventDispatcher_AddSubscriber_Call {
 	return &MockEventDispatcher_AddSubscriber_Call{Call: _e.mock.On("AddSubscriber", subscriber)}
 }
 
@@ -1742,7 +1742,7 @@ type MockEventDispatcher_FireEvent_Call struct {
 
 // FireEvent is a helper method to define mock.On call
 //   - e event.Event
-func (_e *MockEventDispatcher_Expecter) FireEvent(e interface{}) *MockEventDispatcher_FireEvent_Call {
+func (_e *MockEventDispatcher_Expecter) FireEvent(e any) *MockEventDispatcher_FireEvent_Call {
 	return &MockEventDispatcher_FireEvent_Call{Call: _e.mock.On("FireEvent", e)}
 }
 

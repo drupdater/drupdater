@@ -73,7 +73,7 @@ type MockDrush_GetConfigSyncDir_Call struct {
 //   - path string
 //   - site string
 //   - create bool
-func (_e *MockDrush_Expecter) GetConfigSyncDir(ctx interface{}, path interface{}, site interface{}, create interface{}) *MockDrush_GetConfigSyncDir_Call {
+func (_e *MockDrush_Expecter) GetConfigSyncDir(ctx any, path any, site any, create any) *MockDrush_GetConfigSyncDir_Call {
 	return &MockDrush_GetConfigSyncDir_Call{Call: _e.mock.On("GetConfigSyncDir", ctx, path, site, create)}
 }
 
@@ -141,7 +141,7 @@ type MockDrush_InstallSite_Call struct {
 //   - ctx context.Context
 //   - path string
 //   - site string
-func (_e *MockDrush_Expecter) InstallSite(ctx interface{}, path interface{}, site interface{}) *MockDrush_InstallSite_Call {
+func (_e *MockDrush_Expecter) InstallSite(ctx any, path any, site any) *MockDrush_InstallSite_Call {
 	return &MockDrush_InstallSite_Call{Call: _e.mock.On("InstallSite", ctx, path, site)}
 }
 
@@ -240,7 +240,7 @@ type MockComposer_GetConfig_Call struct {
 //   - ctx context.Context
 //   - path string
 //   - key string
-func (_e *MockComposer_Expecter) GetConfig(ctx interface{}, path interface{}, key interface{}) *MockComposer_GetConfig_Call {
+func (_e *MockComposer_Expecter) GetConfig(ctx any, path any, key any) *MockComposer_GetConfig_Call {
 	return &MockComposer_GetConfig_Call{Call: _e.mock.On("GetConfig", ctx, path, key)}
 }
 
