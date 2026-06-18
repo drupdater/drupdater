@@ -71,7 +71,7 @@ type MockPlatform_CreateMergeRequest_Call struct {
 //   - description string
 //   - sourceBranch string
 //   - targetBranch string
-func (_e *MockPlatform_Expecter) CreateMergeRequest(title interface{}, description interface{}, sourceBranch interface{}, targetBranch interface{}) *MockPlatform_CreateMergeRequest_Call {
+func (_e *MockPlatform_Expecter) CreateMergeRequest(title any, description any, sourceBranch any, targetBranch any) *MockPlatform_CreateMergeRequest_Call {
 	return &MockPlatform_CreateMergeRequest_Call{Call: _e.mock.On("CreateMergeRequest", title, description, sourceBranch, targetBranch)}
 }
 
@@ -137,7 +137,7 @@ type MockPlatform_DownloadComposerFiles_Call struct {
 
 // DownloadComposerFiles is a helper method to define mock.On call
 //   - branch string
-func (_e *MockPlatform_Expecter) DownloadComposerFiles(branch interface{}) *MockPlatform_DownloadComposerFiles_Call {
+func (_e *MockPlatform_Expecter) DownloadComposerFiles(branch any) *MockPlatform_DownloadComposerFiles_Call {
 	return &MockPlatform_DownloadComposerFiles_Call{Call: _e.mock.On("DownloadComposerFiles", branch)}
 }
 
