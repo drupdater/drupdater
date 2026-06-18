@@ -50,6 +50,7 @@ func (cd *ComposerDiff) postComposerUpdateHandler(e event.Event) error {
 	}
 	cd.table = table
 
+	table, _ = cd.composer.Diff(evt.Context(), evt.Path(), false)
 	cd.logger.Sugar().Info("composer diff table", fmt.Sprintf("\n%s", table))
 
 	return nil
