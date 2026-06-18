@@ -21,7 +21,7 @@ clean: ## Clean build artifacts
 	go clean
 
 mock: ## Generate mocks
-	docker run -v "$${PWD}":/src -w /src -e GOFLAGS="-buildvcs=false" vektra/mockery:3.5
+	docker run -v "$${PWD}":/src -w /src -e GOFLAGS="-buildvcs=false" vektra/mockery:3.7
 
 lint: ## Run linters
 	go vet ./...

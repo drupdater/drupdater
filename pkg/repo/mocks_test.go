@@ -74,7 +74,7 @@ type MockRepository_CommitObject_Call struct {
 
 // CommitObject is a helper method to define mock.On call
 //   - h plumbing.Hash
-func (_e *MockRepository_Expecter) CommitObject(h interface{}) *MockRepository_CommitObject_Call {
+func (_e *MockRepository_Expecter) CommitObject(h any) *MockRepository_CommitObject_Call {
 	return &MockRepository_CommitObject_Call{Call: _e.mock.On("CommitObject", h)}
 }
 
@@ -180,7 +180,7 @@ type MockRepository_Push_Call struct {
 
 // Push is a helper method to define mock.On call
 //   - o *git.PushOptions
-func (_e *MockRepository_Expecter) Push(o interface{}) *MockRepository_Push_Call {
+func (_e *MockRepository_Expecter) Push(o any) *MockRepository_Push_Call {
 	return &MockRepository_Push_Call{Call: _e.mock.On("Push", o)}
 }
 
@@ -324,7 +324,7 @@ type MockWorktree_Add_Call struct {
 
 // Add is a helper method to define mock.On call
 //   - path string
-func (_e *MockWorktree_Expecter) Add(path interface{}) *MockWorktree_Add_Call {
+func (_e *MockWorktree_Expecter) Add(path any) *MockWorktree_Add_Call {
 	return &MockWorktree_Add_Call{Call: _e.mock.On("Add", path)}
 }
 
@@ -375,7 +375,7 @@ type MockWorktree_AddGlob_Call struct {
 
 // AddGlob is a helper method to define mock.On call
 //   - pattern string
-func (_e *MockWorktree_Expecter) AddGlob(pattern interface{}) *MockWorktree_AddGlob_Call {
+func (_e *MockWorktree_Expecter) AddGlob(pattern any) *MockWorktree_AddGlob_Call {
 	return &MockWorktree_AddGlob_Call{Call: _e.mock.On("AddGlob", pattern)}
 }
 
@@ -426,7 +426,7 @@ type MockWorktree_Checkout_Call struct {
 
 // Checkout is a helper method to define mock.On call
 //   - opts *git.CheckoutOptions
-func (_e *MockWorktree_Expecter) Checkout(opts interface{}) *MockWorktree_Checkout_Call {
+func (_e *MockWorktree_Expecter) Checkout(opts any) *MockWorktree_Checkout_Call {
 	return &MockWorktree_Checkout_Call{Call: _e.mock.On("Checkout", opts)}
 }
 
@@ -489,7 +489,7 @@ type MockWorktree_Commit_Call struct {
 // Commit is a helper method to define mock.On call
 //   - msg string
 //   - opts *git.CommitOptions
-func (_e *MockWorktree_Expecter) Commit(msg interface{}, opts interface{}) *MockWorktree_Commit_Call {
+func (_e *MockWorktree_Expecter) Commit(msg any, opts any) *MockWorktree_Commit_Call {
 	return &MockWorktree_Commit_Call{Call: _e.mock.On("Commit", msg, opts)}
 }
 
@@ -556,7 +556,7 @@ type MockWorktree_Remove_Call struct {
 
 // Remove is a helper method to define mock.On call
 //   - path string
-func (_e *MockWorktree_Expecter) Remove(path interface{}) *MockWorktree_Remove_Call {
+func (_e *MockWorktree_Expecter) Remove(path any) *MockWorktree_Remove_Call {
 	return &MockWorktree_Remove_Call{Call: _e.mock.On("Remove", path)}
 }
 
