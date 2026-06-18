@@ -47,55 +47,6 @@ func (g Github) CreateMergeRequest(title string, description string, sourceBranc
 	}, nil
 }
 
-// DownloadComposerFiles downloads composer.json and composer.lock files from the given branch
-// and returns the path to the temporary directory containing them.
-func (g *Github) DownloadComposerFiles(branch string) string {
-	dir, err := afero.TempDir(g.fs, "", "composer")
-	if err != nil {
-		// Better error handling instead of panic
-		g.logError(fmt.Errorf("failed to create temp directory: %w", err))
-		return ""
-	}
-
-	if err := g.downloadAndWriteFile(branch, "composer.json", dir); err != nil {
-		return dir
-	}
-	if err := g.downloadAndWriteFile(branch, "composer.lock", dir); err != nil {
-		return dir
-	}
-
-	return dir
-}
-
-// downloadAndWriteFile downloads a file from the repository and writes it to the given directory.
-// Returns an error if the download or write operation fails.
-func (g *Github) downloadAndWriteFile(branch, file, dir string) error {
-	content, resp, err := g.client.Repositories.DownloadContents(
-		context.Background(),
-		g.owner,
-		g.repo,
-		file,
-		&github.RepositoryContentGetOptions{
-			Ref: branch,
-		},
-	)
-
-	if err != nil {
-		return fmt.Errorf("failed to download %s: %w", file, err)
-	}
-
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("failed to download %s: HTTP status %s", file, resp.Status)
-	}
-
-	err = afero.WriteReader(g.fs, dir+"/"+file, content)
-	if err != nil {
-		return fmt.Errorf("failed to write %s: %w", file, err)
-	}
-
-	return nil
-}
-
 // logError logs an error. This is a placeholder for proper error handling.
 func (g *Github) logError(err error) {
 	// In a real implementation, this would use a proper logging mechanism

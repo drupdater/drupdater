@@ -9,9 +9,6 @@ type Platform interface {
 	// CreateMergeRequest creates a merge/pull request on the platform.
 	CreateMergeRequest(title string, description string, sourceBranch string, targetBranch string) (MergeRequest, error)
 
-	// DownloadComposerFiles downloads composer files from the specified branch.
-	DownloadComposerFiles(branch string) string
-
 	// GetUser returns the user name and email from the platform.
 	GetUser() (name string, email string)
 }

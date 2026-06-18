@@ -12,7 +12,6 @@ import (
 	"github.com/drupdater/drupdater/pkg/repo"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/storer"
 	"github.com/gookit/event"
 	mock "github.com/stretchr/testify/mock"
@@ -688,123 +687,6 @@ type MockGitRepository_Expecter struct {
 
 func (_m *MockGitRepository) EXPECT() *MockGitRepository_Expecter {
 	return &MockGitRepository_Expecter{mock: &_m.Mock}
-}
-
-// CommitObject provides a mock function for the type MockGitRepository
-func (_mock *MockGitRepository) CommitObject(h plumbing.Hash) (*object.Commit, error) {
-	ret := _mock.Called(h)
-
-	if len(ret) == 0 {
-		panic("no return value specified for CommitObject")
-	}
-
-	var r0 *object.Commit
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(plumbing.Hash) (*object.Commit, error)); ok {
-		return returnFunc(h)
-	}
-	if returnFunc, ok := ret.Get(0).(func(plumbing.Hash) *object.Commit); ok {
-		r0 = returnFunc(h)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*object.Commit)
-		}
-	}
-	if returnFunc, ok := ret.Get(1).(func(plumbing.Hash) error); ok {
-		r1 = returnFunc(h)
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// MockGitRepository_CommitObject_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CommitObject'
-type MockGitRepository_CommitObject_Call struct {
-	*mock.Call
-}
-
-// CommitObject is a helper method to define mock.On call
-//   - h plumbing.Hash
-func (_e *MockGitRepository_Expecter) CommitObject(h any) *MockGitRepository_CommitObject_Call {
-	return &MockGitRepository_CommitObject_Call{Call: _e.mock.On("CommitObject", h)}
-}
-
-func (_c *MockGitRepository_CommitObject_Call) Run(run func(h plumbing.Hash)) *MockGitRepository_CommitObject_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 plumbing.Hash
-		if args[0] != nil {
-			arg0 = args[0].(plumbing.Hash)
-		}
-		run(
-			arg0,
-		)
-	})
-	return _c
-}
-
-func (_c *MockGitRepository_CommitObject_Call) Return(commit *object.Commit, err error) *MockGitRepository_CommitObject_Call {
-	_c.Call.Return(commit, err)
-	return _c
-}
-
-func (_c *MockGitRepository_CommitObject_Call) RunAndReturn(run func(h plumbing.Hash) (*object.Commit, error)) *MockGitRepository_CommitObject_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// Head provides a mock function for the type MockGitRepository
-func (_mock *MockGitRepository) Head() (*plumbing.Reference, error) {
-	ret := _mock.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for Head")
-	}
-
-	var r0 *plumbing.Reference
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func() (*plumbing.Reference, error)); ok {
-		return returnFunc()
-	}
-	if returnFunc, ok := ret.Get(0).(func() *plumbing.Reference); ok {
-		r0 = returnFunc()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*plumbing.Reference)
-		}
-	}
-	if returnFunc, ok := ret.Get(1).(func() error); ok {
-		r1 = returnFunc()
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// MockGitRepository_Head_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Head'
-type MockGitRepository_Head_Call struct {
-	*mock.Call
-}
-
-// Head is a helper method to define mock.On call
-func (_e *MockGitRepository_Expecter) Head() *MockGitRepository_Head_Call {
-	return &MockGitRepository_Head_Call{Call: _e.mock.On("Head")}
-}
-
-func (_c *MockGitRepository_Head_Call) Run(run func()) *MockGitRepository_Head_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *MockGitRepository_Head_Call) Return(reference *plumbing.Reference, err error) *MockGitRepository_Head_Call {
-	_c.Call.Return(reference, err)
-	return _c
-}
-
-func (_c *MockGitRepository_Head_Call) RunAndReturn(run func() (*plumbing.Reference, error)) *MockGitRepository_Head_Call {
-	_c.Call.Return(run)
-	return _c
 }
 
 // Push provides a mock function for the type MockGitRepository
@@ -1543,57 +1425,6 @@ func (_c *MockPlatform_CreateMergeRequest_Call) Return(mergeRequest codehosting.
 }
 
 func (_c *MockPlatform_CreateMergeRequest_Call) RunAndReturn(run func(title string, description string, sourceBranch string, targetBranch string) (codehosting.MergeRequest, error)) *MockPlatform_CreateMergeRequest_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// DownloadComposerFiles provides a mock function for the type MockPlatform
-func (_mock *MockPlatform) DownloadComposerFiles(branch string) string {
-	ret := _mock.Called(branch)
-
-	if len(ret) == 0 {
-		panic("no return value specified for DownloadComposerFiles")
-	}
-
-	var r0 string
-	if returnFunc, ok := ret.Get(0).(func(string) string); ok {
-		r0 = returnFunc(branch)
-	} else {
-		r0 = ret.Get(0).(string)
-	}
-	return r0
-}
-
-// MockPlatform_DownloadComposerFiles_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DownloadComposerFiles'
-type MockPlatform_DownloadComposerFiles_Call struct {
-	*mock.Call
-}
-
-// DownloadComposerFiles is a helper method to define mock.On call
-//   - branch string
-func (_e *MockPlatform_Expecter) DownloadComposerFiles(branch any) *MockPlatform_DownloadComposerFiles_Call {
-	return &MockPlatform_DownloadComposerFiles_Call{Call: _e.mock.On("DownloadComposerFiles", branch)}
-}
-
-func (_c *MockPlatform_DownloadComposerFiles_Call) Run(run func(branch string)) *MockPlatform_DownloadComposerFiles_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 string
-		if args[0] != nil {
-			arg0 = args[0].(string)
-		}
-		run(
-			arg0,
-		)
-	})
-	return _c
-}
-
-func (_c *MockPlatform_DownloadComposerFiles_Call) Return(s string) *MockPlatform_DownloadComposerFiles_Call {
-	_c.Call.Return(s)
-	return _c
-}
-
-func (_c *MockPlatform_DownloadComposerFiles_Call) RunAndReturn(run func(branch string) string) *MockPlatform_DownloadComposerFiles_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -7,7 +7,6 @@ package repo
 import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/storer"
 	mock "github.com/stretchr/testify/mock"
 )
@@ -37,123 +36,6 @@ type MockRepository_Expecter struct {
 
 func (_m *MockRepository) EXPECT() *MockRepository_Expecter {
 	return &MockRepository_Expecter{mock: &_m.Mock}
-}
-
-// CommitObject provides a mock function for the type MockRepository
-func (_mock *MockRepository) CommitObject(h plumbing.Hash) (*object.Commit, error) {
-	ret := _mock.Called(h)
-
-	if len(ret) == 0 {
-		panic("no return value specified for CommitObject")
-	}
-
-	var r0 *object.Commit
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(plumbing.Hash) (*object.Commit, error)); ok {
-		return returnFunc(h)
-	}
-	if returnFunc, ok := ret.Get(0).(func(plumbing.Hash) *object.Commit); ok {
-		r0 = returnFunc(h)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*object.Commit)
-		}
-	}
-	if returnFunc, ok := ret.Get(1).(func(plumbing.Hash) error); ok {
-		r1 = returnFunc(h)
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// MockRepository_CommitObject_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CommitObject'
-type MockRepository_CommitObject_Call struct {
-	*mock.Call
-}
-
-// CommitObject is a helper method to define mock.On call
-//   - h plumbing.Hash
-func (_e *MockRepository_Expecter) CommitObject(h any) *MockRepository_CommitObject_Call {
-	return &MockRepository_CommitObject_Call{Call: _e.mock.On("CommitObject", h)}
-}
-
-func (_c *MockRepository_CommitObject_Call) Run(run func(h plumbing.Hash)) *MockRepository_CommitObject_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 plumbing.Hash
-		if args[0] != nil {
-			arg0 = args[0].(plumbing.Hash)
-		}
-		run(
-			arg0,
-		)
-	})
-	return _c
-}
-
-func (_c *MockRepository_CommitObject_Call) Return(commit *object.Commit, err error) *MockRepository_CommitObject_Call {
-	_c.Call.Return(commit, err)
-	return _c
-}
-
-func (_c *MockRepository_CommitObject_Call) RunAndReturn(run func(h plumbing.Hash) (*object.Commit, error)) *MockRepository_CommitObject_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// Head provides a mock function for the type MockRepository
-func (_mock *MockRepository) Head() (*plumbing.Reference, error) {
-	ret := _mock.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for Head")
-	}
-
-	var r0 *plumbing.Reference
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func() (*plumbing.Reference, error)); ok {
-		return returnFunc()
-	}
-	if returnFunc, ok := ret.Get(0).(func() *plumbing.Reference); ok {
-		r0 = returnFunc()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*plumbing.Reference)
-		}
-	}
-	if returnFunc, ok := ret.Get(1).(func() error); ok {
-		r1 = returnFunc()
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// MockRepository_Head_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Head'
-type MockRepository_Head_Call struct {
-	*mock.Call
-}
-
-// Head is a helper method to define mock.On call
-func (_e *MockRepository_Expecter) Head() *MockRepository_Head_Call {
-	return &MockRepository_Head_Call{Call: _e.mock.On("Head")}
-}
-
-func (_c *MockRepository_Head_Call) Run(run func()) *MockRepository_Head_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *MockRepository_Head_Call) Return(reference *plumbing.Reference, err error) *MockRepository_Head_Call {
-	_c.Call.Return(reference, err)
-	return _c
-}
-
-func (_c *MockRepository_Head_Call) RunAndReturn(run func() (*plumbing.Reference, error)) *MockRepository_Head_Call {
-	_c.Call.Return(run)
-	return _c
 }
 
 // Push provides a mock function for the type MockRepository

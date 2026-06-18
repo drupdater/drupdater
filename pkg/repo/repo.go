@@ -12,7 +12,6 @@ import (
 
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/storer"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"go.uber.org/zap"
@@ -20,8 +19,6 @@ import (
 
 type Repository interface {
 	Push(o *git.PushOptions) error
-	Head() (*plumbing.Reference, error)
-	CommitObject(h plumbing.Hash) (*object.Commit, error)
 	References() (storer.ReferenceIter, error)
 }
 

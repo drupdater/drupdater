@@ -63,48 +63,6 @@ func (g *Gitlab) CreateMergeRequest(title string, description string, sourceBran
 	}, nil
 }
 
-// DownloadComposerFiles downloads composer.json and composer.lock files from the given branch.
-func (g *Gitlab) DownloadComposerFiles(branch string) string {
-	dir, err := afero.TempDir(g.fs, "", "composer")
-	if err != nil {
-		fmt.Printf("Error creating temp dir: %v\n", err)
-		return ""
-	}
-
-	if err := g.downloadAndWriteFile(branch, "composer.json", dir); err != nil {
-		fmt.Printf("Error downloading composer.json: %v\n", err)
-		return ""
-	}
-
-	if err := g.downloadAndWriteFile(branch, "composer.lock", dir); err != nil {
-		fmt.Printf("Error downloading composer.lock: %v\n", err)
-		return ""
-	}
-
-	return dir
-}
-
-func (g *Gitlab) downloadAndWriteFile(branch string, file string, dir string) error {
-	content, resp, err := g.client.RepositoryFiles.GetRawFile(g.projectPath, file, &gitlab.GetRawFileOptions{
-		Ref: &branch,
-	})
-
-	if err != nil {
-		return fmt.Errorf("failed to download %s: %w", file, err)
-	}
-
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("failed to download %s: HTTP status %s", file, resp.Status)
-	}
-
-	err = afero.WriteFile(g.fs, dir+"/"+file, content, 0644)
-	if err != nil {
-		return fmt.Errorf("failed to write %s: %w", file, err)
-	}
-
-	return nil
-}
-
 func (g *Gitlab) GetUser() (name string, email string) {
 	user, _, err := g.client.Users.CurrentUser()
 	if err != nil {

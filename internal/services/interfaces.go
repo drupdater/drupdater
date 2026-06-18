@@ -39,7 +39,6 @@ type Installer interface {
 
 type Platform interface {
 	CreateMergeRequest(title string, description string, sourceBranch string, targetBranch string) (codehosting.MergeRequest, error)
-	DownloadComposerFiles(branch string) string
 	GetUser() (name string, email string)
 }
 
