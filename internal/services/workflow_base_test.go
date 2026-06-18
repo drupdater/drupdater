@@ -56,8 +56,8 @@ func TestStartUpdate(t *testing.T) {
 	fixture, err := os.ReadFile("testdata/dependency_update.md")
 	assert.NoError(t, err, "Failed to read test fixture")
 
-	vcsProvider.EXPECT().GetUser().Return("user", "mail")
-	vcsProvider.EXPECT().CreateMergeRequest(mock.Anything, string(fixture), mock.Anything, config.Branch).Return(codehosting.MergeRequest{}, nil)
+	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
+	vcsProvider.EXPECT().CreateMergeRequest(mock.Anything, mock.Anything, string(fixture), mock.Anything, config.Branch).Return(codehosting.MergeRequest{}, nil)
 
 	mockComposer.EXPECT().Update(mock.Anything, "/tmp", mock.Anything, mock.Anything, false, false).Return([]composer.PackageChange{
 		{
@@ -111,7 +111,7 @@ func TestStartUpdateSiteFailureDoesNotPublish(t *testing.T) {
 	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil).Times(2)
 	repositoryService.EXPECT().BranchExists(repository, mock.Anything).Return(false, nil)
 
-	vcsProvider.EXPECT().GetUser().Return("user", "mail")
+	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
 
 	mockComposer.EXPECT().Install(mock.Anything, "/tmp").Return(nil)
 	mockComposer.EXPECT().Update(mock.Anything, "/tmp", mock.Anything, mock.Anything, false, false).Return([]composer.PackageChange{
@@ -134,7 +134,7 @@ func TestStartUpdateSiteFailureDoesNotPublish(t *testing.T) {
 	// Assert: the error surfaces and no MR was published.
 	assert.ErrorIs(t, err, updateErr)
 	repository.AssertNotCalled(t, "Push", mock.Anything)
-	vcsProvider.AssertNotCalled(t, "CreateMergeRequest", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	vcsProvider.AssertNotCalled(t, "CreateMergeRequest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestStartUpdateNoChanges(t *testing.T) {
@@ -160,7 +160,7 @@ func TestStartUpdateNoChanges(t *testing.T) {
 	// installSite may or may not run depending on goroutine scheduling after cancel.
 	worktree := NewMockWorktree(t)
 
-	vcsProvider.EXPECT().GetUser().Return("user", "mail")
+	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
 
 	// installCode: one CloneRepository + Install
 	// updateSharedCode: one CloneRepository + Update (returns empty → AbortError)
@@ -214,7 +214,7 @@ func TestStartUpdateBranchAlreadyExists(t *testing.T) {
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
 
-	vcsProvider.EXPECT().GetUser().Return("user", "mail")
+	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
 
 	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil).Times(2)
 	repositoryService.EXPECT().BranchExists(repository, mock.Anything).Return(true, nil)
@@ -281,7 +281,7 @@ func TestStartUpdateWithDryRun(t *testing.T) {
 	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil).Times(2)
 	repositoryService.EXPECT().BranchExists(repository, mock.Anything).Return(false, nil)
 
-	vcsProvider.EXPECT().GetUser().Return("user", "mail")
+	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
 
 	mockComposer.EXPECT().Update(mock.Anything, "/tmp", mock.Anything, mock.Anything, false, false).Return([]composer.PackageChange{
 		{
@@ -338,7 +338,7 @@ func TestStartUpdateFireEventError(t *testing.T) {
 
 	worktree := NewMockWorktree(t)
 
-	vcsProvider.EXPECT().GetUser().Return("user", "mail")
+	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
 
 	// installCode and updateSharedCode each clone the repository.
 	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").

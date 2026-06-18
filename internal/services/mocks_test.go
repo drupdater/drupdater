@@ -1352,8 +1352,8 @@ func (_m *MockPlatform) EXPECT() *MockPlatform_Expecter {
 }
 
 // CreateMergeRequest provides a mock function for the type MockPlatform
-func (_mock *MockPlatform) CreateMergeRequest(title string, description string, sourceBranch string, targetBranch string) (codehosting.MergeRequest, error) {
-	ret := _mock.Called(title, description, sourceBranch, targetBranch)
+func (_mock *MockPlatform) CreateMergeRequest(ctx context.Context, title string, description string, sourceBranch string, targetBranch string) (codehosting.MergeRequest, error) {
+	ret := _mock.Called(ctx, title, description, sourceBranch, targetBranch)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CreateMergeRequest")
@@ -1361,16 +1361,16 @@ func (_mock *MockPlatform) CreateMergeRequest(title string, description string, 
 
 	var r0 codehosting.MergeRequest
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(string, string, string, string) (codehosting.MergeRequest, error)); ok {
-		return returnFunc(title, description, sourceBranch, targetBranch)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string, string) (codehosting.MergeRequest, error)); ok {
+		return returnFunc(ctx, title, description, sourceBranch, targetBranch)
 	}
-	if returnFunc, ok := ret.Get(0).(func(string, string, string, string) codehosting.MergeRequest); ok {
-		r0 = returnFunc(title, description, sourceBranch, targetBranch)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string, string) codehosting.MergeRequest); ok {
+		r0 = returnFunc(ctx, title, description, sourceBranch, targetBranch)
 	} else {
 		r0 = ret.Get(0).(codehosting.MergeRequest)
 	}
-	if returnFunc, ok := ret.Get(1).(func(string, string, string, string) error); ok {
-		r1 = returnFunc(title, description, sourceBranch, targetBranch)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string, string, string) error); ok {
+		r1 = returnFunc(ctx, title, description, sourceBranch, targetBranch)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -1383,19 +1383,20 @@ type MockPlatform_CreateMergeRequest_Call struct {
 }
 
 // CreateMergeRequest is a helper method to define mock.On call
+//   - ctx context.Context
 //   - title string
 //   - description string
 //   - sourceBranch string
 //   - targetBranch string
-func (_e *MockPlatform_Expecter) CreateMergeRequest(title any, description any, sourceBranch any, targetBranch any) *MockPlatform_CreateMergeRequest_Call {
-	return &MockPlatform_CreateMergeRequest_Call{Call: _e.mock.On("CreateMergeRequest", title, description, sourceBranch, targetBranch)}
+func (_e *MockPlatform_Expecter) CreateMergeRequest(ctx any, title any, description any, sourceBranch any, targetBranch any) *MockPlatform_CreateMergeRequest_Call {
+	return &MockPlatform_CreateMergeRequest_Call{Call: _e.mock.On("CreateMergeRequest", ctx, title, description, sourceBranch, targetBranch)}
 }
 
-func (_c *MockPlatform_CreateMergeRequest_Call) Run(run func(title string, description string, sourceBranch string, targetBranch string)) *MockPlatform_CreateMergeRequest_Call {
+func (_c *MockPlatform_CreateMergeRequest_Call) Run(run func(ctx context.Context, title string, description string, sourceBranch string, targetBranch string)) *MockPlatform_CreateMergeRequest_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 string
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(string)
+			arg0 = args[0].(context.Context)
 		}
 		var arg1 string
 		if args[1] != nil {
@@ -1409,11 +1410,16 @@ func (_c *MockPlatform_CreateMergeRequest_Call) Run(run func(title string, descr
 		if args[3] != nil {
 			arg3 = args[3].(string)
 		}
+		var arg4 string
+		if args[4] != nil {
+			arg4 = args[4].(string)
+		}
 		run(
 			arg0,
 			arg1,
 			arg2,
 			arg3,
+			arg4,
 		)
 	})
 	return _c
@@ -1424,14 +1430,14 @@ func (_c *MockPlatform_CreateMergeRequest_Call) Return(mergeRequest codehosting.
 	return _c
 }
 
-func (_c *MockPlatform_CreateMergeRequest_Call) RunAndReturn(run func(title string, description string, sourceBranch string, targetBranch string) (codehosting.MergeRequest, error)) *MockPlatform_CreateMergeRequest_Call {
+func (_c *MockPlatform_CreateMergeRequest_Call) RunAndReturn(run func(ctx context.Context, title string, description string, sourceBranch string, targetBranch string) (codehosting.MergeRequest, error)) *MockPlatform_CreateMergeRequest_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // GetUser provides a mock function for the type MockPlatform
-func (_mock *MockPlatform) GetUser() (string, string) {
-	ret := _mock.Called()
+func (_mock *MockPlatform) GetUser(ctx context.Context) (string, string) {
+	ret := _mock.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetUser")
@@ -1439,16 +1445,16 @@ func (_mock *MockPlatform) GetUser() (string, string) {
 
 	var r0 string
 	var r1 string
-	if returnFunc, ok := ret.Get(0).(func() (string, string)); ok {
-		return returnFunc()
+	if returnFunc, ok := ret.Get(0).(func(context.Context) (string, string)); ok {
+		return returnFunc(ctx)
 	}
-	if returnFunc, ok := ret.Get(0).(func() string); ok {
-		r0 = returnFunc()
+	if returnFunc, ok := ret.Get(0).(func(context.Context) string); ok {
+		r0 = returnFunc(ctx)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
-	if returnFunc, ok := ret.Get(1).(func() string); ok {
-		r1 = returnFunc()
+	if returnFunc, ok := ret.Get(1).(func(context.Context) string); ok {
+		r1 = returnFunc(ctx)
 	} else {
 		r1 = ret.Get(1).(string)
 	}
@@ -1461,13 +1467,20 @@ type MockPlatform_GetUser_Call struct {
 }
 
 // GetUser is a helper method to define mock.On call
-func (_e *MockPlatform_Expecter) GetUser() *MockPlatform_GetUser_Call {
-	return &MockPlatform_GetUser_Call{Call: _e.mock.On("GetUser")}
+//   - ctx context.Context
+func (_e *MockPlatform_Expecter) GetUser(ctx any) *MockPlatform_GetUser_Call {
+	return &MockPlatform_GetUser_Call{Call: _e.mock.On("GetUser", ctx)}
 }
 
-func (_c *MockPlatform_GetUser_Call) Run(run func()) *MockPlatform_GetUser_Call {
+func (_c *MockPlatform_GetUser_Call) Run(run func(ctx context.Context)) *MockPlatform_GetUser_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run()
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }
@@ -1477,7 +1490,7 @@ func (_c *MockPlatform_GetUser_Call) Return(name string, email string) *MockPlat
 	return _c
 }
 
-func (_c *MockPlatform_GetUser_Call) RunAndReturn(run func() (string, string)) *MockPlatform_GetUser_Call {
+func (_c *MockPlatform_GetUser_Call) RunAndReturn(run func(ctx context.Context) (string, string)) *MockPlatform_GetUser_Call {
 	_c.Call.Return(run)
 	return _c
 }

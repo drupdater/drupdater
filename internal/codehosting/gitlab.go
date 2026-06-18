@@ -1,6 +1,7 @@
 package codehosting
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"strings"
@@ -45,13 +46,13 @@ func newGitlab(repositoryURL string, token string) *Gitlab {
 }
 
 // CreateMergeRequest creates a merge request on GitLab.
-func (g *Gitlab) CreateMergeRequest(title string, description string, sourceBranch string, targetBranch string) (MergeRequest, error) {
+func (g *Gitlab) CreateMergeRequest(ctx context.Context, title string, description string, sourceBranch string, targetBranch string) (MergeRequest, error) {
 	mr, _, err := g.client.MergeRequests.CreateMergeRequest(g.projectPath, &gitlab.CreateMergeRequestOptions{
 		SourceBranch: &sourceBranch,
 		TargetBranch: &targetBranch,
 		Title:        &title,
 		Description:  &description,
-	})
+	}, gitlab.WithContext(ctx))
 
 	if err != nil {
 		return MergeRequest{}, fmt.Errorf("failed to create merge request: %w", err)
@@ -63,8 +64,8 @@ func (g *Gitlab) CreateMergeRequest(title string, description string, sourceBran
 	}, nil
 }
 
-func (g *Gitlab) GetUser() (name string, email string) {
-	user, _, err := g.client.Users.CurrentUser()
+func (g *Gitlab) GetUser(ctx context.Context) (name string, email string) {
+	user, _, err := g.client.Users.CurrentUser(gitlab.WithContext(ctx))
 	if err != nil {
 		fmt.Printf("Error getting GitLab user: %v\n", err)
 		return "", ""

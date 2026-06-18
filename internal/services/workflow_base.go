@@ -78,6 +78,13 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []interna
 		os.RemoveAll(tmpDirName)
 	}()
 
+	// Bound the whole run so a wedged subprocess or network call can't hang forever.
+	if ws.config.Timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, ws.config.Timeout)
+		defer cancel()
+	}
+
 	// errgroup cancels ctx on the first error and bounds concurrency to the CPU count.
 	// publishWork runs only after Wait() returns nil, so a failed phase can never publish an MR.
 	g, ctx := errgroup.WithContext(ctx)
@@ -137,13 +144,13 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []interna
 	}
 
 	if !ws.config.DryRun {
-		return ws.publishWork(sharedUpdate.Repository, sharedUpdate.updateBranchName, addons)
+		return ws.publishWork(ctx, sharedUpdate.Repository, sharedUpdate.updateBranchName, addons)
 	}
 	return nil
 }
 
 func (ws *WorkflowBaseService) installCode(ctx context.Context) (string, error) {
-	username, email := ws.platform.GetUser()
+	username, email := ws.platform.GetUser(ctx)
 	ws.logger.Info("cloning repository for site-install", zap.String("repositoryURL", ws.config.RepositoryURL), zap.String("branch", ws.config.Branch))
 	_, _, path, err := ws.repository.CloneRepository(ws.config.RepositoryURL, ws.config.Branch, ws.config.Token, username, email)
 	if err != nil {
@@ -160,7 +167,7 @@ func (ws *WorkflowBaseService) installCode(ctx context.Context) (string, error) 
 
 func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context) (SharedUpdate, error) {
 	ws.logger.Info("cloning repository for update", zap.String("repositoryURL", ws.config.RepositoryURL), zap.String("branch", ws.config.Branch))
-	username, email := ws.platform.GetUser()
+	username, email := ws.platform.GetUser(ctx)
 	repository, worktree, path, err := ws.repository.CloneRepository(ws.config.RepositoryURL, ws.config.Branch, ws.config.Token, username, email)
 	if err != nil {
 		return SharedUpdate{}, fmt.Errorf("failed to clone repository: %w", err)
@@ -273,7 +280,7 @@ func (ws *WorkflowBaseService) updateSite(ctx context.Context, sharedUpdate Shar
 	return nil
 }
 
-func (ws *WorkflowBaseService) publishWork(repository GitRepository, updateBranchName string, addons []internal.Addon) error {
+func (ws *WorkflowBaseService) publishWork(ctx context.Context, repository GitRepository, updateBranchName string, addons []internal.Addon) error {
 	err := repository.Push(&git.PushOptions{
 		RemoteName: "origin",
 		RefSpecs: []gitConfig.RefSpec{
@@ -307,7 +314,7 @@ func (ws *WorkflowBaseService) publishWork(repository GitRepository, updateBranc
 		return fmt.Errorf("failed to fire event: %w", err)
 	}
 
-	mr, err := ws.platform.CreateMergeRequest(e.Title, description, updateBranchName, ws.config.Branch)
+	mr, err := ws.platform.CreateMergeRequest(ctx, e.Title, description, updateBranchName, ws.config.Branch)
 	if err != nil {
 		return fmt.Errorf("failed to create merge request: %w", err)
 	}

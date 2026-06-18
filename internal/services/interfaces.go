@@ -38,8 +38,8 @@ type Installer interface {
 }
 
 type Platform interface {
-	CreateMergeRequest(title string, description string, sourceBranch string, targetBranch string) (codehosting.MergeRequest, error)
-	GetUser() (name string, email string)
+	CreateMergeRequest(ctx context.Context, title string, description string, sourceBranch string, targetBranch string) (codehosting.MergeRequest, error)
+	GetUser(ctx context.Context) (name string, email string)
 }
 
 // EventDispatcher abstracts the event bus so it can be injected and tested independently.

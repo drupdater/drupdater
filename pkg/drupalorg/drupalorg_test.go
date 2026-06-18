@@ -30,6 +30,7 @@ func TestGetIssue(t *testing.T) {
 	service := &HTTPClient{
 		DrupalOrgBaseURL: mockServer.URL,
 		logger:           logger,
+		client:           &http.Client{},
 	}
 
 	// Call GetIssue method
@@ -57,6 +58,7 @@ func TestGetIssue_Failure(t *testing.T) {
 	service := &HTTPClient{
 		DrupalOrgBaseURL: mockServer.URL,
 		logger:           logger,
+		client:           &http.Client{},
 	}
 
 	// Call GetIssue method

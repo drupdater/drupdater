@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"time"
 
 	"go.uber.org/zap"
 )
@@ -12,12 +13,14 @@ import (
 type HTTPClient struct {
 	DrupalOrgBaseURL string
 	logger           *zap.Logger
+	client           *http.Client
 }
 
 func NewHTTPClient(logger *zap.Logger) *HTTPClient {
 	return &HTTPClient{
 		DrupalOrgBaseURL: "https://www.drupal.org",
 		logger:           logger,
+		client:           &http.Client{Timeout: 30 * time.Second},
 	}
 }
 
@@ -32,7 +35,7 @@ type Issue struct {
 }
 
 func (s *HTTPClient) GetIssue(issueID string) (*Issue, error) {
-	resp, err := http.Get(s.DrupalOrgBaseURL + "/api-d7/node/" + issueID + ".json")
+	resp, err := s.client.Get(s.DrupalOrgBaseURL + "/api-d7/node/" + issueID + ".json")
 	if err != nil {
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}

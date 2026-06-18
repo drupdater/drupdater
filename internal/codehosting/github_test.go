@@ -1,6 +1,7 @@
 package codehosting
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -55,7 +56,7 @@ func TestGithub_CreateMergeRequest(t *testing.T) {
 	}
 
 	// Execute
-	mr, err := gh.CreateMergeRequest("Test MR", "This is a test MR", "source-branch", "target-branch")
+	mr, err := gh.CreateMergeRequest(context.Background(), "Test MR", "This is a test MR", "source-branch", "target-branch")
 
 	// Assert
 	assert.NoError(t, err)
@@ -74,7 +75,7 @@ func TestGithub_GetUser_Returns403FallbackSilently(t *testing.T) {
 	client, _ := github.NewClient(nil).WithEnterpriseURLs(mockServer.URL, "")
 	gh := &Github{client: client, owner: "o", repo: "r", fs: afero.NewMemMapFs()}
 
-	name, email := gh.GetUser()
+	name, email := gh.GetUser(context.Background())
 
 	assert.Equal(t, "github-actions[bot]", name)
 	assert.Equal(t, "41898282+github-actions[bot]@users.noreply.github.com", email)
@@ -91,7 +92,7 @@ func TestGithub_GetUser_Returns403ErrorForBadCredentials(t *testing.T) {
 	client, _ := github.NewClient(nil).WithEnterpriseURLs(mockServer.URL, "")
 	gh := &Github{client: client, owner: "o", repo: "r", fs: afero.NewMemMapFs()}
 
-	name, email := gh.GetUser()
+	name, email := gh.GetUser(context.Background())
 
 	assert.Empty(t, name)
 	assert.Empty(t, email)
@@ -108,7 +109,7 @@ func TestGithub_GetUser_ReturnsUserOnSuccess(t *testing.T) {
 	client, _ := github.NewClient(nil).WithEnterpriseURLs(mockServer.URL, "")
 	gh := &Github{client: client, owner: "o", repo: "r", fs: afero.NewMemMapFs()}
 
-	name, email := gh.GetUser()
+	name, email := gh.GetUser(context.Background())
 
 	assert.Equal(t, "The Octocat", name)
 	assert.Equal(t, "octocat@github.com", email)
@@ -125,7 +126,7 @@ func TestGithub_GetUser_NoEmailFallsBackToNoreply(t *testing.T) {
 	client, _ := github.NewClient(nil).WithEnterpriseURLs(mockServer.URL, "")
 	gh := &Github{client: client, owner: "o", repo: "r", fs: afero.NewMemMapFs()}
 
-	name, email := gh.GetUser()
+	name, email := gh.GetUser(context.Background())
 
 	assert.Equal(t, "The Octocat", name)
 	assert.Equal(t, "1234567+octocat@users.noreply.github.com", email)

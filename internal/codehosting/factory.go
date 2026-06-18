@@ -1,16 +1,17 @@
 package codehosting
 
 import (
+	"context"
 	"strings"
 )
 
 // Platform defines the interface for version control system providers.
 type Platform interface {
 	// CreateMergeRequest creates a merge/pull request on the platform.
-	CreateMergeRequest(title string, description string, sourceBranch string, targetBranch string) (MergeRequest, error)
+	CreateMergeRequest(ctx context.Context, title string, description string, sourceBranch string, targetBranch string) (MergeRequest, error)
 
 	// GetUser returns the user name and email from the platform.
-	GetUser() (name string, email string)
+	GetUser(ctx context.Context) (name string, email string)
 }
 
 // MergeRequest represents a merge or pull request on a code hosting platform.
