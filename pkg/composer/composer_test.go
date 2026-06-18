@@ -3,6 +3,7 @@ package composer
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -762,4 +763,113 @@ func TestHelperProcess(*testing.T) {
 
 	fmt.Fprintf(os.Stdout, "%v\n", os.Args[3])
 	os.Exit(0)
+}
+
+func TestCheckIfPatchesApply(t *testing.T) {
+	patches := []string{"https://example.com/a.patch", "/repo/patches/b.patch"}
+
+	t.Run("returns true when require succeeds", func(t *testing.T) {
+		execCommand = func(_ context.Context, name string, arg ...string) *exec.Cmd {
+			cs := append([]string{"-test.run=TestHelperProcess", "--", name}, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+
+		service := &CLI{logger: zap.NewNop(), fs: afero.NewOsFs()}
+		ok, err := service.CheckIfPatchesApply(context.Background(), "drupal/core", "10.6.0", patches)
+		assert.NoError(t, err)
+		assert.True(t, ok)
+
+		// The patches are written in order as zero-padded keys.
+		written, err := afero.ReadFile(service.fs, service.tempDir+"/composer.patches.json")
+		assert.NoError(t, err)
+		assert.JSONEq(t, `{"patches":{"drupal/core":{"0000000000":"https://example.com/a.patch","0000000001":"/repo/patches/b.patch"}}}`, string(written))
+	})
+
+	t.Run("returns false when require fails", func(t *testing.T) {
+		execCommand = func(_ context.Context, name string, arg ...string) *exec.Cmd {
+			cs := append([]string{"-test.run=TestHelperProcess", "--", name}, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+
+		service := &CLI{logger: zap.NewNop(), fs: afero.NewOsFs()}
+		ok, err := service.CheckIfPatchesApply(context.Background(), "drupal/core", "10.6.0", patches)
+		assert.NoError(t, err)
+		assert.False(t, ok)
+	})
+
+	t.Run("returns init error", func(t *testing.T) {
+		service := &CLI{logger: zap.NewNop(), fs: afero.NewMemMapFs(), initErr: errors.New("init failed")}
+		service.initOnce.Do(func() {}) // mark init as done so initTempDir is skipped
+
+		ok, err := service.CheckIfPatchesApply(context.Background(), "drupal/core", "10.6.0", patches)
+		assert.ErrorContains(t, err, "init failed")
+		assert.False(t, ok)
+	})
+}
+
+func TestGetDependencyPatches(t *testing.T) {
+	// A dependency provides a patch; another package has empty extra serialized as [].
+	data := `{
+		"packages": [
+			{
+				"name": "drupal/lightning_core",
+				"extra": {
+					"patches": {
+						"drupal/core": {
+							"2869592 - Disabled update module": "https://example.com/2869592.patch"
+						}
+					}
+				}
+			},
+			{ "name": "drupal/empty_extra", "extra": [] },
+			{ "name": "drupal/no_extra" }
+		],
+		"packages-dev": [
+			{
+				"name": "drupal/devtools",
+				"extra": { "patches": { "drupal/views": { "fix": "https://example.com/views.patch" } } }
+			}
+		]
+	}`
+
+	fs := afero.NewMemMapFs()
+	assert.NoError(t, afero.WriteFile(fs, "/test/composer.lock", []byte(data), 0644))
+
+	service := &CLI{logger: zap.NewNop(), fs: fs}
+	patches, err := service.GetDependencyPatches(context.Background(), "/test")
+
+	assert.NoError(t, err)
+	assert.Equal(t, map[string]map[string]bool{
+		"drupal/core":  {"https://example.com/2869592.patch": true},
+		"drupal/views": {"https://example.com/views.patch": true},
+	}, patches)
+
+	t.Run("error when composer.lock is missing", func(t *testing.T) {
+		service := &CLI{logger: zap.NewNop(), fs: afero.NewMemMapFs()}
+		_, err := service.GetDependencyPatches(context.Background(), "/missing")
+		assert.ErrorContains(t, err, "failed to read composer.lock")
+	})
+
+	t.Run("error when composer.lock is invalid JSON", func(t *testing.T) {
+		fs := afero.NewMemMapFs()
+		assert.NoError(t, afero.WriteFile(fs, "/bad/composer.lock", []byte("not-json"), 0644))
+		service := &CLI{logger: zap.NewNop(), fs: fs}
+		_, err := service.GetDependencyPatches(context.Background(), "/bad")
+		assert.ErrorContains(t, err, "failed to unmarshal composer.lock")
+	})
+
+	t.Run("returns empty map when no dependency declares patches", func(t *testing.T) {
+		fs := afero.NewMemMapFs()
+		assert.NoError(t, afero.WriteFile(fs, "/none/composer.lock", []byte(`{"packages":[{"name":"a/b"}]}`), 0644))
+		service := &CLI{logger: zap.NewNop(), fs: fs}
+		patches, err := service.GetDependencyPatches(context.Background(), "/none")
+		assert.NoError(t, err)
+		assert.Empty(t, patches)
+	})
 }

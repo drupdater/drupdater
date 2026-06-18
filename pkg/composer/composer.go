@@ -321,6 +321,49 @@ func (s *CLI) SetConfig(ctx context.Context, dir string, key string, value strin
 	return err
 }
 
+// GetDependencyPatches returns the patches declared by installed dependencies in
+// composer.lock, as targetPackage -> set of patch files. composer-patches collects
+// patches from every installed package, so these are applied in addition to the
+// root composer.json patches.
+func (s *CLI) GetDependencyPatches(_ context.Context, dir string) (map[string]map[string]bool, error) {
+	content, err := afero.ReadFile(s.fs, dir+"/composer.lock")
+	if err != nil {
+		return nil, fmt.Errorf("failed to read composer.lock: %w", err)
+	}
+
+	var lock struct {
+		Packages    []lockPackage `json:"packages"`
+		PackagesDev []lockPackage `json:"packages-dev"`
+	}
+	if err := json.Unmarshal(content, &lock); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal composer.lock: %w", err)
+	}
+
+	result := make(map[string]map[string]bool)
+	for _, pkg := range append(lock.Packages, lock.PackagesDev...) {
+		// extra is optional and may be serialized as [] when empty; tolerate both.
+		var extra struct {
+			Patches map[string]map[string]string `json:"patches"`
+		}
+		if len(pkg.Extra) == 0 || json.Unmarshal(pkg.Extra, &extra) != nil {
+			continue
+		}
+		for targetPackage, byDescription := range extra.Patches {
+			for _, file := range byDescription {
+				if result[targetPackage] == nil {
+					result[targetPackage] = make(map[string]bool)
+				}
+				result[targetPackage][file] = true
+			}
+		}
+	}
+	return result, nil
+}
+
+type lockPackage struct {
+	Extra json.RawMessage `json:"extra"`
+}
+
 func (s *CLI) initTempDir() {
 	s.tempDir, s.initErr = afero.TempDir(s.fs, "", "composer-service")
 
@@ -386,6 +429,34 @@ func (s *CLI) CheckIfPatchApplies(ctx context.Context, packageName string, packa
 		return false, nil
 	}
 
+	return true, nil
+}
+
+func (s *CLI) CheckIfPatchesApply(ctx context.Context, packageName string, packageVersion string, patchPaths []string) (bool, error) {
+	s.initOnce.Do(s.initTempDir)
+	if s.initErr != nil {
+		return false, s.initErr
+	}
+
+	patchMap := make(map[string]string, len(patchPaths))
+	for i, p := range patchPaths {
+		patchMap[fmt.Sprintf("%010d", i)] = p
+	}
+
+	patchesJSONBytes, err := json.Marshal(patchTestConfig{
+		Patches: map[string]map[string]string{packageName: patchMap},
+	})
+	if err != nil {
+		return false, fmt.Errorf("failed to marshal patch config: %w", err)
+	}
+
+	if err := afero.WriteFile(s.fs, s.tempDir+"/composer.patches.json", patchesJSONBytes, 0644); err != nil {
+		return false, err
+	}
+
+	if _, err := s.Require(ctx, s.tempDir, packageName+":"+packageVersion, "--with-all-dependencies", "--quiet"); err != nil {
+		return false, nil
+	}
 	return true, nil
 }
 

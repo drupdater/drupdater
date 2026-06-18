@@ -190,6 +190,84 @@ func (_c *MockComposer_CheckIfPatchApplies_Call) RunAndReturn(run func(ctx conte
 	return _c
 }
 
+// CheckIfPatchesApply provides a mock function for the type MockComposer
+func (_mock *MockComposer) CheckIfPatchesApply(ctx context.Context, packageName string, packageVersion string, patchPaths []string) (bool, error) {
+	ret := _mock.Called(ctx, packageName, packageVersion, patchPaths)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CheckIfPatchesApply")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, []string) (bool, error)); ok {
+		return returnFunc(ctx, packageName, packageVersion, patchPaths)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, []string) bool); ok {
+		r0 = returnFunc(ctx, packageName, packageVersion, patchPaths)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string, []string) error); ok {
+		r1 = returnFunc(ctx, packageName, packageVersion, patchPaths)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockComposer_CheckIfPatchesApply_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CheckIfPatchesApply'
+type MockComposer_CheckIfPatchesApply_Call struct {
+	*mock.Call
+}
+
+// CheckIfPatchesApply is a helper method to define mock.On call
+//   - ctx context.Context
+//   - packageName string
+//   - packageVersion string
+//   - patchPaths []string
+func (_e *MockComposer_Expecter) CheckIfPatchesApply(ctx any, packageName any, packageVersion any, patchPaths any) *MockComposer_CheckIfPatchesApply_Call {
+	return &MockComposer_CheckIfPatchesApply_Call{Call: _e.mock.On("CheckIfPatchesApply", ctx, packageName, packageVersion, patchPaths)}
+}
+
+func (_c *MockComposer_CheckIfPatchesApply_Call) Run(run func(ctx context.Context, packageName string, packageVersion string, patchPaths []string)) *MockComposer_CheckIfPatchesApply_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 []string
+		if args[3] != nil {
+			arg3 = args[3].([]string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *MockComposer_CheckIfPatchesApply_Call) Return(b bool, err error) *MockComposer_CheckIfPatchesApply_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *MockComposer_CheckIfPatchesApply_Call) RunAndReturn(run func(ctx context.Context, packageName string, packageVersion string, patchPaths []string) (bool, error)) *MockComposer_CheckIfPatchesApply_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Diff provides a mock function for the type MockComposer
 func (_mock *MockComposer) Diff(ctx context.Context, path string, withLinks bool) (string, error) {
 	ret := _mock.Called(ctx, path, withLinks)
@@ -466,6 +544,74 @@ func (_c *MockComposer_GetCustomCodeDirectories_Call) Return(strings []string, e
 }
 
 func (_c *MockComposer_GetCustomCodeDirectories_Call) RunAndReturn(run func(ctx context.Context, dir string) ([]string, error)) *MockComposer_GetCustomCodeDirectories_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetDependencyPatches provides a mock function for the type MockComposer
+func (_mock *MockComposer) GetDependencyPatches(ctx context.Context, dir string) (map[string]map[string]bool, error) {
+	ret := _mock.Called(ctx, dir)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetDependencyPatches")
+	}
+
+	var r0 map[string]map[string]bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (map[string]map[string]bool, error)); ok {
+		return returnFunc(ctx, dir)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) map[string]map[string]bool); ok {
+		r0 = returnFunc(ctx, dir)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(map[string]map[string]bool)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, dir)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockComposer_GetDependencyPatches_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetDependencyPatches'
+type MockComposer_GetDependencyPatches_Call struct {
+	*mock.Call
+}
+
+// GetDependencyPatches is a helper method to define mock.On call
+//   - ctx context.Context
+//   - dir string
+func (_e *MockComposer_Expecter) GetDependencyPatches(ctx any, dir any) *MockComposer_GetDependencyPatches_Call {
+	return &MockComposer_GetDependencyPatches_Call{Call: _e.mock.On("GetDependencyPatches", ctx, dir)}
+}
+
+func (_c *MockComposer_GetDependencyPatches_Call) Run(run func(ctx context.Context, dir string)) *MockComposer_GetDependencyPatches_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockComposer_GetDependencyPatches_Call) Return(stringToStringToBool map[string]map[string]bool, err error) *MockComposer_GetDependencyPatches_Call {
+	_c.Call.Return(stringToStringToBool, err)
+	return _c
+}
+
+func (_c *MockComposer_GetDependencyPatches_Call) RunAndReturn(run func(ctx context.Context, dir string) (map[string]map[string]bool, error)) *MockComposer_GetDependencyPatches_Call {
 	_c.Call.Return(run)
 	return _c
 }
