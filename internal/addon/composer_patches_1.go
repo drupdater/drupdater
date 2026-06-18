@@ -58,10 +58,11 @@ type ComposerPatches1 struct {
 	composer     Composer
 	drupalOrg    DrupalOrg
 	gitlab       *gitlab.Client
+	httpClient   HTTPClient
 	patchUpdates PatchUpdates
 }
 
-func NewComposerPatches1(logger *zap.Logger, composer Composer, drupalOrg DrupalOrg) *ComposerPatches1 {
+func NewComposerPatches1(logger *zap.Logger, composer Composer, drupalOrg DrupalOrg, httpClient HTTPClient) *ComposerPatches1 {
 
 	drupalOrgGitlab, err := gitlab.NewClient(os.Getenv("DRUPALCODE_ACCESS_TOKEN"), gitlab.WithBaseURL("https://git.drupalcode.org/api/v4"))
 	if err != nil {
@@ -69,10 +70,11 @@ func NewComposerPatches1(logger *zap.Logger, composer Composer, drupalOrg Drupal
 	}
 
 	return &ComposerPatches1{
-		logger:    logger,
-		composer:  composer,
-		drupalOrg: drupalOrg,
-		gitlab:    drupalOrgGitlab,
+		logger:     logger,
+		composer:   composer,
+		drupalOrg:  drupalOrg,
+		gitlab:     drupalOrgGitlab,
+		httpClient: httpClient,
 	}
 }
 
@@ -297,7 +299,7 @@ func (h *ComposerPatches1) updatePatches(ctx context.Context, path string, workt
 								newPatchPath := fmt.Sprintf("patches/%s", issue.Project.MaschineName)
 								newPatchFile := fmt.Sprintf("%s-%s-%s.diff", issue.ID, mergeRequests[0].SHA, h.cleanURLString(issue.Title))
 								h.logger.Debug("downloading patch", zap.String("url", diff), zap.String("path", newPatchPath))
-								if err := h.downloadFile(diff, path+"/"+newPatchPath, newPatchFile); err != nil {
+								if err := h.downloadFile(ctx, diff, path+"/"+newPatchPath, newPatchFile); err != nil {
 									h.logger.Debug("failed to download patch", zap.Error(err))
 								}
 
@@ -364,33 +366,32 @@ func (h *ComposerPatches1) cleanURLString(s string) string {
 	return re.ReplaceAllString(s, "")
 }
 
-// DownloadFile downloads a file from a given URL and saves it to a specified local path.
-func (h *ComposerPatches1) downloadFile(url, folder string, file string) error {
-	// Get the file from the URL
-	resp, err := http.Get(url)
+func (h *ComposerPatches1) downloadFile(ctx context.Context, url, folder string, file string) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
+
+	resp, err := h.httpClient.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
 
-	// Check if the request was successful
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("failed to download file: status code %d", resp.StatusCode)
 	}
 
-	err = os.MkdirAll(folder, os.ModePerm)
-	if err != nil {
+	if err = os.MkdirAll(folder, os.ModePerm); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
-	// Create the output file
 	outFile, err := os.Create(folder + "/" + file)
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
 	}
 	defer outFile.Close()
 
-	// Copy the response body to the file
 	_, err = io.Copy(outFile, resp.Body)
 	return err
 }

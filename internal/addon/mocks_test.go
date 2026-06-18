@@ -6,6 +6,7 @@ package addon
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/drupalorg"
@@ -79,7 +80,7 @@ type MockComposer_Audit_Call struct {
 // Audit is a helper method to define mock.On call
 //   - ctx context.Context
 //   - dir string
-func (_e *MockComposer_Expecter) Audit(ctx interface{}, dir interface{}) *MockComposer_Audit_Call {
+func (_e *MockComposer_Expecter) Audit(ctx any, dir any) *MockComposer_Audit_Call {
 	return &MockComposer_Audit_Call{Call: _e.mock.On("Audit", ctx, dir)}
 }
 
@@ -147,7 +148,7 @@ type MockComposer_CheckIfPatchApplies_Call struct {
 //   - packageName string
 //   - packageVersion string
 //   - patchPath string
-func (_e *MockComposer_Expecter) CheckIfPatchApplies(ctx interface{}, packageName interface{}, packageVersion interface{}, patchPath interface{}) *MockComposer_CheckIfPatchApplies_Call {
+func (_e *MockComposer_Expecter) CheckIfPatchApplies(ctx any, packageName any, packageVersion any, patchPath any) *MockComposer_CheckIfPatchApplies_Call {
 	return &MockComposer_CheckIfPatchApplies_Call{Call: _e.mock.On("CheckIfPatchApplies", ctx, packageName, packageVersion, patchPath)}
 }
 
@@ -224,7 +225,7 @@ type MockComposer_Diff_Call struct {
 //   - ctx context.Context
 //   - path string
 //   - withLinks bool
-func (_e *MockComposer_Expecter) Diff(ctx interface{}, path interface{}, withLinks interface{}) *MockComposer_Diff_Call {
+func (_e *MockComposer_Expecter) Diff(ctx any, path any, withLinks any) *MockComposer_Diff_Call {
 	return &MockComposer_Diff_Call{Call: _e.mock.On("Diff", ctx, path, withLinks)}
 }
 
@@ -297,7 +298,7 @@ type MockComposer_GetAllowPlugins_Call struct {
 // GetAllowPlugins is a helper method to define mock.On call
 //   - ctx context.Context
 //   - dir string
-func (_e *MockComposer_Expecter) GetAllowPlugins(ctx interface{}, dir interface{}) *MockComposer_GetAllowPlugins_Call {
+func (_e *MockComposer_Expecter) GetAllowPlugins(ctx any, dir any) *MockComposer_GetAllowPlugins_Call {
 	return &MockComposer_GetAllowPlugins_Call{Call: _e.mock.On("GetAllowPlugins", ctx, dir)}
 }
 
@@ -364,7 +365,7 @@ type MockComposer_GetConfig_Call struct {
 //   - ctx context.Context
 //   - dir string
 //   - key string
-func (_e *MockComposer_Expecter) GetConfig(ctx interface{}, dir interface{}, key interface{}) *MockComposer_GetConfig_Call {
+func (_e *MockComposer_Expecter) GetConfig(ctx any, dir any, key any) *MockComposer_GetConfig_Call {
 	return &MockComposer_GetConfig_Call{Call: _e.mock.On("GetConfig", ctx, dir, key)}
 }
 
@@ -437,7 +438,7 @@ type MockComposer_GetCustomCodeDirectories_Call struct {
 // GetCustomCodeDirectories is a helper method to define mock.On call
 //   - ctx context.Context
 //   - dir string
-func (_e *MockComposer_Expecter) GetCustomCodeDirectories(ctx interface{}, dir interface{}) *MockComposer_GetCustomCodeDirectories_Call {
+func (_e *MockComposer_Expecter) GetCustomCodeDirectories(ctx any, dir any) *MockComposer_GetCustomCodeDirectories_Call {
 	return &MockComposer_GetCustomCodeDirectories_Call{Call: _e.mock.On("GetCustomCodeDirectories", ctx, dir)}
 }
 
@@ -504,7 +505,7 @@ type MockComposer_GetInstalledPackageVersion_Call struct {
 //   - ctx context.Context
 //   - dir string
 //   - packageName string
-func (_e *MockComposer_Expecter) GetInstalledPackageVersion(ctx interface{}, dir interface{}, packageName interface{}) *MockComposer_GetInstalledPackageVersion_Call {
+func (_e *MockComposer_Expecter) GetInstalledPackageVersion(ctx any, dir any, packageName any) *MockComposer_GetInstalledPackageVersion_Call {
 	return &MockComposer_GetInstalledPackageVersion_Call{Call: _e.mock.On("GetInstalledPackageVersion", ctx, dir, packageName)}
 }
 
@@ -542,23 +543,23 @@ func (_c *MockComposer_GetInstalledPackageVersion_Call) RunAndReturn(run func(ct
 }
 
 // GetInstalledPlugins provides a mock function for the type MockComposer
-func (_mock *MockComposer) GetInstalledPlugins(ctx context.Context, dir string) (map[string]interface{}, error) {
+func (_mock *MockComposer) GetInstalledPlugins(ctx context.Context, dir string) (map[string]any, error) {
 	ret := _mock.Called(ctx, dir)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetInstalledPlugins")
 	}
 
-	var r0 map[string]interface{}
+	var r0 map[string]any
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (map[string]interface{}, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (map[string]any, error)); ok {
 		return returnFunc(ctx, dir)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) map[string]interface{}); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) map[string]any); ok {
 		r0 = returnFunc(ctx, dir)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(map[string]interface{})
+			r0 = ret.Get(0).(map[string]any)
 		}
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
@@ -577,7 +578,7 @@ type MockComposer_GetInstalledPlugins_Call struct {
 // GetInstalledPlugins is a helper method to define mock.On call
 //   - ctx context.Context
 //   - dir string
-func (_e *MockComposer_Expecter) GetInstalledPlugins(ctx interface{}, dir interface{}) *MockComposer_GetInstalledPlugins_Call {
+func (_e *MockComposer_Expecter) GetInstalledPlugins(ctx any, dir any) *MockComposer_GetInstalledPlugins_Call {
 	return &MockComposer_GetInstalledPlugins_Call{Call: _e.mock.On("GetInstalledPlugins", ctx, dir)}
 }
 
@@ -599,12 +600,12 @@ func (_c *MockComposer_GetInstalledPlugins_Call) Run(run func(ctx context.Contex
 	return _c
 }
 
-func (_c *MockComposer_GetInstalledPlugins_Call) Return(stringToIfaceVal map[string]interface{}, err error) *MockComposer_GetInstalledPlugins_Call {
-	_c.Call.Return(stringToIfaceVal, err)
+func (_c *MockComposer_GetInstalledPlugins_Call) Return(stringToV map[string]any, err error) *MockComposer_GetInstalledPlugins_Call {
+	_c.Call.Return(stringToV, err)
 	return _c
 }
 
-func (_c *MockComposer_GetInstalledPlugins_Call) RunAndReturn(run func(ctx context.Context, dir string) (map[string]interface{}, error)) *MockComposer_GetInstalledPlugins_Call {
+func (_c *MockComposer_GetInstalledPlugins_Call) RunAndReturn(run func(ctx context.Context, dir string) (map[string]any, error)) *MockComposer_GetInstalledPlugins_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -644,7 +645,7 @@ type MockComposer_IsPackageInstalled_Call struct {
 //   - ctx context.Context
 //   - dir string
 //   - packageToCheck string
-func (_e *MockComposer_Expecter) IsPackageInstalled(ctx interface{}, dir interface{}, packageToCheck interface{}) *MockComposer_IsPackageInstalled_Call {
+func (_e *MockComposer_Expecter) IsPackageInstalled(ctx any, dir any, packageToCheck any) *MockComposer_IsPackageInstalled_Call {
 	return &MockComposer_IsPackageInstalled_Call{Call: _e.mock.On("IsPackageInstalled", ctx, dir, packageToCheck)}
 }
 
@@ -715,7 +716,7 @@ type MockComposer_Normalize_Call struct {
 // Normalize is a helper method to define mock.On call
 //   - ctx context.Context
 //   - dir string
-func (_e *MockComposer_Expecter) Normalize(ctx interface{}, dir interface{}) *MockComposer_Normalize_Call {
+func (_e *MockComposer_Expecter) Normalize(ctx any, dir any) *MockComposer_Normalize_Call {
 	return &MockComposer_Normalize_Call{Call: _e.mock.On("Normalize", ctx, dir)}
 }
 
@@ -788,9 +789,9 @@ type MockComposer_Remove_Call struct {
 //   - ctx context.Context
 //   - dir string
 //   - packages ...string
-func (_e *MockComposer_Expecter) Remove(ctx interface{}, dir interface{}, packages ...interface{}) *MockComposer_Remove_Call {
+func (_e *MockComposer_Expecter) Remove(ctx any, dir any, packages ...any) *MockComposer_Remove_Call {
 	return &MockComposer_Remove_Call{Call: _e.mock.On("Remove",
-		append([]interface{}{ctx, dir}, packages...)...)}
+		append([]any{ctx, dir}, packages...)...)}
 }
 
 func (_c *MockComposer_Remove_Call) Run(run func(ctx context.Context, dir string, packages ...string)) *MockComposer_Remove_Call {
@@ -869,9 +870,9 @@ type MockComposer_Require_Call struct {
 //   - ctx context.Context
 //   - dir string
 //   - args ...string
-func (_e *MockComposer_Expecter) Require(ctx interface{}, dir interface{}, args ...interface{}) *MockComposer_Require_Call {
+func (_e *MockComposer_Expecter) Require(ctx any, dir any, args ...any) *MockComposer_Require_Call {
 	return &MockComposer_Require_Call{Call: _e.mock.On("Require",
-		append([]interface{}{ctx, dir}, args...)...)}
+		append([]any{ctx, dir}, args...)...)}
 }
 
 func (_c *MockComposer_Require_Call) Run(run func(ctx context.Context, dir string, args ...string)) *MockComposer_Require_Call {
@@ -935,7 +936,7 @@ type MockComposer_SetAllowPlugins_Call struct {
 //   - ctx context.Context
 //   - dir string
 //   - plugins map[string]bool
-func (_e *MockComposer_Expecter) SetAllowPlugins(ctx interface{}, dir interface{}, plugins interface{}) *MockComposer_SetAllowPlugins_Call {
+func (_e *MockComposer_Expecter) SetAllowPlugins(ctx any, dir any, plugins any) *MockComposer_SetAllowPlugins_Call {
 	return &MockComposer_SetAllowPlugins_Call{Call: _e.mock.On("SetAllowPlugins", ctx, dir, plugins)}
 }
 
@@ -999,7 +1000,7 @@ type MockComposer_SetConfig_Call struct {
 //   - dir string
 //   - key string
 //   - value string
-func (_e *MockComposer_Expecter) SetConfig(ctx interface{}, dir interface{}, key interface{}, value interface{}) *MockComposer_SetConfig_Call {
+func (_e *MockComposer_Expecter) SetConfig(ctx any, dir any, key any, value any) *MockComposer_SetConfig_Call {
 	return &MockComposer_SetConfig_Call{Call: _e.mock.On("SetConfig", ctx, dir, key, value)}
 }
 
@@ -1081,7 +1082,7 @@ type MockComposer_Update_Call struct {
 //   - packagesToKeep []string
 //   - minimalChanges bool
 //   - dryRun bool
-func (_e *MockComposer_Expecter) Update(ctx interface{}, dir interface{}, packagesToUpdate interface{}, packagesToKeep interface{}, minimalChanges interface{}, dryRun interface{}) *MockComposer_Update_Call {
+func (_e *MockComposer_Expecter) Update(ctx any, dir any, packagesToUpdate any, packagesToKeep any, minimalChanges any, dryRun any) *MockComposer_Update_Call {
 	return &MockComposer_Update_Call{Call: _e.mock.On("Update", ctx, dir, packagesToUpdate, packagesToKeep, minimalChanges, dryRun)}
 }
 
@@ -1158,7 +1159,7 @@ type MockComposer_UpdateLockHash_Call struct {
 // UpdateLockHash is a helper method to define mock.On call
 //   - ctx context.Context
 //   - dir string
-func (_e *MockComposer_Expecter) UpdateLockHash(ctx interface{}, dir interface{}) *MockComposer_UpdateLockHash_Call {
+func (_e *MockComposer_Expecter) UpdateLockHash(ctx any, dir any) *MockComposer_UpdateLockHash_Call {
 	return &MockComposer_UpdateLockHash_Call{Call: _e.mock.On("UpdateLockHash", ctx, dir)}
 }
 
@@ -1253,7 +1254,7 @@ type MockDrush_GetTranslationPath_Call struct {
 //   - dir string
 //   - site string
 //   - relative bool
-func (_e *MockDrush_Expecter) GetTranslationPath(ctx interface{}, dir interface{}, site interface{}, relative interface{}) *MockDrush_GetTranslationPath_Call {
+func (_e *MockDrush_Expecter) GetTranslationPath(ctx any, dir any, site any, relative any) *MockDrush_GetTranslationPath_Call {
 	return &MockDrush_GetTranslationPath_Call{Call: _e.mock.On("GetTranslationPath", ctx, dir, site, relative)}
 }
 
@@ -1332,7 +1333,7 @@ type MockDrush_GetUpdateHooks_Call struct {
 //   - ctx context.Context
 //   - dir string
 //   - site string
-func (_e *MockDrush_Expecter) GetUpdateHooks(ctx interface{}, dir interface{}, site interface{}) *MockDrush_GetUpdateHooks_Call {
+func (_e *MockDrush_Expecter) GetUpdateHooks(ctx any, dir any, site any) *MockDrush_GetUpdateHooks_Call {
 	return &MockDrush_GetUpdateHooks_Call{Call: _e.mock.On("GetUpdateHooks", ctx, dir, site)}
 }
 
@@ -1405,7 +1406,7 @@ type MockDrush_IsModuleEnabled_Call struct {
 //   - dir string
 //   - site string
 //   - module string
-func (_e *MockDrush_Expecter) IsModuleEnabled(ctx interface{}, dir interface{}, site interface{}, module interface{}) *MockDrush_IsModuleEnabled_Call {
+func (_e *MockDrush_Expecter) IsModuleEnabled(ctx any, dir any, site any, module any) *MockDrush_IsModuleEnabled_Call {
 	return &MockDrush_IsModuleEnabled_Call{Call: _e.mock.On("IsModuleEnabled", ctx, dir, site, module)}
 }
 
@@ -1473,7 +1474,7 @@ type MockDrush_LocalizeTranslations_Call struct {
 //   - ctx context.Context
 //   - dir string
 //   - site string
-func (_e *MockDrush_Expecter) LocalizeTranslations(ctx interface{}, dir interface{}, site interface{}) *MockDrush_LocalizeTranslations_Call {
+func (_e *MockDrush_Expecter) LocalizeTranslations(ctx any, dir any, site any) *MockDrush_LocalizeTranslations_Call {
 	return &MockDrush_LocalizeTranslations_Call{Call: _e.mock.On("LocalizeTranslations", ctx, dir, site)}
 }
 
@@ -1571,7 +1572,7 @@ type MockPHPCS_Run_Call struct {
 // Run is a helper method to define mock.On call
 //   - ctx context.Context
 //   - path string
-func (_e *MockPHPCS_Expecter) Run(ctx interface{}, path interface{}) *MockPHPCS_Run_Call {
+func (_e *MockPHPCS_Expecter) Run(ctx any, path any) *MockPHPCS_Run_Call {
 	return &MockPHPCS_Run_Call{Call: _e.mock.On("Run", ctx, path)}
 }
 
@@ -1628,7 +1629,7 @@ type MockPHPCS_RunCBF_Call struct {
 // RunCBF is a helper method to define mock.On call
 //   - ctx context.Context
 //   - path string
-func (_e *MockPHPCS_Expecter) RunCBF(ctx interface{}, path interface{}) *MockPHPCS_RunCBF_Call {
+func (_e *MockPHPCS_Expecter) RunCBF(ctx any, path any) *MockPHPCS_RunCBF_Call {
 	return &MockPHPCS_RunCBF_Call{Call: _e.mock.On("RunCBF", ctx, path)}
 }
 
@@ -1712,7 +1713,7 @@ type MockRepository_IsSomethingStagedInPath_Call struct {
 // IsSomethingStagedInPath is a helper method to define mock.On call
 //   - worktree repo.Worktree
 //   - dir string
-func (_e *MockRepository_Expecter) IsSomethingStagedInPath(worktree interface{}, dir interface{}) *MockRepository_IsSomethingStagedInPath_Call {
+func (_e *MockRepository_Expecter) IsSomethingStagedInPath(worktree any, dir any) *MockRepository_IsSomethingStagedInPath_Call {
 	return &MockRepository_IsSomethingStagedInPath_Call{Call: _e.mock.On("IsSomethingStagedInPath", worktree, dir)}
 }
 
@@ -1804,7 +1805,7 @@ type MockDrupalOrg_FindIssueNumber_Call struct {
 
 // FindIssueNumber is a helper method to define mock.On call
 //   - text string
-func (_e *MockDrupalOrg_Expecter) FindIssueNumber(text interface{}) *MockDrupalOrg_FindIssueNumber_Call {
+func (_e *MockDrupalOrg_Expecter) FindIssueNumber(text any) *MockDrupalOrg_FindIssueNumber_Call {
 	return &MockDrupalOrg_FindIssueNumber_Call{Call: _e.mock.On("FindIssueNumber", text)}
 }
 
@@ -1866,7 +1867,7 @@ type MockDrupalOrg_GetIssue_Call struct {
 
 // GetIssue is a helper method to define mock.On call
 //   - issueID string
-func (_e *MockDrupalOrg_Expecter) GetIssue(issueID interface{}) *MockDrupalOrg_GetIssue_Call {
+func (_e *MockDrupalOrg_Expecter) GetIssue(issueID any) *MockDrupalOrg_GetIssue_Call {
 	return &MockDrupalOrg_GetIssue_Call{Call: _e.mock.On("GetIssue", issueID)}
 }
 
@@ -1955,7 +1956,7 @@ type MockRector_Run_Call struct {
 //   - ctx context.Context
 //   - dir string
 //   - customCodeDirectories []string
-func (_e *MockRector_Expecter) Run(ctx interface{}, dir interface{}, customCodeDirectories interface{}) *MockRector_Run_Call {
+func (_e *MockRector_Expecter) Run(ctx any, dir any, customCodeDirectories any) *MockRector_Run_Call {
 	return &MockRector_Run_Call{Call: _e.mock.On("Run", ctx, dir, customCodeDirectories)}
 }
 
@@ -2054,7 +2055,7 @@ type MockWorktree_Add_Call struct {
 
 // Add is a helper method to define mock.On call
 //   - path string
-func (_e *MockWorktree_Expecter) Add(path interface{}) *MockWorktree_Add_Call {
+func (_e *MockWorktree_Expecter) Add(path any) *MockWorktree_Add_Call {
 	return &MockWorktree_Add_Call{Call: _e.mock.On("Add", path)}
 }
 
@@ -2105,7 +2106,7 @@ type MockWorktree_AddGlob_Call struct {
 
 // AddGlob is a helper method to define mock.On call
 //   - pattern string
-func (_e *MockWorktree_Expecter) AddGlob(pattern interface{}) *MockWorktree_AddGlob_Call {
+func (_e *MockWorktree_Expecter) AddGlob(pattern any) *MockWorktree_AddGlob_Call {
 	return &MockWorktree_AddGlob_Call{Call: _e.mock.On("AddGlob", pattern)}
 }
 
@@ -2156,7 +2157,7 @@ type MockWorktree_Checkout_Call struct {
 
 // Checkout is a helper method to define mock.On call
 //   - opts *git.CheckoutOptions
-func (_e *MockWorktree_Expecter) Checkout(opts interface{}) *MockWorktree_Checkout_Call {
+func (_e *MockWorktree_Expecter) Checkout(opts any) *MockWorktree_Checkout_Call {
 	return &MockWorktree_Checkout_Call{Call: _e.mock.On("Checkout", opts)}
 }
 
@@ -2219,7 +2220,7 @@ type MockWorktree_Commit_Call struct {
 // Commit is a helper method to define mock.On call
 //   - msg string
 //   - opts *git.CommitOptions
-func (_e *MockWorktree_Expecter) Commit(msg interface{}, opts interface{}) *MockWorktree_Commit_Call {
+func (_e *MockWorktree_Expecter) Commit(msg any, opts any) *MockWorktree_Commit_Call {
 	return &MockWorktree_Commit_Call{Call: _e.mock.On("Commit", msg, opts)}
 }
 
@@ -2286,7 +2287,7 @@ type MockWorktree_Remove_Call struct {
 
 // Remove is a helper method to define mock.On call
 //   - path string
-func (_e *MockWorktree_Expecter) Remove(path interface{}) *MockWorktree_Remove_Call {
+func (_e *MockWorktree_Expecter) Remove(path any) *MockWorktree_Remove_Call {
 	return &MockWorktree_Remove_Call{Call: _e.mock.On("Remove", path)}
 }
 
@@ -2364,6 +2365,95 @@ func (_c *MockWorktree_Status_Call) Return(status git.Status, err error) *MockWo
 }
 
 func (_c *MockWorktree_Status_Call) RunAndReturn(run func() (git.Status, error)) *MockWorktree_Status_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// NewMockHTTPClient creates a new instance of MockHTTPClient. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
+// The first argument is typically a *testing.T value.
+func NewMockHTTPClient(t interface {
+	mock.TestingT
+	Cleanup(func())
+}) *MockHTTPClient {
+	mock := &MockHTTPClient{}
+	mock.Mock.Test(t)
+
+	t.Cleanup(func() { mock.AssertExpectations(t) })
+
+	return mock
+}
+
+// MockHTTPClient is an autogenerated mock type for the HTTPClient type
+type MockHTTPClient struct {
+	mock.Mock
+}
+
+type MockHTTPClient_Expecter struct {
+	mock *mock.Mock
+}
+
+func (_m *MockHTTPClient) EXPECT() *MockHTTPClient_Expecter {
+	return &MockHTTPClient_Expecter{mock: &_m.Mock}
+}
+
+// Do provides a mock function for the type MockHTTPClient
+func (_mock *MockHTTPClient) Do(req *http.Request) (*http.Response, error) {
+	ret := _mock.Called(req)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Do")
+	}
+
+	var r0 *http.Response
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(*http.Request) (*http.Response, error)); ok {
+		return returnFunc(req)
+	}
+	if returnFunc, ok := ret.Get(0).(func(*http.Request) *http.Response); ok {
+		r0 = returnFunc(req)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*http.Response)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(*http.Request) error); ok {
+		r1 = returnFunc(req)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockHTTPClient_Do_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Do'
+type MockHTTPClient_Do_Call struct {
+	*mock.Call
+}
+
+// Do is a helper method to define mock.On call
+//   - req *http.Request
+func (_e *MockHTTPClient_Expecter) Do(req any) *MockHTTPClient_Do_Call {
+	return &MockHTTPClient_Do_Call{Call: _e.mock.On("Do", req)}
+}
+
+func (_c *MockHTTPClient_Do_Call) Run(run func(req *http.Request)) *MockHTTPClient_Do_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *http.Request
+		if args[0] != nil {
+			arg0 = args[0].(*http.Request)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockHTTPClient_Do_Call) Return(response *http.Response, err error) *MockHTTPClient_Do_Call {
+	_c.Call.Return(response, err)
+	return _c
+}
+
+func (_c *MockHTTPClient_Do_Call) RunAndReturn(run func(req *http.Request) (*http.Response, error)) *MockHTTPClient_Do_Call {
 	_c.Call.Return(run)
 	return _c
 }
