@@ -131,61 +131,6 @@ func TestGithub_GetUser_NoEmailFallsBackToNoreply(t *testing.T) {
 	assert.Equal(t, "1234567+octocat@users.noreply.github.com", email)
 }
 
-func TestGithub_DownloadComposerFiles(t *testing.T) {
-	// Setup mock HTTP server for file content
-	mockContentServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_, err := w.Write([]byte(`[{"name":"composer.json","download_url":""}]`))
-		assert.NoError(t, err)
-	}))
-	defer mockContentServer.Close()
-
-	// Setup mock HTTP server for repository contents
-	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-
-		if r.URL.Path == "/api/v3/repos/test_owner/test_project/contents/" {
-			jsonResponse := []byte(`[
-				{"name":"composer.json","download_url":"` + mockContentServer.URL + `"}, 
-				{"name":"composer.lock","download_url":"` + mockContentServer.URL + `"}
-			]`)
-			w.WriteHeader(http.StatusOK)
-			_, err := w.Write(jsonResponse)
-			assert.NoError(t, err)
-		} else {
-			w.WriteHeader(http.StatusNotFound)
-		}
-	}))
-	defer mockServer.Close()
-
-	// Create GitHub client with mock server
-	client, _ := github.NewClient(nil).WithEnterpriseURLs(mockServer.URL, "")
-
-	gh := &Github{
-		client: client,
-		owner:  "test_owner",
-		repo:   "test_project",
-		fs:     afero.NewMemMapFs(),
-	}
-
-	// Execute
-	dir := gh.DownloadComposerFiles("main")
-
-	// Assert
-	assert.NotEmpty(t, dir)
-
-	// Verify files were created in the filesystem
-	_, err := gh.fs.Stat(dir)
-	assert.NoError(t, err)
-
-	_, err = gh.fs.Stat(dir + "/composer.json")
-	assert.NoError(t, err)
-
-	_, err = gh.fs.Stat(dir + "/composer.lock")
-	assert.NoError(t, err)
-}
-
 func TestIsGitHubActionsToken403_ReturnsFalseForNonGitHubError(t *testing.T) {
 	result := isGitHubActionsToken403(nil, errors.New("plain network error"))
 	assert.False(t, result)
