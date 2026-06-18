@@ -255,3 +255,19 @@ func TestComposerAudit_RenderTemplate(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, expected, result)
 }
+
+// TestComposerAudit_RenderTemplate_EscapesPipes ensures a "|" in an advisory
+// title is escaped so it can't break out of the markdown table cell.
+func TestComposerAudit_RenderTemplate_EscapesPipes(t *testing.T) {
+	audit := NewComposerAudit(zap.NewNop(), NewMockComposer(t))
+	audit.afterAudit = composer.Audit{
+		Advisories: []composer.Advisory{
+			{PackageName: "drupal/foo", CVE: "CVE-1", Title: "XSS via a|b\nsecond line"},
+		},
+	}
+
+	result, err := audit.RenderTemplate()
+	assert.NoError(t, err)
+	assert.Contains(t, result, "XSS via a\\|b second line")
+	assert.NotContains(t, result, "a|b")
+}
