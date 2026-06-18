@@ -84,6 +84,28 @@ func TestCreateMergeRequest(t *testing.T) {
 	assert.Equal(t, "http://example.com", mr.URL)
 }
 
+func TestGitlab_CreateMergeRequest_HonorsContext(t *testing.T) {
+	// A cancelled context must abort before the request is sent.
+	g := newGitlab("https://gitlab.com/user/repo", "dummy-token")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err := g.CreateMergeRequest(ctx, "Test MR", "body", "source", "target")
+	assert.ErrorIs(t, err, context.Canceled)
+}
+
+func TestGitlab_GetUser_HonorsContext(t *testing.T) {
+	g := newGitlab("https://gitlab.com/user/repo", "dummy-token")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	name, email := g.GetUser(ctx)
+	assert.Empty(t, name)
+	assert.Empty(t, email)
+}
+
 func TestGetUser_ReturnsEmptyStringsOnError(t *testing.T) {
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)

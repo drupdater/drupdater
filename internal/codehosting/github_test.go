@@ -132,6 +132,32 @@ func TestGithub_GetUser_NoEmailFallsBackToNoreply(t *testing.T) {
 	assert.Equal(t, "1234567+octocat@users.noreply.github.com", email)
 }
 
+func TestGithub_CreateMergeRequest_HonorsContext(t *testing.T) {
+	// A cancelled context must abort before any request is sent. This would have
+	// passed silently when the implementation used context.TODO().
+	client, _ := github.NewClient(nil).WithEnterpriseURLs("http://example.invalid", "")
+	gh := &Github{client: client, owner: "o", repo: "r", fs: afero.NewMemMapFs()}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err := gh.CreateMergeRequest(ctx, "Test MR", "body", "source", "target")
+	assert.ErrorIs(t, err, context.Canceled)
+}
+
+func TestGithub_GetUser_HonorsContext(t *testing.T) {
+	client, _ := github.NewClient(nil).WithEnterpriseURLs("http://example.invalid", "")
+	gh := &Github{client: client, owner: "o", repo: "r", fs: afero.NewMemMapFs()}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	// A request error (not the Actions 403 fallback) yields empty strings.
+	name, email := gh.GetUser(ctx)
+	assert.Empty(t, name)
+	assert.Empty(t, email)
+}
+
 func TestIsGitHubActionsToken403_ReturnsFalseForNonGitHubError(t *testing.T) {
 	result := isGitHubActionsToken403(nil, errors.New("plain network error"))
 	assert.False(t, result)

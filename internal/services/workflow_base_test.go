@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/codehosting"
@@ -133,6 +134,51 @@ func TestStartUpdateSiteFailureDoesNotPublish(t *testing.T) {
 
 	// Assert: the error surfaces and no MR was published.
 	assert.ErrorIs(t, err, updateErr)
+	repository.AssertNotCalled(t, "Push", mock.Anything)
+	vcsProvider.AssertNotCalled(t, "CreateMergeRequest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestStartUpdateTimeout(t *testing.T) {
+	// A run-level timeout must cancel the workflow context and surface as a
+	// deadline error rather than hanging.
+	logger := zap.NewNop()
+	installer := NewMockInstaller(t)
+	repositoryService := NewMockRepository(t)
+	vcsProvider := NewMockPlatform(t)
+	repository := NewMockGitRepository(t)
+	mockComposer := NewMockComposer(t)
+	drush := NewMockDrush(t)
+	ctx := context.Background()
+
+	config := internal.Config{
+		RepositoryURL: "https://example.com/repo.git",
+		Branch:        "main",
+		Token:         "token",
+		Sites:         []string{"site1"},
+		Timeout:       20 * time.Millisecond,
+	}
+
+	worktree := NewMockWorktree(t)
+	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
+	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil).Times(2)
+
+	// Both phases block on the context, simulating a wedged subprocess; the run
+	// timeout is what releases them.
+	mockComposer.EXPECT().Install(mock.Anything, "/tmp").RunAndReturn(func(ctx context.Context, _ string) error {
+		<-ctx.Done()
+		return ctx.Err()
+	})
+	mockComposer.EXPECT().Update(mock.Anything, "/tmp", mock.Anything, mock.Anything, false, false).RunAndReturn(func(ctx context.Context, _ string, _ []string, _ []string, _ bool, _ bool) ([]composer.PackageChange, error) {
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}).Maybe()
+
+	// Execute
+	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
+	err := workflowService.StartUpdate(ctx, nil)
+
+	// Assert: the deadline propagates and nothing is published.
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
 	repository.AssertNotCalled(t, "Push", mock.Anything)
 	vcsProvider.AssertNotCalled(t, "CreateMergeRequest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }

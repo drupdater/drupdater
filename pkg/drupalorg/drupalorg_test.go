@@ -4,10 +4,37 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
 )
+
+func TestNewHTTPClient_HasTimeout(t *testing.T) {
+	c := NewHTTPClient(zap.NewNop())
+	assert.Equal(t, 30*time.Second, c.client.Timeout)
+}
+
+func TestGetIssue_Timeout(t *testing.T) {
+	// Server never responds; the client timeout must abort the request.
+	block := make(chan struct{})
+	mockServer := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+		<-block
+	}))
+	defer mockServer.Close()
+	defer close(block)
+
+	service := &HTTPClient{
+		DrupalOrgBaseURL: mockServer.URL,
+		logger:           zaptest.NewLogger(t),
+		client:           &http.Client{Timeout: 10 * time.Millisecond},
+	}
+
+	issue, err := service.GetIssue("12345")
+	assert.Error(t, err)
+	assert.Nil(t, issue)
+}
 
 func TestGetIssue(t *testing.T) {
 	// Mock server to simulate Drupal API
