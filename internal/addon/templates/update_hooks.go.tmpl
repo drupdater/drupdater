@@ -3,12 +3,15 @@
 <details>
 <summary>⚙️ Update Hooks</summary>
 
+{{ $multiSite := gt (len .) 1 -}}
 {{ range $site, $hooks := . -}}
-{{ if . | len | gt 1 -}}### Site: {{ $site }}{{ end -}}
+{{ if $multiSite }}### Site: {{ $site }}
+
+{{ end -}}
 | Hook | Description |
 | ---- | ----------- |
 {{ range $hookName, $hookDetails := $hooks -}}
-| {{ $hookName }} | {{$hookDetails.Description }} |
+| {{ $hookName | cell }} | {{ $hookDetails.Description | cell }} |
 {{ end -}}
 {{ end }}
 </details>

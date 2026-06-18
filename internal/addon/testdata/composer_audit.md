@@ -1,6 +1,6 @@
 ## 🛡️ Security Report
 
-The security report shows fixed and unfixed security vulnerabilities. There are still 1 unresolved issues. Please investigate manually.
+The security report shows fixed and unfixed security vulnerabilities. There are still 1 unresolved issue. Please investigate manually.
 
 | Status | CVE      | Title | Severity | Package  |
 | ------ | -------- | ----- | -------- | -------- |

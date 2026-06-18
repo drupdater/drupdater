@@ -17,7 +17,6 @@ import (
 type SecurityReport struct {
 	FixedAdvisories       []composer.Advisory
 	AfterUpdateAdvisories []composer.Advisory
-	NumUnresolvedIssues   int
 }
 
 // ComposerAudit handles security auditing for Drupal sites.
@@ -63,7 +62,6 @@ func (ca *ComposerAudit) RenderTemplate() (string, error) {
 	return ca.Render("security_report.go.tmpl", SecurityReport{
 		FixedAdvisories:       ca.GetFixedAdvisories(),
 		AfterUpdateAdvisories: ca.afterAudit.Advisories,
-		NumUnresolvedIssues:   len(ca.afterAudit.Advisories),
 	})
 }
 
