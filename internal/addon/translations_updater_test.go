@@ -8,10 +8,27 @@ import (
 
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/gookit/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"go.uber.org/zap"
 )
+
+func TestTranslationsUpdater_SubscribedEvents(t *testing.T) {
+	tu := &TranslationsUpdater{}
+	events := tu.SubscribedEvents()
+
+	assert.Contains(t, events, "post-site-update")
+	item := events["post-site-update"].(event.ListenerItem)
+	assert.Equal(t, event.Normal, item.Priority)
+}
+
+func TestTranslationsUpdater_RenderTemplate(t *testing.T) {
+	tu := &TranslationsUpdater{}
+	result, err := tu.RenderTemplate()
+	assert.NoError(t, err)
+	assert.Equal(t, "", result)
+}
 
 func TestUpdateTranslationsEventHandlerWithoutLocaleDeploy(t *testing.T) {
 	// Setup - Create mocks and system under test

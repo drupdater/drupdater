@@ -10,11 +10,29 @@ import (
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/drupalorg"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/gookit/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	gitlab "gitlab.com/gitlab-org/api/client-go"
 	"go.uber.org/zap"
 )
+
+func TestComposerPatches1_SubscribedEvents(t *testing.T) {
+	h := &ComposerPatches1{}
+	events := h.SubscribedEvents()
+
+	assert.Contains(t, events, "pre-composer-update")
+	item := events["pre-composer-update"].(event.ListenerItem)
+	assert.Equal(t, event.Normal, item.Priority)
+}
+
+func TestComposerPatches1_RenderTemplate_NoChanges(t *testing.T) {
+	logger := zap.NewNop()
+	h := &ComposerPatches1{logger: logger, patchUpdates: PatchUpdates{}}
+	result, err := h.RenderTemplate()
+	assert.NoError(t, err)
+	assert.Equal(t, "", result)
+}
 
 func TestUpdatePatches(t *testing.T) {
 
