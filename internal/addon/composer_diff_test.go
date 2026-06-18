@@ -51,6 +51,7 @@ func TestComposerDiff_PostComposerUpdateHandler_Success(t *testing.T) {
 
 	// Configure mock expectations
 	mockComposer.EXPECT().Diff(ctx, testPath, true).Return(expectedDiff, nil)
+	mockComposer.EXPECT().Diff(ctx, testPath, false).Return("plain text diff", nil)
 
 	// Execute
 	err := diff.postComposerUpdateHandler(mockEvent)
