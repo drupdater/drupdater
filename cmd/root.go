@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"errors"
+	"net/http"
 	"net/url"
 	"os"
 
@@ -113,7 +114,7 @@ func createAddons(
 		addon.NewTranslationsUpdater(logger, drush, git),
 		addon.NewComposerAllowPlugins(logger, composer),
 		addon.NewComposerNormalizer(logger, composer),
-		addon.NewComposerPatches1(logger, composer, drupalOrg),
+		addon.NewComposerPatches1(logger, composer, drupalOrg, http.DefaultClient),
 		addon.NewComposerDiff(logger, composer),
 		addon.NewUpdateHooks(logger, drush),
 	)

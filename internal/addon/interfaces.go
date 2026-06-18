@@ -2,6 +2,7 @@ package addon
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/drupalorg"
@@ -59,3 +60,7 @@ type Rector interface {
 
 // Worktree is an alias for repo.Worktree to avoid duplication.
 type Worktree = repo.Worktree
+
+type HTTPClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}

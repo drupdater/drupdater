@@ -2,9 +2,11 @@ package addon
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/drupdater/drupdater/pkg/composer"
@@ -212,6 +214,7 @@ func TestUpdatePatches(t *testing.T) {
 		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/remote/0001-remote.patch").Return(false, nil)
 		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/drupal/123456-111111-alot_of_problems.diff").Return(true, nil)
 
+		var serverURL string
 		mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
@@ -227,28 +230,36 @@ func TestUpdatePatches(t *testing.T) {
 				response := []gitlab.MergeRequest{
 					{
 						BasicMergeRequest: gitlab.BasicMergeRequest{
-							ID:    1234,
-							IID:   5678,
-							Title: "Remote patch",
-							SHA:   "111111",
+							ID:     1234,
+							IID:    5678,
+							Title:  "Remote patch",
+							SHA:    "111111",
+							WebURL: serverURL + "/project/drupal/-/merge_requests/1",
 						},
 					},
 				}
 				jsonString, _ = json.Marshal(response)
 			}
+			if r.URL.Path == "/project/drupal/-/merge_requests/1.diff" {
+				w.Header().Set("Content-Type", "text/plain")
+				_, _ = w.Write([]byte("patch content"))
+				return
+			}
 
 			_, err := w.Write(jsonString)
 			assert.NoError(t, err)
 		}))
+		serverURL = mockServer.URL
 		defer mockServer.Close()
 
-		git, _ := gitlab.NewClient("", gitlab.WithBaseURL(mockServer.URL))
+		gitClient, _ := gitlab.NewClient("", gitlab.WithBaseURL(mockServer.URL))
 
 		updater := &ComposerPatches1{
-			logger:    logger,
-			composer:  composerService,
-			drupalOrg: drupalOrgService,
-			gitlab:    git,
+			logger:     logger,
+			composer:   composerService,
+			drupalOrg:  drupalOrgService,
+			gitlab:     gitClient,
+			httpClient: mockServer.Client(),
 		}
 
 		operations := []composer.PackageChange{
@@ -302,6 +313,7 @@ func TestUpdatePatches(t *testing.T) {
 		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/remote/0001-remote.patch").Return(false, nil)
 		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/drupal/123456-111111-alot_of_problems.diff").Return(false, nil)
 
+		var serverURL string
 		mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
@@ -317,28 +329,36 @@ func TestUpdatePatches(t *testing.T) {
 				response := []gitlab.MergeRequest{
 					{
 						BasicMergeRequest: gitlab.BasicMergeRequest{
-							ID:    1234,
-							IID:   5678,
-							Title: "Remote patch",
-							SHA:   "111111",
+							ID:     1234,
+							IID:    5678,
+							Title:  "Remote patch",
+							SHA:    "111111",
+							WebURL: serverURL + "/project/drupal/-/merge_requests/1",
 						},
 					},
 				}
 				jsonString, _ = json.Marshal(response)
 			}
+			if r.URL.Path == "/project/drupal/-/merge_requests/1.diff" {
+				w.Header().Set("Content-Type", "text/plain")
+				_, _ = w.Write([]byte("patch content"))
+				return
+			}
 
 			_, err := w.Write(jsonString)
 			assert.NoError(t, err)
 		}))
+		serverURL = mockServer.URL
 		defer mockServer.Close()
 
-		git, _ := gitlab.NewClient("", gitlab.WithBaseURL(mockServer.URL))
+		gitClient, _ := gitlab.NewClient("", gitlab.WithBaseURL(mockServer.URL))
 
 		updater := &ComposerPatches1{
-			logger:    logger,
-			composer:  composerService,
-			drupalOrg: drupalOrgService,
-			gitlab:    git,
+			logger:     logger,
+			composer:   composerService,
+			drupalOrg:  drupalOrgService,
+			gitlab:     gitClient,
+			httpClient: mockServer.Client(),
 		}
 
 		operations := []composer.PackageChange{
@@ -616,7 +636,7 @@ func TestComposer_Patches_1_RenderTemplate(t *testing.T) {
 	drupalorgService := NewMockDrupalOrg(t)
 
 	// Initialize system under test
-	ap := NewComposerPatches1(logger, composerRunner, drupalorgService)
+	ap := NewComposerPatches1(logger, composerRunner, drupalorgService, http.DefaultClient)
 	ap.patchUpdates = PatchUpdates{
 		Conflicts: []ConflictPatch{
 			{
@@ -657,4 +677,66 @@ func TestComposer_Patches_1_RenderTemplate(t *testing.T) {
 	// Verify
 	assert.NoError(t, err)
 	assert.Equal(t, expected, result)
+}
+
+func TestDownloadFile(t *testing.T) {
+	logger := zap.NewNop()
+
+	t.Run("success", func(t *testing.T) {
+		const content = "--- a/file\n+++ b/file\n@@ -1 +1 @@\n-old\n+new\n"
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = io.WriteString(w, content)
+		}))
+		defer server.Close()
+
+		dir := t.TempDir()
+		h := &ComposerPatches1{logger: logger, httpClient: server.Client()}
+
+		err := h.downloadFile(t.Context(), server.URL+"/patch.diff", dir, "patch.diff")
+		assert.NoError(t, err)
+
+		data, err := os.ReadFile(dir + "/patch.diff")
+		assert.NoError(t, err)
+		assert.Equal(t, content, string(data))
+	})
+
+	t.Run("http error response", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusNotFound)
+		}))
+		defer server.Close()
+
+		dir := t.TempDir()
+		h := &ComposerPatches1{logger: logger, httpClient: server.Client()}
+
+		err := h.downloadFile(t.Context(), server.URL+"/patch.diff", dir, "patch.diff")
+		assert.ErrorContains(t, err, "status code 404")
+	})
+
+	t.Run("invalid url", func(t *testing.T) {
+		h := &ComposerPatches1{logger: logger, httpClient: http.DefaultClient}
+
+		err := h.downloadFile(t.Context(), "not-a-valid-url", t.TempDir(), "patch.diff")
+		assert.Error(t, err)
+	})
+
+	t.Run("mock http client", func(t *testing.T) {
+		const content = "patch data"
+		mockClient := NewMockHTTPClient(t)
+		mockClient.EXPECT().Do(mock.AnythingOfType("*http.Request")).Return(&http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader(content)),
+		}, nil)
+
+		dir := t.TempDir()
+		h := &ComposerPatches1{logger: logger, httpClient: mockClient}
+
+		err := h.downloadFile(t.Context(), "http://example.com/patch.diff", dir, "patch.diff")
+		assert.NoError(t, err)
+
+		data, err := os.ReadFile(dir + "/patch.diff")
+		assert.NoError(t, err)
+		assert.Equal(t, content, string(data))
+	})
 }
