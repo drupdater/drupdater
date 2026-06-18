@@ -87,7 +87,7 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []interna
 
 	// errgroup cancels ctx on the first error and bounds concurrency to the CPU count.
 	// publishWork runs only after Wait() returns nil, so a failed phase can never publish an MR.
-	g, ctx := errgroup.WithContext(ctx)
+	g, groupCtx := errgroup.WithContext(ctx)
 	g.SetLimit(runtime.NumCPU())
 
 	// installCode and updateSharedCode are independent; site work waits on these signals.
@@ -95,7 +95,7 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []interna
 	var installPath string
 	installCodeDone := make(chan struct{})
 	g.Go(func() error {
-		path, err := ws.installCode(ctx)
+		path, err := ws.installCode(groupCtx)
 		if err != nil {
 			return fmt.Errorf("code installation failed: %w", err)
 		}
@@ -107,7 +107,7 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []interna
 	var sharedUpdate SharedUpdate
 	updateDone := make(chan struct{})
 	g.Go(func() error {
-		update, err := ws.updateSharedCode(ctx)
+		update, err := ws.updateSharedCode(groupCtx)
 		if err != nil {
 			return err
 		}
@@ -121,21 +121,21 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []interna
 		g.Go(func() error {
 			select {
 			case <-installCodeDone:
-			case <-ctx.Done():
-				return ctx.Err()
+			case <-groupCtx.Done():
+				return groupCtx.Err()
 			}
 
-			if err := ws.installer.Install(ctx, installPath, site); err != nil {
+			if err := ws.installer.Install(groupCtx, installPath, site); err != nil {
 				return fmt.Errorf("site %s installation failed: %w", site, err)
 			}
 
 			select {
 			case <-updateDone:
-			case <-ctx.Done():
-				return ctx.Err()
+			case <-groupCtx.Done():
+				return groupCtx.Err()
 			}
 
-			return ws.updateSite(ctx, sharedUpdate, site)
+			return ws.updateSite(groupCtx, sharedUpdate, site)
 		})
 	}
 

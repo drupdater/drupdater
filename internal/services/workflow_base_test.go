@@ -85,6 +85,72 @@ func TestStartUpdate(t *testing.T) {
 	vcsProvider.AssertExpectations(t)
 }
 
+func TestStartUpdatePublishUsesLiveContext(t *testing.T) {
+	// Regression: publishWork must run on the outer (timeout-bounded) context, not the
+	// errgroup-derived context. The errgroup context is cancelled as soon as g.Wait()
+	// returns, so if publishWork received it, CreateMergeRequest would see a cancelled
+	// context. Assert the context handed to CreateMergeRequest is still alive.
+	logger := zap.NewNop()
+	installer := NewMockInstaller(t)
+	repositoryService := NewMockRepository(t)
+	vcsProvider := NewMockPlatform(t)
+	repository := NewMockGitRepository(t)
+	mockComposer := NewMockComposer(t)
+	drush := NewMockDrush(t)
+	ctx := context.Background()
+
+	config := internal.Config{
+		RepositoryURL: "https://example.com/repo.git",
+		Branch:        "main",
+		Token:         "token",
+		Sites:         []string{"site1"},
+		DryRun:        false,
+	}
+
+	worktree := NewMockWorktree(t)
+	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
+	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Checkout(mock.Anything).Return(nil)
+
+	installer.EXPECT().Install(mock.Anything, "/tmp", "site1").Return(nil)
+	installer.EXPECT().ConfigureDatabase(mock.Anything, "/tmp", "site1").Return(nil)
+
+	drush.EXPECT().UpdateSite(mock.Anything, "/tmp", "site1").Return(nil)
+	drush.EXPECT().ExportConfiguration(mock.Anything, "/tmp", "site1").Return(nil)
+	drush.EXPECT().ConfigResave(mock.Anything, "/tmp", "site1").Return(nil)
+
+	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil).Times(2)
+	mockComposer.EXPECT().CheckPlatformReqs(mock.Anything, "/tmp").Return("", nil)
+	repositoryService.EXPECT().BranchExists(repository, mock.Anything).Return(false, nil)
+
+	repository.EXPECT().Push(mock.Anything).Return(nil)
+
+	fixture, err := os.ReadFile("testdata/dependency_update.md")
+	assert.NoError(t, err, "Failed to read test fixture")
+
+	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
+
+	// Capture the context handed to publishWork's MR creation and assert it is not cancelled.
+	var publishCtxErr error
+	vcsProvider.EXPECT().CreateMergeRequest(mock.Anything, mock.Anything, string(fixture), mock.Anything, config.Branch).
+		Run(func(ctx context.Context, _ string, _ string, _ string, _ string) {
+			publishCtxErr = ctx.Err()
+		}).Return(codehosting.MergeRequest{}, nil)
+
+	mockComposer.EXPECT().Update(mock.Anything, "/tmp", mock.Anything, mock.Anything, false, false).Return([]composer.PackageChange{
+		{Package: "drupal/core", From: "9.0.0", To: "9.1.0"},
+	}, nil)
+	mockComposer.EXPECT().Install(mock.Anything, "/tmp").Return(nil)
+	mockComposer.EXPECT().GetLockHash("/tmp").Return("dummy-hash", nil)
+
+	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
+	err = workflowService.StartUpdate(ctx, nil)
+
+	assert.NoError(t, err)
+	assert.NoError(t, publishCtxErr, "publishWork must receive a live (non-cancelled) context")
+	vcsProvider.AssertExpectations(t)
+}
+
 func TestStartUpdateSiteFailureDoesNotPublish(t *testing.T) {
 	// A failing site update must propagate the error and never push a branch or open an MR.
 	logger := zap.NewNop()
