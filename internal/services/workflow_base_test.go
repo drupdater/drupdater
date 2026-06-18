@@ -253,6 +253,15 @@ func TestStartUpdateWithDryRun(t *testing.T) {
 	vcsProvider.AssertExpectations(t)
 }
 
+func TestGenerateDescription_UnknownTemplate(t *testing.T) {
+	logger := zap.NewNop()
+	ws := NewWorkflowBaseService(logger, internal.Config{}, nil, nil, nil, nil, nil, nil)
+
+	_, err := ws.GenerateDescription(nil, "nonexistent.go.tmpl")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to execute template")
+}
+
 func TestStartUpdateFireEventError(t *testing.T) {
 	// Verify that a FireEvent error is propagated out of StartUpdate.
 	logger := zap.NewNop()

@@ -9,10 +9,27 @@ import (
 	"github.com/drupdater/drupdater/pkg/rector"
 
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/gookit/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"go.uber.org/zap"
 )
+
+func TestDeprecationsRemover_SubscribedEvents(t *testing.T) {
+	dr := &DeprecationsRemover{}
+	events := dr.SubscribedEvents()
+
+	assert.Contains(t, events, "post-code-update")
+	item := events["post-code-update"].(event.ListenerItem)
+	assert.Equal(t, event.Normal, item.Priority)
+}
+
+func TestDeprecationsRemover_RenderTemplate(t *testing.T) {
+	dr := &DeprecationsRemover{}
+	result, err := dr.RenderTemplate()
+	assert.NoError(t, err)
+	assert.Equal(t, "", result)
+}
 
 func TestRemoveDeprecations(t *testing.T) {
 	// Common test setup

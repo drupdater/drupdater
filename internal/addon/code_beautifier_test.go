@@ -12,10 +12,27 @@ import (
 
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/gookit/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"go.uber.org/zap"
 )
+
+func TestCodeBeautifier_SubscribedEvents(t *testing.T) {
+	cb := &CodeBeautifier{}
+	events := cb.SubscribedEvents()
+
+	assert.Contains(t, events, "post-code-update")
+	item := events["post-code-update"].(event.ListenerItem)
+	assert.Equal(t, event.Normal, item.Priority)
+}
+
+func TestCodeBeautifier_RenderTemplate(t *testing.T) {
+	cb := &CodeBeautifier{}
+	result, err := cb.RenderTemplate()
+	assert.NoError(t, err)
+	assert.Equal(t, "", result)
+}
 
 func TestCreatePHPCSConfig(t *testing.T) {
 	logger := zap.NewNop()
