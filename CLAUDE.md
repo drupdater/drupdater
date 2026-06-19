@@ -78,7 +78,7 @@ Events fired during the workflow: `PreComposerUpdateEvent`, `PostComposerUpdateE
 Config is split into two tiers, with no overlap:
 
 - **CLI flags** — how a given run is invoked (volatile): token (positional arg), plus the flags below.
-- **`.drupdater.yaml`** — what the project needs (committed at the repo root, read from `<working-dir>/.drupdater.yaml`). Loaded by `internal/configfile.go`; a missing file falls back to built-in defaults, and absent keys keep their default. Keys: `sites`, `timeout` (Go duration string, e.g. `30m`), and `addons.regular` / `addons.security`.
+- **`.drupdater.yaml`** — what the project needs (committed at the repo root, read from `<working-dir>/.drupdater.yaml` or `--config`). Loaded by `internal/configfile.go`; a missing file falls back to built-in defaults, absent keys keep their default, and unknown keys are rejected (strict decode). Keys: `sites`, `timeout` (Go duration string, e.g. `30m`), and `addons.normal` / `addons.security`. Addon names in both lists are validated up front via `validateAddons`; `drupdater addons` lists valid names.
 
 ### CLI Flags
 
@@ -91,6 +91,7 @@ Config is split into two tiers, with no overlap:
 | `--security` | false | Only apply security updates; selects the `addons.security` list |
 | `--dry-run` | false | Skip branch creation and MR |
 | `--verbose` | false | Debug-level structured logging |
+| `--config` | _(`<working-dir>/.drupdater.yaml`)_ | Path to the config file |
 
 ### `.drupdater.yaml`
 
@@ -98,7 +99,7 @@ Config is split into two tiers, with no overlap:
 sites: [default]      # Drupal site names
 timeout: 30m          # overall run timeout (Go duration; 0 disables)
 addons:               # configurable addons per mode; mandatory addons always run
-  regular:
+  normal:
     - code_beautifier
     - deprecations_remover
     - translations_updater

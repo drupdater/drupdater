@@ -168,19 +168,20 @@ All flags are optional. Pass them after the required `<token>` argument.
 | `--repository-url` | _(from `origin`)_ | Repository URL. Required with `--clone`; otherwise derived from the checkout's `origin` remote. |
 | `--security` | `false` | Only update packages with known security vulnerabilities. Selects the `addons.security` list from `.drupdater.yaml`. |
 | `--dry-run` | `false` | Run all update steps but skip branch creation and MR/PR creation. |
-| `--verbose` | `false` | Enable debug-level structured logging. |
+| `--verbose` | `false` | Enable debug-level structured logging (also logs the resolved configuration). |
+| `--config` | _(`<working-dir>/.drupdater.yaml`)_ | Path to the config file. |
 
 ### `.drupdater.yaml`
 
 Per-project settings live in a `.drupdater.yaml` committed at the repository root (read from
-`--working-dir`). The file is optional — a missing file, or any key left out, falls back to the
-defaults shown below.
+`--working-dir`, or `--config`). The file is optional — a missing file, or any key left out,
+falls back to the defaults shown below. Unknown keys are rejected, so typos fail fast.
 
 ```yaml
 sites: [default]      # Drupal site directories to update
 timeout: 30m          # overall run timeout (Go duration string; 0 disables)
 addons:               # which configurable addons run in each mode
-  regular:
+  normal:
     - code_beautifier        # phpcbf PHP code style fixes
     - deprecations_remover   # drupal-rector deprecation removal
     - translations_updater
@@ -188,11 +189,11 @@ addons:               # which configurable addons run in each mode
   security: []          # minimal by default: just the security fix, nothing else
 ```
 
-`--security` picks the `addons.security` list; otherwise `addons.regular` is used. Security runs
+`--security` picks the `addons.security` list; otherwise `addons.normal` is used. Security runs
 default to no extra addons so nothing interferes with the package update — add entries here only
 if you want code style, deprecation, or other changes applied during security updates too.
 
-Addons you can add to either list:
+Run `drupdater addons` to list the addon names you can add to either list:
 
 | Addon | What it does |
 |-------|--------------|

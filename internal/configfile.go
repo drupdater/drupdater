@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"time"
@@ -8,10 +9,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// defaultRegularAddons is the configurable addon set that runs in a normal update. Security
+// defaultNormalAddons is the configurable addon set that runs in a normal update. Security
 // mode defaults to none of these: it should be a minimal, focused security fix, with only the
 // mandatory addons and the (automatically added) composer_audit running.
-var defaultRegularAddons = []string{
+var defaultNormalAddons = []string{
 	"code_beautifier",
 	"deprecations_remover",
 	"translations_updater",
@@ -34,39 +35,42 @@ func defaultFileConfig() fileConfig {
 		Sites:   []string{"default"},
 		Timeout: "30m",
 		Addons: AddonsConfig{
-			Regular:  defaultRegularAddons,
+			Normal:   defaultNormalAddons,
 			Security: nil, // minimal by default; composer_audit is added automatically
 		},
 	}
 }
 
 // LoadConfigFile reads the .drupdater.yaml at path (layered over the built-in defaults) and
-// applies sites, timeout, and addons onto c. A missing file is not an error: the defaults apply.
-func LoadConfigFile(path string, c *Config) error {
+// applies sites, timeout, and addons onto c. A missing file is not an error: the defaults
+// apply and found is false. Unknown keys in the file are rejected so typos fail loudly.
+func LoadConfigFile(path string, c *Config) (found bool, err error) {
 	fc := defaultFileConfig()
 
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return applyFileConfig(fc, c)
+			return false, applyFileConfig(fc, c)
 		}
-		return err
+		return false, err
 	}
 
-	if err := yaml.Unmarshal(data, &fc); err != nil {
-		return fmt.Errorf("parsing %s: %w", path, err)
+	dec := yaml.NewDecoder(bytes.NewReader(data))
+	dec.KnownFields(true)
+	if err := dec.Decode(&fc); err != nil {
+		return true, fmt.Errorf("parsing %s: %w", path, err)
 	}
 
 	if err := applyFileConfig(fc, c); err != nil {
-		return fmt.Errorf("in %s: %w", path, err)
+		return true, fmt.Errorf("in %s: %w", path, err)
 	}
-	return nil
+	return true, nil
 }
 
 func applyFileConfig(fc fileConfig, c *Config) error {
 	timeout, err := time.ParseDuration(fc.Timeout)
 	if err != nil {
-		return fmt.Errorf("invalid timeout %q: %w", fc.Timeout, err)
+		return fmt.Errorf("invalid timeout %q (use a Go duration like \"30m\" or \"2h\"): %w", fc.Timeout, err)
 	}
 	c.Sites = fc.Sites
 	c.Timeout = timeout

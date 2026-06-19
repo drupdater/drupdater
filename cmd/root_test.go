@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"errors"
 	"testing"
 
@@ -101,7 +102,7 @@ func TestCreateDispatcher(t *testing.T) {
 	logger := zaptest.NewLogger(t)
 
 	t.Run("returns a non-nil dispatcher with addons subscribed", func(t *testing.T) {
-		config := internal.Config{Addons: internal.AddonsConfig{Regular: []string{"composer_normalizer"}}}
+		config := internal.Config{Addons: internal.AddonsConfig{Normal: []string{"composer_normalizer"}}}
 		addons, err := createAddons(logger, config, nil, nil, nil, nil)
 		require.NoError(t, err)
 		dispatcher := createDispatcher(addons)
@@ -117,9 +118,9 @@ func TestCreateDispatcher(t *testing.T) {
 func TestCreateAddons(t *testing.T) {
 	logger := zaptest.NewLogger(t)
 
-	t.Run("mandatory addons plus the regular list", func(t *testing.T) {
+	t.Run("mandatory addons plus the normal list", func(t *testing.T) {
 		config := internal.Config{
-			Addons: internal.AddonsConfig{Regular: []string{"code_beautifier"}},
+			Addons: internal.AddonsConfig{Normal: []string{"code_beautifier"}},
 		}
 		addons, err := createAddons(logger, config, nil, nil, nil, nil)
 		require.NoError(t, err)
@@ -131,7 +132,7 @@ func TestCreateAddons(t *testing.T) {
 		config := internal.Config{
 			Security: true,
 			Addons: internal.AddonsConfig{
-				Regular:  []string{"code_beautifier"},
+				Normal:   []string{"code_beautifier"},
 				Security: []string{"code_beautifier"}, // composer_audit intentionally omitted
 			},
 		}
@@ -142,17 +143,68 @@ func TestCreateAddons(t *testing.T) {
 	})
 
 	t.Run("a mandatory addon listed in the YAML is not duplicated", func(t *testing.T) {
-		config := internal.Config{Addons: internal.AddonsConfig{Regular: []string{"update_hooks"}}}
+		config := internal.Config{Addons: internal.AddonsConfig{Normal: []string{"update_hooks"}}}
 		addons, err := createAddons(logger, config, nil, nil, nil, nil)
 		require.NoError(t, err)
 		assert.Len(t, addons, 4) // update_hooks is already mandatory
 	})
 
 	t.Run("an unknown addon name is an error", func(t *testing.T) {
-		config := internal.Config{Addons: internal.AddonsConfig{Regular: []string{"does_not_exist"}}}
+		config := internal.Config{Addons: internal.AddonsConfig{Normal: []string{"does_not_exist"}}}
 		_, err := createAddons(logger, config, nil, nil, nil, nil)
 		require.Error(t, err)
 	})
+}
+
+func TestValidateAddons(t *testing.T) {
+	t.Run("known names pass, including mandatory ones", func(t *testing.T) {
+		config := internal.Config{Addons: internal.AddonsConfig{
+			Normal:   []string{"code_beautifier", "update_hooks"},
+			Security: []string{"composer_normalizer"},
+		}}
+		require.NoError(t, validateAddons(config))
+	})
+
+	t.Run("unknown name in the normal list is an error", func(t *testing.T) {
+		config := internal.Config{Addons: internal.AddonsConfig{Normal: []string{"nope"}}}
+		err := validateAddons(config)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "nope")
+	})
+
+	t.Run("unknown name in the security list is caught regardless of mode", func(t *testing.T) {
+		// Security: false, yet a bad security-list name must still be rejected.
+		config := internal.Config{Addons: internal.AddonsConfig{Security: []string{"typo"}}}
+		require.Error(t, validateAddons(config))
+	})
+}
+
+func TestConfigurableAddons(t *testing.T) {
+	names := configurableAddons()
+
+	// Exactly the four configurable addons, sorted, and nothing mandatory.
+	assert.Equal(t, []string{
+		"code_beautifier",
+		"composer_normalizer",
+		"deprecations_remover",
+		"translations_updater",
+	}, names)
+
+	for _, mandatory := range append(mandatoryAddons, "composer_audit") {
+		assert.NotContains(t, names, mandatory)
+	}
+}
+
+func TestAddonsCommand(t *testing.T) {
+	var buf bytes.Buffer
+	addonsCmd.SetOut(&buf)
+	addonsCmd.Run(addonsCmd, nil)
+	out := buf.String()
+
+	assert.Contains(t, out, "code_beautifier")
+	// Mandatory addons must not be listed as settable.
+	assert.NotContains(t, out, "composer_patches")
+	assert.NotContains(t, out, "composer_audit")
 }
 
 func TestResolveCheckoutBranch(t *testing.T) {

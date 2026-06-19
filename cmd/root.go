@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"sort"
 	"syscall"
 
 	"github.com/drupdater/drupdater/internal"
@@ -34,12 +35,19 @@ import (
 // config holds the application configuration
 var config internal.Config
 
+// configFile is the path to .drupdater.yaml; empty means <working-dir>/.drupdater.yaml.
+var configFile string
+
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "drupdater token",
 	Short: "Drupal Updater",
-	Long:  `Drupal Updater is a tool to update Drupal dependencies and create merge requests.`,
-	Args:  cobra.ExactArgs(1),
+	Long: `Drupal Updater is a tool to update Drupal dependencies and create merge requests.
+
+Project settings (sites, timeout, and which addons run) are read from .drupdater.yaml in the
+working directory; override the path with --config. Run "drupdater addons" to list the addon
+names you can set there. See the README for the full file format.`,
+	Args: cobra.ExactArgs(1),
 	PreRunE: func(_ *cobra.Command, _ []string) error {
 		// --clone needs an explicit repository URL; checkout mode derives it from origin.
 		if config.Clone && config.RepositoryURL == "" {
@@ -64,12 +72,29 @@ var rootCmd = &cobra.Command{
 		// Initialize the logger first so config errors are reported (errors are silenced by Cobra).
 		logger := NewLogger(config)
 
-		// Load per-project config from .drupdater.yaml in the checkout (sites, timeout, addons).
-		// A missing file falls back to built-in defaults.
-		if err := internal.LoadConfigFile(filepath.Join(config.WorkingDir, ".drupdater.yaml"), &config); err != nil {
+		// Load per-project config from .drupdater.yaml (sites, timeout, addons). A missing file
+		// falls back to built-in defaults.
+		cfgPath := configFile
+		if cfgPath == "" {
+			cfgPath = filepath.Join(config.WorkingDir, ".drupdater.yaml")
+		}
+		found, err := internal.LoadConfigFile(cfgPath, &config)
+		if err != nil {
 			logger.Error("invalid configuration", zap.Error(err))
 			return err
 		}
+		if err := validateAddons(config); err != nil {
+			logger.Error("invalid configuration", zap.String("path", cfgPath), zap.Error(err))
+			return err
+		}
+		logger.Debug("configuration loaded",
+			zap.String("path", cfgPath),
+			zap.Bool("file_found", found),
+			zap.Strings("sites", config.Sites),
+			zap.Duration("timeout", config.Timeout),
+			zap.Strings("addons.normal", config.Addons.Normal),
+			zap.Strings("addons.security", config.Addons.Security),
+		)
 
 		cache := NewCache()
 
@@ -194,7 +219,7 @@ func createAddons(
 ) ([]internal.Addon, error) {
 	deps := addonDeps{logger: logger, config: config, drush: drush, composer: composer, drupalOrg: drupalOrg, git: git}
 
-	names := config.Addons.Regular
+	names := config.Addons.Normal
 	if config.Security {
 		names = config.Addons.Security
 	}
@@ -234,6 +259,48 @@ func createAddons(
 	return addons, nil
 }
 
+// validateAddons checks every addon named in either list is known, regardless of which mode
+// will run, so a typo in addons.security is caught even on a normal run (and vice versa).
+func validateAddons(config internal.Config) error {
+	for _, name := range append(append([]string{}, config.Addons.Normal...), config.Addons.Security...) {
+		if _, ok := addonRegistry[name]; !ok {
+			return fmt.Errorf("unknown addon %q (run \"drupdater addons\" to list valid names)", name)
+		}
+	}
+	return nil
+}
+
+// configurableAddons returns the sorted addon names a user can set in .drupdater.yaml — every
+// registered addon except the ones that always run (mandatoryAddons and, in security mode,
+// composer_audit).
+func configurableAddons() []string {
+	excluded := map[string]bool{"composer_audit": true}
+	for _, n := range mandatoryAddons {
+		excluded[n] = true
+	}
+	names := make([]string, 0, len(addonRegistry))
+	for n := range addonRegistry {
+		if !excluded[n] {
+			names = append(names, n)
+		}
+	}
+	sort.Strings(names)
+	return names
+}
+
+// addonsCmd lists the addon names that can be set in .drupdater.yaml.
+var addonsCmd = &cobra.Command{
+	Use:   "addons",
+	Short: "List the addon names that can be set in .drupdater.yaml",
+	Run: func(cmd *cobra.Command, _ []string) {
+		out := cmd.OutOrStdout()
+		fmt.Fprintln(out, "Addons you can set under addons.normal / addons.security in .drupdater.yaml:")
+		for _, n := range configurableAddons() {
+			fmt.Fprintf(out, "  %s\n", n)
+		}
+	},
+}
+
 // createDispatcher creates a new event manager and subscribes all addons to it.
 func createDispatcher(addons []internal.Addon) services.EventDispatcher {
 	dispatcher := event.NewManager("")
@@ -261,6 +328,9 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&config.Security, "security", false, "Only security updates. If true, only security updates will be applied.")
 	rootCmd.PersistentFlags().BoolVar(&config.DryRun, "dry-run", false, "Dry run. If true, no branch and merge request will be created.")
 	rootCmd.PersistentFlags().BoolVar(&config.Verbose, "verbose", false, "Verbose")
+	rootCmd.PersistentFlags().StringVar(&configFile, "config", "", "Path to the config file (default: <working-dir>/.drupdater.yaml).")
+
+	rootCmd.AddCommand(addonsCmd)
 }
 
 func Execute() {

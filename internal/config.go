@@ -20,6 +20,6 @@ type Config struct {
 // (composer_allow_plugins, composer_patches, composer_diff, update_hooks) always run and are
 // not listed here.
 type AddonsConfig struct {
-	Regular  []string `yaml:"regular"`
+	Normal   []string `yaml:"normal"`
 	Security []string `yaml:"security"`
 }
