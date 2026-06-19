@@ -25,7 +25,7 @@ func TestLoadConfigFile(t *testing.T) {
 		assert.Equal(t, []string{"default"}, c.Sites)
 		assert.Equal(t, 30*time.Minute, c.Timeout)
 		assert.Equal(t, defaultRegularAddons, c.Addons.Regular)
-		assert.Equal(t, defaultSecurityAddons, c.Addons.Security)
+		assert.Empty(t, c.Addons.Security) // security is minimal by default
 	})
 
 	t.Run("partial file keeps defaults for absent keys", func(t *testing.T) {
@@ -33,7 +33,7 @@ func TestLoadConfigFile(t *testing.T) {
 		require.NoError(t, LoadConfigFile(writeConfig(t, "addons:\n  regular: [code_beautifier]\n"), &c))
 
 		assert.Equal(t, []string{"code_beautifier"}, c.Addons.Regular) // overridden
-		assert.Equal(t, defaultSecurityAddons, c.Addons.Security)      // default kept
+		assert.Empty(t, c.Addons.Security)                             // default kept (minimal)
 		assert.Equal(t, []string{"default"}, c.Sites)                  // default kept
 		assert.Equal(t, 30*time.Minute, c.Timeout)                     // default kept
 	})

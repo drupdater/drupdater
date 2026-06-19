@@ -127,18 +127,18 @@ func TestCreateAddons(t *testing.T) {
 		assert.Len(t, addons, 5)
 	})
 
-	t.Run("security mode uses the security list", func(t *testing.T) {
+	t.Run("security mode adds composer_audit even when not listed", func(t *testing.T) {
 		config := internal.Config{
 			Security: true,
 			Addons: internal.AddonsConfig{
 				Regular:  []string{"code_beautifier"},
-				Security: []string{"composer_audit"},
+				Security: []string{"code_beautifier"}, // composer_audit intentionally omitted
 			},
 		}
 		addons, err := createAddons(logger, config, nil, nil, nil, nil)
 		require.NoError(t, err)
-		// 4 mandatory + composer_audit
-		assert.Len(t, addons, 5)
+		// 4 mandatory + composer_audit + code_beautifier
+		assert.Len(t, addons, 6)
 	})
 
 	t.Run("a mandatory addon listed in the YAML is not duplicated", func(t *testing.T) {

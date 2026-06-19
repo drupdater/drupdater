@@ -185,18 +185,21 @@ addons:               # which configurable addons run in each mode
     - deprecations_remover   # drupal-rector deprecation removal
     - translations_updater
     - composer_normalizer
-  security:
-    - composer_audit
-    - code_beautifier
-    - deprecations_remover
-    - translations_updater
-    - composer_normalizer
+  security: []          # minimal by default: just the security fix, nothing else
 ```
 
-`--security` picks the `addons.security` list; otherwise `addons.regular` is used. To skip an
-addon (e.g. the code beautifier or rector), simply leave it out of the relevant list. These
-four addons always run and cannot be listed/disabled: `composer_allow_plugins`,
-`composer_patches`, `composer_diff`, `update_hooks`.
+`--security` picks the `addons.security` list; otherwise `addons.regular` is used. Security runs
+default to no extra addons so nothing interferes with the package update — add entries here only
+if you want code style, deprecation, or other changes applied during security updates too.
+
+Addons you can add to either list:
+
+| Addon | What it does |
+|-------|--------------|
+| `code_beautifier` | Runs `phpcbf` for PHP code style fixes. |
+| `deprecations_remover` | Runs `drupal-rector` to remove deprecated code. |
+| `translations_updater` | Updates Drupal interface translations. |
+| `composer_normalizer` | Normalizes `composer.json`. |
 
 ### Environment Variables
 

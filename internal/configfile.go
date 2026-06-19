@@ -8,23 +8,15 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Default addon lists (configurable addons only). These reproduce the historical behavior so
-// an absent .drupdater.yaml changes nothing. Mandatory addons always run regardless.
-var (
-	defaultRegularAddons = []string{
-		"code_beautifier",
-		"deprecations_remover",
-		"translations_updater",
-		"composer_normalizer",
-	}
-	defaultSecurityAddons = []string{
-		"composer_audit",
-		"code_beautifier",
-		"deprecations_remover",
-		"translations_updater",
-		"composer_normalizer",
-	}
-)
+// defaultRegularAddons is the configurable addon set that runs in a normal update. Security
+// mode defaults to none of these: it should be a minimal, focused security fix, with only the
+// mandatory addons and the (automatically added) composer_audit running.
+var defaultRegularAddons = []string{
+	"code_beautifier",
+	"deprecations_remover",
+	"translations_updater",
+	"composer_normalizer",
+}
 
 // fileConfig mirrors the YAML-settable keys of .drupdater.yaml. Timeout is a string because
 // yaml.v3 cannot decode a duration like "30m" into a time.Duration.
@@ -43,7 +35,7 @@ func defaultFileConfig() fileConfig {
 		Timeout: "30m",
 		Addons: AddonsConfig{
 			Regular:  defaultRegularAddons,
-			Security: defaultSecurityAddons,
+			Security: nil, // minimal by default; composer_audit is added automatically
 		},
 	}
 }

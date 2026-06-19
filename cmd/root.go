@@ -219,6 +219,12 @@ func createAddons(
 			return nil, err
 		}
 	}
+	// composer_audit is mandatory in security mode.
+	if config.Security {
+		if err := build("composer_audit"); err != nil {
+			return nil, err
+		}
+	}
 	for _, name := range names {
 		if err := build(name); err != nil {
 			return nil, err
