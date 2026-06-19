@@ -108,6 +108,24 @@ func (rs *GitRepositoryService) GetRemoteURL(path string) (string, error) {
 	return urls[0], nil
 }
 
+// GetCurrentBranch returns the short name of the branch HEAD points to in the checkout at
+// path, or "" if HEAD is detached (the usual state of a CI checkout). Callers fall back to
+// CI environment variables in that case.
+func (rs *GitRepositoryService) GetCurrentBranch(path string) (string, error) {
+	checkout, err := git.PlainOpen(path)
+	if err != nil {
+		return "", fmt.Errorf("git open %q: %w", path, err)
+	}
+	head, err := checkout.Head()
+	if err != nil {
+		return "", fmt.Errorf("failed to get HEAD: %w", err)
+	}
+	if head.Name().IsBranch() {
+		return head.Name().Short(), nil
+	}
+	return "", nil
+}
+
 // prepareCheckout sets the commit identity and removes the prepare-commit-msg hook, then
 // returns the repository, worktree and working-tree root. Shared by clone and open.
 func prepareCheckout(checkout *git.Repository, username string, email string) (Repository, Worktree, string, error) {

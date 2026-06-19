@@ -153,7 +153,7 @@ All flags are optional. Pass them after the required `<token>` argument.
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--branch` | `main` | Branch to update. |
+| `--branch` | `main` | Branch to update and target for the MR. Only used with `--clone`; in checkout mode the branch is taken from the checkout (or the CI branch variable when in detached HEAD). |
 | `--working-dir` | `.` | Path to the existing checkout to update in place. |
 | `--clone` | `false` | Clone the repository instead of using the existing checkout. Requires `--repository-url`. Intended for local testing. |
 | `--repository-url` | _(from `origin`)_ | Repository URL. Required with `--clone`; otherwise derived from the checkout's `origin` remote. |

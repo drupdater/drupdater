@@ -75,7 +75,7 @@ Events fired during the workflow: `PreComposerUpdateEvent`, `PostComposerUpdateE
 
 | Flag | Default | Effect |
 |------|---------|--------|
-| `--branch` | `main` | Target branch to update from |
+| `--branch` | `main` | Branch to update/MR target; only used with `--clone` (checkout mode reads it from the checkout or CI branch var) |
 | `--working-dir` | `.` | Existing checkout to update in place |
 | `--clone` | false | Clone instead of using the checkout (needs `--repository-url`); for testing |
 | `--repository-url` | _(from `origin`)_ | Repo URL; required with `--clone`, else read from `origin` |

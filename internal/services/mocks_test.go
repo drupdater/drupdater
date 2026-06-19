@@ -728,6 +728,66 @@ func (_c *MockRepository_CloneRepository_Call) RunAndReturn(run func(repository 
 	return _c
 }
 
+// GetCurrentBranch provides a mock function for the type MockRepository
+func (_mock *MockRepository) GetCurrentBranch(path string) (string, error) {
+	ret := _mock.Called(path)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetCurrentBranch")
+	}
+
+	var r0 string
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(string) (string, error)); ok {
+		return returnFunc(path)
+	}
+	if returnFunc, ok := ret.Get(0).(func(string) string); ok {
+		r0 = returnFunc(path)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	if returnFunc, ok := ret.Get(1).(func(string) error); ok {
+		r1 = returnFunc(path)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRepository_GetCurrentBranch_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetCurrentBranch'
+type MockRepository_GetCurrentBranch_Call struct {
+	*mock.Call
+}
+
+// GetCurrentBranch is a helper method to define mock.On call
+//   - path string
+func (_e *MockRepository_Expecter) GetCurrentBranch(path any) *MockRepository_GetCurrentBranch_Call {
+	return &MockRepository_GetCurrentBranch_Call{Call: _e.mock.On("GetCurrentBranch", path)}
+}
+
+func (_c *MockRepository_GetCurrentBranch_Call) Run(run func(path string)) *MockRepository_GetCurrentBranch_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_GetCurrentBranch_Call) Return(s string, err error) *MockRepository_GetCurrentBranch_Call {
+	_c.Call.Return(s, err)
+	return _c
+}
+
+func (_c *MockRepository_GetCurrentBranch_Call) RunAndReturn(run func(path string) (string, error)) *MockRepository_GetCurrentBranch_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetRemoteURL provides a mock function for the type MockRepository
 func (_mock *MockRepository) GetRemoteURL(path string) (string, error) {
 	ret := _mock.Called(path)

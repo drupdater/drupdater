@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -70,15 +71,23 @@ var rootCmd = &cobra.Command{
 		installer := drupal.NewInstaller(logger, drush, composer)
 		git := repo.NewGitRepositoryService(logger)
 
-		// In checkout mode the repository URL is read from the checkout's origin remote,
-		// so it doesn't have to be passed in. It's only needed for GitHub/GitLab detection.
-		if config.RepositoryURL == "" {
-			remoteURL, err := git.GetRemoteURL(config.WorkingDir)
-			if err != nil {
-				return fmt.Errorf("failed to determine repository URL from checkout (pass --repository-url or run inside a checkout): %w", err)
+		// In checkout mode the repository URL and target branch come from the checkout, so
+		// they don't have to be passed in. --branch only applies to --clone.
+		if !config.Clone {
+			if config.RepositoryURL == "" {
+				remoteURL, err := git.GetRemoteURL(config.WorkingDir)
+				if err != nil {
+					return fmt.Errorf("failed to determine repository URL from checkout (pass --repository-url or run inside a checkout): %w", err)
+				}
+				config.RepositoryURL = remoteURL
 			}
-			config.RepositoryURL = remoteURL
-			logger.Info("using repository from checkout", zap.String("url", config.RepositoryURL))
+
+			branch, err := resolveCheckoutBranch(git, config.WorkingDir)
+			if err != nil {
+				return err
+			}
+			config.Branch = branch
+			logger.Info("using checkout", zap.String("url", config.RepositoryURL), zap.String("branch", config.Branch))
 		}
 
 		vcsProviderFactory := codehosting.NewDefaultVcsProviderFactory()
@@ -101,6 +110,23 @@ var rootCmd = &cobra.Command{
 		}
 		return nil
 	},
+}
+
+// resolveCheckoutBranch determines the MR target branch for checkout mode: the checkout's
+// current branch, or — when it's in detached HEAD (the usual CI state) — the branch reported
+// by the CI environment.
+func resolveCheckoutBranch(git *repo.GitRepositoryService, workingDir string) (string, error) {
+	branch, err := git.GetCurrentBranch(workingDir)
+	if err != nil {
+		return "", fmt.Errorf("failed to determine branch from checkout: %w", err)
+	}
+	if branch == "" {
+		branch = cmp.Or(os.Getenv("GITHUB_REF_NAME"), os.Getenv("CI_COMMIT_REF_NAME"))
+	}
+	if branch == "" {
+		return "", errors.New("could not determine the target branch: the checkout is in detached HEAD and no CI branch variable (GITHUB_REF_NAME, CI_COMMIT_REF_NAME) is set")
+	}
+	return branch, nil
 }
 
 // createAddons creates and returns the list of addons to be used based on the configuration
@@ -160,7 +186,7 @@ func handleWorkflowError(logger *zap.Logger, err error) error {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&config.Branch, "branch", "main", "Branch")
+	rootCmd.PersistentFlags().StringVar(&config.Branch, "branch", "main", "Branch to update and target for the MR. Only used with --clone; in checkout mode it's taken from the checkout (or CI branch variable).")
 	rootCmd.PersistentFlags().StringVar(&config.WorkingDir, "working-dir", ".", "Path to the existing checkout to update in place.")
 	rootCmd.PersistentFlags().BoolVar(&config.Clone, "clone", false, "Clone the repository instead of using the existing checkout. Requires --repository-url. Intended for local testing.")
 	rootCmd.PersistentFlags().StringVar(&config.RepositoryURL, "repository-url", "", "Repository URL. Required with --clone; otherwise derived from the checkout's origin remote.")

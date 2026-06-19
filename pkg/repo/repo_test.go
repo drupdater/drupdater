@@ -7,6 +7,7 @@ import (
 	git "github.com/go-git/go-git/v5"
 	gitConfig "github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/storer"
 
 	"github.com/stretchr/testify/assert"
@@ -215,5 +216,50 @@ func TestGetRemoteURL(t *testing.T) {
 
 		_, err = service.GetRemoteURL(dir)
 		require.Error(t, err)
+	})
+}
+
+func TestGetCurrentBranch(t *testing.T) {
+	logger := zap.NewNop()
+	service := NewGitRepositoryService(logger)
+
+	t.Run("returns the branch HEAD points to", func(t *testing.T) {
+		dir := t.TempDir()
+		r, err := git.PlainInit(dir, false)
+		require.NoError(t, err)
+
+		// Commit once so HEAD resolves to a branch.
+		wt, err := r.Worktree()
+		require.NoError(t, err)
+		_, err = wt.Commit("init", &git.CommitOptions{
+			AllowEmptyCommits: true,
+			Author:            &object.Signature{Name: "t", Email: "t@example.com"},
+		})
+		require.NoError(t, err)
+
+		branch, err := service.GetCurrentBranch(dir)
+		require.NoError(t, err)
+		assert.Equal(t, "master", branch)
+	})
+
+	t.Run("returns empty string in detached HEAD", func(t *testing.T) {
+		dir := t.TempDir()
+		r, err := git.PlainInit(dir, false)
+		require.NoError(t, err)
+
+		wt, err := r.Worktree()
+		require.NoError(t, err)
+		hash, err := wt.Commit("init", &git.CommitOptions{
+			AllowEmptyCommits: true,
+			Author:            &object.Signature{Name: "t", Email: "t@example.com"},
+		})
+		require.NoError(t, err)
+
+		// Detach HEAD at the commit.
+		require.NoError(t, wt.Checkout(&git.CheckoutOptions{Hash: hash}))
+
+		branch, err := service.GetCurrentBranch(dir)
+		require.NoError(t, err)
+		assert.Equal(t, "", branch)
 	})
 }
