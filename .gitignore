@@ -1,4 +1,5 @@
-.claude
+.claude/settings.local.json
+.claude/worktrees
 .idea
 
 graphify-out/cost.json        # local only

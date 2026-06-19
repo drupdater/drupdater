@@ -2,7 +2,7 @@
 
 # Variables
 BINARY_NAME=drupdater
-DOCKER_IMAGE=ghcr.io/drupdater/drupdater-php8.3
+DOCKER_IMAGE=drupdater-local
 VERSION=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 LDFLAGS=-ldflags "-X main.version=${VERSION}"
 
@@ -40,7 +40,7 @@ run: ## Run the application (requires REPO and TOKEN args)
 		echo "Usage: make run REPO=<repository_url> TOKEN=<your_token> [OPTIONS=--flag1 --flag2]"; \
 		exit 1; \
 	fi
-	go run ${LDFLAGS} main.go $(TOKEN) --clone --repository-url $(REPO) $(OPTIONS)
+	@go run ${LDFLAGS} main.go $(TOKEN) --clone --repository-url $(REPO) $(OPTIONS)
 
 docker-build: ## Build Docker image
 	docker build -t ${DOCKER_IMAGE}:latest .
@@ -51,7 +51,7 @@ docker-run: ## Run Docker image (requires REPO and TOKEN args)
 		echo "Usage: make docker-run REPO=<repository_url> TOKEN=<your_token> [OPTIONS=--flag1 --flag2]"; \
 		exit 1; \
 	fi
-	docker run ${DOCKER_IMAGE}:latest $(TOKEN) --clone --repository-url $(REPO) $(OPTIONS)
+	@docker run ${DOCKER_IMAGE}:latest $(TOKEN) --clone --repository-url $(REPO) $(OPTIONS)
 
 update: ## Update dependencies
 	go get -u ./...

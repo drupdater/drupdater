@@ -72,7 +72,7 @@
       "source_file": "cmd/root_test.go",
       "source_location": "L1",
       "id": "cmd_root_test_go",
-      "community": 14,
+      "community": 21,
       "norm_label": "root_test.go"
     },
     {
@@ -81,7 +81,7 @@
       "source_file": "cmd/root_test.go",
       "source_location": "L21",
       "id": "cmd_root_test_testnewlogger",
-      "community": 14,
+      "community": 21,
       "norm_label": "testnewlogger()"
     },
     {
@@ -90,7 +90,7 @@
       "source_file": "cmd/root_test.go",
       "source_location": "L52",
       "id": "cmd_root_test_testnewcache",
-      "community": 14,
+      "community": 21,
       "norm_label": "testnewcache()"
     },
     {
@@ -99,7 +99,7 @@
       "source_file": "cmd/root_test.go",
       "source_location": "L67",
       "id": "cmd_root_test_testhandleworkflowerror",
-      "community": 14,
+      "community": 21,
       "norm_label": "testhandleworkflowerror()"
     },
     {
@@ -108,7 +108,7 @@
       "source_file": "cmd/root_test.go",
       "source_location": "L101",
       "id": "cmd_root_test_testcreatedispatcher",
-      "community": 14,
+      "community": 27,
       "norm_label": "testcreatedispatcher()"
     },
     {
@@ -117,7 +117,7 @@
       "source_file": "cmd/root_test.go",
       "source_location": "L118",
       "id": "cmd_root_test_testcreateaddons",
-      "community": 14,
+      "community": 27,
       "norm_label": "testcreateaddons()"
     },
     {
@@ -126,7 +126,7 @@
       "source_file": "cmd/root_test.go",
       "source_location": "L159",
       "id": "cmd_root_test_testvalidateaddons",
-      "community": 14,
+      "community": 21,
       "norm_label": "testvalidateaddons()"
     },
     {
@@ -135,7 +135,7 @@
       "source_file": "cmd/root_test.go",
       "source_location": "L182",
       "id": "cmd_root_test_testconfigurableaddons",
-      "community": 14,
+      "community": 21,
       "norm_label": "testconfigurableaddons()"
     },
     {
@@ -144,7 +144,7 @@
       "source_file": "cmd/root_test.go",
       "source_location": "L198",
       "id": "cmd_root_test_testaddonscommand",
-      "community": 14,
+      "community": 21,
       "norm_label": "testaddonscommand()"
     },
     {
@@ -153,7 +153,7 @@
       "source_file": "cmd/root_test.go",
       "source_location": "L210",
       "id": "cmd_root_test_testresolvecheckoutbranch",
-      "community": 14,
+      "community": 21,
       "norm_label": "testresolvecheckoutbranch()"
     },
     {
@@ -162,7 +162,7 @@
       "source_file": "cmd/root.go",
       "source_location": "L1",
       "id": "cmd_root_go",
-      "community": 14,
+      "community": 21,
       "norm_label": "root.go"
     },
     {
@@ -171,7 +171,7 @@
       "source_file": "cmd/root.go",
       "source_location": "L164",
       "id": "cmd_root_resolvecheckoutbranch",
-      "community": 14,
+      "community": 21,
       "norm_label": "resolvecheckoutbranch()"
     },
     {
@@ -180,7 +180,7 @@
       "source_file": "cmd/root.go",
       "source_location": "L179",
       "id": "cmd_addondeps",
-      "community": 14,
+      "community": 21,
       "norm_label": "addondeps"
     },
     {
@@ -189,7 +189,7 @@
       "source_file": "cmd/root.go",
       "source_location": "L212",
       "id": "cmd_root_createaddons",
-      "community": 14,
+      "community": 27,
       "norm_label": "createaddons()"
     },
     {
@@ -198,7 +198,7 @@
       "source_file": "cmd/root.go",
       "source_location": "L264",
       "id": "cmd_root_validateaddons",
-      "community": 14,
+      "community": 21,
       "norm_label": "validateaddons()"
     },
     {
@@ -207,7 +207,7 @@
       "source_file": "cmd/root.go",
       "source_location": "L276",
       "id": "cmd_root_configurableaddons",
-      "community": 14,
+      "community": 21,
       "norm_label": "configurableaddons()"
     },
     {
@@ -216,7 +216,7 @@
       "source_file": "cmd/root.go",
       "source_location": "L305",
       "id": "cmd_root_createdispatcher",
-      "community": 14,
+      "community": 27,
       "norm_label": "createdispatcher()"
     },
     {
@@ -225,7 +225,7 @@
       "source_file": "cmd/root.go",
       "source_location": "L314",
       "id": "cmd_root_handleworkflowerror",
-      "community": 14,
+      "community": 21,
       "norm_label": "handleworkflowerror()"
     },
     {
@@ -234,7 +234,7 @@
       "source_file": "cmd/root.go",
       "source_location": "L323",
       "id": "cmd_root_init",
-      "community": 14,
+      "community": 21,
       "norm_label": "init()"
     },
     {
@@ -252,7 +252,7 @@
       "source_file": "cmd/root.go",
       "source_location": "L346",
       "id": "cmd_root_newcache",
-      "community": 14,
+      "community": 21,
       "norm_label": "newcache()"
     },
     {
@@ -261,7 +261,7 @@
       "source_file": "cmd/root.go",
       "source_location": "L351",
       "id": "cmd_root_newlogger",
-      "community": 26,
+      "community": 27,
       "norm_label": "newlogger()"
     },
     {
@@ -270,7 +270,7 @@
       "source_file": "internal/config.go",
       "source_location": "L1",
       "id": "internal_config_go",
-      "community": 99,
+      "community": 98,
       "norm_label": "config.go"
     },
     {
@@ -279,7 +279,7 @@
       "source_file": "internal/config.go",
       "source_location": "L5",
       "id": "internal_config",
-      "community": 99,
+      "community": 98,
       "norm_label": "config"
     },
     {
@@ -288,7 +288,7 @@
       "source_file": "internal/config.go",
       "source_location": "L22",
       "id": "internal_addonsconfig",
-      "community": 99,
+      "community": 98,
       "norm_label": "addonsconfig"
     },
     {
@@ -333,7 +333,7 @@
       "source_file": "internal/configfile.go",
       "source_location": "L1",
       "id": "internal_configfile_go",
-      "community": 33,
+      "community": 34,
       "norm_label": "configfile.go"
     },
     {
@@ -342,7 +342,7 @@
       "source_file": "internal/configfile.go",
       "source_location": "L24",
       "id": "internal_fileconfig",
-      "community": 33,
+      "community": 34,
       "norm_label": "fileconfig"
     },
     {
@@ -351,7 +351,7 @@
       "source_file": "internal/configfile.go",
       "source_location": "L33",
       "id": "internal_configfile_defaultfileconfig",
-      "community": 33,
+      "community": 34,
       "norm_label": "defaultfileconfig()"
     },
     {
@@ -360,7 +360,7 @@
       "source_file": "internal/configfile.go",
       "source_location": "L47",
       "id": "internal_configfile_loadconfigfile",
-      "community": 33,
+      "community": 34,
       "norm_label": "loadconfigfile()"
     },
     {
@@ -369,7 +369,7 @@
       "source_file": "internal/configfile.go",
       "source_location": "L70",
       "id": "internal_configfile_applyfileconfig",
-      "community": 33,
+      "community": 34,
       "norm_label": "applyfileconfig()"
     },
     {
@@ -378,7 +378,7 @@
       "source_file": "internal/configfile_test.go",
       "source_location": "L1",
       "id": "internal_configfile_test_go",
-      "community": 33,
+      "community": 34,
       "norm_label": "configfile_test.go"
     },
     {
@@ -387,7 +387,7 @@
       "source_file": "internal/configfile_test.go",
       "source_location": "L13",
       "id": "internal_configfile_test_writeconfig",
-      "community": 33,
+      "community": 34,
       "norm_label": "writeconfig()"
     },
     {
@@ -396,7 +396,7 @@
       "source_file": "internal/configfile_test.go",
       "source_location": "L20",
       "id": "internal_configfile_test_testloadconfigfile",
-      "community": 33,
+      "community": 34,
       "norm_label": "testloadconfigfile()"
     },
     {
@@ -405,7 +405,7 @@
       "source_file": "internal/mocks_test.go",
       "source_location": "L1",
       "id": "internal_mocks_test_go",
-      "community": 19,
+      "community": 18,
       "norm_label": "mocks_test.go"
     },
     {
@@ -414,7 +414,7 @@
       "source_file": "internal/mocks_test.go",
       "source_location": "L13",
       "id": "internal_mocks_test_newmockaddon",
-      "community": 19,
+      "community": 18,
       "norm_label": "newmockaddon()"
     },
     {
@@ -423,7 +423,7 @@
       "source_file": "internal/mocks_test.go",
       "source_location": "L26",
       "id": "internal_mockaddon",
-      "community": 19,
+      "community": 18,
       "norm_label": "mockaddon"
     },
     {
@@ -432,7 +432,7 @@
       "source_file": "internal/mocks_test.go",
       "source_location": "L30",
       "id": "internal_mockaddon_expecter",
-      "community": 19,
+      "community": 18,
       "norm_label": "mockaddon_expecter"
     },
     {
@@ -441,7 +441,7 @@
       "source_file": "internal/mocks_test.go",
       "source_location": "L34",
       "id": "internal_mockaddon_expect",
-      "community": 19,
+      "community": 18,
       "norm_label": ".expect()"
     },
     {
@@ -450,7 +450,7 @@
       "source_file": "internal/mocks_test.go",
       "source_location": "L39",
       "id": "internal_mockaddon_rendertemplate",
-      "community": 19,
+      "community": 18,
       "norm_label": ".rendertemplate()"
     },
     {
@@ -459,7 +459,7 @@
       "source_file": "internal/mocks_test.go",
       "source_location": "L65",
       "id": "internal_mockaddon_rendertemplate_call",
-      "community": 19,
+      "community": 18,
       "norm_label": "mockaddon_rendertemplate_call"
     },
     {
@@ -468,7 +468,7 @@
       "source_file": "internal/mocks_test.go",
       "source_location": "L70",
       "id": "internal_mockaddon_expecter_rendertemplate",
-      "community": 19,
+      "community": 18,
       "norm_label": ".rendertemplate()"
     },
     {
@@ -477,7 +477,7 @@
       "source_file": "internal/mocks_test.go",
       "source_location": "L74",
       "id": "internal_mockaddon_rendertemplate_call_run",
-      "community": 19,
+      "community": 18,
       "norm_label": ".run()"
     },
     {
@@ -486,7 +486,7 @@
       "source_file": "internal/mocks_test.go",
       "source_location": "L81",
       "id": "internal_mockaddon_rendertemplate_call_return",
-      "community": 19,
+      "community": 18,
       "norm_label": ".return()"
     },
     {
@@ -495,7 +495,7 @@
       "source_file": "internal/mocks_test.go",
       "source_location": "L86",
       "id": "internal_mockaddon_rendertemplate_call_runandreturn",
-      "community": 19,
+      "community": 18,
       "norm_label": ".runandreturn()"
     },
     {
@@ -504,7 +504,7 @@
       "source_file": "internal/mocks_test.go",
       "source_location": "L92",
       "id": "internal_mockaddon_subscribedevents",
-      "community": 19,
+      "community": 18,
       "norm_label": ".subscribedevents()"
     },
     {
@@ -513,7 +513,7 @@
       "source_file": "internal/mocks_test.go",
       "source_location": "L111",
       "id": "internal_mockaddon_subscribedevents_call",
-      "community": 19,
+      "community": 18,
       "norm_label": "mockaddon_subscribedevents_call"
     },
     {
@@ -522,7 +522,7 @@
       "source_file": "internal/mocks_test.go",
       "source_location": "L116",
       "id": "internal_mockaddon_expecter_subscribedevents",
-      "community": 19,
+      "community": 18,
       "norm_label": ".subscribedevents()"
     },
     {
@@ -531,7 +531,7 @@
       "source_file": "internal/mocks_test.go",
       "source_location": "L120",
       "id": "internal_mockaddon_subscribedevents_call_run",
-      "community": 19,
+      "community": 18,
       "norm_label": ".run()"
     },
     {
@@ -540,7 +540,7 @@
       "source_file": "internal/mocks_test.go",
       "source_location": "L127",
       "id": "internal_mockaddon_subscribedevents_call_return",
-      "community": 19,
+      "community": 18,
       "norm_label": ".return()"
     },
     {
@@ -549,7 +549,7 @@
       "source_file": "internal/mocks_test.go",
       "source_location": "L132",
       "id": "internal_mockaddon_subscribedevents_call_runandreturn",
-      "community": 19,
+      "community": 18,
       "norm_label": ".runandreturn()"
     },
     {
@@ -774,7 +774,7 @@
       "source_file": "internal/codehosting/mocks_test.go",
       "source_location": "L1",
       "id": "internal_codehosting_mocks_test_go",
-      "community": 20,
+      "community": 19,
       "norm_label": "mocks_test.go"
     },
     {
@@ -783,7 +783,7 @@
       "source_file": "internal/codehosting/mocks_test.go",
       "source_location": "L15",
       "id": "codehosting_mocks_test_newmockplatform",
-      "community": 20,
+      "community": 19,
       "norm_label": "newmockplatform()"
     },
     {
@@ -792,7 +792,7 @@
       "source_file": "internal/codehosting/mocks_test.go",
       "source_location": "L28",
       "id": "codehosting_mockplatform",
-      "community": 20,
+      "community": 19,
       "norm_label": "mockplatform"
     },
     {
@@ -801,7 +801,7 @@
       "source_file": "internal/codehosting/mocks_test.go",
       "source_location": "L32",
       "id": "codehosting_mockplatform_expecter",
-      "community": 20,
+      "community": 19,
       "norm_label": "mockplatform_expecter"
     },
     {
@@ -810,7 +810,7 @@
       "source_file": "internal/codehosting/mocks_test.go",
       "source_location": "L36",
       "id": "codehosting_mockplatform_expect",
-      "community": 20,
+      "community": 19,
       "norm_label": ".expect()"
     },
     {
@@ -819,7 +819,7 @@
       "source_file": "internal/codehosting/mocks_test.go",
       "source_location": "L41",
       "id": "codehosting_mockplatform_createmergerequest",
-      "community": 20,
+      "community": 19,
       "norm_label": ".createmergerequest()"
     },
     {
@@ -828,7 +828,7 @@
       "source_file": "internal/codehosting/mocks_test.go",
       "source_location": "L67",
       "id": "codehosting_mockplatform_createmergerequest_call",
-      "community": 20,
+      "community": 19,
       "norm_label": "mockplatform_createmergerequest_call"
     },
     {
@@ -837,7 +837,7 @@
       "source_file": "internal/codehosting/mocks_test.go",
       "source_location": "L77",
       "id": "codehosting_mockplatform_expecter_createmergerequest",
-      "community": 20,
+      "community": 19,
       "norm_label": ".createmergerequest()"
     },
     {
@@ -846,7 +846,7 @@
       "source_file": "internal/codehosting/mocks_test.go",
       "source_location": "L81",
       "id": "codehosting_mockplatform_createmergerequest_call_run",
-      "community": 20,
+      "community": 19,
       "norm_label": ".run()"
     },
     {
@@ -855,7 +855,7 @@
       "source_file": "internal/codehosting/mocks_test.go",
       "source_location": "L114",
       "id": "codehosting_mockplatform_createmergerequest_call_return",
-      "community": 20,
+      "community": 19,
       "norm_label": ".return()"
     },
     {
@@ -864,7 +864,7 @@
       "source_file": "internal/codehosting/mocks_test.go",
       "source_location": "L119",
       "id": "codehosting_mockplatform_createmergerequest_call_runandreturn",
-      "community": 20,
+      "community": 19,
       "norm_label": ".runandreturn()"
     },
     {
@@ -873,7 +873,7 @@
       "source_file": "internal/codehosting/mocks_test.go",
       "source_location": "L125",
       "id": "codehosting_mockplatform_getuser",
-      "community": 20,
+      "community": 19,
       "norm_label": ".getuser()"
     },
     {
@@ -882,7 +882,7 @@
       "source_file": "internal/codehosting/mocks_test.go",
       "source_location": "L151",
       "id": "codehosting_mockplatform_getuser_call",
-      "community": 20,
+      "community": 19,
       "norm_label": "mockplatform_getuser_call"
     },
     {
@@ -891,7 +891,7 @@
       "source_file": "internal/codehosting/mocks_test.go",
       "source_location": "L157",
       "id": "codehosting_mockplatform_expecter_getuser",
-      "community": 20,
+      "community": 19,
       "norm_label": ".getuser()"
     },
     {
@@ -900,7 +900,7 @@
       "source_file": "internal/codehosting/mocks_test.go",
       "source_location": "L161",
       "id": "codehosting_mockplatform_getuser_call_run",
-      "community": 20,
+      "community": 19,
       "norm_label": ".run()"
     },
     {
@@ -909,7 +909,7 @@
       "source_file": "internal/codehosting/mocks_test.go",
       "source_location": "L174",
       "id": "codehosting_mockplatform_getuser_call_return",
-      "community": 20,
+      "community": 19,
       "norm_label": ".return()"
     },
     {
@@ -918,7 +918,7 @@
       "source_file": "internal/codehosting/mocks_test.go",
       "source_location": "L179",
       "id": "codehosting_mockplatform_getuser_call_runandreturn",
-      "community": 20,
+      "community": 19,
       "norm_label": ".runandreturn()"
     },
     {
@@ -1305,7 +1305,7 @@
       "source_file": "internal/addon/interfaces.go",
       "source_location": "L1",
       "id": "internal_addon_interfaces_go",
-      "community": 34,
+      "community": 35,
       "norm_label": "interfaces.go"
     },
     {
@@ -1314,7 +1314,7 @@
       "source_file": "internal/addon/interfaces.go",
       "source_location": "L15",
       "id": "addon_composer",
-      "community": 34,
+      "community": 35,
       "norm_label": "composer"
     },
     {
@@ -1323,7 +1323,7 @@
       "source_file": "internal/addon/interfaces.go",
       "source_location": "L38",
       "id": "addon_drush",
-      "community": 34,
+      "community": 35,
       "norm_label": "drush"
     },
     {
@@ -1332,7 +1332,7 @@
       "source_file": "internal/addon/interfaces.go",
       "source_location": "L45",
       "id": "addon_phpcs",
-      "community": 34,
+      "community": 35,
       "norm_label": "phpcs"
     },
     {
@@ -1341,7 +1341,7 @@
       "source_file": "internal/addon/interfaces.go",
       "source_location": "L50",
       "id": "addon_repository",
-      "community": 34,
+      "community": 35,
       "norm_label": "repository"
     },
     {
@@ -1350,7 +1350,7 @@
       "source_file": "internal/addon/interfaces.go",
       "source_location": "L54",
       "id": "addon_drupalorg",
-      "community": 34,
+      "community": 35,
       "norm_label": "drupalorg"
     },
     {
@@ -1359,7 +1359,7 @@
       "source_file": "internal/addon/interfaces.go",
       "source_location": "L59",
       "id": "addon_rector",
-      "community": 34,
+      "community": 35,
       "norm_label": "rector"
     },
     {
@@ -1368,7 +1368,7 @@
       "source_file": "internal/addon/interfaces.go",
       "source_location": "L66",
       "id": "addon_httpclient",
-      "community": 34,
+      "community": 35,
       "norm_label": "httpclient"
     },
     {
@@ -1377,7 +1377,7 @@
       "source_file": "internal/addon/update_hooks.go",
       "source_location": "L1",
       "id": "internal_addon_update_hooks_go",
-      "community": 21,
+      "community": 20,
       "norm_label": "update_hooks.go"
     },
     {
@@ -1386,7 +1386,7 @@
       "source_file": "internal/addon/update_hooks.go",
       "source_location": "L14",
       "id": "addon_updatehookspersite",
-      "community": 21,
+      "community": 20,
       "norm_label": "updatehookspersite"
     },
     {
@@ -1395,7 +1395,7 @@
       "source_file": "internal/addon/update_hooks.go",
       "source_location": "L17",
       "id": "addon_updatehooks",
-      "community": 21,
+      "community": 20,
       "norm_label": "updatehooks"
     },
     {
@@ -1404,7 +1404,7 @@
       "source_file": "internal/addon/update_hooks.go",
       "source_location": "L26",
       "id": "addon_update_hooks_newupdatehooks",
-      "community": 21,
+      "community": 20,
       "norm_label": "newupdatehooks()"
     },
     {
@@ -1413,7 +1413,7 @@
       "source_file": "internal/addon/update_hooks.go",
       "source_location": "L35",
       "id": "addon_updatehooks_subscribedevents",
-      "community": 21,
+      "community": 20,
       "norm_label": ".subscribedevents()"
     },
     {
@@ -1422,7 +1422,7 @@
       "source_file": "internal/addon/update_hooks.go",
       "source_location": "L45",
       "id": "addon_updatehooks_rendertemplate",
-      "community": 21,
+      "community": 20,
       "norm_label": ".rendertemplate()"
     },
     {
@@ -1431,7 +1431,7 @@
       "source_file": "internal/addon/update_hooks.go",
       "source_location": "L52",
       "id": "addon_updatehooks_presiteupdatehandler",
-      "community": 21,
+      "community": 20,
       "norm_label": ".presiteupdatehandler()"
     },
     {
@@ -1485,7 +1485,7 @@
       "source_file": "internal/addon/code_beautifier_test.go",
       "source_location": "L1",
       "id": "internal_addon_code_beautifier_test_go",
-      "community": 30,
+      "community": 31,
       "norm_label": "code_beautifier_test.go"
     },
     {
@@ -1494,7 +1494,7 @@
       "source_file": "internal/addon/code_beautifier_test.go",
       "source_location": "L21",
       "id": "addon_code_beautifier_test_testcodebeautifier_subscribedevents",
-      "community": 30,
+      "community": 31,
       "norm_label": "testcodebeautifier_subscribedevents()"
     },
     {
@@ -1503,7 +1503,7 @@
       "source_file": "internal/addon/code_beautifier_test.go",
       "source_location": "L30",
       "id": "addon_code_beautifier_test_testcodebeautifier_rendertemplate",
-      "community": 30,
+      "community": 31,
       "norm_label": "testcodebeautifier_rendertemplate()"
     },
     {
@@ -1512,7 +1512,7 @@
       "source_file": "internal/addon/code_beautifier_test.go",
       "source_location": "L37",
       "id": "addon_code_beautifier_test_testcreatephpcsconfig",
-      "community": 30,
+      "community": 31,
       "norm_label": "testcreatephpcsconfig()"
     },
     {
@@ -1521,7 +1521,7 @@
       "source_file": "internal/addon/code_beautifier_test.go",
       "source_location": "L180",
       "id": "addon_code_beautifier_test_testhasphpcspathdefinitions",
-      "community": 30,
+      "community": 31,
       "norm_label": "testhasphpcspathdefinitions()"
     },
     {
@@ -1530,7 +1530,7 @@
       "source_file": "internal/addon/code_beautifier_test.go",
       "source_location": "L267",
       "id": "addon_code_beautifier_test_testcodingstyles",
-      "community": 30,
+      "community": 31,
       "norm_label": "testcodingstyles()"
     },
     {
@@ -1791,7 +1791,7 @@
       "source_file": "internal/addon/composer_audit.go",
       "source_location": "L1",
       "id": "internal_addon_composer_audit_go",
-      "community": 31,
+      "community": 32,
       "norm_label": "composer_audit.go"
     },
     {
@@ -1800,7 +1800,7 @@
       "source_file": "internal/addon/composer_audit.go",
       "source_location": "L17",
       "id": "addon_securityreport",
-      "community": 31,
+      "community": 32,
       "norm_label": "securityreport"
     },
     {
@@ -1809,7 +1809,7 @@
       "source_file": "internal/addon/composer_audit.go",
       "source_location": "L23",
       "id": "addon_composeraudit",
-      "community": 31,
+      "community": 32,
       "norm_label": "composeraudit"
     },
     {
@@ -1827,7 +1827,7 @@
       "source_file": "internal/addon/composer_audit.go",
       "source_location": "L43",
       "id": "addon_composeraudit_subscribedevents",
-      "community": 31,
+      "community": 32,
       "norm_label": ".subscribedevents()"
     },
     {
@@ -1836,7 +1836,7 @@
       "source_file": "internal/addon/composer_audit.go",
       "source_location": "L61",
       "id": "addon_composeraudit_rendertemplate",
-      "community": 31,
+      "community": 32,
       "norm_label": ".rendertemplate()"
     },
     {
@@ -1845,7 +1845,7 @@
       "source_file": "internal/addon/composer_audit.go",
       "source_location": "L68",
       "id": "addon_composeraudit_precomposerupdatehandler",
-      "community": 31,
+      "community": 32,
       "norm_label": ".precomposerupdatehandler()"
     },
     {
@@ -1854,7 +1854,7 @@
       "source_file": "internal/addon/composer_audit.go",
       "source_location": "L100",
       "id": "addon_composeraudit_postcodeupdatehandler",
-      "community": 31,
+      "community": 32,
       "norm_label": ".postcodeupdatehandler()"
     },
     {
@@ -1863,7 +1863,7 @@
       "source_file": "internal/addon/composer_audit.go",
       "source_location": "L118",
       "id": "addon_composeraudit_getfixedadvisories",
-      "community": 31,
+      "community": 32,
       "norm_label": ".getfixedadvisories()"
     },
     {
@@ -1872,7 +1872,7 @@
       "source_file": "internal/addon/composer_audit.go",
       "source_location": "L136",
       "id": "addon_composeraudit_premergerequestcreatehandler",
-      "community": 31,
+      "community": 32,
       "norm_label": ".premergerequestcreatehandler()"
     },
     {
@@ -1935,7 +1935,7 @@
       "source_file": "internal/addon/code_beautifier.go",
       "source_location": "L1",
       "id": "internal_addon_code_beautifier_go",
-      "community": 30,
+      "community": 31,
       "norm_label": "code_beautifier.go"
     },
     {
@@ -1953,7 +1953,7 @@
       "source_file": "internal/addon/code_beautifier.go",
       "source_location": "L29",
       "id": "addon_code_beautifier_newcodebeautifier",
-      "community": 30,
+      "community": 31,
       "norm_label": "newcodebeautifier()"
     },
     {
@@ -1980,7 +1980,7 @@
       "source_file": "internal/addon/code_beautifier.go",
       "source_location": "L63",
       "id": "addon_phpcsruleset",
-      "community": 30,
+      "community": 31,
       "norm_label": "phpcsruleset"
     },
     {
@@ -2151,7 +2151,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1",
       "id": "internal_addon_mocks_test_go",
-      "community": 8,
+      "community": 10,
       "norm_label": "mocks_test.go"
     },
     {
@@ -2160,7 +2160,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L24",
       "id": "addon_mocks_test_newmockcomposer",
-      "community": 8,
+      "community": 10,
       "norm_label": "newmockcomposer()"
     },
     {
@@ -2169,7 +2169,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L37",
       "id": "addon_mockcomposer",
-      "community": 13,
+      "community": 14,
       "norm_label": "mockcomposer"
     },
     {
@@ -2187,7 +2187,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L45",
       "id": "addon_mockcomposer_expect",
-      "community": 13,
+      "community": 14,
       "norm_label": ".expect()"
     },
     {
@@ -2196,7 +2196,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L50",
       "id": "addon_mockcomposer_audit",
-      "community": 13,
+      "community": 14,
       "norm_label": ".audit()"
     },
     {
@@ -2205,7 +2205,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L76",
       "id": "addon_mockcomposer_audit_call",
-      "community": 64,
+      "community": 23,
       "norm_label": "mockcomposer_audit_call"
     },
     {
@@ -2223,7 +2223,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L87",
       "id": "addon_mockcomposer_audit_call_run",
-      "community": 64,
+      "community": 23,
       "norm_label": ".run()"
     },
     {
@@ -2232,7 +2232,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L105",
       "id": "addon_mockcomposer_audit_call_return",
-      "community": 64,
+      "community": 23,
       "norm_label": ".return()"
     },
     {
@@ -2241,7 +2241,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L110",
       "id": "addon_mockcomposer_audit_call_runandreturn",
-      "community": 64,
+      "community": 23,
       "norm_label": ".runandreturn()"
     },
     {
@@ -2250,7 +2250,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L116",
       "id": "addon_mockcomposer_checkifpatchapplies",
-      "community": 13,
+      "community": 14,
       "norm_label": ".checkifpatchapplies()"
     },
     {
@@ -2259,7 +2259,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L142",
       "id": "addon_mockcomposer_checkifpatchapplies_call",
-      "community": 17,
+      "community": 64,
       "norm_label": "mockcomposer_checkifpatchapplies_call"
     },
     {
@@ -2277,7 +2277,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L155",
       "id": "addon_mockcomposer_checkifpatchapplies_call_run",
-      "community": 17,
+      "community": 64,
       "norm_label": ".run()"
     },
     {
@@ -2286,7 +2286,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L183",
       "id": "addon_mockcomposer_checkifpatchapplies_call_return",
-      "community": 17,
+      "community": 64,
       "norm_label": ".return()"
     },
     {
@@ -2295,7 +2295,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L188",
       "id": "addon_mockcomposer_checkifpatchapplies_call_runandreturn",
-      "community": 17,
+      "community": 64,
       "norm_label": ".runandreturn()"
     },
     {
@@ -2304,7 +2304,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L194",
       "id": "addon_mockcomposer_checkifpatchesapply",
-      "community": 13,
+      "community": 14,
       "norm_label": ".checkifpatchesapply()"
     },
     {
@@ -2313,7 +2313,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L220",
       "id": "addon_mockcomposer_checkifpatchesapply_call",
-      "community": 52,
+      "community": 13,
       "norm_label": "mockcomposer_checkifpatchesapply_call"
     },
     {
@@ -2331,7 +2331,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L233",
       "id": "addon_mockcomposer_checkifpatchesapply_call_run",
-      "community": 52,
+      "community": 13,
       "norm_label": ".run()"
     },
     {
@@ -2340,7 +2340,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L261",
       "id": "addon_mockcomposer_checkifpatchesapply_call_return",
-      "community": 52,
+      "community": 13,
       "norm_label": ".return()"
     },
     {
@@ -2349,7 +2349,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L266",
       "id": "addon_mockcomposer_checkifpatchesapply_call_runandreturn",
-      "community": 52,
+      "community": 13,
       "norm_label": ".runandreturn()"
     },
     {
@@ -2358,7 +2358,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L272",
       "id": "addon_mockcomposer_diff",
-      "community": 13,
+      "community": 14,
       "norm_label": ".diff()"
     },
     {
@@ -2367,7 +2367,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L298",
       "id": "addon_mockcomposer_diff_call",
-      "community": 73,
+      "community": 61,
       "norm_label": "mockcomposer_diff_call"
     },
     {
@@ -2385,7 +2385,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L310",
       "id": "addon_mockcomposer_diff_call_run",
-      "community": 73,
+      "community": 61,
       "norm_label": ".run()"
     },
     {
@@ -2394,7 +2394,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L333",
       "id": "addon_mockcomposer_diff_call_return",
-      "community": 73,
+      "community": 61,
       "norm_label": ".return()"
     },
     {
@@ -2403,7 +2403,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L338",
       "id": "addon_mockcomposer_diff_call_runandreturn",
-      "community": 73,
+      "community": 61,
       "norm_label": ".runandreturn()"
     },
     {
@@ -2412,7 +2412,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L344",
       "id": "addon_mockcomposer_getallowplugins",
-      "community": 13,
+      "community": 14,
       "norm_label": ".getallowplugins()"
     },
     {
@@ -2421,7 +2421,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L372",
       "id": "addon_mockcomposer_getallowplugins_call",
-      "community": 17,
+      "community": 50,
       "norm_label": "mockcomposer_getallowplugins_call"
     },
     {
@@ -2439,7 +2439,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L383",
       "id": "addon_mockcomposer_getallowplugins_call_run",
-      "community": 17,
+      "community": 50,
       "norm_label": ".run()"
     },
     {
@@ -2448,7 +2448,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L401",
       "id": "addon_mockcomposer_getallowplugins_call_return",
-      "community": 17,
+      "community": 50,
       "norm_label": ".return()"
     },
     {
@@ -2457,7 +2457,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L406",
       "id": "addon_mockcomposer_getallowplugins_call_runandreturn",
-      "community": 17,
+      "community": 50,
       "norm_label": ".runandreturn()"
     },
     {
@@ -2466,7 +2466,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L412",
       "id": "addon_mockcomposer_getconfig",
-      "community": 13,
+      "community": 14,
       "norm_label": ".getconfig()"
     },
     {
@@ -2475,7 +2475,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L438",
       "id": "addon_mockcomposer_getconfig_call",
-      "community": 54,
+      "community": 73,
       "norm_label": "mockcomposer_getconfig_call"
     },
     {
@@ -2493,7 +2493,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L450",
       "id": "addon_mockcomposer_getconfig_call_run",
-      "community": 54,
+      "community": 73,
       "norm_label": ".run()"
     },
     {
@@ -2502,7 +2502,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L473",
       "id": "addon_mockcomposer_getconfig_call_return",
-      "community": 54,
+      "community": 73,
       "norm_label": ".return()"
     },
     {
@@ -2511,7 +2511,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L478",
       "id": "addon_mockcomposer_getconfig_call_runandreturn",
-      "community": 54,
+      "community": 73,
       "norm_label": ".runandreturn()"
     },
     {
@@ -2520,7 +2520,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L484",
       "id": "addon_mockcomposer_getcustomcodedirectories",
-      "community": 13,
+      "community": 14,
       "norm_label": ".getcustomcodedirectories()"
     },
     {
@@ -2529,7 +2529,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L512",
       "id": "addon_mockcomposer_getcustomcodedirectories_call",
-      "community": 66,
+      "community": 49,
       "norm_label": "mockcomposer_getcustomcodedirectories_call"
     },
     {
@@ -2547,7 +2547,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L523",
       "id": "addon_mockcomposer_getcustomcodedirectories_call_run",
-      "community": 66,
+      "community": 49,
       "norm_label": ".run()"
     },
     {
@@ -2556,7 +2556,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L541",
       "id": "addon_mockcomposer_getcustomcodedirectories_call_return",
-      "community": 66,
+      "community": 49,
       "norm_label": ".return()"
     },
     {
@@ -2565,7 +2565,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L546",
       "id": "addon_mockcomposer_getcustomcodedirectories_call_runandreturn",
-      "community": 66,
+      "community": 49,
       "norm_label": ".runandreturn()"
     },
     {
@@ -2574,7 +2574,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L552",
       "id": "addon_mockcomposer_getdependencypatches",
-      "community": 13,
+      "community": 14,
       "norm_label": ".getdependencypatches()"
     },
     {
@@ -2583,7 +2583,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L580",
       "id": "addon_mockcomposer_getdependencypatches_call",
-      "community": 49,
+      "community": 13,
       "norm_label": "mockcomposer_getdependencypatches_call"
     },
     {
@@ -2601,7 +2601,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L591",
       "id": "addon_mockcomposer_getdependencypatches_call_run",
-      "community": 49,
+      "community": 13,
       "norm_label": ".run()"
     },
     {
@@ -2610,7 +2610,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L609",
       "id": "addon_mockcomposer_getdependencypatches_call_return",
-      "community": 49,
+      "community": 13,
       "norm_label": ".return()"
     },
     {
@@ -2619,7 +2619,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L614",
       "id": "addon_mockcomposer_getdependencypatches_call_runandreturn",
-      "community": 49,
+      "community": 13,
       "norm_label": ".runandreturn()"
     },
     {
@@ -2628,7 +2628,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L620",
       "id": "addon_mockcomposer_getinstalledpackageversion",
-      "community": 13,
+      "community": 14,
       "norm_label": ".getinstalledpackageversion()"
     },
     {
@@ -2637,7 +2637,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L646",
       "id": "addon_mockcomposer_getinstalledpackageversion_call",
-      "community": 67,
+      "community": 68,
       "norm_label": "mockcomposer_getinstalledpackageversion_call"
     },
     {
@@ -2655,7 +2655,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L658",
       "id": "addon_mockcomposer_getinstalledpackageversion_call_run",
-      "community": 67,
+      "community": 68,
       "norm_label": ".run()"
     },
     {
@@ -2664,7 +2664,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L681",
       "id": "addon_mockcomposer_getinstalledpackageversion_call_return",
-      "community": 67,
+      "community": 68,
       "norm_label": ".return()"
     },
     {
@@ -2673,7 +2673,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L686",
       "id": "addon_mockcomposer_getinstalledpackageversion_call_runandreturn",
-      "community": 67,
+      "community": 68,
       "norm_label": ".runandreturn()"
     },
     {
@@ -2682,7 +2682,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L692",
       "id": "addon_mockcomposer_getinstalledplugins",
-      "community": 13,
+      "community": 14,
       "norm_label": ".getinstalledplugins()"
     },
     {
@@ -2691,7 +2691,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L720",
       "id": "addon_mockcomposer_getinstalledplugins_call",
-      "community": 61,
+      "community": 65,
       "norm_label": "mockcomposer_getinstalledplugins_call"
     },
     {
@@ -2709,7 +2709,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L731",
       "id": "addon_mockcomposer_getinstalledplugins_call_run",
-      "community": 61,
+      "community": 65,
       "norm_label": ".run()"
     },
     {
@@ -2718,7 +2718,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L749",
       "id": "addon_mockcomposer_getinstalledplugins_call_return",
-      "community": 61,
+      "community": 65,
       "norm_label": ".return()"
     },
     {
@@ -2727,7 +2727,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L754",
       "id": "addon_mockcomposer_getinstalledplugins_call_runandreturn",
-      "community": 61,
+      "community": 65,
       "norm_label": ".runandreturn()"
     },
     {
@@ -2736,7 +2736,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L760",
       "id": "addon_mockcomposer_ispackageinstalled",
-      "community": 13,
+      "community": 14,
       "norm_label": ".ispackageinstalled()"
     },
     {
@@ -2745,7 +2745,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L786",
       "id": "addon_mockcomposer_ispackageinstalled_call",
-      "community": 50,
+      "community": 60,
       "norm_label": "mockcomposer_ispackageinstalled_call"
     },
     {
@@ -2763,7 +2763,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L798",
       "id": "addon_mockcomposer_ispackageinstalled_call_run",
-      "community": 50,
+      "community": 60,
       "norm_label": ".run()"
     },
     {
@@ -2772,7 +2772,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L821",
       "id": "addon_mockcomposer_ispackageinstalled_call_return",
-      "community": 50,
+      "community": 60,
       "norm_label": ".return()"
     },
     {
@@ -2781,7 +2781,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L826",
       "id": "addon_mockcomposer_ispackageinstalled_call_runandreturn",
-      "community": 50,
+      "community": 60,
       "norm_label": ".runandreturn()"
     },
     {
@@ -2790,7 +2790,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L832",
       "id": "addon_mockcomposer_normalize",
-      "community": 13,
+      "community": 14,
       "norm_label": ".normalize()"
     },
     {
@@ -2799,7 +2799,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L858",
       "id": "addon_mockcomposer_normalize_call",
-      "community": 70,
+      "community": 69,
       "norm_label": "mockcomposer_normalize_call"
     },
     {
@@ -2817,7 +2817,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L869",
       "id": "addon_mockcomposer_normalize_call_run",
-      "community": 70,
+      "community": 69,
       "norm_label": ".run()"
     },
     {
@@ -2826,7 +2826,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L887",
       "id": "addon_mockcomposer_normalize_call_return",
-      "community": 70,
+      "community": 69,
       "norm_label": ".return()"
     },
     {
@@ -2835,7 +2835,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L892",
       "id": "addon_mockcomposer_normalize_call_runandreturn",
-      "community": 70,
+      "community": 69,
       "norm_label": ".runandreturn()"
     },
     {
@@ -2844,7 +2844,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L898",
       "id": "addon_mockcomposer_remove",
-      "community": 13,
+      "community": 14,
       "norm_label": ".remove()"
     },
     {
@@ -2853,7 +2853,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L930",
       "id": "addon_mockcomposer_remove_call",
-      "community": 53,
+      "community": 58,
       "norm_label": "mockcomposer_remove_call"
     },
     {
@@ -2871,7 +2871,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L943",
       "id": "addon_mockcomposer_remove_call_run",
-      "community": 53,
+      "community": 58,
       "norm_label": ".run()"
     },
     {
@@ -2880,7 +2880,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L968",
       "id": "addon_mockcomposer_remove_call_return",
-      "community": 53,
+      "community": 58,
       "norm_label": ".return()"
     },
     {
@@ -2889,7 +2889,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L973",
       "id": "addon_mockcomposer_remove_call_runandreturn",
-      "community": 53,
+      "community": 58,
       "norm_label": ".runandreturn()"
     },
     {
@@ -2898,7 +2898,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L979",
       "id": "addon_mockcomposer_require",
-      "community": 13,
+      "community": 14,
       "norm_label": ".require()"
     },
     {
@@ -2907,7 +2907,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1011",
       "id": "addon_mockcomposer_require_call",
-      "community": 47,
+      "community": 54,
       "norm_label": "mockcomposer_require_call"
     },
     {
@@ -2925,7 +2925,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1024",
       "id": "addon_mockcomposer_require_call_run",
-      "community": 47,
+      "community": 54,
       "norm_label": ".run()"
     },
     {
@@ -2934,7 +2934,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1049",
       "id": "addon_mockcomposer_require_call_return",
-      "community": 47,
+      "community": 54,
       "norm_label": ".return()"
     },
     {
@@ -2943,7 +2943,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1054",
       "id": "addon_mockcomposer_require_call_runandreturn",
-      "community": 47,
+      "community": 54,
       "norm_label": ".runandreturn()"
     },
     {
@@ -2952,7 +2952,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1060",
       "id": "addon_mockcomposer_setallowplugins",
-      "community": 13,
+      "community": 14,
       "norm_label": ".setallowplugins()"
     },
     {
@@ -2961,7 +2961,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1077",
       "id": "addon_mockcomposer_setallowplugins_call",
-      "community": 51,
+      "community": 23,
       "norm_label": "mockcomposer_setallowplugins_call"
     },
     {
@@ -2979,7 +2979,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1089",
       "id": "addon_mockcomposer_setallowplugins_call_run",
-      "community": 51,
+      "community": 23,
       "norm_label": ".run()"
     },
     {
@@ -2988,7 +2988,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1112",
       "id": "addon_mockcomposer_setallowplugins_call_return",
-      "community": 51,
+      "community": 23,
       "norm_label": ".return()"
     },
     {
@@ -2997,7 +2997,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1117",
       "id": "addon_mockcomposer_setallowplugins_call_runandreturn",
-      "community": 51,
+      "community": 23,
       "norm_label": ".runandreturn()"
     },
     {
@@ -3006,7 +3006,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1123",
       "id": "addon_mockcomposer_setconfig",
-      "community": 13,
+      "community": 14,
       "norm_label": ".setconfig()"
     },
     {
@@ -3015,7 +3015,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1140",
       "id": "addon_mockcomposer_setconfig_call",
-      "community": 62,
+      "community": 13,
       "norm_label": "mockcomposer_setconfig_call"
     },
     {
@@ -3033,7 +3033,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1153",
       "id": "addon_mockcomposer_setconfig_call_run",
-      "community": 62,
+      "community": 13,
       "norm_label": ".run()"
     },
     {
@@ -3042,7 +3042,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1181",
       "id": "addon_mockcomposer_setconfig_call_return",
-      "community": 62,
+      "community": 13,
       "norm_label": ".return()"
     },
     {
@@ -3051,7 +3051,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1186",
       "id": "addon_mockcomposer_setconfig_call_runandreturn",
-      "community": 62,
+      "community": 13,
       "norm_label": ".runandreturn()"
     },
     {
@@ -3060,7 +3060,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1192",
       "id": "addon_mockcomposer_update",
-      "community": 13,
+      "community": 14,
       "norm_label": ".update()"
     },
     {
@@ -3069,7 +3069,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1220",
       "id": "addon_mockcomposer_update_call",
-      "community": 59,
+      "community": 72,
       "norm_label": "mockcomposer_update_call"
     },
     {
@@ -3087,7 +3087,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1235",
       "id": "addon_mockcomposer_update_call_run",
-      "community": 59,
+      "community": 72,
       "norm_label": ".run()"
     },
     {
@@ -3096,7 +3096,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1273",
       "id": "addon_mockcomposer_update_call_return",
-      "community": 59,
+      "community": 72,
       "norm_label": ".return()"
     },
     {
@@ -3105,7 +3105,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1278",
       "id": "addon_mockcomposer_update_call_runandreturn",
-      "community": 59,
+      "community": 72,
       "norm_label": ".runandreturn()"
     },
     {
@@ -3114,7 +3114,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1284",
       "id": "addon_mockcomposer_updatelockhash",
-      "community": 13,
+      "community": 14,
       "norm_label": ".updatelockhash()"
     },
     {
@@ -3123,7 +3123,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1301",
       "id": "addon_mockcomposer_updatelockhash_call",
-      "community": 57,
+      "community": 53,
       "norm_label": "mockcomposer_updatelockhash_call"
     },
     {
@@ -3141,7 +3141,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1312",
       "id": "addon_mockcomposer_updatelockhash_call_run",
-      "community": 57,
+      "community": 53,
       "norm_label": ".run()"
     },
     {
@@ -3150,7 +3150,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1330",
       "id": "addon_mockcomposer_updatelockhash_call_return",
-      "community": 57,
+      "community": 53,
       "norm_label": ".return()"
     },
     {
@@ -3159,7 +3159,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1335",
       "id": "addon_mockcomposer_updatelockhash_call_runandreturn",
-      "community": 57,
+      "community": 53,
       "norm_label": ".runandreturn()"
     },
     {
@@ -3168,7 +3168,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1342",
       "id": "addon_mocks_test_newmockdrush",
-      "community": 8,
+      "community": 10,
       "norm_label": "newmockdrush()"
     },
     {
@@ -3213,7 +3213,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1394",
       "id": "addon_mockdrush_gettranslationpath_call",
-      "community": 69,
+      "community": 63,
       "norm_label": "mockdrush_gettranslationpath_call"
     },
     {
@@ -3231,7 +3231,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1407",
       "id": "addon_mockdrush_gettranslationpath_call_run",
-      "community": 69,
+      "community": 63,
       "norm_label": ".run()"
     },
     {
@@ -3240,7 +3240,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1435",
       "id": "addon_mockdrush_gettranslationpath_call_return",
-      "community": 69,
+      "community": 63,
       "norm_label": ".return()"
     },
     {
@@ -3249,7 +3249,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1440",
       "id": "addon_mockdrush_gettranslationpath_call_runandreturn",
-      "community": 69,
+      "community": 63,
       "norm_label": ".runandreturn()"
     },
     {
@@ -3267,7 +3267,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1474",
       "id": "addon_mockdrush_getupdatehooks_call",
-      "community": 65,
+      "community": 62,
       "norm_label": "mockdrush_getupdatehooks_call"
     },
     {
@@ -3285,7 +3285,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1486",
       "id": "addon_mockdrush_getupdatehooks_call_run",
-      "community": 65,
+      "community": 62,
       "norm_label": ".run()"
     },
     {
@@ -3294,7 +3294,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1509",
       "id": "addon_mockdrush_getupdatehooks_call_return",
-      "community": 65,
+      "community": 62,
       "norm_label": ".return()"
     },
     {
@@ -3303,7 +3303,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1514",
       "id": "addon_mockdrush_getupdatehooks_call_runandreturn",
-      "community": 65,
+      "community": 62,
       "norm_label": ".runandreturn()"
     },
     {
@@ -3321,7 +3321,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1546",
       "id": "addon_mockdrush_ismoduleenabled_call",
-      "community": 17,
+      "community": 13,
       "norm_label": "mockdrush_ismoduleenabled_call"
     },
     {
@@ -3339,7 +3339,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1559",
       "id": "addon_mockdrush_ismoduleenabled_call_run",
-      "community": 17,
+      "community": 13,
       "norm_label": ".run()"
     },
     {
@@ -3348,7 +3348,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1587",
       "id": "addon_mockdrush_ismoduleenabled_call_return",
-      "community": 17,
+      "community": 13,
       "norm_label": ".return()"
     },
     {
@@ -3357,7 +3357,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1592",
       "id": "addon_mockdrush_ismoduleenabled_call_runandreturn",
-      "community": 17,
+      "community": 13,
       "norm_label": ".runandreturn()"
     },
     {
@@ -3375,7 +3375,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1615",
       "id": "addon_mockdrush_localizetranslations_call",
-      "community": 48,
+      "community": 71,
       "norm_label": "mockdrush_localizetranslations_call"
     },
     {
@@ -3393,7 +3393,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1627",
       "id": "addon_mockdrush_localizetranslations_call_run",
-      "community": 48,
+      "community": 71,
       "norm_label": ".run()"
     },
     {
@@ -3402,7 +3402,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1650",
       "id": "addon_mockdrush_localizetranslations_call_return",
-      "community": 48,
+      "community": 71,
       "norm_label": ".return()"
     },
     {
@@ -3411,7 +3411,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1655",
       "id": "addon_mockdrush_localizetranslations_call_runandreturn",
-      "community": 48,
+      "community": 71,
       "norm_label": ".runandreturn()"
     },
     {
@@ -3420,7 +3420,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1662",
       "id": "addon_mocks_test_newmockphpcs",
-      "community": 30,
+      "community": 31,
       "norm_label": "newmockphpcs()"
     },
     {
@@ -3429,7 +3429,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1675",
       "id": "addon_mockphpcs",
-      "community": 63,
+      "community": 51,
       "norm_label": "mockphpcs"
     },
     {
@@ -3438,7 +3438,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1679",
       "id": "addon_mockphpcs_expecter",
-      "community": 8,
+      "community": 10,
       "norm_label": "mockphpcs_expecter"
     },
     {
@@ -3447,7 +3447,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1683",
       "id": "addon_mockphpcs_expect",
-      "community": 63,
+      "community": 51,
       "norm_label": ".expect()"
     },
     {
@@ -3456,7 +3456,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1688",
       "id": "addon_mockphpcs_run",
-      "community": 63,
+      "community": 51,
       "norm_label": ".run()"
     },
     {
@@ -3474,7 +3474,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1721",
       "id": "addon_mockphpcs_expecter_run",
-      "community": 8,
+      "community": 10,
       "norm_label": ".run()"
     },
     {
@@ -3510,7 +3510,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1754",
       "id": "addon_mockphpcs_runcbf",
-      "community": 63,
+      "community": 51,
       "norm_label": ".runcbf()"
     },
     {
@@ -3519,7 +3519,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1771",
       "id": "addon_mockphpcs_runcbf_call",
-      "community": 55,
+      "community": 67,
       "norm_label": "mockphpcs_runcbf_call"
     },
     {
@@ -3528,7 +3528,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1778",
       "id": "addon_mockphpcs_expecter_runcbf",
-      "community": 8,
+      "community": 10,
       "norm_label": ".runcbf()"
     },
     {
@@ -3537,7 +3537,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1782",
       "id": "addon_mockphpcs_runcbf_call_run",
-      "community": 55,
+      "community": 67,
       "norm_label": ".run()"
     },
     {
@@ -3546,7 +3546,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1800",
       "id": "addon_mockphpcs_runcbf_call_return",
-      "community": 55,
+      "community": 67,
       "norm_label": ".return()"
     },
     {
@@ -3555,7 +3555,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1805",
       "id": "addon_mockphpcs_runcbf_call_runandreturn",
-      "community": 55,
+      "community": 67,
       "norm_label": ".runandreturn()"
     },
     {
@@ -3564,7 +3564,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1812",
       "id": "addon_mocks_test_newmockrepository",
-      "community": 8,
+      "community": 10,
       "norm_label": "newmockrepository()"
     },
     {
@@ -3573,7 +3573,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1825",
       "id": "addon_mockrepository",
-      "community": 8,
+      "community": 10,
       "norm_label": "mockrepository"
     },
     {
@@ -3582,7 +3582,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1829",
       "id": "addon_mockrepository_expecter",
-      "community": 8,
+      "community": 10,
       "norm_label": "mockrepository_expecter"
     },
     {
@@ -3591,7 +3591,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1833",
       "id": "addon_mockrepository_expect",
-      "community": 8,
+      "community": 10,
       "norm_label": ".expect()"
     },
     {
@@ -3600,7 +3600,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1838",
       "id": "addon_mockrepository_issomethingstagedinpath",
-      "community": 8,
+      "community": 10,
       "norm_label": ".issomethingstagedinpath()"
     },
     {
@@ -3609,7 +3609,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1855",
       "id": "addon_mockrepository_issomethingstagedinpath_call",
-      "community": 23,
+      "community": 59,
       "norm_label": "mockrepository_issomethingstagedinpath_call"
     },
     {
@@ -3618,7 +3618,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1862",
       "id": "addon_mockrepository_expecter_issomethingstagedinpath",
-      "community": 8,
+      "community": 10,
       "norm_label": ".issomethingstagedinpath()"
     },
     {
@@ -3627,7 +3627,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1866",
       "id": "addon_mockrepository_issomethingstagedinpath_call_run",
-      "community": 23,
+      "community": 59,
       "norm_label": ".run()"
     },
     {
@@ -3636,7 +3636,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1884",
       "id": "addon_mockrepository_issomethingstagedinpath_call_return",
-      "community": 23,
+      "community": 59,
       "norm_label": ".return()"
     },
     {
@@ -3645,7 +3645,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1889",
       "id": "addon_mockrepository_issomethingstagedinpath_call_runandreturn",
-      "community": 23,
+      "community": 59,
       "norm_label": ".runandreturn()"
     },
     {
@@ -3663,7 +3663,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1909",
       "id": "addon_mockdrupalorg",
-      "community": 8,
+      "community": 48,
       "norm_label": "mockdrupalorg"
     },
     {
@@ -3672,7 +3672,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1913",
       "id": "addon_mockdrupalorg_expecter",
-      "community": 8,
+      "community": 10,
       "norm_label": "mockdrupalorg_expecter"
     },
     {
@@ -3681,7 +3681,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1917",
       "id": "addon_mockdrupalorg_expect",
-      "community": 8,
+      "community": 48,
       "norm_label": ".expect()"
     },
     {
@@ -3690,7 +3690,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1922",
       "id": "addon_mockdrupalorg_findissuenumber",
-      "community": 8,
+      "community": 48,
       "norm_label": ".findissuenumber()"
     },
     {
@@ -3699,7 +3699,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1948",
       "id": "addon_mockdrupalorg_findissuenumber_call",
-      "community": 17,
+      "community": 46,
       "norm_label": "mockdrupalorg_findissuenumber_call"
     },
     {
@@ -3708,7 +3708,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1954",
       "id": "addon_mockdrupalorg_expecter_findissuenumber",
-      "community": 8,
+      "community": 10,
       "norm_label": ".findissuenumber()"
     },
     {
@@ -3717,7 +3717,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1958",
       "id": "addon_mockdrupalorg_findissuenumber_call_run",
-      "community": 17,
+      "community": 46,
       "norm_label": ".run()"
     },
     {
@@ -3726,7 +3726,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1971",
       "id": "addon_mockdrupalorg_findissuenumber_call_return",
-      "community": 17,
+      "community": 46,
       "norm_label": ".return()"
     },
     {
@@ -3735,7 +3735,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1976",
       "id": "addon_mockdrupalorg_findissuenumber_call_runandreturn",
-      "community": 17,
+      "community": 46,
       "norm_label": ".runandreturn()"
     },
     {
@@ -3744,7 +3744,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L1982",
       "id": "addon_mockdrupalorg_getissue",
-      "community": 8,
+      "community": 48,
       "norm_label": ".getissue()"
     },
     {
@@ -3753,7 +3753,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2010",
       "id": "addon_mockdrupalorg_getissue_call",
-      "community": 58,
+      "community": 57,
       "norm_label": "mockdrupalorg_getissue_call"
     },
     {
@@ -3762,7 +3762,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2016",
       "id": "addon_mockdrupalorg_expecter_getissue",
-      "community": 8,
+      "community": 10,
       "norm_label": ".getissue()"
     },
     {
@@ -3771,7 +3771,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2020",
       "id": "addon_mockdrupalorg_getissue_call_run",
-      "community": 58,
+      "community": 57,
       "norm_label": ".run()"
     },
     {
@@ -3780,7 +3780,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2033",
       "id": "addon_mockdrupalorg_getissue_call_return",
-      "community": 58,
+      "community": 57,
       "norm_label": ".return()"
     },
     {
@@ -3789,7 +3789,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2038",
       "id": "addon_mockdrupalorg_getissue_call_runandreturn",
-      "community": 58,
+      "community": 57,
       "norm_label": ".runandreturn()"
     },
     {
@@ -3807,7 +3807,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2058",
       "id": "addon_mockrector",
-      "community": 8,
+      "community": 10,
       "norm_label": "mockrector"
     },
     {
@@ -3816,7 +3816,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2062",
       "id": "addon_mockrector_expecter",
-      "community": 8,
+      "community": 10,
       "norm_label": "mockrector_expecter"
     },
     {
@@ -3825,7 +3825,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2066",
       "id": "addon_mockrector_expect",
-      "community": 8,
+      "community": 10,
       "norm_label": ".expect()"
     },
     {
@@ -3834,7 +3834,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2071",
       "id": "addon_mockrector_run",
-      "community": 8,
+      "community": 10,
       "norm_label": ".run()"
     },
     {
@@ -3843,7 +3843,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2097",
       "id": "addon_mockrector_run_call",
-      "community": 60,
+      "community": 55,
       "norm_label": "mockrector_run_call"
     },
     {
@@ -3852,7 +3852,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2105",
       "id": "addon_mockrector_expecter_run",
-      "community": 8,
+      "community": 10,
       "norm_label": ".run()"
     },
     {
@@ -3861,7 +3861,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2109",
       "id": "addon_mockrector_run_call_run",
-      "community": 60,
+      "community": 55,
       "norm_label": ".run()"
     },
     {
@@ -3870,7 +3870,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2132",
       "id": "addon_mockrector_run_call_return",
-      "community": 60,
+      "community": 55,
       "norm_label": ".return()"
     },
     {
@@ -3879,7 +3879,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2137",
       "id": "addon_mockrector_run_call_runandreturn",
-      "community": 60,
+      "community": 55,
       "norm_label": ".runandreturn()"
     },
     {
@@ -3888,7 +3888,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2144",
       "id": "addon_mocks_test_newmockworktree",
-      "community": 8,
+      "community": 10,
       "norm_label": "newmockworktree()"
     },
     {
@@ -3897,7 +3897,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2157",
       "id": "addon_mockworktree",
-      "community": 35,
+      "community": 36,
       "norm_label": "mockworktree"
     },
     {
@@ -3906,7 +3906,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2161",
       "id": "addon_mockworktree_expecter",
-      "community": 37,
+      "community": 38,
       "norm_label": "mockworktree_expecter"
     },
     {
@@ -3915,7 +3915,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2165",
       "id": "addon_mockworktree_expect",
-      "community": 35,
+      "community": 36,
       "norm_label": ".expect()"
     },
     {
@@ -3924,7 +3924,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2170",
       "id": "addon_mockworktree_add",
-      "community": 35,
+      "community": 36,
       "norm_label": ".add()"
     },
     {
@@ -3933,7 +3933,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2198",
       "id": "addon_mockworktree_add_call",
-      "community": 46,
+      "community": 52,
       "norm_label": "mockworktree_add_call"
     },
     {
@@ -3942,7 +3942,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2204",
       "id": "addon_mockworktree_expecter_add",
-      "community": 37,
+      "community": 38,
       "norm_label": ".add()"
     },
     {
@@ -3951,7 +3951,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2208",
       "id": "addon_mockworktree_add_call_run",
-      "community": 46,
+      "community": 52,
       "norm_label": ".run()"
     },
     {
@@ -3960,7 +3960,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2221",
       "id": "addon_mockworktree_add_call_return",
-      "community": 46,
+      "community": 52,
       "norm_label": ".return()"
     },
     {
@@ -3969,7 +3969,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2226",
       "id": "addon_mockworktree_add_call_runandreturn",
-      "community": 46,
+      "community": 52,
       "norm_label": ".runandreturn()"
     },
     {
@@ -3978,7 +3978,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2232",
       "id": "addon_mockworktree_addglob",
-      "community": 35,
+      "community": 36,
       "norm_label": ".addglob()"
     },
     {
@@ -3987,7 +3987,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2249",
       "id": "addon_mockworktree_addglob_call",
-      "community": 71,
+      "community": 23,
       "norm_label": "mockworktree_addglob_call"
     },
     {
@@ -3996,7 +3996,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2255",
       "id": "addon_mockworktree_expecter_addglob",
-      "community": 37,
+      "community": 38,
       "norm_label": ".addglob()"
     },
     {
@@ -4005,7 +4005,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2259",
       "id": "addon_mockworktree_addglob_call_run",
-      "community": 71,
+      "community": 23,
       "norm_label": ".run()"
     },
     {
@@ -4014,7 +4014,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2272",
       "id": "addon_mockworktree_addglob_call_return",
-      "community": 71,
+      "community": 23,
       "norm_label": ".return()"
     },
     {
@@ -4023,7 +4023,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2277",
       "id": "addon_mockworktree_addglob_call_runandreturn",
-      "community": 71,
+      "community": 23,
       "norm_label": ".runandreturn()"
     },
     {
@@ -4032,7 +4032,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2283",
       "id": "addon_mockworktree_checkout",
-      "community": 35,
+      "community": 36,
       "norm_label": ".checkout()"
     },
     {
@@ -4041,7 +4041,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2300",
       "id": "addon_mockworktree_checkout_call",
-      "community": 72,
+      "community": 70,
       "norm_label": "mockworktree_checkout_call"
     },
     {
@@ -4050,7 +4050,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2306",
       "id": "addon_mockworktree_expecter_checkout",
-      "community": 37,
+      "community": 38,
       "norm_label": ".checkout()"
     },
     {
@@ -4059,7 +4059,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2310",
       "id": "addon_mockworktree_checkout_call_run",
-      "community": 72,
+      "community": 70,
       "norm_label": ".run()"
     },
     {
@@ -4068,7 +4068,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2323",
       "id": "addon_mockworktree_checkout_call_return",
-      "community": 72,
+      "community": 70,
       "norm_label": ".return()"
     },
     {
@@ -4077,7 +4077,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2328",
       "id": "addon_mockworktree_checkout_call_runandreturn",
-      "community": 72,
+      "community": 70,
       "norm_label": ".runandreturn()"
     },
     {
@@ -4086,7 +4086,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2334",
       "id": "addon_mockworktree_commit",
-      "community": 35,
+      "community": 36,
       "norm_label": ".commit()"
     },
     {
@@ -4095,7 +4095,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2362",
       "id": "addon_mockworktree_commit_call",
-      "community": 23,
+      "community": 66,
       "norm_label": "mockworktree_commit_call"
     },
     {
@@ -4104,7 +4104,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2369",
       "id": "addon_mockworktree_expecter_commit",
-      "community": 37,
+      "community": 38,
       "norm_label": ".commit()"
     },
     {
@@ -4113,7 +4113,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2373",
       "id": "addon_mockworktree_commit_call_run",
-      "community": 23,
+      "community": 66,
       "norm_label": ".run()"
     },
     {
@@ -4122,7 +4122,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2391",
       "id": "addon_mockworktree_commit_call_return",
-      "community": 23,
+      "community": 66,
       "norm_label": ".return()"
     },
     {
@@ -4131,7 +4131,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2396",
       "id": "addon_mockworktree_commit_call_runandreturn",
-      "community": 23,
+      "community": 66,
       "norm_label": ".runandreturn()"
     },
     {
@@ -4140,7 +4140,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2402",
       "id": "addon_mockworktree_remove",
-      "community": 35,
+      "community": 36,
       "norm_label": ".remove()"
     },
     {
@@ -4149,7 +4149,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2430",
       "id": "addon_mockworktree_remove_call",
-      "community": 23,
+      "community": 47,
       "norm_label": "mockworktree_remove_call"
     },
     {
@@ -4158,7 +4158,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2436",
       "id": "addon_mockworktree_expecter_remove",
-      "community": 37,
+      "community": 38,
       "norm_label": ".remove()"
     },
     {
@@ -4167,7 +4167,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2440",
       "id": "addon_mockworktree_remove_call_run",
-      "community": 23,
+      "community": 47,
       "norm_label": ".run()"
     },
     {
@@ -4176,7 +4176,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2453",
       "id": "addon_mockworktree_remove_call_return",
-      "community": 23,
+      "community": 47,
       "norm_label": ".return()"
     },
     {
@@ -4185,7 +4185,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2458",
       "id": "addon_mockworktree_remove_call_runandreturn",
-      "community": 23,
+      "community": 47,
       "norm_label": ".runandreturn()"
     },
     {
@@ -4194,7 +4194,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2464",
       "id": "addon_mockworktree_status",
-      "community": 35,
+      "community": 36,
       "norm_label": ".status()"
     },
     {
@@ -4203,7 +4203,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2492",
       "id": "addon_mockworktree_status_call",
-      "community": 68,
+      "community": 13,
       "norm_label": "mockworktree_status_call"
     },
     {
@@ -4212,7 +4212,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2497",
       "id": "addon_mockworktree_expecter_status",
-      "community": 37,
+      "community": 38,
       "norm_label": ".status()"
     },
     {
@@ -4221,7 +4221,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2501",
       "id": "addon_mockworktree_status_call_run",
-      "community": 68,
+      "community": 13,
       "norm_label": ".run()"
     },
     {
@@ -4230,7 +4230,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2508",
       "id": "addon_mockworktree_status_call_return",
-      "community": 68,
+      "community": 13,
       "norm_label": ".return()"
     },
     {
@@ -4239,7 +4239,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2513",
       "id": "addon_mockworktree_status_call_runandreturn",
-      "community": 68,
+      "community": 13,
       "norm_label": ".runandreturn()"
     },
     {
@@ -4257,7 +4257,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2533",
       "id": "addon_mockhttpclient",
-      "community": 8,
+      "community": 10,
       "norm_label": "mockhttpclient"
     },
     {
@@ -4266,7 +4266,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2537",
       "id": "addon_mockhttpclient_expecter",
-      "community": 8,
+      "community": 10,
       "norm_label": "mockhttpclient_expecter"
     },
     {
@@ -4275,7 +4275,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2541",
       "id": "addon_mockhttpclient_expect",
-      "community": 8,
+      "community": 10,
       "norm_label": ".expect()"
     },
     {
@@ -4284,7 +4284,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2546",
       "id": "addon_mockhttpclient_do",
-      "community": 8,
+      "community": 10,
       "norm_label": ".do()"
     },
     {
@@ -4293,7 +4293,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2574",
       "id": "addon_mockhttpclient_do_call",
-      "community": 17,
+      "community": 13,
       "norm_label": "mockhttpclient_do_call"
     },
     {
@@ -4302,7 +4302,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2580",
       "id": "addon_mockhttpclient_expecter_do",
-      "community": 8,
+      "community": 10,
       "norm_label": ".do()"
     },
     {
@@ -4320,7 +4320,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2597",
       "id": "addon_mockhttpclient_do_call_return",
-      "community": 17,
+      "community": 13,
       "norm_label": ".return()"
     },
     {
@@ -4329,7 +4329,7 @@
       "source_file": "internal/addon/mocks_test.go",
       "source_location": "L2602",
       "id": "addon_mockhttpclient_do_call_runandreturn",
-      "community": 17,
+      "community": 13,
       "norm_label": ".runandreturn()"
     },
     {
@@ -4482,7 +4482,7 @@
       "source_file": "internal/addon/update_hooks_test.go",
       "source_location": "L1",
       "id": "internal_addon_update_hooks_test_go",
-      "community": 21,
+      "community": 20,
       "norm_label": "update_hooks_test.go"
     },
     {
@@ -4491,7 +4491,7 @@
       "source_file": "internal/addon/update_hooks_test.go",
       "source_location": "L16",
       "id": "addon_update_hooks_test_testnewupdatehooks",
-      "community": 21,
+      "community": 20,
       "norm_label": "testnewupdatehooks()"
     },
     {
@@ -4500,7 +4500,7 @@
       "source_file": "internal/addon/update_hooks_test.go",
       "source_location": "L32",
       "id": "addon_update_hooks_test_testupdatehooks_subscribedevents",
-      "community": 21,
+      "community": 20,
       "norm_label": "testupdatehooks_subscribedevents()"
     },
     {
@@ -4509,7 +4509,7 @@
       "source_file": "internal/addon/update_hooks_test.go",
       "source_location": "L44",
       "id": "addon_update_hooks_test_testupdatehooks_rendertemplate",
-      "community": 21,
+      "community": 20,
       "norm_label": "testupdatehooks_rendertemplate()"
     },
     {
@@ -4518,7 +4518,7 @@
       "source_file": "internal/addon/update_hooks_test.go",
       "source_location": "L72",
       "id": "addon_update_hooks_test_testupdatehooks_rendertemplate_empty",
-      "community": 21,
+      "community": 20,
       "norm_label": "testupdatehooks_rendertemplate_empty()"
     },
     {
@@ -4527,7 +4527,7 @@
       "source_file": "internal/addon/update_hooks_test.go",
       "source_location": "L89",
       "id": "addon_update_hooks_test_testupdatehooks_presiteupdatehandler_success",
-      "community": 21,
+      "community": 20,
       "norm_label": "testupdatehooks_presiteupdatehandler_success()"
     },
     {
@@ -4536,7 +4536,7 @@
       "source_file": "internal/addon/update_hooks_test.go",
       "source_location": "L119",
       "id": "addon_update_hooks_test_testupdatehooks_presiteupdatehandler_nohooks",
-      "community": 21,
+      "community": 20,
       "norm_label": "testupdatehooks_presiteupdatehandler_nohooks()"
     },
     {
@@ -4545,7 +4545,7 @@
       "source_file": "internal/addon/update_hooks_test.go",
       "source_location": "L143",
       "id": "addon_update_hooks_test_testupdatehooks_presiteupdatehandler_error",
-      "community": 21,
+      "community": 20,
       "norm_label": "testupdatehooks_presiteupdatehandler_error()"
     },
     {
@@ -4572,7 +4572,7 @@
       "source_file": "internal/services/event.go",
       "source_location": "L13",
       "id": "services_aborterror_error",
-      "community": 11,
+      "community": 12,
       "norm_label": ".error()"
     },
     {
@@ -4680,7 +4680,7 @@
       "source_file": "internal/services/event.go",
       "source_location": "L108",
       "id": "services_event_newpresiteupdateevent",
-      "community": 21,
+      "community": 20,
       "norm_label": "newpresiteupdateevent()"
     },
     {
@@ -4743,7 +4743,7 @@
       "source_file": "internal/services/interfaces.go",
       "source_location": "L1",
       "id": "internal_services_interfaces_go",
-      "community": 38,
+      "community": 39,
       "norm_label": "interfaces.go"
     },
     {
@@ -4752,7 +4752,7 @@
       "source_file": "internal/services/interfaces.go",
       "source_location": "L12",
       "id": "services_composer",
-      "community": 38,
+      "community": 39,
       "norm_label": "composer"
     },
     {
@@ -4761,7 +4761,7 @@
       "source_file": "internal/services/interfaces.go",
       "source_location": "L19",
       "id": "services_drush",
-      "community": 38,
+      "community": 39,
       "norm_label": "drush"
     },
     {
@@ -4770,7 +4770,7 @@
       "source_file": "internal/services/interfaces.go",
       "source_location": "L25",
       "id": "services_repository",
-      "community": 38,
+      "community": 39,
       "norm_label": "repository"
     },
     {
@@ -4779,7 +4779,7 @@
       "source_file": "internal/services/interfaces.go",
       "source_location": "L39",
       "id": "services_installer",
-      "community": 38,
+      "community": 39,
       "norm_label": "installer"
     },
     {
@@ -4788,7 +4788,7 @@
       "source_file": "internal/services/interfaces.go",
       "source_location": "L44",
       "id": "services_platform",
-      "community": 38,
+      "community": 39,
       "norm_label": "platform"
     },
     {
@@ -4797,7 +4797,7 @@
       "source_file": "internal/services/interfaces.go",
       "source_location": "L50",
       "id": "services_eventdispatcher",
-      "community": 38,
+      "community": 39,
       "norm_label": "eventdispatcher"
     },
     {
@@ -5094,7 +5094,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1",
       "id": "internal_services_mocks_test_go",
-      "community": 12,
+      "community": 8,
       "norm_label": "mocks_test.go"
     },
     {
@@ -5103,7 +5103,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L22",
       "id": "services_mocks_test_newmockcomposer",
-      "community": 12,
+      "community": 8,
       "norm_label": "newmockcomposer()"
     },
     {
@@ -5148,7 +5148,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L74",
       "id": "services_mockcomposer_checkplatformreqs_call",
-      "community": 89,
+      "community": 92,
       "norm_label": "mockcomposer_checkplatformreqs_call"
     },
     {
@@ -5166,7 +5166,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L85",
       "id": "services_mockcomposer_checkplatformreqs_call_run",
-      "community": 89,
+      "community": 92,
       "norm_label": ".run()"
     },
     {
@@ -5175,7 +5175,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L103",
       "id": "services_mockcomposer_checkplatformreqs_call_return",
-      "community": 89,
+      "community": 92,
       "norm_label": ".return()"
     },
     {
@@ -5184,7 +5184,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L108",
       "id": "services_mockcomposer_checkplatformreqs_call_runandreturn",
-      "community": 89,
+      "community": 92,
       "norm_label": ".runandreturn()"
     },
     {
@@ -5202,7 +5202,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L140",
       "id": "services_mockcomposer_getlockhash_call",
-      "community": 94,
+      "community": 79,
       "norm_label": "mockcomposer_getlockhash_call"
     },
     {
@@ -5220,7 +5220,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L150",
       "id": "services_mockcomposer_getlockhash_call_run",
-      "community": 94,
+      "community": 79,
       "norm_label": ".run()"
     },
     {
@@ -5229,7 +5229,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L163",
       "id": "services_mockcomposer_getlockhash_call_return",
-      "community": 94,
+      "community": 79,
       "norm_label": ".return()"
     },
     {
@@ -5238,7 +5238,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L168",
       "id": "services_mockcomposer_getlockhash_call_runandreturn",
-      "community": 94,
+      "community": 79,
       "norm_label": ".runandreturn()"
     },
     {
@@ -5256,7 +5256,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L191",
       "id": "services_mockcomposer_install_call",
-      "community": 80,
+      "community": 17,
       "norm_label": "mockcomposer_install_call"
     },
     {
@@ -5274,7 +5274,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L202",
       "id": "services_mockcomposer_install_call_run",
-      "community": 80,
+      "community": 17,
       "norm_label": ".run()"
     },
     {
@@ -5283,7 +5283,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L220",
       "id": "services_mockcomposer_install_call_return",
-      "community": 80,
+      "community": 17,
       "norm_label": ".return()"
     },
     {
@@ -5292,7 +5292,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L225",
       "id": "services_mockcomposer_install_call_runandreturn",
-      "community": 80,
+      "community": 17,
       "norm_label": ".runandreturn()"
     },
     {
@@ -5310,7 +5310,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L259",
       "id": "services_mockcomposer_update_call",
-      "community": 32,
+      "community": 17,
       "norm_label": "mockcomposer_update_call"
     },
     {
@@ -5328,7 +5328,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L274",
       "id": "services_mockcomposer_update_call_run",
-      "community": 32,
+      "community": 17,
       "norm_label": ".run()"
     },
     {
@@ -5337,7 +5337,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L312",
       "id": "services_mockcomposer_update_call_return",
-      "community": 32,
+      "community": 17,
       "norm_label": ".return()"
     },
     {
@@ -5346,7 +5346,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L317",
       "id": "services_mockcomposer_update_call_runandreturn",
-      "community": 32,
+      "community": 17,
       "norm_label": ".runandreturn()"
     },
     {
@@ -5355,7 +5355,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L324",
       "id": "services_mocks_test_newmockdrush",
-      "community": 12,
+      "community": 8,
       "norm_label": "newmockdrush()"
     },
     {
@@ -5373,7 +5373,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L341",
       "id": "services_mockdrush_expecter",
-      "community": 86,
+      "community": 8,
       "norm_label": "mockdrush_expecter"
     },
     {
@@ -5400,7 +5400,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L367",
       "id": "services_mockdrush_configresave_call",
-      "community": 75,
+      "community": 17,
       "norm_label": "mockdrush_configresave_call"
     },
     {
@@ -5409,7 +5409,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L375",
       "id": "services_mockdrush_expecter_configresave",
-      "community": 86,
+      "community": 8,
       "norm_label": ".configresave()"
     },
     {
@@ -5418,7 +5418,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L379",
       "id": "services_mockdrush_configresave_call_run",
-      "community": 75,
+      "community": 17,
       "norm_label": ".run()"
     },
     {
@@ -5427,7 +5427,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L402",
       "id": "services_mockdrush_configresave_call_return",
-      "community": 75,
+      "community": 17,
       "norm_label": ".return()"
     },
     {
@@ -5436,7 +5436,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L407",
       "id": "services_mockdrush_configresave_call_runandreturn",
-      "community": 75,
+      "community": 17,
       "norm_label": ".runandreturn()"
     },
     {
@@ -5454,7 +5454,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L430",
       "id": "services_mockdrush_exportconfiguration_call",
-      "community": 84,
+      "community": 81,
       "norm_label": "mockdrush_exportconfiguration_call"
     },
     {
@@ -5463,7 +5463,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L438",
       "id": "services_mockdrush_expecter_exportconfiguration",
-      "community": 86,
+      "community": 8,
       "norm_label": ".exportconfiguration()"
     },
     {
@@ -5472,7 +5472,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L442",
       "id": "services_mockdrush_exportconfiguration_call_run",
-      "community": 84,
+      "community": 81,
       "norm_label": ".run()"
     },
     {
@@ -5481,7 +5481,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L465",
       "id": "services_mockdrush_exportconfiguration_call_return",
-      "community": 84,
+      "community": 81,
       "norm_label": ".return()"
     },
     {
@@ -5490,7 +5490,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L470",
       "id": "services_mockdrush_exportconfiguration_call_runandreturn",
-      "community": 84,
+      "community": 81,
       "norm_label": ".runandreturn()"
     },
     {
@@ -5508,7 +5508,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L493",
       "id": "services_mockdrush_updatesite_call",
-      "community": 85,
+      "community": 17,
       "norm_label": "mockdrush_updatesite_call"
     },
     {
@@ -5517,7 +5517,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L501",
       "id": "services_mockdrush_expecter_updatesite",
-      "community": 86,
+      "community": 8,
       "norm_label": ".updatesite()"
     },
     {
@@ -5526,7 +5526,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L505",
       "id": "services_mockdrush_updatesite_call_run",
-      "community": 85,
+      "community": 17,
       "norm_label": ".run()"
     },
     {
@@ -5535,7 +5535,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L528",
       "id": "services_mockdrush_updatesite_call_return",
-      "community": 85,
+      "community": 17,
       "norm_label": ".return()"
     },
     {
@@ -5544,7 +5544,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L533",
       "id": "services_mockdrush_updatesite_call_runandreturn",
-      "community": 85,
+      "community": 17,
       "norm_label": ".runandreturn()"
     },
     {
@@ -5553,7 +5553,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L540",
       "id": "services_mocks_test_newmockrepository",
-      "community": 12,
+      "community": 8,
       "norm_label": "newmockrepository()"
     },
     {
@@ -5598,7 +5598,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L592",
       "id": "services_mockrepository_branchexists_call",
-      "community": 74,
+      "community": 91,
       "norm_label": "mockrepository_branchexists_call"
     },
     {
@@ -5616,7 +5616,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L603",
       "id": "services_mockrepository_branchexists_call_run",
-      "community": 74,
+      "community": 91,
       "norm_label": ".run()"
     },
     {
@@ -5625,7 +5625,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L621",
       "id": "services_mockrepository_branchexists_call_return",
-      "community": 74,
+      "community": 91,
       "norm_label": ".return()"
     },
     {
@@ -5634,7 +5634,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L626",
       "id": "services_mockrepository_branchexists_call_runandreturn",
-      "community": 74,
+      "community": 91,
       "norm_label": ".runandreturn()"
     },
     {
@@ -5652,7 +5652,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L674",
       "id": "services_mockrepository_clonerepository_call",
-      "community": 88,
+      "community": 78,
       "norm_label": "mockrepository_clonerepository_call"
     },
     {
@@ -5670,7 +5670,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L688",
       "id": "services_mockrepository_clonerepository_call_run",
-      "community": 88,
+      "community": 78,
       "norm_label": ".run()"
     },
     {
@@ -5679,7 +5679,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L721",
       "id": "services_mockrepository_clonerepository_call_return",
-      "community": 88,
+      "community": 78,
       "norm_label": ".return()"
     },
     {
@@ -5688,7 +5688,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L726",
       "id": "services_mockrepository_clonerepository_call_runandreturn",
-      "community": 88,
+      "community": 78,
       "norm_label": ".runandreturn()"
     },
     {
@@ -5706,7 +5706,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L758",
       "id": "services_mockrepository_getcurrentbranch_call",
-      "community": 95,
+      "community": 87,
       "norm_label": "mockrepository_getcurrentbranch_call"
     },
     {
@@ -5724,7 +5724,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L768",
       "id": "services_mockrepository_getcurrentbranch_call_run",
-      "community": 95,
+      "community": 87,
       "norm_label": ".run()"
     },
     {
@@ -5733,7 +5733,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L781",
       "id": "services_mockrepository_getcurrentbranch_call_return",
-      "community": 95,
+      "community": 87,
       "norm_label": ".return()"
     },
     {
@@ -5742,7 +5742,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L786",
       "id": "services_mockrepository_getcurrentbranch_call_runandreturn",
-      "community": 95,
+      "community": 87,
       "norm_label": ".runandreturn()"
     },
     {
@@ -5760,7 +5760,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L818",
       "id": "services_mockrepository_getremoteurl_call",
-      "community": 18,
+      "community": 94,
       "norm_label": "mockrepository_getremoteurl_call"
     },
     {
@@ -5778,7 +5778,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L828",
       "id": "services_mockrepository_getremoteurl_call_run",
-      "community": 18,
+      "community": 94,
       "norm_label": ".run()"
     },
     {
@@ -5787,7 +5787,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L841",
       "id": "services_mockrepository_getremoteurl_call_return",
-      "community": 18,
+      "community": 94,
       "norm_label": ".return()"
     },
     {
@@ -5796,7 +5796,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L846",
       "id": "services_mockrepository_getremoteurl_call_runandreturn",
-      "community": 18,
+      "community": 94,
       "norm_label": ".runandreturn()"
     },
     {
@@ -5814,7 +5814,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L894",
       "id": "services_mockrepository_openrepository_call",
-      "community": 76,
+      "community": 86,
       "norm_label": "mockrepository_openrepository_call"
     },
     {
@@ -5832,7 +5832,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L906",
       "id": "services_mockrepository_openrepository_call_run",
-      "community": 76,
+      "community": 86,
       "norm_label": ".run()"
     },
     {
@@ -5841,7 +5841,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L929",
       "id": "services_mockrepository_openrepository_call_return",
-      "community": 76,
+      "community": 86,
       "norm_label": ".return()"
     },
     {
@@ -5850,7 +5850,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L934",
       "id": "services_mockrepository_openrepository_call_runandreturn",
-      "community": 76,
+      "community": 86,
       "norm_label": ".runandreturn()"
     },
     {
@@ -5868,7 +5868,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L954",
       "id": "services_mockgitrepository",
-      "community": 83,
+      "community": 8,
       "norm_label": "mockgitrepository"
     },
     {
@@ -5877,7 +5877,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L958",
       "id": "services_mockgitrepository_expecter",
-      "community": 12,
+      "community": 8,
       "norm_label": "mockgitrepository_expecter"
     },
     {
@@ -5886,7 +5886,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L962",
       "id": "services_mockgitrepository_expect",
-      "community": 83,
+      "community": 8,
       "norm_label": ".expect()"
     },
     {
@@ -5895,7 +5895,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L967",
       "id": "services_mockgitrepository_push",
-      "community": 83,
+      "community": 8,
       "norm_label": ".push()"
     },
     {
@@ -5904,7 +5904,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L984",
       "id": "services_mockgitrepository_push_call",
-      "community": 81,
+      "community": 33,
       "norm_label": "mockgitrepository_push_call"
     },
     {
@@ -5913,7 +5913,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L990",
       "id": "services_mockgitrepository_expecter_push",
-      "community": 12,
+      "community": 8,
       "norm_label": ".push()"
     },
     {
@@ -5922,7 +5922,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L994",
       "id": "services_mockgitrepository_push_call_run",
-      "community": 81,
+      "community": 33,
       "norm_label": ".run()"
     },
     {
@@ -5931,7 +5931,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1007",
       "id": "services_mockgitrepository_push_call_return",
-      "community": 81,
+      "community": 33,
       "norm_label": ".return()"
     },
     {
@@ -5940,7 +5940,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1012",
       "id": "services_mockgitrepository_push_call_runandreturn",
-      "community": 81,
+      "community": 33,
       "norm_label": ".runandreturn()"
     },
     {
@@ -5949,7 +5949,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1018",
       "id": "services_mockgitrepository_references",
-      "community": 83,
+      "community": 8,
       "norm_label": ".references()"
     },
     {
@@ -5958,7 +5958,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1046",
       "id": "services_mockgitrepository_references_call",
-      "community": 93,
+      "community": 77,
       "norm_label": "mockgitrepository_references_call"
     },
     {
@@ -5967,7 +5967,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1051",
       "id": "services_mockgitrepository_expecter_references",
-      "community": 12,
+      "community": 8,
       "norm_label": ".references()"
     },
     {
@@ -5976,7 +5976,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1055",
       "id": "services_mockgitrepository_references_call_run",
-      "community": 93,
+      "community": 77,
       "norm_label": ".run()"
     },
     {
@@ -5985,7 +5985,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1062",
       "id": "services_mockgitrepository_references_call_return",
-      "community": 93,
+      "community": 77,
       "norm_label": ".return()"
     },
     {
@@ -5994,7 +5994,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1067",
       "id": "services_mockgitrepository_references_call_runandreturn",
-      "community": 93,
+      "community": 77,
       "norm_label": ".runandreturn()"
     },
     {
@@ -6003,7 +6003,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1074",
       "id": "services_mocks_test_newmockworktree",
-      "community": 12,
+      "community": 8,
       "norm_label": "newmockworktree()"
     },
     {
@@ -6021,7 +6021,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1091",
       "id": "services_mockworktree_expecter",
-      "community": 39,
+      "community": 40,
       "norm_label": "mockworktree_expecter"
     },
     {
@@ -6048,7 +6048,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1128",
       "id": "services_mockworktree_add_call",
-      "community": 78,
+      "community": 83,
       "norm_label": "mockworktree_add_call"
     },
     {
@@ -6057,7 +6057,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1134",
       "id": "services_mockworktree_expecter_add",
-      "community": 39,
+      "community": 40,
       "norm_label": ".add()"
     },
     {
@@ -6066,7 +6066,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1138",
       "id": "services_mockworktree_add_call_run",
-      "community": 78,
+      "community": 83,
       "norm_label": ".run()"
     },
     {
@@ -6075,7 +6075,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1151",
       "id": "services_mockworktree_add_call_return",
-      "community": 78,
+      "community": 83,
       "norm_label": ".return()"
     },
     {
@@ -6084,7 +6084,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1156",
       "id": "services_mockworktree_add_call_runandreturn",
-      "community": 78,
+      "community": 83,
       "norm_label": ".runandreturn()"
     },
     {
@@ -6102,7 +6102,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1179",
       "id": "services_mockworktree_addglob_call",
-      "community": 90,
+      "community": 88,
       "norm_label": "mockworktree_addglob_call"
     },
     {
@@ -6111,7 +6111,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1185",
       "id": "services_mockworktree_expecter_addglob",
-      "community": 39,
+      "community": 40,
       "norm_label": ".addglob()"
     },
     {
@@ -6120,7 +6120,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1189",
       "id": "services_mockworktree_addglob_call_run",
-      "community": 90,
+      "community": 88,
       "norm_label": ".run()"
     },
     {
@@ -6129,7 +6129,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1202",
       "id": "services_mockworktree_addglob_call_return",
-      "community": 90,
+      "community": 88,
       "norm_label": ".return()"
     },
     {
@@ -6138,7 +6138,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1207",
       "id": "services_mockworktree_addglob_call_runandreturn",
-      "community": 90,
+      "community": 88,
       "norm_label": ".runandreturn()"
     },
     {
@@ -6156,7 +6156,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1230",
       "id": "services_mockworktree_checkout_call",
-      "community": 91,
+      "community": 82,
       "norm_label": "mockworktree_checkout_call"
     },
     {
@@ -6165,7 +6165,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1236",
       "id": "services_mockworktree_expecter_checkout",
-      "community": 39,
+      "community": 40,
       "norm_label": ".checkout()"
     },
     {
@@ -6174,7 +6174,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1240",
       "id": "services_mockworktree_checkout_call_run",
-      "community": 91,
+      "community": 82,
       "norm_label": ".run()"
     },
     {
@@ -6183,7 +6183,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1253",
       "id": "services_mockworktree_checkout_call_return",
-      "community": 91,
+      "community": 82,
       "norm_label": ".return()"
     },
     {
@@ -6192,7 +6192,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1258",
       "id": "services_mockworktree_checkout_call_runandreturn",
-      "community": 91,
+      "community": 82,
       "norm_label": ".runandreturn()"
     },
     {
@@ -6210,7 +6210,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1292",
       "id": "services_mockworktree_commit_call",
-      "community": 82,
+      "community": 80,
       "norm_label": "mockworktree_commit_call"
     },
     {
@@ -6219,7 +6219,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1299",
       "id": "services_mockworktree_expecter_commit",
-      "community": 39,
+      "community": 40,
       "norm_label": ".commit()"
     },
     {
@@ -6228,7 +6228,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1303",
       "id": "services_mockworktree_commit_call_run",
-      "community": 82,
+      "community": 80,
       "norm_label": ".run()"
     },
     {
@@ -6237,7 +6237,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1321",
       "id": "services_mockworktree_commit_call_return",
-      "community": 82,
+      "community": 80,
       "norm_label": ".return()"
     },
     {
@@ -6246,7 +6246,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1326",
       "id": "services_mockworktree_commit_call_runandreturn",
-      "community": 82,
+      "community": 80,
       "norm_label": ".runandreturn()"
     },
     {
@@ -6264,7 +6264,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1360",
       "id": "services_mockworktree_remove_call",
-      "community": 87,
+      "community": 76,
       "norm_label": "mockworktree_remove_call"
     },
     {
@@ -6273,7 +6273,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1366",
       "id": "services_mockworktree_expecter_remove",
-      "community": 39,
+      "community": 40,
       "norm_label": ".remove()"
     },
     {
@@ -6282,7 +6282,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1370",
       "id": "services_mockworktree_remove_call_run",
-      "community": 87,
+      "community": 76,
       "norm_label": ".run()"
     },
     {
@@ -6291,7 +6291,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1383",
       "id": "services_mockworktree_remove_call_return",
-      "community": 87,
+      "community": 76,
       "norm_label": ".return()"
     },
     {
@@ -6300,7 +6300,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1388",
       "id": "services_mockworktree_remove_call_runandreturn",
-      "community": 87,
+      "community": 76,
       "norm_label": ".runandreturn()"
     },
     {
@@ -6318,7 +6318,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1422",
       "id": "services_mockworktree_status_call",
-      "community": 18,
+      "community": 93,
       "norm_label": "mockworktree_status_call"
     },
     {
@@ -6327,7 +6327,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1427",
       "id": "services_mockworktree_expecter_status",
-      "community": 39,
+      "community": 40,
       "norm_label": ".status()"
     },
     {
@@ -6336,7 +6336,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1431",
       "id": "services_mockworktree_status_call_run",
-      "community": 18,
+      "community": 93,
       "norm_label": ".run()"
     },
     {
@@ -6345,7 +6345,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1438",
       "id": "services_mockworktree_status_call_return",
-      "community": 18,
+      "community": 93,
       "norm_label": ".return()"
     },
     {
@@ -6354,7 +6354,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1443",
       "id": "services_mockworktree_status_call_runandreturn",
-      "community": 18,
+      "community": 93,
       "norm_label": ".runandreturn()"
     },
     {
@@ -6372,7 +6372,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1463",
       "id": "services_mockinstaller",
-      "community": 92,
+      "community": 95,
       "norm_label": "mockinstaller"
     },
     {
@@ -6381,7 +6381,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1467",
       "id": "services_mockinstaller_expecter",
-      "community": 12,
+      "community": 8,
       "norm_label": "mockinstaller_expecter"
     },
     {
@@ -6390,7 +6390,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1471",
       "id": "services_mockinstaller_expect",
-      "community": 92,
+      "community": 95,
       "norm_label": ".expect()"
     },
     {
@@ -6399,7 +6399,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1476",
       "id": "services_mockinstaller_configuredatabase",
-      "community": 92,
+      "community": 95,
       "norm_label": ".configuredatabase()"
     },
     {
@@ -6408,7 +6408,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1493",
       "id": "services_mockinstaller_configuredatabase_call",
-      "community": 18,
+      "community": 85,
       "norm_label": "mockinstaller_configuredatabase_call"
     },
     {
@@ -6417,7 +6417,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1501",
       "id": "services_mockinstaller_expecter_configuredatabase",
-      "community": 12,
+      "community": 8,
       "norm_label": ".configuredatabase()"
     },
     {
@@ -6426,7 +6426,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1505",
       "id": "services_mockinstaller_configuredatabase_call_run",
-      "community": 18,
+      "community": 85,
       "norm_label": ".run()"
     },
     {
@@ -6435,7 +6435,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1528",
       "id": "services_mockinstaller_configuredatabase_call_return",
-      "community": 18,
+      "community": 85,
       "norm_label": ".return()"
     },
     {
@@ -6444,7 +6444,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1533",
       "id": "services_mockinstaller_configuredatabase_call_runandreturn",
-      "community": 18,
+      "community": 85,
       "norm_label": ".runandreturn()"
     },
     {
@@ -6453,7 +6453,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1539",
       "id": "services_mockinstaller_install",
-      "community": 92,
+      "community": 95,
       "norm_label": ".install()"
     },
     {
@@ -6462,7 +6462,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1556",
       "id": "services_mockinstaller_install_call",
-      "community": 18,
+      "community": 84,
       "norm_label": "mockinstaller_install_call"
     },
     {
@@ -6471,7 +6471,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1564",
       "id": "services_mockinstaller_expecter_install",
-      "community": 12,
+      "community": 8,
       "norm_label": ".install()"
     },
     {
@@ -6480,7 +6480,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1568",
       "id": "services_mockinstaller_install_call_run",
-      "community": 18,
+      "community": 84,
       "norm_label": ".run()"
     },
     {
@@ -6489,7 +6489,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1591",
       "id": "services_mockinstaller_install_call_return",
-      "community": 18,
+      "community": 84,
       "norm_label": ".return()"
     },
     {
@@ -6498,7 +6498,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1596",
       "id": "services_mockinstaller_install_call_runandreturn",
-      "community": 18,
+      "community": 84,
       "norm_label": ".runandreturn()"
     },
     {
@@ -6507,7 +6507,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1603",
       "id": "services_mocks_test_newmockplatform",
-      "community": 12,
+      "community": 8,
       "norm_label": "newmockplatform()"
     },
     {
@@ -6516,7 +6516,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1616",
       "id": "services_mockplatform",
-      "community": 12,
+      "community": 89,
       "norm_label": "mockplatform"
     },
     {
@@ -6525,7 +6525,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1620",
       "id": "services_mockplatform_expecter",
-      "community": 12,
+      "community": 8,
       "norm_label": "mockplatform_expecter"
     },
     {
@@ -6534,7 +6534,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1624",
       "id": "services_mockplatform_expect",
-      "community": 12,
+      "community": 89,
       "norm_label": ".expect()"
     },
     {
@@ -6543,7 +6543,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1629",
       "id": "services_mockplatform_createmergerequest",
-      "community": 12,
+      "community": 89,
       "norm_label": ".createmergerequest()"
     },
     {
@@ -6552,7 +6552,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1655",
       "id": "services_mockplatform_createmergerequest_call",
-      "community": 79,
+      "community": 74,
       "norm_label": "mockplatform_createmergerequest_call"
     },
     {
@@ -6561,7 +6561,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1665",
       "id": "services_mockplatform_expecter_createmergerequest",
-      "community": 12,
+      "community": 8,
       "norm_label": ".createmergerequest()"
     },
     {
@@ -6570,7 +6570,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1669",
       "id": "services_mockplatform_createmergerequest_call_run",
-      "community": 79,
+      "community": 74,
       "norm_label": ".run()"
     },
     {
@@ -6579,7 +6579,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1702",
       "id": "services_mockplatform_createmergerequest_call_return",
-      "community": 79,
+      "community": 74,
       "norm_label": ".return()"
     },
     {
@@ -6588,7 +6588,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1707",
       "id": "services_mockplatform_createmergerequest_call_runandreturn",
-      "community": 79,
+      "community": 74,
       "norm_label": ".runandreturn()"
     },
     {
@@ -6597,7 +6597,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1713",
       "id": "services_mockplatform_getuser",
-      "community": 12,
+      "community": 89,
       "norm_label": ".getuser()"
     },
     {
@@ -6606,7 +6606,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1739",
       "id": "services_mockplatform_getuser_call",
-      "community": 96,
+      "community": 90,
       "norm_label": "mockplatform_getuser_call"
     },
     {
@@ -6615,7 +6615,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1745",
       "id": "services_mockplatform_expecter_getuser",
-      "community": 12,
+      "community": 8,
       "norm_label": ".getuser()"
     },
     {
@@ -6624,7 +6624,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1749",
       "id": "services_mockplatform_getuser_call_run",
-      "community": 96,
+      "community": 90,
       "norm_label": ".run()"
     },
     {
@@ -6633,7 +6633,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1762",
       "id": "services_mockplatform_getuser_call_return",
-      "community": 96,
+      "community": 90,
       "norm_label": ".return()"
     },
     {
@@ -6642,7 +6642,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1767",
       "id": "services_mockplatform_getuser_call_runandreturn",
-      "community": 96,
+      "community": 90,
       "norm_label": ".runandreturn()"
     },
     {
@@ -6651,7 +6651,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1774",
       "id": "services_mocks_test_newmockeventdispatcher",
-      "community": 12,
+      "community": 8,
       "norm_label": "newmockeventdispatcher()"
     },
     {
@@ -6660,7 +6660,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1787",
       "id": "services_mockeventdispatcher",
-      "community": 77,
+      "community": 75,
       "norm_label": "mockeventdispatcher"
     },
     {
@@ -6669,7 +6669,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1791",
       "id": "services_mockeventdispatcher_expecter",
-      "community": 12,
+      "community": 8,
       "norm_label": "mockeventdispatcher_expecter"
     },
     {
@@ -6678,7 +6678,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1795",
       "id": "services_mockeventdispatcher_expect",
-      "community": 77,
+      "community": 75,
       "norm_label": ".expect()"
     },
     {
@@ -6687,7 +6687,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1800",
       "id": "services_mockeventdispatcher_addsubscriber",
-      "community": 77,
+      "community": 75,
       "norm_label": ".addsubscriber()"
     },
     {
@@ -6696,7 +6696,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1806",
       "id": "services_mockeventdispatcher_addsubscriber_call",
-      "community": 32,
+      "community": 33,
       "norm_label": "mockeventdispatcher_addsubscriber_call"
     },
     {
@@ -6705,7 +6705,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1812",
       "id": "services_mockeventdispatcher_expecter_addsubscriber",
-      "community": 12,
+      "community": 8,
       "norm_label": ".addsubscriber()"
     },
     {
@@ -6714,7 +6714,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1816",
       "id": "services_mockeventdispatcher_addsubscriber_call_run",
-      "community": 32,
+      "community": 33,
       "norm_label": ".run()"
     },
     {
@@ -6723,7 +6723,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1829",
       "id": "services_mockeventdispatcher_addsubscriber_call_return",
-      "community": 32,
+      "community": 33,
       "norm_label": ".return()"
     },
     {
@@ -6732,7 +6732,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1834",
       "id": "services_mockeventdispatcher_addsubscriber_call_runandreturn",
-      "community": 32,
+      "community": 33,
       "norm_label": ".runandreturn()"
     },
     {
@@ -6741,7 +6741,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1840",
       "id": "services_mockeventdispatcher_fireevent",
-      "community": 77,
+      "community": 75,
       "norm_label": ".fireevent()"
     },
     {
@@ -6750,7 +6750,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1857",
       "id": "services_mockeventdispatcher_fireevent_call",
-      "community": 18,
+      "community": 17,
       "norm_label": "mockeventdispatcher_fireevent_call"
     },
     {
@@ -6759,7 +6759,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1863",
       "id": "services_mockeventdispatcher_expecter_fireevent",
-      "community": 12,
+      "community": 8,
       "norm_label": ".fireevent()"
     },
     {
@@ -6768,7 +6768,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1867",
       "id": "services_mockeventdispatcher_fireevent_call_run",
-      "community": 32,
+      "community": 33,
       "norm_label": ".run()"
     },
     {
@@ -6777,7 +6777,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1880",
       "id": "services_mockeventdispatcher_fireevent_call_return",
-      "community": 18,
+      "community": 17,
       "norm_label": ".return()"
     },
     {
@@ -6786,7 +6786,7 @@
       "source_file": "internal/services/mocks_test.go",
       "source_location": "L1885",
       "id": "services_mockeventdispatcher_fireevent_call_runandreturn",
-      "community": 18,
+      "community": 17,
       "norm_label": ".runandreturn()"
     },
     {
@@ -6795,7 +6795,7 @@
       "source_file": "scripts/rector.php",
       "source_location": "L1",
       "id": "scripts_rector_php",
-      "community": 106,
+      "community": 105,
       "norm_label": "rector.php"
     },
     {
@@ -6804,7 +6804,7 @@
       "source_file": "scripts/config-resave.php",
       "source_location": "L1",
       "id": "scripts_config_resave_php",
-      "community": 107,
+      "community": 106,
       "norm_label": "config-resave.php"
     },
     {
@@ -6813,7 +6813,7 @@
       "source_file": "pkg/phpcs/phpcs.go",
       "source_location": "L1",
       "id": "pkg_phpcs_phpcs_go",
-      "community": 28,
+      "community": 29,
       "norm_label": "phpcs.go"
     },
     {
@@ -6822,7 +6822,7 @@
       "source_file": "pkg/phpcs/phpcs.go",
       "source_location": "L14",
       "id": "phpcs_cli",
-      "community": 28,
+      "community": 29,
       "norm_label": "cli"
     },
     {
@@ -6831,7 +6831,7 @@
       "source_file": "pkg/phpcs/phpcs.go",
       "source_location": "L18",
       "id": "phpcs_phpcs_newcli",
-      "community": 28,
+      "community": 29,
       "norm_label": "newcli()"
     },
     {
@@ -6840,7 +6840,7 @@
       "source_file": "pkg/phpcs/phpcs.go",
       "source_location": "L24",
       "id": "phpcs_cli_execcomposer",
-      "community": 28,
+      "community": 29,
       "norm_label": ".execcomposer()"
     },
     {
@@ -6849,7 +6849,7 @@
       "source_file": "pkg/phpcs/phpcs.go",
       "source_location": "L36",
       "id": "phpcs_returnoutput",
-      "community": 28,
+      "community": 29,
       "norm_label": "returnoutput"
     },
     {
@@ -6858,7 +6858,7 @@
       "source_file": "pkg/phpcs/phpcs.go",
       "source_location": "L41",
       "id": "phpcs_returnoutputfile",
-      "community": 28,
+      "community": 29,
       "norm_label": "returnoutputfile"
     },
     {
@@ -6867,7 +6867,7 @@
       "source_file": "pkg/phpcs/phpcs.go",
       "source_location": "L47",
       "id": "phpcs_returnoutputfilemessage",
-      "community": 28,
+      "community": 29,
       "norm_label": "returnoutputfilemessage"
     },
     {
@@ -6876,7 +6876,7 @@
       "source_file": "pkg/phpcs/phpcs.go",
       "source_location": "L56",
       "id": "phpcs_returnoutputtotals",
-      "community": 28,
+      "community": 29,
       "norm_label": "returnoutputtotals"
     },
     {
@@ -6885,7 +6885,7 @@
       "source_file": "pkg/phpcs/phpcs.go",
       "source_location": "L62",
       "id": "phpcs_cli_run",
-      "community": 28,
+      "community": 29,
       "norm_label": ".run()"
     },
     {
@@ -6894,7 +6894,7 @@
       "source_file": "pkg/phpcs/phpcs.go",
       "source_location": "L75",
       "id": "phpcs_cli_runcbf",
-      "community": 28,
+      "community": 29,
       "norm_label": ".runcbf()"
     },
     {
@@ -6903,7 +6903,7 @@
       "source_file": "pkg/phpcs/phpcs_test.go",
       "source_location": "L1",
       "id": "pkg_phpcs_phpcs_test_go",
-      "community": 98,
+      "community": 97,
       "norm_label": "phpcs_test.go"
     },
     {
@@ -6912,7 +6912,7 @@
       "source_file": "pkg/phpcs/phpcs_test.go",
       "source_location": "L14",
       "id": "phpcs_phpcs_test_testphpcsrun",
-      "community": 98,
+      "community": 97,
       "norm_label": "testphpcsrun()"
     },
     {
@@ -6921,7 +6921,7 @@
       "source_file": "pkg/phpcs/phpcs_test.go",
       "source_location": "L63",
       "id": "phpcs_phpcs_test_testphpcsruncbf",
-      "community": 98,
+      "community": 97,
       "norm_label": "testphpcsruncbf()"
     },
     {
@@ -6930,7 +6930,7 @@
       "source_file": "pkg/phpcs/phpcs_test.go",
       "source_location": "L95",
       "id": "phpcs_phpcs_test_testhelperprocess",
-      "community": 98,
+      "community": 97,
       "norm_label": "testhelperprocess()"
     },
     {
@@ -6939,7 +6939,7 @@
       "source_file": "pkg/drupalorg/drupalorg_test.go",
       "source_location": "L1",
       "id": "pkg_drupalorg_drupalorg_test_go",
-      "community": 26,
+      "community": 27,
       "norm_label": "drupalorg_test.go"
     },
     {
@@ -6948,7 +6948,7 @@
       "source_file": "pkg/drupalorg/drupalorg_test.go",
       "source_location": "L14",
       "id": "drupalorg_drupalorg_test_testnewhttpclient_hastimeout",
-      "community": 40,
+      "community": 41,
       "norm_label": "testnewhttpclient_hastimeout()"
     },
     {
@@ -6957,7 +6957,7 @@
       "source_file": "pkg/drupalorg/drupalorg_test.go",
       "source_location": "L19",
       "id": "drupalorg_drupalorg_test_testgetissue_timeout",
-      "community": 26,
+      "community": 27,
       "norm_label": "testgetissue_timeout()"
     },
     {
@@ -6966,7 +6966,7 @@
       "source_file": "pkg/drupalorg/drupalorg_test.go",
       "source_location": "L39",
       "id": "drupalorg_drupalorg_test_testgetissue",
-      "community": 26,
+      "community": 27,
       "norm_label": "testgetissue()"
     },
     {
@@ -6975,7 +6975,7 @@
       "source_file": "pkg/drupalorg/drupalorg_test.go",
       "source_location": "L76",
       "id": "drupalorg_drupalorg_test_testgetissue_failure",
-      "community": 26,
+      "community": 27,
       "norm_label": "testgetissue_failure()"
     },
     {
@@ -6984,7 +6984,7 @@
       "source_file": "pkg/drupalorg/drupalorg_test.go",
       "source_location": "L100",
       "id": "drupalorg_drupalorg_test_testfindissuenumber",
-      "community": 26,
+      "community": 27,
       "norm_label": "testfindissuenumber()"
     },
     {
@@ -6993,7 +6993,7 @@
       "source_file": "pkg/drupalorg/drupalorg.go",
       "source_location": "L1",
       "id": "pkg_drupalorg_drupalorg_go",
-      "community": 40,
+      "community": 41,
       "norm_label": "drupalorg.go"
     },
     {
@@ -7002,7 +7002,7 @@
       "source_file": "pkg/drupalorg/drupalorg.go",
       "source_location": "L13",
       "id": "drupalorg_httpclient",
-      "community": 40,
+      "community": 41,
       "norm_label": "httpclient"
     },
     {
@@ -7011,7 +7011,7 @@
       "source_file": "pkg/drupalorg/drupalorg.go",
       "source_location": "L19",
       "id": "drupalorg_drupalorg_newhttpclient",
-      "community": 40,
+      "community": 41,
       "norm_label": "newhttpclient()"
     },
     {
@@ -7020,7 +7020,7 @@
       "source_file": "pkg/drupalorg/drupalorg.go",
       "source_location": "L27",
       "id": "drupalorg_issue",
-      "community": 40,
+      "community": 41,
       "norm_label": "issue"
     },
     {
@@ -7029,7 +7029,7 @@
       "source_file": "pkg/drupalorg/drupalorg.go",
       "source_location": "L37",
       "id": "drupalorg_httpclient_getissue",
-      "community": 40,
+      "community": 41,
       "norm_label": ".getissue()"
     },
     {
@@ -7038,7 +7038,7 @@
       "source_file": "pkg/drupalorg/drupalorg.go",
       "source_location": "L52",
       "id": "drupalorg_httpclient_findissuenumber",
-      "community": 40,
+      "community": 41,
       "norm_label": ".findissuenumber()"
     },
     {
@@ -7047,7 +7047,7 @@
       "source_file": "pkg/drupal/installer.go",
       "source_location": "L1",
       "id": "pkg_drupal_installer_go",
-      "community": 29,
+      "community": 30,
       "norm_label": "installer.go"
     },
     {
@@ -7056,7 +7056,7 @@
       "source_file": "pkg/drupal/installer.go",
       "source_location": "L17",
       "id": "drupal_drush",
-      "community": 29,
+      "community": 30,
       "norm_label": "drush"
     },
     {
@@ -7065,7 +7065,7 @@
       "source_file": "pkg/drupal/installer.go",
       "source_location": "L22",
       "id": "drupal_composer",
-      "community": 29,
+      "community": 30,
       "norm_label": "composer"
     },
     {
@@ -7074,7 +7074,7 @@
       "source_file": "pkg/drupal/installer.go",
       "source_location": "L26",
       "id": "drupal_installer",
-      "community": 29,
+      "community": 30,
       "norm_label": "installer"
     },
     {
@@ -7083,7 +7083,7 @@
       "source_file": "pkg/drupal/installer.go",
       "source_location": "L33",
       "id": "drupal_installer_newinstaller",
-      "community": 29,
+      "community": 30,
       "norm_label": "newinstaller()"
     },
     {
@@ -7092,7 +7092,7 @@
       "source_file": "pkg/drupal/installer.go",
       "source_location": "L42",
       "id": "drupal_installer_install",
-      "community": 29,
+      "community": 30,
       "norm_label": ".install()"
     },
     {
@@ -7101,7 +7101,7 @@
       "source_file": "pkg/drupal/installer.go",
       "source_location": "L61",
       "id": "drupal_installer_configuredatabase",
-      "community": 29,
+      "community": 30,
       "norm_label": ".configuredatabase()"
     },
     {
@@ -7110,7 +7110,7 @@
       "source_file": "pkg/drupal/installer.go",
       "source_location": "L122",
       "id": "drupal_installer_issqlitemoduleenabled",
-      "community": 29,
+      "community": 30,
       "norm_label": ".issqlitemoduleenabled()"
     },
     {
@@ -7119,7 +7119,7 @@
       "source_file": "pkg/drupal/installer.go",
       "source_location": "L154",
       "id": "drupal_installer_addsqlitemodule",
-      "community": 29,
+      "community": 30,
       "norm_label": ".addsqlitemodule()"
     },
     {
@@ -7128,7 +7128,7 @@
       "source_file": "pkg/drupal/installer.go",
       "source_location": "L192",
       "id": "drupal_installer_removeprofile",
-      "community": 29,
+      "community": 30,
       "norm_label": ".removeprofile()"
     },
     {
@@ -7380,7 +7380,7 @@
       "source_file": "pkg/drupal/installer_test.go",
       "source_location": "L1",
       "id": "pkg_drupal_installer_test_go",
-      "community": 97,
+      "community": 96,
       "norm_label": "installer_test.go"
     },
     {
@@ -7389,7 +7389,7 @@
       "source_file": "pkg/drupal/installer_test.go",
       "source_location": "L14",
       "id": "drupal_installer_test_testinstalldrupal",
-      "community": 97,
+      "community": 96,
       "norm_label": "testinstalldrupal()"
     },
     {
@@ -7398,7 +7398,7 @@
       "source_file": "pkg/drupal/installer_test.go",
       "source_location": "L116",
       "id": "drupal_installer_test_testaddsqlitemodule",
-      "community": 97,
+      "community": 96,
       "norm_label": "testaddsqlitemodule()"
     },
     {
@@ -7407,7 +7407,7 @@
       "source_file": "pkg/drupal/installer_test.go",
       "source_location": "L190",
       "id": "drupal_installer_test_testremoveprofile",
-      "community": 97,
+      "community": 96,
       "norm_label": "testremoveprofile()"
     },
     {
@@ -7722,7 +7722,7 @@
       "source_file": "pkg/composer/composer_test.go",
       "source_location": "L1",
       "id": "pkg_composer_composer_test_go",
-      "community": 11,
+      "community": 12,
       "norm_label": "composer_test.go"
     },
     {
@@ -7731,7 +7731,7 @@
       "source_file": "pkg/composer/composer_test.go",
       "source_location": "L17",
       "id": "composer_composer_test_testexeccomposer",
-      "community": 11,
+      "community": 12,
       "norm_label": "testexeccomposer()"
     },
     {
@@ -7740,7 +7740,7 @@
       "source_file": "pkg/composer/composer_test.go",
       "source_location": "L56",
       "id": "composer_composer_test_testgetcomposerupdates",
-      "community": 11,
+      "community": 12,
       "norm_label": "testgetcomposerupdates()"
     },
     {
@@ -7749,7 +7749,7 @@
       "source_file": "pkg/composer/composer_test.go",
       "source_location": "L112",
       "id": "composer_composer_test_testgetinstalledplugins",
-      "community": 11,
+      "community": 12,
       "norm_label": "testgetinstalledplugins()"
     },
     {
@@ -7758,7 +7758,7 @@
       "source_file": "pkg/composer/composer_test.go",
       "source_location": "L160",
       "id": "composer_composer_test_testruncomposeraudit",
-      "community": 11,
+      "community": 12,
       "norm_label": "testruncomposeraudit()"
     },
     {
@@ -7767,7 +7767,7 @@
       "source_file": "pkg/composer/composer_test.go",
       "source_location": "L254",
       "id": "composer_composer_test_testgetcomposerlockhash",
-      "community": 11,
+      "community": 12,
       "norm_label": "testgetcomposerlockhash()"
     },
     {
@@ -7776,7 +7776,7 @@
       "source_file": "pkg/composer/composer_test.go",
       "source_location": "L273",
       "id": "composer_composer_test_testgetinstalledpackageversion",
-      "community": 11,
+      "community": 12,
       "norm_label": "testgetinstalledpackageversion()"
     },
     {
@@ -7785,7 +7785,7 @@
       "source_file": "pkg/composer/composer_test.go",
       "source_location": "L315",
       "id": "composer_composer_test_testcheckpatchapplies",
-      "community": 11,
+      "community": 12,
       "norm_label": "testcheckpatchapplies()"
     },
     {
@@ -7794,7 +7794,7 @@
       "source_file": "pkg/composer/composer_test.go",
       "source_location": "L415",
       "id": "composer_composer_test_testinstall",
-      "community": 11,
+      "community": 12,
       "norm_label": "testinstall()"
     },
     {
@@ -7803,7 +7803,7 @@
       "source_file": "pkg/composer/composer_test.go",
       "source_location": "L445",
       "id": "composer_composer_test_testremove",
-      "community": 11,
+      "community": 12,
       "norm_label": "testremove()"
     },
     {
@@ -7812,7 +7812,7 @@
       "source_file": "pkg/composer/composer_test.go",
       "source_location": "L476",
       "id": "composer_composer_test_testnormalize",
-      "community": 11,
+      "community": 12,
       "norm_label": "testnormalize()"
     },
     {
@@ -7821,7 +7821,7 @@
       "source_file": "pkg/composer/composer_test.go",
       "source_location": "L493",
       "id": "composer_composer_test_testcheckplatformreqs",
-      "community": 11,
+      "community": 12,
       "norm_label": "testcheckplatformreqs()"
     },
     {
@@ -7830,7 +7830,7 @@
       "source_file": "pkg/composer/composer_test.go",
       "source_location": "L526",
       "id": "composer_composer_test_testdiff",
-      "community": 11,
+      "community": 12,
       "norm_label": "testdiff()"
     },
     {
@@ -7839,7 +7839,7 @@
       "source_file": "pkg/composer/composer_test.go",
       "source_location": "L558",
       "id": "composer_composer_test_testgetconfig",
-      "community": 11,
+      "community": 12,
       "norm_label": "testgetconfig()"
     },
     {
@@ -7848,7 +7848,7 @@
       "source_file": "pkg/composer/composer_test.go",
       "source_location": "L575",
       "id": "composer_composer_test_testsetconfig",
-      "community": 11,
+      "community": 12,
       "norm_label": "testsetconfig()"
     },
     {
@@ -7857,7 +7857,7 @@
       "source_file": "pkg/composer/composer_test.go",
       "source_location": "L603",
       "id": "composer_composer_test_testispackageinstalled",
-      "community": 11,
+      "community": 12,
       "norm_label": "testispackageinstalled()"
     },
     {
@@ -7866,7 +7866,7 @@
       "source_file": "pkg/composer/composer_test.go",
       "source_location": "L635",
       "id": "composer_composer_test_testupdatelockhash",
-      "community": 11,
+      "community": 12,
       "norm_label": "testupdatelockhash()"
     },
     {
@@ -7875,7 +7875,7 @@
       "source_file": "pkg/composer/composer_test.go",
       "source_location": "L663",
       "id": "composer_composer_test_testgetallowplugins",
-      "community": 11,
+      "community": 12,
       "norm_label": "testgetallowplugins()"
     },
     {
@@ -7884,7 +7884,7 @@
       "source_file": "pkg/composer/composer_test.go",
       "source_location": "L697",
       "id": "composer_composer_test_testsetallowplugins",
-      "community": 11,
+      "community": 12,
       "norm_label": "testsetallowplugins()"
     },
     {
@@ -7893,7 +7893,7 @@
       "source_file": "pkg/composer/composer_test.go",
       "source_location": "L719",
       "id": "composer_composer_test_testgetcustomcodedirectories",
-      "community": 11,
+      "community": 12,
       "norm_label": "testgetcustomcodedirectories()"
     },
     {
@@ -7902,7 +7902,7 @@
       "source_file": "pkg/composer/composer_test.go",
       "source_location": "L756",
       "id": "composer_composer_test_testhelperprocess",
-      "community": 11,
+      "community": 12,
       "norm_label": "testhelperprocess()"
     },
     {
@@ -7911,7 +7911,7 @@
       "source_file": "pkg/composer/composer_test.go",
       "source_location": "L768",
       "id": "composer_composer_test_testcheckifpatchesapply",
-      "community": 11,
+      "community": 12,
       "norm_label": "testcheckifpatchesapply()"
     },
     {
@@ -7920,7 +7920,7 @@
       "source_file": "pkg/composer/composer_test.go",
       "source_location": "L816",
       "id": "composer_composer_test_testgetdependencypatches",
-      "community": 11,
+      "community": 12,
       "norm_label": "testgetdependencypatches()"
     },
     {
@@ -7929,7 +7929,7 @@
       "source_file": "pkg/rector/rector_test.go",
       "source_location": "L1",
       "id": "pkg_rector_rector_test_go",
-      "community": 100,
+      "community": 99,
       "norm_label": "rector_test.go"
     },
     {
@@ -7938,7 +7938,7 @@
       "source_file": "pkg/rector/rector_test.go",
       "source_location": "L14",
       "id": "rector_rector_test_testrectorrun",
-      "community": 100,
+      "community": 99,
       "norm_label": "testrectorrun()"
     },
     {
@@ -7947,7 +7947,7 @@
       "source_file": "pkg/rector/rector_test.go",
       "source_location": "L80",
       "id": "rector_rector_test_testhelperprocess",
-      "community": 100,
+      "community": 99,
       "norm_label": "testhelperprocess()"
     },
     {
@@ -7956,7 +7956,7 @@
       "source_file": "pkg/rector/rector.go",
       "source_location": "L1",
       "id": "pkg_rector_rector_go",
-      "community": 36,
+      "community": 37,
       "norm_label": "rector.go"
     },
     {
@@ -7965,7 +7965,7 @@
       "source_file": "pkg/rector/rector.go",
       "source_location": "L15",
       "id": "rector_cli",
-      "community": 36,
+      "community": 37,
       "norm_label": "cli"
     },
     {
@@ -7974,7 +7974,7 @@
       "source_file": "pkg/rector/rector.go",
       "source_location": "L19",
       "id": "rector_rector_newcli",
-      "community": 36,
+      "community": 37,
       "norm_label": "newcli()"
     },
     {
@@ -7983,7 +7983,7 @@
       "source_file": "pkg/rector/rector.go",
       "source_location": "L25",
       "id": "rector_cli_execcomposer",
-      "community": 36,
+      "community": 37,
       "norm_label": ".execcomposer()"
     },
     {
@@ -7992,7 +7992,7 @@
       "source_file": "pkg/rector/rector.go",
       "source_location": "L37",
       "id": "rector_returnoutput",
-      "community": 36,
+      "community": 37,
       "norm_label": "returnoutput"
     },
     {
@@ -8001,7 +8001,7 @@
       "source_file": "pkg/rector/rector.go",
       "source_location": "L43",
       "id": "rector_returnoutputtotals",
-      "community": 36,
+      "community": 37,
       "norm_label": "returnoutputtotals"
     },
     {
@@ -8010,7 +8010,7 @@
       "source_file": "pkg/rector/rector.go",
       "source_location": "L48",
       "id": "rector_returnoutputfilldiff",
-      "community": 36,
+      "community": 37,
       "norm_label": "returnoutputfilldiff"
     },
     {
@@ -8019,7 +8019,7 @@
       "source_file": "pkg/rector/rector.go",
       "source_location": "L54",
       "id": "rector_cli_run",
-      "community": 36,
+      "community": 37,
       "norm_label": ".run()"
     },
     {
@@ -8037,7 +8037,7 @@
       "source_file": "pkg/drush/drush_test.go",
       "source_location": "L16",
       "id": "drush_drush_test_testexecdrush",
-      "community": 26,
+      "community": 27,
       "norm_label": "testexecdrush()"
     },
     {
@@ -8262,7 +8262,7 @@
       "source_file": "pkg/repo/repo.go",
       "source_location": "L1",
       "id": "pkg_repo_repo_go",
-      "community": 27,
+      "community": 28,
       "norm_label": "repo.go"
     },
     {
@@ -8271,7 +8271,7 @@
       "source_file": "pkg/repo/repo.go",
       "source_location": "L21",
       "id": "repo_repository",
-      "community": 27,
+      "community": 28,
       "norm_label": "repository"
     },
     {
@@ -8280,7 +8280,7 @@
       "source_file": "pkg/repo/repo.go",
       "source_location": "L26",
       "id": "repo_worktree",
-      "community": 27,
+      "community": 28,
       "norm_label": "worktree"
     },
     {
@@ -8289,7 +8289,7 @@
       "source_file": "pkg/repo/repo.go",
       "source_location": "L35",
       "id": "repo_gitrepositoryservice",
-      "community": 27,
+      "community": 28,
       "norm_label": "gitrepositoryservice"
     },
     {
@@ -8298,7 +8298,7 @@
       "source_file": "pkg/repo/repo.go",
       "source_location": "L40",
       "id": "repo_repo_newgitrepositoryservice",
-      "community": 41,
+      "community": 26,
       "norm_label": "newgitrepositoryservice()"
     },
     {
@@ -8307,7 +8307,7 @@
       "source_file": "pkg/repo/repo.go",
       "source_location": "L47",
       "id": "repo_gitrepositoryservice_clonerepository",
-      "community": 27,
+      "community": 28,
       "norm_label": ".clonerepository()"
     },
     {
@@ -8316,7 +8316,7 @@
       "source_file": "pkg/repo/repo.go",
       "source_location": "L80",
       "id": "repo_gitrepositoryservice_openrepository",
-      "community": 27,
+      "community": 28,
       "norm_label": ".openrepository()"
     },
     {
@@ -8325,7 +8325,7 @@
       "source_file": "pkg/repo/repo.go",
       "source_location": "L91",
       "id": "repo_gitrepositoryservice_getremoteurl",
-      "community": 27,
+      "community": 28,
       "norm_label": ".getremoteurl()"
     },
     {
@@ -8334,7 +8334,7 @@
       "source_file": "pkg/repo/repo.go",
       "source_location": "L114",
       "id": "repo_gitrepositoryservice_getcurrentbranch",
-      "community": 27,
+      "community": 28,
       "norm_label": ".getcurrentbranch()"
     },
     {
@@ -8343,7 +8343,7 @@
       "source_file": "pkg/repo/repo.go",
       "source_location": "L131",
       "id": "repo_repo_preparecheckout",
-      "community": 27,
+      "community": 28,
       "norm_label": "preparecheckout()"
     },
     {
@@ -8352,7 +8352,7 @@
       "source_file": "pkg/repo/repo.go",
       "source_location": "L155",
       "id": "repo_gitrepositoryservice_branchexists",
-      "community": 27,
+      "community": 28,
       "norm_label": ".branchexists()"
     },
     {
@@ -8361,7 +8361,7 @@
       "source_file": "pkg/repo/repo.go",
       "source_location": "L181",
       "id": "repo_gitrepositoryservice_issomethingstagedinpath",
-      "community": 27,
+      "community": 28,
       "norm_label": ".issomethingstagedinpath()"
     },
     {
@@ -8370,7 +8370,7 @@
       "source_file": "pkg/repo/repo_test.go",
       "source_location": "L1",
       "id": "pkg_repo_repo_test_go",
-      "community": 41,
+      "community": 26,
       "norm_label": "repo_test.go"
     },
     {
@@ -8424,7 +8424,7 @@
       "source_file": "pkg/repo/repo_test.go",
       "source_location": "L39",
       "id": "repo_repo_test_testissomethingstaged",
-      "community": 41,
+      "community": 26,
       "norm_label": "testissomethingstaged()"
     },
     {
@@ -8433,7 +8433,7 @@
       "source_file": "pkg/repo/repo_test.go",
       "source_location": "L130",
       "id": "repo_repo_test_testbranchexists",
-      "community": 41,
+      "community": 26,
       "norm_label": "testbranchexists()"
     },
     {
@@ -8442,7 +8442,7 @@
       "source_file": "pkg/repo/repo_test.go",
       "source_location": "L193",
       "id": "repo_repo_test_testgetremoteurl",
-      "community": 41,
+      "community": 26,
       "norm_label": "testgetremoteurl()"
     },
     {
@@ -8451,7 +8451,7 @@
       "source_file": "pkg/repo/repo_test.go",
       "source_location": "L222",
       "id": "repo_repo_test_testgetcurrentbranch",
-      "community": 41,
+      "community": 26,
       "norm_label": "testgetcurrentbranch()"
     },
     {
@@ -8460,7 +8460,7 @@
       "source_file": "pkg/repo/repo_test.go",
       "source_location": "L272",
       "id": "repo_repo_test_testopenrepository",
-      "community": 41,
+      "community": 26,
       "norm_label": "testopenrepository()"
     },
     {
@@ -8982,7 +8982,7 @@
       "source_file": "README.md",
       "source_location": "L1",
       "id": "drupdater_readme_drupdater",
-      "community": 10,
+      "community": 11,
       "norm_label": "drupdater"
     },
     {
@@ -8991,7 +8991,7 @@
       "source_file": "README.md",
       "source_location": "L9",
       "id": "drupdater_readme_table_of_contents",
-      "community": 10,
+      "community": 11,
       "norm_label": "table of contents"
     },
     {
@@ -9000,7 +9000,7 @@
       "source_file": "README.md",
       "source_location": "L21",
       "id": "drupdater_readme_features",
-      "community": 10,
+      "community": 11,
       "norm_label": "features"
     },
     {
@@ -9009,7 +9009,7 @@
       "source_file": "README.md",
       "source_location": "L35",
       "id": "drupdater_readme_prerequisites",
-      "community": 10,
+      "community": 11,
       "norm_label": "prerequisites"
     },
     {
@@ -9018,7 +9018,7 @@
       "source_file": "README.md",
       "source_location": "L42",
       "id": "drupdater_readme_usage",
-      "community": 10,
+      "community": 11,
       "norm_label": "usage"
     },
     {
@@ -9027,7 +9027,7 @@
       "source_file": "README.md",
       "source_location": "L44",
       "id": "drupdater_readme_command_line",
-      "community": 10,
+      "community": 11,
       "norm_label": "command-line"
     },
     {
@@ -9036,7 +9036,7 @@
       "source_file": "README.md",
       "source_location": "L50",
       "id": "drupdater_readme_codeblock_1",
-      "community": 10,
+      "community": 11,
       "norm_label": "code:bash (# php 8.3)"
     },
     {
@@ -9045,7 +9045,7 @@
       "source_file": "README.md",
       "source_location": "L63",
       "id": "drupdater_readme_ci_cd_integration",
-      "community": 10,
+      "community": 11,
       "norm_label": "ci/cd integration"
     },
     {
@@ -9054,7 +9054,7 @@
       "source_file": "README.md",
       "source_location": "L65",
       "id": "drupdater_readme_gitlab_ci",
-      "community": 10,
+      "community": 11,
       "norm_label": "gitlab ci"
     },
     {
@@ -9063,7 +9063,7 @@
       "source_file": "README.md",
       "source_location": "L69",
       "id": "drupdater_readme_codeblock_2",
-      "community": 10,
+      "community": 11,
       "norm_label": "code:yaml (drupdater:)"
     },
     {
@@ -9072,7 +9072,7 @@
       "source_file": "README.md",
       "source_location": "L84",
       "id": "drupdater_readme_codeblock_3",
-      "community": 10,
+      "community": 11,
       "norm_label": "code:yaml (drupdater-security:)"
     },
     {
@@ -9081,7 +9081,7 @@
       "source_file": "README.md",
       "source_location": "L97",
       "id": "drupdater_readme_github_actions",
-      "community": 10,
+      "community": 11,
       "norm_label": "github actions"
     },
     {
@@ -9090,7 +9090,7 @@
       "source_file": "README.md",
       "source_location": "L101",
       "id": "drupdater_readme_codeblock_4",
-      "community": 10,
+      "community": 11,
       "norm_label": "code:yaml (name: drupdater)"
     },
     {
@@ -9099,7 +9099,7 @@
       "source_file": "README.md",
       "source_location": "L129",
       "id": "drupdater_readme_codeblock_5",
-      "community": 10,
+      "community": 11,
       "norm_label": "code:yaml (name: drupdater security)"
     },
     {
@@ -9108,7 +9108,7 @@
       "source_file": "README.md",
       "source_location": "L157",
       "id": "drupdater_readme_configuration",
-      "community": 10,
+      "community": 11,
       "norm_label": "configuration"
     },
     {
@@ -9117,7 +9117,7 @@
       "source_file": "README.md",
       "source_location": "L159",
       "id": "drupdater_readme_flags",
-      "community": 10,
+      "community": 11,
       "norm_label": "flags"
     },
     {
@@ -9126,7 +9126,7 @@
       "source_file": "README.md",
       "source_location": "L174",
       "id": "drupdater_readme_drupdater_yaml",
-      "community": 10,
+      "community": 11,
       "norm_label": "`.drupdater.yaml`"
     },
     {
@@ -9135,7 +9135,7 @@
       "source_file": "README.md",
       "source_location": "L180",
       "id": "drupdater_readme_codeblock_6",
-      "community": 10,
+      "community": 11,
       "norm_label": "code:yaml (sites: [default]      # drupal site directories to update)"
     },
     {
@@ -9144,7 +9144,7 @@
       "source_file": "README.md",
       "source_location": "L205",
       "id": "drupdater_readme_environment_variables",
-      "community": 10,
+      "community": 11,
       "norm_label": "environment variables"
     },
     {
@@ -9153,7 +9153,7 @@
       "source_file": "README.md",
       "source_location": "L212",
       "id": "drupdater_readme_faq",
-      "community": 10,
+      "community": 11,
       "norm_label": "faq"
     },
     {
@@ -9162,7 +9162,7 @@
       "source_file": "README.md",
       "source_location": "L214",
       "id": "drupdater_readme_how_do_i_use_drupdater_with_a_private_packagist",
-      "community": 10,
+      "community": 11,
       "norm_label": "how do i use drupdater with a private packagist?"
     },
     {
@@ -9171,7 +9171,7 @@
       "source_file": "README.md",
       "source_location": "L218",
       "id": "drupdater_readme_codeblock_7",
-      "community": 10,
+      "community": 11,
       "norm_label": "code:bash (docker run \\)"
     },
     {
@@ -9180,7 +9180,7 @@
       "source_file": "README.md",
       "source_location": "L225",
       "id": "drupdater_readme_how_do_i_update_multiple_drupal_sites_in_one_repository",
-      "community": 10,
+      "community": 11,
       "norm_label": "how do i update multiple drupal sites in one repository?"
     },
     {
@@ -9189,7 +9189,7 @@
       "source_file": "README.md",
       "source_location": "L229",
       "id": "drupdater_readme_codeblock_8",
-      "community": 10,
+      "community": 11,
       "norm_label": "code:php ($site_name = getenv('site_name');)"
     },
     {
@@ -9198,7 +9198,7 @@
       "source_file": "README.md",
       "source_location": "L254",
       "id": "drupdater_readme_codeblock_9",
-      "community": 10,
+      "community": 11,
       "norm_label": "code:yaml (sites: [default, subsite_a, subsite_b])"
     },
     {
@@ -9292,13 +9292,13 @@
       "norm_label": "code:bash (go test -v -run testname ./path/to/package/...)"
     },
     {
-      "label": "code:bash (make run REPO=<git-url> TOKEN=<token>)",
+      "label": "code:bash (make docker-run REPO=<git-url> TOKEN=<token>)",
       "file_type": "document",
       "source_file": "CLAUDE.md",
       "source_location": "L27",
       "id": "drupdater_claude_codeblock_3",
       "community": 15,
-      "norm_label": "code:bash (make run repo=<git-url> token=<token>)"
+      "norm_label": "code:bash (make docker-run repo=<git-url> token=<token>)"
     },
     {
       "label": "Architecture",
@@ -9423,7 +9423,7 @@
       "source_file": "internal/addon/testdata/composer_audit.md",
       "source_location": "L1",
       "id": "internal_addon_testdata_composer_audit_md",
-      "community": 102,
+      "community": 101,
       "norm_label": "composer_audit.md"
     },
     {
@@ -9432,7 +9432,7 @@
       "source_file": "internal/addon/testdata/composer_audit.md",
       "source_location": "L1",
       "id": "testdata_composer_audit_security_report",
-      "community": 102,
+      "community": 101,
       "norm_label": "\ud83d\udee1\ufe0f security report"
     },
     {
@@ -9441,7 +9441,7 @@
       "source_file": "internal/addon/testdata/allowplugins.md",
       "source_location": "L1",
       "id": "internal_addon_testdata_allowplugins_md",
-      "community": 101,
+      "community": 100,
       "norm_label": "allowplugins.md"
     },
     {
@@ -9450,7 +9450,7 @@
       "source_file": "internal/addon/testdata/allowplugins.md",
       "source_location": "L1",
       "id": "testdata_allowplugins_new_composer_plugins",
-      "community": 101,
+      "community": 100,
       "norm_label": "\ud83d\udd0c new composer plugins"
     },
     {
@@ -9459,7 +9459,7 @@
       "source_file": "internal/addon/testdata/allowplugins.md",
       "source_location": "L10",
       "id": "testdata_allowplugins_codeblock_1",
-      "community": 101,
+      "community": 100,
       "norm_label": "code:bash (composer config allow-plugins.plugin1 true)"
     },
     {
@@ -9468,7 +9468,7 @@
       "source_file": "internal/addon/testdata/update_hooks.md",
       "source_location": "L1",
       "id": "internal_addon_testdata_update_hooks_md",
-      "community": 103,
+      "community": 102,
       "norm_label": "update_hooks.md"
     },
     {
@@ -9477,7 +9477,7 @@
       "source_file": "internal/addon/testdata/update_hooks.md",
       "source_location": "L1",
       "id": "testdata_update_hooks_job_logs",
-      "community": 103,
+      "community": 102,
       "norm_label": "\ud83d\udcc4 job logs"
     },
     {
@@ -9486,7 +9486,7 @@
       "source_file": "internal/addon/testdata/composer_patches_1.md",
       "source_location": "L1",
       "id": "internal_addon_testdata_composer_patches_1_md",
-      "community": 104,
+      "community": 103,
       "norm_label": "composer_patches_1.md"
     },
     {
@@ -9495,7 +9495,7 @@
       "source_file": "internal/addon/testdata/composer_patches_1.md",
       "source_location": "L1",
       "id": "testdata_composer_patches_1_patch_updates",
-      "community": 104,
+      "community": 103,
       "norm_label": "\ud83e\ude79 patch updates"
     },
     {
@@ -9504,7 +9504,7 @@
       "source_file": "internal/addon/testdata/composer_diff.md",
       "source_location": "L1",
       "id": "internal_addon_testdata_composer_diff_md",
-      "community": 105,
+      "community": 104,
       "norm_label": "composer_diff.md"
     },
     {
@@ -9513,7 +9513,7 @@
       "source_file": "internal/addon/testdata/composer_diff.md",
       "source_location": "L1",
       "id": "testdata_composer_diff_dependency_updates",
-      "community": 105,
+      "community": 104,
       "norm_label": "\ud83d\udee0\ufe0f dependency updates"
     },
     {
@@ -9522,7 +9522,7 @@
       "source_file": "internal/services/testdata/dependency_update.md",
       "source_location": "L1",
       "id": "internal_services_testdata_dependency_update_md",
-      "community": 108,
+      "community": 107,
       "norm_label": "dependency_update.md"
     },
     {
@@ -24514,9 +24514,9 @@
       "source_file": "README.md",
       "source_location": "L1",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "readme_md",
-      "target": "drupdater_readme_drupdater",
-      "confidence_score": 1.0
+      "target": "drupdater_readme_drupdater"
     },
     {
       "relation": "references",
@@ -24574,9 +24574,9 @@
       "source_file": "README.md",
       "source_location": "L9",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_readme_drupdater",
-      "target": "drupdater_readme_table_of_contents",
-      "confidence_score": 1.0
+      "target": "drupdater_readme_table_of_contents"
     },
     {
       "relation": "contains",
@@ -24584,9 +24584,9 @@
       "source_file": "README.md",
       "source_location": "L21",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_readme_drupdater",
-      "target": "drupdater_readme_features",
-      "confidence_score": 1.0
+      "target": "drupdater_readme_features"
     },
     {
       "relation": "contains",
@@ -24594,9 +24594,9 @@
       "source_file": "README.md",
       "source_location": "L35",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_readme_drupdater",
-      "target": "drupdater_readme_prerequisites",
-      "confidence_score": 1.0
+      "target": "drupdater_readme_prerequisites"
     },
     {
       "relation": "contains",
@@ -24604,9 +24604,9 @@
       "source_file": "README.md",
       "source_location": "L42",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_readme_drupdater",
-      "target": "drupdater_readme_usage",
-      "confidence_score": 1.0
+      "target": "drupdater_readme_usage"
     },
     {
       "relation": "contains",
@@ -24614,9 +24614,9 @@
       "source_file": "README.md",
       "source_location": "L157",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_readme_drupdater",
-      "target": "drupdater_readme_configuration",
-      "confidence_score": 1.0
+      "target": "drupdater_readme_configuration"
     },
     {
       "relation": "contains",
@@ -24624,9 +24624,9 @@
       "source_file": "README.md",
       "source_location": "L212",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_readme_drupdater",
-      "target": "drupdater_readme_faq",
-      "confidence_score": 1.0
+      "target": "drupdater_readme_faq"
     },
     {
       "relation": "contains",
@@ -24634,9 +24634,9 @@
       "source_file": "README.md",
       "source_location": "L44",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_readme_usage",
-      "target": "drupdater_readme_command_line",
-      "confidence_score": 1.0
+      "target": "drupdater_readme_command_line"
     },
     {
       "relation": "contains",
@@ -24644,9 +24644,9 @@
       "source_file": "README.md",
       "source_location": "L63",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_readme_usage",
-      "target": "drupdater_readme_ci_cd_integration",
-      "confidence_score": 1.0
+      "target": "drupdater_readme_ci_cd_integration"
     },
     {
       "relation": "contains",
@@ -24654,9 +24654,9 @@
       "source_file": "README.md",
       "source_location": "L50",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_readme_command_line",
-      "target": "drupdater_readme_codeblock_1",
-      "confidence_score": 1.0
+      "target": "drupdater_readme_codeblock_1"
     },
     {
       "relation": "contains",
@@ -24664,9 +24664,9 @@
       "source_file": "README.md",
       "source_location": "L65",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_readme_ci_cd_integration",
-      "target": "drupdater_readme_gitlab_ci",
-      "confidence_score": 1.0
+      "target": "drupdater_readme_gitlab_ci"
     },
     {
       "relation": "contains",
@@ -24674,9 +24674,9 @@
       "source_file": "README.md",
       "source_location": "L97",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_readme_ci_cd_integration",
-      "target": "drupdater_readme_github_actions",
-      "confidence_score": 1.0
+      "target": "drupdater_readme_github_actions"
     },
     {
       "relation": "contains",
@@ -24684,9 +24684,9 @@
       "source_file": "README.md",
       "source_location": "L69",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_readme_gitlab_ci",
-      "target": "drupdater_readme_codeblock_2",
-      "confidence_score": 1.0
+      "target": "drupdater_readme_codeblock_2"
     },
     {
       "relation": "contains",
@@ -24694,9 +24694,9 @@
       "source_file": "README.md",
       "source_location": "L84",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_readme_gitlab_ci",
-      "target": "drupdater_readme_codeblock_3",
-      "confidence_score": 1.0
+      "target": "drupdater_readme_codeblock_3"
     },
     {
       "relation": "contains",
@@ -24704,9 +24704,9 @@
       "source_file": "README.md",
       "source_location": "L101",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_readme_github_actions",
-      "target": "drupdater_readme_codeblock_4",
-      "confidence_score": 1.0
+      "target": "drupdater_readme_codeblock_4"
     },
     {
       "relation": "contains",
@@ -24714,9 +24714,9 @@
       "source_file": "README.md",
       "source_location": "L129",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_readme_github_actions",
-      "target": "drupdater_readme_codeblock_5",
-      "confidence_score": 1.0
+      "target": "drupdater_readme_codeblock_5"
     },
     {
       "relation": "contains",
@@ -24724,9 +24724,9 @@
       "source_file": "README.md",
       "source_location": "L159",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_readme_configuration",
-      "target": "drupdater_readme_flags",
-      "confidence_score": 1.0
+      "target": "drupdater_readme_flags"
     },
     {
       "relation": "contains",
@@ -24734,9 +24734,9 @@
       "source_file": "README.md",
       "source_location": "L174",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_readme_configuration",
-      "target": "drupdater_readme_drupdater_yaml",
-      "confidence_score": 1.0
+      "target": "drupdater_readme_drupdater_yaml"
     },
     {
       "relation": "contains",
@@ -24744,9 +24744,9 @@
       "source_file": "README.md",
       "source_location": "L205",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_readme_configuration",
-      "target": "drupdater_readme_environment_variables",
-      "confidence_score": 1.0
+      "target": "drupdater_readme_environment_variables"
     },
     {
       "relation": "contains",
@@ -24754,9 +24754,9 @@
       "source_file": "README.md",
       "source_location": "L180",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_readme_drupdater_yaml",
-      "target": "drupdater_readme_codeblock_6",
-      "confidence_score": 1.0
+      "target": "drupdater_readme_codeblock_6"
     },
     {
       "relation": "contains",
@@ -24764,9 +24764,9 @@
       "source_file": "README.md",
       "source_location": "L214",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_readme_faq",
-      "target": "drupdater_readme_how_do_i_use_drupdater_with_a_private_packagist",
-      "confidence_score": 1.0
+      "target": "drupdater_readme_how_do_i_use_drupdater_with_a_private_packagist"
     },
     {
       "relation": "contains",
@@ -24774,9 +24774,9 @@
       "source_file": "README.md",
       "source_location": "L225",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_readme_faq",
-      "target": "drupdater_readme_how_do_i_update_multiple_drupal_sites_in_one_repository",
-      "confidence_score": 1.0
+      "target": "drupdater_readme_how_do_i_update_multiple_drupal_sites_in_one_repository"
     },
     {
       "relation": "contains",
@@ -24784,9 +24784,9 @@
       "source_file": "README.md",
       "source_location": "L218",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_readme_how_do_i_use_drupdater_with_a_private_packagist",
-      "target": "drupdater_readme_codeblock_7",
-      "confidence_score": 1.0
+      "target": "drupdater_readme_codeblock_7"
     },
     {
       "relation": "contains",
@@ -24794,9 +24794,9 @@
       "source_file": "README.md",
       "source_location": "L229",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_readme_how_do_i_update_multiple_drupal_sites_in_one_repository",
-      "target": "drupdater_readme_codeblock_8",
-      "confidence_score": 1.0
+      "target": "drupdater_readme_codeblock_8"
     },
     {
       "relation": "contains",
@@ -24804,9 +24804,9 @@
       "source_file": "README.md",
       "source_location": "L254",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_readme_how_do_i_update_multiple_drupal_sites_in_one_repository",
-      "target": "drupdater_readme_codeblock_9",
-      "confidence_score": 1.0
+      "target": "drupdater_readme_codeblock_9"
     },
     {
       "relation": "contains",
@@ -24814,9 +24814,9 @@
       "source_file": "DEVELOPMENT.md",
       "source_location": "L1",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "development_md",
-      "target": "drupdater_development_development",
-      "confidence_score": 1.0
+      "target": "drupdater_development_development"
     },
     {
       "relation": "references",
@@ -24834,9 +24834,9 @@
       "source_file": "DEVELOPMENT.md",
       "source_location": "L5",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_development_development",
-      "target": "drupdater_development_using_the_makefile",
-      "confidence_score": 1.0
+      "target": "drupdater_development_using_the_makefile"
     },
     {
       "relation": "contains",
@@ -24844,9 +24844,9 @@
       "source_file": "DEVELOPMENT.md",
       "source_location": "L9",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_development_using_the_makefile",
-      "target": "drupdater_development_codeblock_1",
-      "confidence_score": 1.0
+      "target": "drupdater_development_codeblock_1"
     },
     {
       "relation": "contains",
@@ -24854,9 +24854,9 @@
       "source_file": "CLAUDE.md",
       "source_location": "L1",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "claude_md",
-      "target": "drupdater_claude_claude_md",
-      "confidence_score": 1.0
+      "target": "drupdater_claude_claude_md"
     },
     {
       "relation": "contains",
@@ -24864,9 +24864,9 @@
       "source_file": "CLAUDE.md",
       "source_location": "L5",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_claude_claude_md",
-      "target": "drupdater_claude_what_this_project_does",
-      "confidence_score": 1.0
+      "target": "drupdater_claude_what_this_project_does"
     },
     {
       "relation": "contains",
@@ -24874,9 +24874,9 @@
       "source_file": "CLAUDE.md",
       "source_location": "L9",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_claude_claude_md",
-      "target": "drupdater_claude_commands",
-      "confidence_score": 1.0
+      "target": "drupdater_claude_commands"
     },
     {
       "relation": "contains",
@@ -24884,9 +24884,9 @@
       "source_file": "CLAUDE.md",
       "source_location": "L31",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_claude_claude_md",
-      "target": "drupdater_claude_architecture",
-      "confidence_score": 1.0
+      "target": "drupdater_claude_architecture"
     },
     {
       "relation": "contains",
@@ -24894,9 +24894,9 @@
       "source_file": "CLAUDE.md",
       "source_location": "L76",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_claude_claude_md",
-      "target": "drupdater_claude_configuration",
-      "confidence_score": 1.0
+      "target": "drupdater_claude_configuration"
     },
     {
       "relation": "contains",
@@ -24904,9 +24904,9 @@
       "source_file": "CLAUDE.md",
       "source_location": "L110",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_claude_claude_md",
-      "target": "drupdater_claude_mocking",
-      "confidence_score": 1.0
+      "target": "drupdater_claude_mocking"
     },
     {
       "relation": "contains",
@@ -24914,9 +24914,9 @@
       "source_file": "CLAUDE.md",
       "source_location": "L114",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_claude_claude_md",
-      "target": "drupdater_claude_docker",
-      "confidence_score": 1.0
+      "target": "drupdater_claude_docker"
     },
     {
       "relation": "contains",
@@ -24924,9 +24924,9 @@
       "source_file": "CLAUDE.md",
       "source_location": "L11",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_claude_commands",
-      "target": "drupdater_claude_codeblock_1",
-      "confidence_score": 1.0
+      "target": "drupdater_claude_codeblock_1"
     },
     {
       "relation": "contains",
@@ -24934,9 +24934,9 @@
       "source_file": "CLAUDE.md",
       "source_location": "L22",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_claude_commands",
-      "target": "drupdater_claude_codeblock_2",
-      "confidence_score": 1.0
+      "target": "drupdater_claude_codeblock_2"
     },
     {
       "relation": "contains",
@@ -24944,9 +24944,9 @@
       "source_file": "CLAUDE.md",
       "source_location": "L27",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_claude_commands",
-      "target": "drupdater_claude_codeblock_3",
-      "confidence_score": 1.0
+      "target": "drupdater_claude_codeblock_3"
     },
     {
       "relation": "contains",
@@ -24954,9 +24954,9 @@
       "source_file": "CLAUDE.md",
       "source_location": "L33",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_claude_architecture",
-      "target": "drupdater_claude_entry_point_workflow",
-      "confidence_score": 1.0
+      "target": "drupdater_claude_entry_point_workflow"
     },
     {
       "relation": "contains",
@@ -24964,9 +24964,9 @@
       "source_file": "CLAUDE.md",
       "source_location": "L39",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_claude_architecture",
-      "target": "drupdater_claude_workflow_phases",
-      "confidence_score": 1.0
+      "target": "drupdater_claude_workflow_phases"
     },
     {
       "relation": "contains",
@@ -24974,9 +24974,9 @@
       "source_file": "CLAUDE.md",
       "source_location": "L50",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_claude_architecture",
-      "target": "drupdater_claude_addon_system_internal_addon",
-      "confidence_score": 1.0
+      "target": "drupdater_claude_addon_system_internal_addon"
     },
     {
       "relation": "contains",
@@ -24984,9 +24984,9 @@
       "source_file": "CLAUDE.md",
       "source_location": "L58",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_claude_architecture",
-      "target": "drupdater_claude_vcs_provider_internal_codehosting",
-      "confidence_score": 1.0
+      "target": "drupdater_claude_vcs_provider_internal_codehosting"
     },
     {
       "relation": "contains",
@@ -24994,9 +24994,9 @@
       "source_file": "CLAUDE.md",
       "source_location": "L62",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_claude_architecture",
-      "target": "drupdater_claude_pkg_cli_wrappers",
-      "confidence_score": 1.0
+      "target": "drupdater_claude_pkg_cli_wrappers"
     },
     {
       "relation": "contains",
@@ -25004,9 +25004,9 @@
       "source_file": "CLAUDE.md",
       "source_location": "L72",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_claude_architecture",
-      "target": "drupdater_claude_events_internal_services_event_go",
-      "confidence_score": 1.0
+      "target": "drupdater_claude_events_internal_services_event_go"
     },
     {
       "relation": "contains",
@@ -25014,9 +25014,9 @@
       "source_file": "CLAUDE.md",
       "source_location": "L83",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_claude_configuration",
-      "target": "drupdater_claude_cli_flags",
-      "confidence_score": 1.0
+      "target": "drupdater_claude_cli_flags"
     },
     {
       "relation": "contains",
@@ -25024,9 +25024,9 @@
       "source_file": "CLAUDE.md",
       "source_location": "L96",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_claude_configuration",
-      "target": "drupdater_claude_drupdater_yaml",
-      "confidence_score": 1.0
+      "target": "drupdater_claude_drupdater_yaml"
     },
     {
       "relation": "contains",
@@ -25034,9 +25034,9 @@
       "source_file": "CLAUDE.md",
       "source_location": "L98",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "drupdater_claude_drupdater_yaml",
-      "target": "drupdater_claude_codeblock_4",
-      "confidence_score": 1.0
+      "target": "drupdater_claude_codeblock_4"
     },
     {
       "relation": "contains",
@@ -25044,9 +25044,9 @@
       "source_file": "internal/addon/testdata/composer_audit.md",
       "source_location": "L1",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "internal_addon_testdata_composer_audit_md",
-      "target": "testdata_composer_audit_security_report",
-      "confidence_score": 1.0
+      "target": "testdata_composer_audit_security_report"
     },
     {
       "relation": "contains",
@@ -25054,9 +25054,9 @@
       "source_file": "internal/addon/testdata/allowplugins.md",
       "source_location": "L1",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "internal_addon_testdata_allowplugins_md",
-      "target": "testdata_allowplugins_new_composer_plugins",
-      "confidence_score": 1.0
+      "target": "testdata_allowplugins_new_composer_plugins"
     },
     {
       "relation": "contains",
@@ -25064,9 +25064,9 @@
       "source_file": "internal/addon/testdata/allowplugins.md",
       "source_location": "L10",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "testdata_allowplugins_new_composer_plugins",
-      "target": "testdata_allowplugins_codeblock_1",
-      "confidence_score": 1.0
+      "target": "testdata_allowplugins_codeblock_1"
     },
     {
       "relation": "contains",
@@ -25074,9 +25074,9 @@
       "source_file": "internal/addon/testdata/update_hooks.md",
       "source_location": "L1",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "internal_addon_testdata_update_hooks_md",
-      "target": "testdata_update_hooks_job_logs",
-      "confidence_score": 1.0
+      "target": "testdata_update_hooks_job_logs"
     },
     {
       "relation": "contains",
@@ -25084,9 +25084,9 @@
       "source_file": "internal/addon/testdata/composer_patches_1.md",
       "source_location": "L1",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "internal_addon_testdata_composer_patches_1_md",
-      "target": "testdata_composer_patches_1_patch_updates",
-      "confidence_score": 1.0
+      "target": "testdata_composer_patches_1_patch_updates"
     },
     {
       "relation": "contains",
@@ -25094,9 +25094,9 @@
       "source_file": "internal/addon/testdata/composer_diff.md",
       "source_location": "L1",
       "weight": 1.0,
+      "confidence_score": 1.0,
       "source": "internal_addon_testdata_composer_diff_md",
-      "target": "testdata_composer_diff_dependency_updates",
-      "confidence_score": 1.0
+      "target": "testdata_composer_diff_dependency_updates"
     },
     {
       "relation": "references",
@@ -25513,5 +25513,5 @@
       "source_file": "CLAUDE.md"
     }
   ],
-  "built_at_commit": "5c37bc6c26223613ef65efa430e4daa541817da1"
+  "built_at_commit": "c4c5482a48076ef171d6e10c39611819ddc2b85a"
 }
