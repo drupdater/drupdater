@@ -4,7 +4,7 @@
 [![Docker](https://ghcr-badge.egpl.dev/drupdater/drupdater-php8.3/latest_tag?trim=major&label=docker)](https://github.com/drupdater/drupdater/pkgs/container/drupdater-php8.3)
 [![License](https://img.shields.io/github/license/drupdater/drupdater)](LICENSE)
 
-Drupdater is a standalone tool for automating Drupal site updates. It clones your repository, updates Composer dependencies, applies code quality fixes, exports Drupal configuration, and opens a pull/merge request on GitHub or GitLab with a detailed changelog — highlighting any security-related changes.
+Drupdater is a standalone tool for automating Drupal site updates. It runs against your existing checkout (the one CI already provides), updates Composer dependencies, applies code quality fixes, exports Drupal configuration, and opens a pull/merge request on GitHub or GitLab with a detailed changelog — highlighting any security-related changes.
 
 ## Table of Contents
 
@@ -36,23 +36,26 @@ Drupdater is a standalone tool for automating Drupal site updates. It clones you
 
 - Your Drupal site must be installable from configuration (i.e. `drush site-install --existing-config` works).
 - Your repository is hosted on GitHub or GitLab.
+- The checkout must have full git history so the update branch can be pushed — set `fetch-depth: 0` (GitHub Actions) or `GIT_DEPTH: 0` (GitLab CI). Shallow checkouts fail the push with `object not found`.
 - *(Optional)* A [Drupal.org GitLab access token](https://git.drupalcode.org) (`DRUPALCODE_ACCESS_TOKEN`) to enable automated patch management.
 
 ## Usage
 
 ### Command-Line
 
+By default Drupdater runs against the **existing checkout** in the working directory — which is exactly what CI provides — so it only needs a token. To run it standalone (no checkout on disk), add `--clone --repository-url <url>` and it will clone the repository itself.
+
 Pick the image that matches the PHP version your site requires:
 
 ```bash
 # PHP 8.3
-docker run ghcr.io/drupdater/drupdater-php8.3:latest <repository_url> <token>
+docker run ghcr.io/drupdater/drupdater-php8.3:latest <token> --clone --repository-url <repository_url>
 
 # PHP 8.4
-docker run ghcr.io/drupdater/drupdater-php8.4:latest <repository_url> <token>
+docker run ghcr.io/drupdater/drupdater-php8.4:latest <token> --clone --repository-url <repository_url>
 
 # PHP 8.5
-docker run ghcr.io/drupdater/drupdater-php8.5:latest <repository_url> <token>
+docker run ghcr.io/drupdater/drupdater-php8.5:latest <token> --clone --repository-url <repository_url>
 ```
 
 Replace `<repository_url>` with your repository's HTTPS URL and `<token>` with a personal access token that has permission to push branches and create merge/pull requests.
@@ -68,8 +71,10 @@ drupdater:
   image:
     name: ghcr.io/drupdater/drupdater-php8.3:latest
     entrypoint: [""]
+  variables:
+    GIT_DEPTH: "0"  # full history is required to push the update branch
   script:
-    - /opt/drupdater/bin $CI_PROJECT_URL $DRUPDATER_TOKEN
+    - /opt/drupdater/bin $DRUPDATER_TOKEN
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule" && $DRUPDATER_SCHEDULE == "weekly"
 ```
@@ -81,8 +86,10 @@ drupdater-security:
   image:
     name: ghcr.io/drupdater/drupdater-php8.3:latest
     entrypoint: [""]
+  variables:
+    GIT_DEPTH: "0"  # full history is required to push the update branch
   script:
-    - /opt/drupdater/bin $CI_PROJECT_URL $DRUPDATER_TOKEN --security
+    - /opt/drupdater/bin $DRUPDATER_TOKEN --security
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule" && $DRUPDATER_SCHEDULE == "daily"
 ```
@@ -109,8 +116,12 @@ jobs:
     container:
       image: ghcr.io/drupdater/drupdater-php8.3:latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0  # full history is required to push the update branch
       - name: Run Drupdater
-        run: /opt/drupdater/bin ${{ github.server_url }}/${{ github.repository }} ${{ secrets.GITHUB_TOKEN }}
+        run: /opt/drupdater/bin ${{ secrets.GITHUB_TOKEN }}
 ```
 
 **Daily security-only update** — create a separate workflow file (e.g. `.github/workflows/drupdater-security.yml`) that runs every day and passes `--security` to only update packages with known vulnerabilities:
@@ -133,8 +144,12 @@ jobs:
     container:
       image: ghcr.io/drupdater/drupdater-php8.3:latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history is required to push the update branch
       - name: Run Drupdater (security only)
-        run: /opt/drupdater/bin ${{ github.server_url }}/${{ github.repository }} ${{ secrets.GITHUB_TOKEN }} --security
+        run: /opt/drupdater/bin ${{ secrets.GITHUB_TOKEN }} --security
 ```
 
 > **Note:** `GITHUB_TOKEN` is sufficient to push a branch and open a pull request. However, GitHub prevents workflows triggered by `GITHUB_TOKEN` from starting other workflows, so CI will not run automatically on the resulting PR. To have CI trigger on the Drupdater PR, use a [personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens) or a [GitHub App token](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-an-installation-access-token-for-a-github-app) stored as a repository secret instead.
@@ -143,11 +158,14 @@ jobs:
 
 ### Flags
 
-All flags are optional. Pass them after the required `<repository_url>` and `<token>` arguments.
+All flags are optional. Pass them after the required `<token>` argument.
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--branch` | `main` | Branch to update. |
+| `--branch` | `main` | Branch to update and target for the MR. Only used with `--clone`; in checkout mode the branch is taken from the checkout (or the CI branch variable when in detached HEAD). |
+| `--working-dir` | `.` | Path to the existing checkout to update in place. |
+| `--clone` | `false` | Clone the repository instead of using the existing checkout. Requires `--repository-url`. Intended for local testing. |
+| `--repository-url` | _(from `origin`)_ | Repository URL. Required with `--clone`; otherwise derived from the checkout's `origin` remote. |
 | `--sites` | `default` | Drupal site directories to update. Repeat the flag for multiple sites: `--sites default --sites subsite`. |
 | `--security` | `false` | Only update packages with known security vulnerabilities. |
 | `--skip-cbf` | `false` | Skip running `phpcbf` for PHP code style fixes. |
@@ -172,7 +190,7 @@ Pass your credentials via the `COMPOSER_AUTH` environment variable:
 docker run \
   -e COMPOSER_AUTH='{"http-basic":{"repo.packagist.com":{"username":"token","password":"<your-token>"}}}' \
   ghcr.io/drupdater/drupdater-php8.3:latest \
-  <repository_url> <token>
+  <token> --clone --repository-url <repository_url>
 ```
 
 ### How do I update multiple Drupal sites in one repository?

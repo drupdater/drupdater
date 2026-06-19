@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Project Does
 
-**Drupdater** is a Go CLI tool that automates Drupal site updates: it clones a repo, runs Composer updates, applies code quality fixes (PHPCBF, Rector), updates Drupal config/translations, and opens a merge/pull request on GitHub or GitLab with a detailed changelog.
+**Drupdater** is a Go CLI tool that automates Drupal site updates: it runs against an existing checkout (or clones one with `--clone` for testing), runs Composer updates, applies code quality fixes (PHPCBF, Rector), updates Drupal config/translations, and opens a merge/pull request on GitHub or GitLab with a detailed changelog.
 
 ## Commands
 
@@ -34,18 +34,18 @@ make run REPO=<git-url> TOKEN=<token>
 
 `main.go` → `cmd/root.go` (Cobra) → `internal/services/workflow_base.go`
 
-`root.go` is where CLI flags are parsed, core services are initialized (logger, cache, Composer/Drush/Git wrappers), the VCS provider (GitHub or GitLab) is detected via factory, and all addons are registered before the workflow starts.
+`root.go` is where CLI flags are parsed, core services are initialized (logger, cache, Composer/Drush/Git wrappers), the VCS provider (GitHub or GitLab) is detected via factory, and all addons are registered before the workflow starts. The repository URL is read from the checkout's `origin` remote unless `--clone`/`--repository-url` is given.
 
 ### Workflow Phases
 
-The workflow in `workflow_base.go` runs these phases with goroutine-based concurrency (limited to CPU cores):
+The workflow in `workflow_base.go` operates on a **single working directory** (the existing checkout by default, or a fresh clone with `--clone`). Old and new code live there sequentially; phases run linearly, with per-site work fanned out concurrently (limited to CPU cores):
 
-1. **installCode** – clone the repo and run `composer install`
-2. **installSite(s)** – install each Drupal site via Drush
-3. **updateSharedCode** – run `composer update`, fire addon events, commit changes
-4. **updateSite(s)** – run Drush update hooks and config import per site
+1. **acquire working copy** – open the existing checkout (default) or clone (`--clone`), then `composer install`
+2. **installSite(s)** – install each Drupal site via Drush at the current (old) code to build the baseline database
+3. **updateSharedCode** – run `composer update`, fire addon events, commit changes, create the update branch
+4. **updateSite(s)** – run Drush update hooks and config export per site against the updated code
 
-At the end (unless `--dry-run`), a merge/pull request is created with a generated description.
+The site databases are SQLite files written beside the working directory (`{dir}/../{site}.sqlite`); checkout-mode runs clean these up afterward. At the end (unless `--dry-run`), a merge/pull request is created with a generated description.
 
 ### Addon System (`internal/addon/`)
 
@@ -75,7 +75,10 @@ Events fired during the workflow: `PreComposerUpdateEvent`, `PostComposerUpdateE
 
 | Flag | Default | Effect |
 |------|---------|--------|
-| `--branch` | `main` | Target branch to update from |
+| `--branch` | `main` | Branch to update/MR target; only used with `--clone` (checkout mode reads it from the checkout or CI branch var) |
+| `--working-dir` | `.` | Existing checkout to update in place |
+| `--clone` | false | Clone instead of using the checkout (needs `--repository-url`); for testing |
+| `--repository-url` | _(from `origin`)_ | Repo URL; required with `--clone`, else read from `origin` |
 | `--sites` | `default` | Comma-separated Drupal site names |
 | `--security` | false | Only apply security updates |
 | `--skip-cbf` | false | Skip PHP Code Beautifier |

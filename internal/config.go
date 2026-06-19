@@ -6,6 +6,8 @@ type Config struct {
 	RepositoryURL string
 	Branch        string
 	Token         string
+	WorkingDir    string
+	Clone         bool
 	Sites         []string
 	Security      bool
 	SkipCBF       bool

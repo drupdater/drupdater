@@ -728,6 +728,214 @@ func (_c *MockRepository_CloneRepository_Call) RunAndReturn(run func(repository 
 	return _c
 }
 
+// GetCurrentBranch provides a mock function for the type MockRepository
+func (_mock *MockRepository) GetCurrentBranch(path string) (string, error) {
+	ret := _mock.Called(path)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetCurrentBranch")
+	}
+
+	var r0 string
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(string) (string, error)); ok {
+		return returnFunc(path)
+	}
+	if returnFunc, ok := ret.Get(0).(func(string) string); ok {
+		r0 = returnFunc(path)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	if returnFunc, ok := ret.Get(1).(func(string) error); ok {
+		r1 = returnFunc(path)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRepository_GetCurrentBranch_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetCurrentBranch'
+type MockRepository_GetCurrentBranch_Call struct {
+	*mock.Call
+}
+
+// GetCurrentBranch is a helper method to define mock.On call
+//   - path string
+func (_e *MockRepository_Expecter) GetCurrentBranch(path any) *MockRepository_GetCurrentBranch_Call {
+	return &MockRepository_GetCurrentBranch_Call{Call: _e.mock.On("GetCurrentBranch", path)}
+}
+
+func (_c *MockRepository_GetCurrentBranch_Call) Run(run func(path string)) *MockRepository_GetCurrentBranch_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_GetCurrentBranch_Call) Return(s string, err error) *MockRepository_GetCurrentBranch_Call {
+	_c.Call.Return(s, err)
+	return _c
+}
+
+func (_c *MockRepository_GetCurrentBranch_Call) RunAndReturn(run func(path string) (string, error)) *MockRepository_GetCurrentBranch_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetRemoteURL provides a mock function for the type MockRepository
+func (_mock *MockRepository) GetRemoteURL(path string) (string, error) {
+	ret := _mock.Called(path)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetRemoteURL")
+	}
+
+	var r0 string
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(string) (string, error)); ok {
+		return returnFunc(path)
+	}
+	if returnFunc, ok := ret.Get(0).(func(string) string); ok {
+		r0 = returnFunc(path)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	if returnFunc, ok := ret.Get(1).(func(string) error); ok {
+		r1 = returnFunc(path)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRepository_GetRemoteURL_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetRemoteURL'
+type MockRepository_GetRemoteURL_Call struct {
+	*mock.Call
+}
+
+// GetRemoteURL is a helper method to define mock.On call
+//   - path string
+func (_e *MockRepository_Expecter) GetRemoteURL(path any) *MockRepository_GetRemoteURL_Call {
+	return &MockRepository_GetRemoteURL_Call{Call: _e.mock.On("GetRemoteURL", path)}
+}
+
+func (_c *MockRepository_GetRemoteURL_Call) Run(run func(path string)) *MockRepository_GetRemoteURL_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_GetRemoteURL_Call) Return(s string, err error) *MockRepository_GetRemoteURL_Call {
+	_c.Call.Return(s, err)
+	return _c
+}
+
+func (_c *MockRepository_GetRemoteURL_Call) RunAndReturn(run func(path string) (string, error)) *MockRepository_GetRemoteURL_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// OpenRepository provides a mock function for the type MockRepository
+func (_mock *MockRepository) OpenRepository(path string, username string, email string) (repo.Repository, repo.Worktree, string, error) {
+	ret := _mock.Called(path, username, email)
+
+	if len(ret) == 0 {
+		panic("no return value specified for OpenRepository")
+	}
+
+	var r0 repo.Repository
+	var r1 repo.Worktree
+	var r2 string
+	var r3 error
+	if returnFunc, ok := ret.Get(0).(func(string, string, string) (repo.Repository, repo.Worktree, string, error)); ok {
+		return returnFunc(path, username, email)
+	}
+	if returnFunc, ok := ret.Get(0).(func(string, string, string) repo.Repository); ok {
+		r0 = returnFunc(path, username, email)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(repo.Repository)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(string, string, string) repo.Worktree); ok {
+		r1 = returnFunc(path, username, email)
+	} else {
+		if ret.Get(1) != nil {
+			r1 = ret.Get(1).(repo.Worktree)
+		}
+	}
+	if returnFunc, ok := ret.Get(2).(func(string, string, string) string); ok {
+		r2 = returnFunc(path, username, email)
+	} else {
+		r2 = ret.Get(2).(string)
+	}
+	if returnFunc, ok := ret.Get(3).(func(string, string, string) error); ok {
+		r3 = returnFunc(path, username, email)
+	} else {
+		r3 = ret.Error(3)
+	}
+	return r0, r1, r2, r3
+}
+
+// MockRepository_OpenRepository_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'OpenRepository'
+type MockRepository_OpenRepository_Call struct {
+	*mock.Call
+}
+
+// OpenRepository is a helper method to define mock.On call
+//   - path string
+//   - username string
+//   - email string
+func (_e *MockRepository_Expecter) OpenRepository(path any, username any, email any) *MockRepository_OpenRepository_Call {
+	return &MockRepository_OpenRepository_Call{Call: _e.mock.On("OpenRepository", path, username, email)}
+}
+
+func (_c *MockRepository_OpenRepository_Call) Run(run func(path string, username string, email string)) *MockRepository_OpenRepository_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_OpenRepository_Call) Return(repository repo.Repository, worktree repo.Worktree, s string, err error) *MockRepository_OpenRepository_Call {
+	_c.Call.Return(repository, worktree, s, err)
+	return _c
+}
+
+func (_c *MockRepository_OpenRepository_Call) RunAndReturn(run func(path string, username string, email string) (repo.Repository, repo.Worktree, string, error)) *MockRepository_OpenRepository_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // NewMockGitRepository creates a new instance of MockGitRepository. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockGitRepository(t interface {

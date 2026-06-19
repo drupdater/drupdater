@@ -1,12 +1,16 @@
 package cmd
 
 import (
+	"cmp"
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -33,19 +37,20 @@ var config internal.Config
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "drupdater repository-url token",
+	Use:   "drupdater token",
 	Short: "Drupal Updater",
 	Long:  `Drupal Updater is a tool to update Drupal dependencies and create merge requests.`,
-	Args:  cobra.ExactArgs(2),
-	PreRunE: func(_ *cobra.Command, args []string) error {
-		// Validate command line arguments
-		if len(args) != 2 {
-			return errors.New("repository URL and token are required")
+	Args:  cobra.ExactArgs(1),
+	PreRunE: func(_ *cobra.Command, _ []string) error {
+		// --clone needs an explicit repository URL; checkout mode derives it from origin.
+		if config.Clone && config.RepositoryURL == "" {
+			return errors.New("--repository-url is required with --clone")
 		}
-		// Validate that repository URL is a valid URL
-		_, err := url.ParseRequestURI(args[0])
-		if err != nil {
-			return errors.New("invalid repository URL")
+		// Validate the URL format when one is given.
+		if config.RepositoryURL != "" {
+			if _, err := url.ParseRequestURI(config.RepositoryURL); err != nil {
+				return errors.New("invalid repository URL")
+			}
 		}
 		return nil
 	},
@@ -55,8 +60,7 @@ var rootCmd = &cobra.Command{
 		cmd.SilenceErrors = true
 
 		// Parse command line arguments
-		config.RepositoryURL = args[0]
-		config.Token = args[1]
+		config.Token = args[0]
 
 		// Initialize required services
 		logger := NewLogger(config)
@@ -67,9 +71,38 @@ var rootCmd = &cobra.Command{
 		composer := composer.NewCLI(logger)
 		drupalOrg := drupalorg.NewHTTPClient(logger)
 		installer := drupal.NewInstaller(logger, drush, composer)
+		git := repo.NewGitRepositoryService(logger)
+
+		// In checkout mode the repository URL and target branch come from the checkout, so
+		// they don't have to be passed in. --branch only applies to --clone.
+		if !config.Clone {
+			if config.RepositoryURL == "" {
+				remoteURL, err := git.GetRemoteURL(config.WorkingDir)
+				if err != nil {
+					return fmt.Errorf("failed to determine repository URL from checkout (pass --repository-url or run inside a checkout): %w", err)
+				}
+				config.RepositoryURL = remoteURL
+			}
+
+			branch, err := resolveCheckoutBranch(git, config.WorkingDir)
+			if err != nil {
+				return err
+			}
+			config.Branch = branch
+			logger.Info("using checkout", zap.String("url", config.RepositoryURL), zap.String("branch", config.Branch))
+
+			// CI mounts the checkout owned by a different user than the container runs as, so
+			// the git binary (invoked by drush/composer) refuses it as "dubious ownership".
+			// Mark it safe so those child processes can run git against it.
+			if abs, err := filepath.Abs(config.WorkingDir); err == nil {
+				if out, err := exec.Command("git", "config", "--global", "--add", "safe.directory", abs).CombinedOutput(); err != nil {
+					logger.Warn("failed to mark checkout as a safe git directory", zap.String("output", string(out)), zap.Error(err))
+				}
+			}
+		}
+
 		vcsProviderFactory := codehosting.NewDefaultVcsProviderFactory()
 		platform := vcsProviderFactory.Create(config.RepositoryURL, config.Token)
-		git := repo.NewGitRepositoryService(logger)
 
 		// Create the event dispatcher and register addons as subscribers
 		addons := createAddons(logger, config, drush, composer, drupalOrg, git)
@@ -88,6 +121,23 @@ var rootCmd = &cobra.Command{
 		}
 		return nil
 	},
+}
+
+// resolveCheckoutBranch determines the MR target branch for checkout mode: the checkout's
+// current branch, or — when it's in detached HEAD (the usual CI state) — the branch reported
+// by the CI environment.
+func resolveCheckoutBranch(git *repo.GitRepositoryService, workingDir string) (string, error) {
+	branch, err := git.GetCurrentBranch(workingDir)
+	if err != nil {
+		return "", fmt.Errorf("failed to determine branch from checkout: %w", err)
+	}
+	if branch == "" {
+		branch = cmp.Or(os.Getenv("GITHUB_REF_NAME"), os.Getenv("CI_COMMIT_REF_NAME"))
+	}
+	if branch == "" {
+		return "", errors.New("could not determine the target branch: the checkout is in detached HEAD and no CI branch variable (GITHUB_REF_NAME, CI_COMMIT_REF_NAME) is set")
+	}
+	return branch, nil
 }
 
 // createAddons creates and returns the list of addons to be used based on the configuration
@@ -147,7 +197,10 @@ func handleWorkflowError(logger *zap.Logger, err error) error {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&config.Branch, "branch", "main", "Branch")
+	rootCmd.PersistentFlags().StringVar(&config.Branch, "branch", "main", "Branch to update and target for the MR. Only used with --clone; in checkout mode it's taken from the checkout (or CI branch variable).")
+	rootCmd.PersistentFlags().StringVar(&config.WorkingDir, "working-dir", ".", "Path to the existing checkout to update in place.")
+	rootCmd.PersistentFlags().BoolVar(&config.Clone, "clone", false, "Clone the repository instead of using the existing checkout. Requires --repository-url. Intended for local testing.")
+	rootCmd.PersistentFlags().StringVar(&config.RepositoryURL, "repository-url", "", "Repository URL. Required with --clone; otherwise derived from the checkout's origin remote.")
 	rootCmd.PersistentFlags().StringArrayVar(&config.Sites, "sites", []string{"default"}, "Sites")
 	rootCmd.PersistentFlags().BoolVar(&config.Security, "security", false, "Only security updates. If true, only security updates will be applied.")
 	rootCmd.PersistentFlags().BoolVar(&config.SkipCBF, "skip-cbf", false, "Skip CBF. If true, the PHPCBF will not be run.")

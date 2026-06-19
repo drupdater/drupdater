@@ -40,7 +40,7 @@ run: ## Run the application (requires REPO and TOKEN args)
 		echo "Usage: make run REPO=<repository_url> TOKEN=<your_token> [OPTIONS=--flag1 --flag2]"; \
 		exit 1; \
 	fi
-	go run ${LDFLAGS} main.go $(REPO) $(TOKEN) $(OPTIONS)
+	go run ${LDFLAGS} main.go $(TOKEN) --clone --repository-url $(REPO) $(OPTIONS)
 
 docker-build: ## Build Docker image
 	docker build -t ${DOCKER_IMAGE}:latest .
@@ -51,7 +51,7 @@ docker-run: ## Run Docker image (requires REPO and TOKEN args)
 		echo "Usage: make docker-run REPO=<repository_url> TOKEN=<your_token> [OPTIONS=--flag1 --flag2]"; \
 		exit 1; \
 	fi
-	docker run ${DOCKER_IMAGE}:latest $(REPO) $(TOKEN) $(OPTIONS)
+	docker run ${DOCKER_IMAGE}:latest $(TOKEN) --clone --repository-url $(REPO) $(OPTIONS)
 
 update: ## Update dependencies
 	go get -u ./...

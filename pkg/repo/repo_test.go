@@ -5,7 +5,9 @@ import (
 	"testing"
 
 	git "github.com/go-git/go-git/v5"
+	gitConfig "github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/storer"
 
 	"github.com/stretchr/testify/assert"
@@ -185,5 +187,114 @@ func TestBranchExists(t *testing.T) {
 		require.Error(t, err)
 		assert.ErrorIs(t, err, refsErr)
 		assert.False(t, found)
+	})
+}
+
+func TestGetRemoteURL(t *testing.T) {
+	logger := zap.NewNop()
+	service := NewGitRepositoryService(logger)
+
+	t.Run("returns origin URL with credentials stripped", func(t *testing.T) {
+		dir := t.TempDir()
+		r, err := git.PlainInit(dir, false)
+		require.NoError(t, err)
+		_, err = r.CreateRemote(&gitConfig.RemoteConfig{
+			Name: "origin",
+			URLs: []string{"https://gitlab-ci-token:secret@example.com/group/repo.git"},
+		})
+		require.NoError(t, err)
+
+		url, err := service.GetRemoteURL(dir)
+		require.NoError(t, err)
+		assert.Equal(t, "https://example.com/group/repo.git", url)
+	})
+
+	t.Run("errors when there is no origin remote", func(t *testing.T) {
+		dir := t.TempDir()
+		_, err := git.PlainInit(dir, false)
+		require.NoError(t, err)
+
+		_, err = service.GetRemoteURL(dir)
+		require.Error(t, err)
+	})
+}
+
+func TestGetCurrentBranch(t *testing.T) {
+	logger := zap.NewNop()
+	service := NewGitRepositoryService(logger)
+
+	t.Run("returns the branch HEAD points to", func(t *testing.T) {
+		dir := t.TempDir()
+		r, err := git.PlainInit(dir, false)
+		require.NoError(t, err)
+
+		// Commit once so HEAD resolves to a branch.
+		wt, err := r.Worktree()
+		require.NoError(t, err)
+		_, err = wt.Commit("init", &git.CommitOptions{
+			AllowEmptyCommits: true,
+			Author:            &object.Signature{Name: "t", Email: "t@example.com"},
+		})
+		require.NoError(t, err)
+
+		branch, err := service.GetCurrentBranch(dir)
+		require.NoError(t, err)
+		assert.Equal(t, "master", branch)
+	})
+
+	t.Run("returns empty string in detached HEAD", func(t *testing.T) {
+		dir := t.TempDir()
+		r, err := git.PlainInit(dir, false)
+		require.NoError(t, err)
+
+		wt, err := r.Worktree()
+		require.NoError(t, err)
+		hash, err := wt.Commit("init", &git.CommitOptions{
+			AllowEmptyCommits: true,
+			Author:            &object.Signature{Name: "t", Email: "t@example.com"},
+		})
+		require.NoError(t, err)
+
+		// Detach HEAD at the commit.
+		require.NoError(t, wt.Checkout(&git.CheckoutOptions{Hash: hash}))
+
+		branch, err := service.GetCurrentBranch(dir)
+		require.NoError(t, err)
+		assert.Equal(t, "", branch)
+	})
+
+	t.Run("errors on a non-repository path", func(t *testing.T) {
+		_, err := service.GetCurrentBranch(t.TempDir())
+		require.Error(t, err)
+	})
+}
+
+func TestOpenRepository(t *testing.T) {
+	logger := zap.NewNop()
+	service := NewGitRepositoryService(logger)
+
+	t.Run("opens the checkout and sets the commit identity", func(t *testing.T) {
+		dir := t.TempDir()
+		_, err := git.PlainInit(dir, false)
+		require.NoError(t, err)
+
+		repository, worktree, path, err := service.OpenRepository(dir, "Bot", "bot@example.com")
+		require.NoError(t, err)
+		assert.NotNil(t, repository)
+		assert.NotNil(t, worktree)
+		assert.NotEmpty(t, path)
+
+		// The commit identity must have been written to the repo config.
+		r, err := git.PlainOpen(dir)
+		require.NoError(t, err)
+		cfg, err := r.Config()
+		require.NoError(t, err)
+		assert.Equal(t, "Bot", cfg.User.Name)
+		assert.Equal(t, "bot@example.com", cfg.User.Email)
+	})
+
+	t.Run("errors on a non-repository path", func(t *testing.T) {
+		_, _, _, err := service.OpenRepository(t.TempDir(), "Bot", "bot@example.com")
+		require.Error(t, err)
 	})
 }

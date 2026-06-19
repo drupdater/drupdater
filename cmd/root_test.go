@@ -6,7 +6,11 @@ import (
 
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/services"
+	"github.com/drupdater/drupdater/pkg/repo"
+	git "github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest"
@@ -153,5 +157,47 @@ func TestCreateAddons(t *testing.T) {
 
 		// Should have the basic addons + security addon
 		assert.Len(t, addons, 7)
+	})
+}
+
+func TestResolveCheckoutBranch(t *testing.T) {
+	svc := repo.NewGitRepositoryService(zap.NewNop())
+
+	// initRepo creates a repo with one commit; detach leaves HEAD off any branch.
+	initRepo := func(t *testing.T, detach bool) string {
+		dir := t.TempDir()
+		r, err := git.PlainInit(dir, false)
+		require.NoError(t, err)
+		wt, err := r.Worktree()
+		require.NoError(t, err)
+		h, err := wt.Commit("init", &git.CommitOptions{
+			AllowEmptyCommits: true,
+			Author:            &object.Signature{Name: "t", Email: "t@example.com"},
+		})
+		require.NoError(t, err)
+		if detach {
+			require.NoError(t, wt.Checkout(&git.CheckoutOptions{Hash: h}))
+		}
+		return dir
+	}
+
+	t.Run("uses the checkout's current branch", func(t *testing.T) {
+		branch, err := resolveCheckoutBranch(svc, initRepo(t, false))
+		require.NoError(t, err)
+		assert.Equal(t, "master", branch)
+	})
+
+	t.Run("falls back to CI variable when detached", func(t *testing.T) {
+		t.Setenv("GITHUB_REF_NAME", "release-1")
+		branch, err := resolveCheckoutBranch(svc, initRepo(t, true))
+		require.NoError(t, err)
+		assert.Equal(t, "release-1", branch)
+	})
+
+	t.Run("errors when detached and no CI variable", func(t *testing.T) {
+		t.Setenv("GITHUB_REF_NAME", "")
+		t.Setenv("CI_COMMIT_REF_NAME", "")
+		_, err := resolveCheckoutBranch(svc, initRepo(t, true))
+		require.Error(t, err)
 	})
 }
