@@ -79,7 +79,7 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []interna
 	// Acquire a single working directory: the existing checkout (default, CI) or a fresh
 	// clone (--clone, for local testing). Old and new code live in this one directory
 	// sequentially: install the baseline site, then composer update, then run update hooks.
-	repository, worktree, path, err := ws.acquireWorkingCopy(ctx, username, email)
+	repository, worktree, path, err := ws.acquireWorkingCopy(username, email)
 	if err != nil {
 		return err
 	}
@@ -130,21 +130,12 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []interna
 
 // acquireWorkingCopy returns the single working directory the run operates on. By default it
 // opens the existing checkout in place; with --clone it clones the repository to a temp dir.
-func (ws *WorkflowBaseService) acquireWorkingCopy(ctx context.Context, username, email string) (GitRepository, Worktree, string, error) {
+func (ws *WorkflowBaseService) acquireWorkingCopy(username, email string) (GitRepository, Worktree, string, error) {
 	if ws.config.Clone {
 		ws.logger.Info("cloning repository", zap.String("url", ws.config.RepositoryURL), zap.String("branch", ws.config.Branch))
-		repository, worktree, path, err := ws.repository.CloneRepository(ws.config.RepositoryURL, ws.config.Branch, ws.config.Token, username, email)
-		if err != nil {
-			return nil, nil, "", fmt.Errorf("failed to clone repository: %w", err)
-		}
-		return repository, worktree, path, nil
+		return ws.repository.CloneRepository(ws.config.RepositoryURL, ws.config.Branch, ws.config.Token, username, email)
 	}
-
-	repository, worktree, path, err := ws.repository.OpenRepository(ws.config.WorkingDir, username, email)
-	if err != nil {
-		return nil, nil, "", fmt.Errorf("failed to open checkout: %w", err)
-	}
-	return repository, worktree, path, nil
+	return ws.repository.OpenRepository(ws.config.WorkingDir, username, email)
 }
 
 // forEachSite runs fn for every configured site concurrently, bounded to the CPU count, and
