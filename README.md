@@ -36,6 +36,7 @@ Drupdater is a standalone tool for automating Drupal site updates. It runs again
 
 - Your Drupal site must be installable from configuration (i.e. `drush site-install --existing-config` works).
 - Your repository is hosted on GitHub or GitLab.
+- The checkout must have full git history so the update branch can be pushed — set `fetch-depth: 0` (GitHub Actions) or `GIT_DEPTH: 0` (GitLab CI). Shallow checkouts fail the push with `object not found`.
 - *(Optional)* A [Drupal.org GitLab access token](https://git.drupalcode.org) (`DRUPALCODE_ACCESS_TOKEN`) to enable automated patch management.
 
 ## Usage
@@ -70,6 +71,8 @@ drupdater:
   image:
     name: ghcr.io/drupdater/drupdater-php8.3:latest
     entrypoint: [""]
+  variables:
+    GIT_DEPTH: "0"  # full history is required to push the update branch
   script:
     - /opt/drupdater/bin $DRUPDATER_TOKEN
   rules:
@@ -83,6 +86,8 @@ drupdater-security:
   image:
     name: ghcr.io/drupdater/drupdater-php8.3:latest
     entrypoint: [""]
+  variables:
+    GIT_DEPTH: "0"  # full history is required to push the update branch
   script:
     - /opt/drupdater/bin $DRUPDATER_TOKEN --security
   rules:
@@ -113,6 +118,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0  # full history is required to push the update branch
       - name: Run Drupdater
         run: /opt/drupdater/bin ${{ secrets.GITHUB_TOKEN }}
 ```
@@ -139,6 +146,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history is required to push the update branch
       - name: Run Drupdater (security only)
         run: /opt/drupdater/bin ${{ secrets.GITHUB_TOKEN }} --security
 ```
