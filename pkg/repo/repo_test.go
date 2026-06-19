@@ -262,4 +262,39 @@ func TestGetCurrentBranch(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "", branch)
 	})
+
+	t.Run("errors on a non-repository path", func(t *testing.T) {
+		_, err := service.GetCurrentBranch(t.TempDir())
+		require.Error(t, err)
+	})
+}
+
+func TestOpenRepository(t *testing.T) {
+	logger := zap.NewNop()
+	service := NewGitRepositoryService(logger)
+
+	t.Run("opens the checkout and sets the commit identity", func(t *testing.T) {
+		dir := t.TempDir()
+		_, err := git.PlainInit(dir, false)
+		require.NoError(t, err)
+
+		repository, worktree, path, err := service.OpenRepository(dir, "Bot", "bot@example.com")
+		require.NoError(t, err)
+		assert.NotNil(t, repository)
+		assert.NotNil(t, worktree)
+		assert.NotEmpty(t, path)
+
+		// The commit identity must have been written to the repo config.
+		r, err := git.PlainOpen(dir)
+		require.NoError(t, err)
+		cfg, err := r.Config()
+		require.NoError(t, err)
+		assert.Equal(t, "Bot", cfg.User.Name)
+		assert.Equal(t, "bot@example.com", cfg.User.Email)
+	})
+
+	t.Run("errors on a non-repository path", func(t *testing.T) {
+		_, _, _, err := service.OpenRepository(t.TempDir(), "Bot", "bot@example.com")
+		require.Error(t, err)
+	})
 }
