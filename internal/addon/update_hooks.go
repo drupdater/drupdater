@@ -62,6 +62,7 @@ func (uh *UpdateHooks) preSiteUpdateHandler(e event.Event) error {
 		return nil
 	}
 	uh.hooks[evt.Site()] = hooks
+	uh.logger.Info("update hooks found", zap.String("site", evt.Site()), zap.Int("count", len(hooks)))
 
 	return nil
 }

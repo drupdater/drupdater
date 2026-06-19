@@ -128,6 +128,12 @@ func (h *ComposerPatches1) preComposerUpdateHandler(e event.Event) error {
 	h.patchUpdates = patchUpdates
 
 	if h.patchUpdates.Changes() {
+		h.logger.Info("patches changed",
+			zap.Int("removed", len(h.patchUpdates.Removed)),
+			zap.Int("updated", len(h.patchUpdates.Updated)),
+			zap.Int("conflicts", len(h.patchUpdates.Conflicts)),
+		)
+
 		jsonBytes, err := json.Marshal(newPatches)
 		if err != nil {
 			return fmt.Errorf("failed to marshal patches: %w", err)

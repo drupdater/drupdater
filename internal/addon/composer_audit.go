@@ -106,6 +106,11 @@ func (ca *ComposerAudit) postCodeUpdateHandler(e event.Event) error {
 		return fmt.Errorf("failed to run composer audit after update: %w", err)
 	}
 
+	ca.logger.Info("security advisories",
+		zap.Int("fixed", len(ca.GetFixedAdvisories())),
+		zap.Int("unresolved", len(ca.afterAudit.Advisories)),
+	)
+
 	return nil
 }
 

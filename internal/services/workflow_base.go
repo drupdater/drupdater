@@ -72,7 +72,9 @@ func NewWorkflowBaseService(
 }
 
 func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []internal.Addon) error {
+	start := time.Now()
 	defer func() {
+		ws.logger.Info("update run finished", zap.Duration("duration", time.Since(start)))
 		// Clean up the temporary directory
 		tmpDirName := filepath.Join(os.TempDir(), fmt.Sprintf("%x", md5.Sum([]byte(ws.config.RepositoryURL))))
 		os.RemoveAll(tmpDirName)
@@ -194,6 +196,19 @@ func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context) (SharedUpda
 	if len(changes) == 0 {
 		return SharedUpdate{}, AbortError{Msg: "no changes detected"}
 	}
+
+	// Summarise the dependency changes for the run log.
+	byAction := map[string]int{}
+	for _, c := range changes {
+		byAction[c.Action]++
+	}
+	ws.logger.Info("dependencies updated",
+		zap.Int("total", len(changes)),
+		zap.Int("installed", byAction["Install"]),
+		zap.Int("upgraded", byAction["Upgrade"]),
+		zap.Int("downgraded", byAction["Downgrade"]),
+		zap.Int("removed", byAction["Remove"]),
+	)
 
 	postComposerUpdateEvent := NewPostComposerUpdateEvent(ctx, path, worktree)
 	err = ws.dispatcher.FireEvent(postComposerUpdateEvent)
