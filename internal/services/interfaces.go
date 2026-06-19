@@ -25,6 +25,8 @@ type Drush interface {
 type Repository interface {
 	BranchExists(repository repo.Repository, branch string) (bool, error)
 	CloneRepository(repository string, branch string, token string, username string, email string) (repo.Repository, repo.Worktree, string, error)
+	OpenRepository(path string, username string, email string) (repo.Repository, repo.Worktree, string, error)
+	GetRemoteURL(path string) (string, error)
 }
 
 // GitRepository is an alias for repo.Repository to avoid duplication.

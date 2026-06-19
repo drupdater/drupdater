@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	git "github.com/go-git/go-git/v5"
+	gitConfig "github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/storer"
 
@@ -185,5 +186,34 @@ func TestBranchExists(t *testing.T) {
 		require.Error(t, err)
 		assert.ErrorIs(t, err, refsErr)
 		assert.False(t, found)
+	})
+}
+
+func TestGetRemoteURL(t *testing.T) {
+	logger := zap.NewNop()
+	service := NewGitRepositoryService(logger)
+
+	t.Run("returns origin URL with credentials stripped", func(t *testing.T) {
+		dir := t.TempDir()
+		r, err := git.PlainInit(dir, false)
+		require.NoError(t, err)
+		_, err = r.CreateRemote(&gitConfig.RemoteConfig{
+			Name: "origin",
+			URLs: []string{"https://gitlab-ci-token:secret@example.com/group/repo.git"},
+		})
+		require.NoError(t, err)
+
+		url, err := service.GetRemoteURL(dir)
+		require.NoError(t, err)
+		assert.Equal(t, "https://example.com/group/repo.git", url)
+	})
+
+	t.Run("errors when there is no origin remote", func(t *testing.T) {
+		dir := t.TempDir()
+		_, err := git.PlainInit(dir, false)
+		require.NoError(t, err)
+
+		_, err = service.GetRemoteURL(dir)
+		require.Error(t, err)
 	})
 }

@@ -4,6 +4,7 @@ import (
 	"crypto/md5"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -70,12 +71,50 @@ func (rs *GitRepositoryService) CloneRepository(repository string, branch string
 		return nil, nil, "", fmt.Errorf("git clone: %w", err)
 	}
 
-	// Set the user name and email for the commit
+	return prepareCheckout(checkout, username, email)
+}
+
+// OpenRepository opens an existing checkout (e.g. the one CI already provides) instead of
+// cloning. It applies the same git-user and hook setup as CloneRepository so commits and
+// pushes behave identically.
+func (rs *GitRepositoryService) OpenRepository(path string, username string, email string) (Repository, Worktree, string, error) {
+	checkout, err := git.PlainOpen(path)
+	if err != nil {
+		return nil, nil, "", fmt.Errorf("git open %q: %w", path, err)
+	}
+	return prepareCheckout(checkout, username, email)
+}
+
+// GetRemoteURL returns the "origin" remote URL of the checkout at path. It is how checkout
+// mode learns the repository URL (for GitHub/GitLab detection) without requiring it as an
+// argument. Any embedded credentials (e.g. GitLab CI's token in the URL) are stripped.
+func (rs *GitRepositoryService) GetRemoteURL(path string) (string, error) {
+	checkout, err := git.PlainOpen(path)
+	if err != nil {
+		return "", fmt.Errorf("git open %q: %w", path, err)
+	}
+	remote, err := checkout.Remote("origin")
+	if err != nil {
+		return "", fmt.Errorf("failed to get origin remote: %w", err)
+	}
+	urls := remote.Config().URLs
+	if len(urls) == 0 {
+		return "", fmt.Errorf("origin remote has no URL")
+	}
+	if u, err := url.Parse(urls[0]); err == nil {
+		u.User = nil
+		return u.String(), nil
+	}
+	return urls[0], nil
+}
+
+// prepareCheckout sets the commit identity and removes the prepare-commit-msg hook, then
+// returns the repository, worktree and working-tree root. Shared by clone and open.
+func prepareCheckout(checkout *git.Repository, username string, email string) (Repository, Worktree, string, error) {
 	config, _ := checkout.Config()
 	config.User.Name = username
 	config.User.Email = email
-	err = checkout.SetConfig(config)
-	if err != nil {
+	if err := checkout.SetConfig(config); err != nil {
 		return checkout, nil, "", err
 	}
 
@@ -87,8 +126,7 @@ func (rs *GitRepositoryService) CloneRepository(repository string, branch string
 	// @TODO: Verify if this is necessary
 	// Remove prepare-commit-msg hook because it does not work with the --no-verify option.
 	if _, err := w.Filesystem.Stat(".git/hooks/prepare-commit-msg"); err == nil {
-		err = w.Filesystem.Remove(".git/hooks/prepare-commit-msg")
-		if err != nil {
+		if err := w.Filesystem.Remove(".git/hooks/prepare-commit-msg"); err != nil {
 			return checkout, w, "", fmt.Errorf("failed to remove prepare-commit-msg hook: %w", err)
 		}
 	}
