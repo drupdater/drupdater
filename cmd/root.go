@@ -8,7 +8,9 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -88,6 +90,15 @@ var rootCmd = &cobra.Command{
 			}
 			config.Branch = branch
 			logger.Info("using checkout", zap.String("url", config.RepositoryURL), zap.String("branch", config.Branch))
+
+			// CI mounts the checkout owned by a different user than the container runs as, so
+			// the git binary (invoked by drush/composer) refuses it as "dubious ownership".
+			// Mark it safe so those child processes can run git against it.
+			if abs, err := filepath.Abs(config.WorkingDir); err == nil {
+				if out, err := exec.Command("git", "config", "--global", "--add", "safe.directory", abs).CombinedOutput(); err != nil {
+					logger.Warn("failed to mark checkout as a safe git directory", zap.String("output", string(out)), zap.Error(err))
+				}
+			}
 		}
 
 		vcsProviderFactory := codehosting.NewDefaultVcsProviderFactory()

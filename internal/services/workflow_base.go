@@ -140,7 +140,6 @@ func (ws *WorkflowBaseService) acquireWorkingCopy(ctx context.Context, username,
 		return repository, worktree, path, nil
 	}
 
-	ws.logger.Info("using existing checkout", zap.String("path", ws.config.WorkingDir))
 	repository, worktree, path, err := ws.repository.OpenRepository(ws.config.WorkingDir, username, email)
 	if err != nil {
 		return nil, nil, "", fmt.Errorf("failed to open checkout: %w", err)

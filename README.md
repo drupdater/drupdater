@@ -112,7 +112,7 @@ jobs:
       image: ghcr.io/drupdater/drupdater-php8.3:latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Run Drupdater
         run: /opt/drupdater/bin ${{ secrets.GITHUB_TOKEN }}
 ```
