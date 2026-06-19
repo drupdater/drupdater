@@ -66,12 +66,10 @@ var rootCmd = &cobra.Command{
 
 		// Load per-project config from .drupdater.yaml in the checkout (sites, timeout, addons).
 		// A missing file falls back to built-in defaults.
-		fc, err := internal.LoadConfigFile(filepath.Join(config.WorkingDir, ".drupdater.yaml"))
-		if err != nil {
+		if err := internal.LoadConfigFile(filepath.Join(config.WorkingDir, ".drupdater.yaml"), &config); err != nil {
 			logger.Error("invalid configuration", zap.Error(err))
 			return err
 		}
-		fc.Apply(&config)
 
 		cache := NewCache()
 
