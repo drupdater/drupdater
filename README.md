@@ -166,12 +166,41 @@ All flags are optional. Pass them after the required `<token>` argument.
 | `--working-dir` | `.` | Path to the existing checkout to update in place. |
 | `--clone` | `false` | Clone the repository instead of using the existing checkout. Requires `--repository-url`. Intended for local testing. |
 | `--repository-url` | _(from `origin`)_ | Repository URL. Required with `--clone`; otherwise derived from the checkout's `origin` remote. |
-| `--sites` | `default` | Drupal site directories to update. Repeat the flag for multiple sites: `--sites default --sites subsite`. |
-| `--security` | `false` | Only update packages with known security vulnerabilities. |
-| `--skip-cbf` | `false` | Skip running `phpcbf` for PHP code style fixes. |
-| `--skip-rector` | `false` | Skip running `drupal-rector` for deprecation removal. |
+| `--security` | `false` | Only update packages with known security vulnerabilities. Selects the `addons.security` list from `.drupdater.yaml`. |
 | `--dry-run` | `false` | Run all update steps but skip branch creation and MR/PR creation. |
-| `--verbose` | `false` | Enable debug-level structured logging. |
+| `--verbose` | `false` | Enable debug-level structured logging (also logs the resolved configuration). |
+| `--config` | _(`<working-dir>/.drupdater.yaml`)_ | Path to the config file. |
+
+### `.drupdater.yaml`
+
+Per-project settings live in a `.drupdater.yaml` committed at the repository root (read from
+`--working-dir`, or `--config`). The file is optional — a missing file, or any key left out,
+falls back to the defaults shown below. Unknown keys are rejected, so typos fail fast.
+
+```yaml
+sites: [default]      # Drupal site directories to update
+timeout: 30m          # overall run timeout (Go duration string; 0 disables)
+addons:               # which configurable addons run in each mode
+  normal:
+    - code_beautifier        # phpcbf PHP code style fixes
+    - deprecations_remover   # drupal-rector deprecation removal
+    - translations_updater
+    - composer_normalizer
+  security: []          # minimal by default: just the security fix, nothing else
+```
+
+`--security` picks the `addons.security` list; otherwise `addons.normal` is used. Security runs
+default to no extra addons so nothing interferes with the package update — add entries here only
+if you want code style, deprecation, or other changes applied during security updates too.
+
+Run `drupdater addons` to list the addon names you can add to either list:
+
+| Addon | What it does |
+|-------|--------------|
+| `code_beautifier` | Runs `phpcbf` for PHP code style fixes. |
+| `deprecations_remover` | Runs `drupal-rector` to remove deprecated code. |
+| `translations_updater` | Updates Drupal interface translations. |
+| `composer_normalizer` | Normalizes `composer.json`. |
 
 ### Environment Variables
 
@@ -220,12 +249,10 @@ if (is_string($site_name) && $site_name !== "") {
 }
 ```
 
-**2. Pass each site directory name via `--sites`:**
+**2. List each site directory name under `sites` in `.drupdater.yaml`:**
 
-```bash
-docker run ghcr.io/drupdater/drupdater-php8.3:latest \
-  <repository_url> <token> \
-  --sites default --sites subsite_a --sites subsite_b
+```yaml
+sites: [default, subsite_a, subsite_b]
 ```
 
 All sites will be updated in a single branch and covered by one merge/pull request.

@@ -10,9 +10,16 @@ type Config struct {
 	Clone         bool
 	Sites         []string
 	Security      bool
-	SkipCBF       bool
-	SkipRector    bool
 	DryRun        bool
 	Verbose       bool
 	Timeout       time.Duration
+	Addons        AddonsConfig
+}
+
+// AddonsConfig lists which configurable addons run in each mode. Mandatory addons
+// (composer_allow_plugins, composer_patches, composer_diff, update_hooks) always run and are
+// not listed here.
+type AddonsConfig struct {
+	Normal   []string `yaml:"normal"`
+	Security []string `yaml:"security"`
 }

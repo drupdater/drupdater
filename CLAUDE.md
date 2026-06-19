@@ -49,7 +49,9 @@ The site databases are SQLite files written beside the working directory (`{dir}
 
 ### Addon System (`internal/addon/`)
 
-Addons implement the `Addon` interface and subscribe to workflow events via `gookit/event`. They hook into pre/post composer update and pre/post site update events. The 10 addons include: ComposerAudit (security only flag), CodeBeautifier (`--skip-cbf`), DeprecationsRemover (`--skip-rector`), TranslationsUpdater, ComposerAllowPlugins, ComposerNormalizer, ComposerPatches1, ComposerDiff, UpdateHooks.
+Addons implement the `Addon` interface and subscribe to workflow events via `gookit/event`. They hook into pre/post composer update and pre/post site update events.
+
+Which addons run is data-driven: `cmd/root.go` holds an `addonRegistry` (name → constructor) and `mandatoryAddons`. Four addons always run — `composer_allow_plugins`, `composer_patches`, `composer_diff`, `update_hooks` — and `composer_audit` is additionally mandatory in security mode. The rest are *configurable* and listed per mode in `.drupdater.yaml` under `addons.regular` / `addons.security`; `--security` selects which list is used. Configurable addon names: `code_beautifier`, `deprecations_remover`, `translations_updater`, `composer_normalizer`. An unknown name in the active list aborts the run.
 
 Addons use Go templates in `internal/addon/templates/` to render the MR description sections.
 
@@ -71,20 +73,39 @@ Each subdirectory wraps an external tool:
 
 Events fired during the workflow: `PreComposerUpdateEvent`, `PostComposerUpdateEvent`, `PostCodeUpdateEvent`, `PreSiteUpdateEvent`, `PostSiteUpdateEvent`, `PreMergeRequestCreateEvent`.
 
-## Key Flags
+## Configuration
+
+Config is split into two tiers, with no overlap:
+
+- **CLI flags** — how a given run is invoked (volatile): token (positional arg), plus the flags below.
+- **`.drupdater.yaml`** — what the project needs (committed at the repo root, read from `<working-dir>/.drupdater.yaml` or `--config`). Loaded by `internal/configfile.go`; a missing file falls back to built-in defaults, absent keys keep their default, and unknown keys are rejected (strict decode). Keys: `sites`, `timeout` (Go duration string, e.g. `30m`), and `addons.normal` / `addons.security`. Addon names in both lists are validated up front via `validateAddons`; `drupdater addons` lists valid names.
+
+### CLI Flags
 
 | Flag | Default | Effect |
 |------|---------|--------|
 | `--branch` | `main` | Branch to update/MR target; only used with `--clone` (checkout mode reads it from the checkout or CI branch var) |
-| `--working-dir` | `.` | Existing checkout to update in place |
+| `--working-dir` | `.` | Existing checkout to update in place (also where `.drupdater.yaml` is read from) |
 | `--clone` | false | Clone instead of using the checkout (needs `--repository-url`); for testing |
 | `--repository-url` | _(from `origin`)_ | Repo URL; required with `--clone`, else read from `origin` |
-| `--sites` | `default` | Comma-separated Drupal site names |
-| `--security` | false | Only apply security updates |
-| `--skip-cbf` | false | Skip PHP Code Beautifier |
-| `--skip-rector` | false | Skip Drupal-Rector deprecation removal |
+| `--security` | false | Only apply security updates; selects the `addons.security` list |
 | `--dry-run` | false | Skip branch creation and MR |
 | `--verbose` | false | Debug-level structured logging |
+| `--config` | _(`<working-dir>/.drupdater.yaml`)_ | Path to the config file |
+
+### `.drupdater.yaml`
+
+```yaml
+sites: [default]      # Drupal site names
+timeout: 30m          # overall run timeout (Go duration; 0 disables)
+addons:               # configurable addons per mode; mandatory addons always run
+  normal:
+    - code_beautifier
+    - deprecations_remover
+    - translations_updater
+    - composer_normalizer
+  security: []            # minimal by default; composer_audit is added automatically
+```
 
 ## Mocking
 

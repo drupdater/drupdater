@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"errors"
 	"testing"
 
@@ -101,8 +102,9 @@ func TestCreateDispatcher(t *testing.T) {
 	logger := zaptest.NewLogger(t)
 
 	t.Run("returns a non-nil dispatcher with addons subscribed", func(t *testing.T) {
-		config := internal.Config{SkipCBF: true, SkipRector: true}
-		addons := createAddons(logger, config, nil, nil, nil, nil)
+		config := internal.Config{Addons: internal.AddonsConfig{Normal: []string{"composer_normalizer"}}}
+		addons, err := createAddons(logger, config, nil, nil, nil, nil)
+		require.NoError(t, err)
 		dispatcher := createDispatcher(addons)
 		assert.NotNil(t, dispatcher)
 	})
@@ -114,50 +116,95 @@ func TestCreateDispatcher(t *testing.T) {
 }
 
 func TestCreateAddons(t *testing.T) {
-	// Setup minimal test dependencies
 	logger := zaptest.NewLogger(t)
 
-	// Test with default config
-	t.Run("default config", func(t *testing.T) {
+	t.Run("mandatory addons plus the normal list", func(t *testing.T) {
 		config := internal.Config{
-			SkipCBF:    true,  // Skip code beautifier
-			SkipRector: true,  // Skip rector
-			Security:   false, // No security-only updates
+			Addons: internal.AddonsConfig{Normal: []string{"code_beautifier"}},
 		}
+		addons, err := createAddons(logger, config, nil, nil, nil, nil)
+		require.NoError(t, err)
+		// 4 mandatory + code_beautifier
+		assert.Len(t, addons, 5)
+	})
 
-		addons := createAddons(
-			logger,
-			config,
-			nil, // mock would be better here
-			nil, // mock would be better here
-			nil, // mock would be better here
-			nil, // mock would be better here
-		)
-
-		// Should have the basic addons (6 addons)
+	t.Run("security mode adds composer_audit even when not listed", func(t *testing.T) {
+		config := internal.Config{
+			Security: true,
+			Addons: internal.AddonsConfig{
+				Normal:   []string{"code_beautifier"},
+				Security: []string{"code_beautifier"}, // composer_audit intentionally omitted
+			},
+		}
+		addons, err := createAddons(logger, config, nil, nil, nil, nil)
+		require.NoError(t, err)
+		// 4 mandatory + composer_audit + code_beautifier
 		assert.Len(t, addons, 6)
 	})
 
-	// Test with security mode enabled
-	t.Run("security mode", func(t *testing.T) {
-		config := internal.Config{
-			SkipCBF:    true,
-			SkipRector: true,
-			Security:   true, // Enable security-only updates
-		}
-
-		addons := createAddons(
-			logger,
-			config,
-			nil, // mock would be better here
-			nil, // mock would be better here
-			nil, // mock would be better here
-			nil, // mock would be better here
-		)
-
-		// Should have the basic addons + security addon
-		assert.Len(t, addons, 7)
+	t.Run("a mandatory addon listed in the YAML is not duplicated", func(t *testing.T) {
+		config := internal.Config{Addons: internal.AddonsConfig{Normal: []string{"update_hooks"}}}
+		addons, err := createAddons(logger, config, nil, nil, nil, nil)
+		require.NoError(t, err)
+		assert.Len(t, addons, 4) // update_hooks is already mandatory
 	})
+
+	t.Run("an unknown addon name is an error", func(t *testing.T) {
+		config := internal.Config{Addons: internal.AddonsConfig{Normal: []string{"does_not_exist"}}}
+		_, err := createAddons(logger, config, nil, nil, nil, nil)
+		require.Error(t, err)
+	})
+}
+
+func TestValidateAddons(t *testing.T) {
+	t.Run("known names pass, including mandatory ones", func(t *testing.T) {
+		config := internal.Config{Addons: internal.AddonsConfig{
+			Normal:   []string{"code_beautifier", "update_hooks"},
+			Security: []string{"composer_normalizer"},
+		}}
+		require.NoError(t, validateAddons(config))
+	})
+
+	t.Run("unknown name in the normal list is an error", func(t *testing.T) {
+		config := internal.Config{Addons: internal.AddonsConfig{Normal: []string{"nope"}}}
+		err := validateAddons(config)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "nope")
+	})
+
+	t.Run("unknown name in the security list is caught regardless of mode", func(t *testing.T) {
+		// Security: false, yet a bad security-list name must still be rejected.
+		config := internal.Config{Addons: internal.AddonsConfig{Security: []string{"typo"}}}
+		require.Error(t, validateAddons(config))
+	})
+}
+
+func TestConfigurableAddons(t *testing.T) {
+	names := configurableAddons()
+
+	// Exactly the four configurable addons, sorted, and nothing mandatory.
+	assert.Equal(t, []string{
+		"code_beautifier",
+		"composer_normalizer",
+		"deprecations_remover",
+		"translations_updater",
+	}, names)
+
+	for _, mandatory := range append(mandatoryAddons, "composer_audit") {
+		assert.NotContains(t, names, mandatory)
+	}
+}
+
+func TestAddonsCommand(t *testing.T) {
+	var buf bytes.Buffer
+	addonsCmd.SetOut(&buf)
+	addonsCmd.Run(addonsCmd, nil)
+	out := buf.String()
+
+	assert.Contains(t, out, "code_beautifier")
+	// Mandatory addons must not be listed as settable.
+	assert.NotContains(t, out, "composer_patches")
+	assert.NotContains(t, out, "composer_audit")
 }
 
 func TestResolveCheckoutBranch(t *testing.T) {
