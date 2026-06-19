@@ -1,0 +1,286 @@
+{
+  "/Users/d430774/Sites/drupdater/main.go": {
+    "mtime": 1781544133.6386805,
+    "hash": "8e445afd43675339fcdf8e3cccfaa63c"
+  },
+  "/Users/d430774/Sites/drupdater/cmd/root_test.go": {
+    "mtime": 1781889706.377685,
+    "hash": "ecd7c5261998cf8fa28892a4e4cd4d5d"
+  },
+  "/Users/d430774/Sites/drupdater/cmd/root.go": {
+    "mtime": 1781889706.3773904,
+    "hash": "8668e3c9793ad90247315cd4d864b4b0"
+  },
+  "/Users/d430774/Sites/drupdater/internal/config.go": {
+    "mtime": 1781889706.3786032,
+    "hash": "e8caee3280c53b57d0ea56b5918a231f"
+  },
+  "/Users/d430774/Sites/drupdater/internal/addon.go": {
+    "mtime": 1781813695.0689437,
+    "hash": "58419729ec21ada6aa57855f68483a76"
+  },
+  "/Users/d430774/Sites/drupdater/internal/configfile.go": {
+    "mtime": 1781889706.37887,
+    "hash": "48f0b118e2f1a0e1751778e17b474566"
+  },
+  "/Users/d430774/Sites/drupdater/internal/configfile_test.go": {
+    "mtime": 1781889706.3792062,
+    "hash": "3cf422172e7625e975089889cea7b80b"
+  },
+  "/Users/d430774/Sites/drupdater/internal/mocks_test.go": {
+    "mtime": 1781851746.1195638,
+    "hash": "9bad0d6dd8406e34285bbe8a8909b7da"
+  },
+  "/Users/d430774/Sites/drupdater/internal/codehosting/factory.go": {
+    "mtime": 1781774598.3593056,
+    "hash": "aea4a9118204359c15fd82a87c28d1c5"
+  },
+  "/Users/d430774/Sites/drupdater/internal/codehosting/github_test.go": {
+    "mtime": 1781774598.3600657,
+    "hash": "6a357220a4b67c56c4263ef268683416"
+  },
+  "/Users/d430774/Sites/drupdater/internal/codehosting/gitlab.go": {
+    "mtime": 1781774598.3603811,
+    "hash": "7f2a3081eb89cc5b4bf0911b3bb07d24"
+  },
+  "/Users/d430774/Sites/drupdater/internal/codehosting/mocks_test.go": {
+    "mtime": 1781851746.120971,
+    "hash": "3a95f3729fb172226edc898a60eec241"
+  },
+  "/Users/d430774/Sites/drupdater/internal/codehosting/gitlab_test.go": {
+    "mtime": 1781774598.3606858,
+    "hash": "bdcf69253929934160c60459ccb8b28c"
+  },
+  "/Users/d430774/Sites/drupdater/internal/codehosting/github.go": {
+    "mtime": 1781804914.562015,
+    "hash": "bfc45bb47c338a1766303804c218e13d"
+  },
+  "/Users/d430774/Sites/drupdater/internal/codehosting/factory_test.go": {
+    "mtime": 1781759232.7221107,
+    "hash": "04208c4ab203b83791dbe0105999dfcf"
+  },
+  "/Users/d430774/Sites/drupdater/internal/addon/composer_normalizer.go": {
+    "mtime": 1781759232.7191384,
+    "hash": "561f588ddca688e9696f5d536808a25e"
+  },
+  "/Users/d430774/Sites/drupdater/internal/addon/composer_allow_plugins.go": {
+    "mtime": 1781759232.7183604,
+    "hash": "4f16f346fa94bf04fe49e0edfb1c62df"
+  },
+  "/Users/d430774/Sites/drupdater/internal/addon/composer_allow_plugins_test.go": {
+    "mtime": 1781759232.718542,
+    "hash": "2de5f0d1581272b555578de900851b56"
+  },
+  "/Users/d430774/Sites/drupdater/internal/addon/composer_normalizer_test.go": {
+    "mtime": 1781544133.6340737,
+    "hash": "6f69dcc2ffd8b6c9c79a554e243c6344"
+  },
+  "/Users/d430774/Sites/drupdater/internal/addon/interfaces.go": {
+    "mtime": 1781808781.79664,
+    "hash": "dde7282092b4851497e8078ef8300df5"
+  },
+  "/Users/d430774/Sites/drupdater/internal/addon/update_hooks.go": {
+    "mtime": 1781850169.0254972,
+    "hash": "2e39abdf5c3ea0f6408ae1ab0cf0f20b"
+  },
+  "/Users/d430774/Sites/drupdater/internal/addon/composer_diff_test.go": {
+    "mtime": 1781786398.6594417,
+    "hash": "db5811f6d4e3a5c998259880a2632310"
+  },
+  "/Users/d430774/Sites/drupdater/internal/addon/code_beautifier_test.go": {
+    "mtime": 1781889706.3780115,
+    "hash": "a572358990d90af96bbf9acba1b47c69"
+  },
+  "/Users/d430774/Sites/drupdater/internal/addon/composer_patches_1.go": {
+    "mtime": 1781850169.025246,
+    "hash": "1cd5b4aa26e3539898cd87b1017536b7"
+  },
+  "/Users/d430774/Sites/drupdater/internal/addon/composer_patches_1_handler_test.go": {
+    "mtime": 1781808781.7955432,
+    "hash": "4ee0231bc704406fcb724102988a744b"
+  },
+  "/Users/d430774/Sites/drupdater/internal/addon/composer_diff.go": {
+    "mtime": 1781792482.1647646,
+    "hash": "9853ed32cd92840a5e57fa308707cf14"
+  },
+  "/Users/d430774/Sites/drupdater/internal/addon/composer_audit.go": {
+    "mtime": 1781850169.0242078,
+    "hash": "82f0cab33e97e4d894b9c3d67db9de98"
+  },
+  "/Users/d430774/Sites/drupdater/internal/addon/composer_patches_1_test.go": {
+    "mtime": 1781808781.7963896,
+    "hash": "ebea3db53cbd9caa4318d9fe22125c3a"
+  },
+  "/Users/d430774/Sites/drupdater/internal/addon/code_beautifier.go": {
+    "mtime": 1781759232.7168531,
+    "hash": "922b57d3a6171c0e90b6755bc4ab4ff3"
+  },
+  "/Users/d430774/Sites/drupdater/internal/addon/translations_updater_test.go": {
+    "mtime": 1781759232.721219,
+    "hash": "fd34eb1feabcac77f71190e0e6b5f941"
+  },
+  "/Users/d430774/Sites/drupdater/internal/addon/deprecations_remover_test.go": {
+    "mtime": 1781889706.3783364,
+    "hash": "1b80bc3137d44f4ffe37e68bd37030e4"
+  },
+  "/Users/d430774/Sites/drupdater/internal/addon/deprecations_remover.go": {
+    "mtime": 1781792482.1653495,
+    "hash": "28cf14b1231232b694481ddfdd932ebe"
+  },
+  "/Users/d430774/Sites/drupdater/internal/addon/mocks_test.go": {
+    "mtime": 1781851746.1184063,
+    "hash": "48408cf064caf2ba6178573f57e68bcc"
+  },
+  "/Users/d430774/Sites/drupdater/internal/addon/translations_updater.go": {
+    "mtime": 1781792482.1655283,
+    "hash": "7f38abd0792aaa8bd9be2590dd5b2123"
+  },
+  "/Users/d430774/Sites/drupdater/internal/addon/composer_audit_test.go": {
+    "mtime": 1781813695.0699337,
+    "hash": "3434e880599a9028c5386c5b6d032a6f"
+  },
+  "/Users/d430774/Sites/drupdater/internal/addon/update_hooks_test.go": {
+    "mtime": 1781544133.6365645,
+    "hash": "33e234d78e182a6f4c581bdfa19b153c"
+  },
+  "/Users/d430774/Sites/drupdater/internal/services/event.go": {
+    "mtime": 1781722989.1915073,
+    "hash": "cf12edb5249e70f0ec954083d846104a"
+  },
+  "/Users/d430774/Sites/drupdater/internal/services/interfaces.go": {
+    "mtime": 1781867599.9439144,
+    "hash": "28cb882e7bca835f41e9f24bf88e8fe1"
+  },
+  "/Users/d430774/Sites/drupdater/internal/services/workflow_base.go": {
+    "mtime": 1781867591.0654578,
+    "hash": "f06e08a460b6501d37d8e5838ea5fd81"
+  },
+  "/Users/d430774/Sites/drupdater/internal/services/workflow_base_test.go": {
+    "mtime": 1781867628.3717275,
+    "hash": "1b70dfd1671d09d53f9b32ce9a8fd73b"
+  },
+  "/Users/d430774/Sites/drupdater/internal/services/event_test.go": {
+    "mtime": 1781759232.7232013,
+    "hash": "d718c40f5fa37dacd751d9d26179ee2f"
+  },
+  "/Users/d430774/Sites/drupdater/internal/services/mocks_test.go": {
+    "mtime": 1781863800.1663692,
+    "hash": "8c83504db465321eca9c247034afbfbc"
+  },
+  "/Users/d430774/Sites/drupdater/scripts/rector.php": {
+    "mtime": 1781544133.641089,
+    "hash": "ab18879cd8e438c15d18d6d242a5179e"
+  },
+  "/Users/d430774/Sites/drupdater/scripts/config-resave.php": {
+    "mtime": 1781544133.6409838,
+    "hash": "4b9415df4b15cb944aeb346e8e0ac542"
+  },
+  "/Users/d430774/Sites/drupdater/pkg/phpcs/phpcs.go": {
+    "mtime": 1781792482.1670165,
+    "hash": "e04c8037a9b586d7c726fc778c14ac96"
+  },
+  "/Users/d430774/Sites/drupdater/pkg/phpcs/phpcs_test.go": {
+    "mtime": 1781673485.834547,
+    "hash": "40cd601dae0cd0042ffaa834f6ed1061"
+  },
+  "/Users/d430774/Sites/drupdater/pkg/drupalorg/drupalorg_test.go": {
+    "mtime": 1781774598.3628938,
+    "hash": "3db452924aabd6bde79a58b5335da032"
+  },
+  "/Users/d430774/Sites/drupdater/pkg/drupalorg/drupalorg.go": {
+    "mtime": 1781774598.3626173,
+    "hash": "a3443e7bd07de237a80e270e6a1dec9a"
+  },
+  "/Users/d430774/Sites/drupdater/pkg/drupal/installer.go": {
+    "mtime": 1781792482.1665673,
+    "hash": "f37debd12370e8aa4c7fdc46014ca383"
+  },
+  "/Users/d430774/Sites/drupdater/pkg/drupal/mocks_test.go": {
+    "mtime": 1781851746.1323218,
+    "hash": "1cae69495461ea0fb0b5800e0e496797"
+  },
+  "/Users/d430774/Sites/drupdater/pkg/drupal/installer_test.go": {
+    "mtime": 1781759232.7253158,
+    "hash": "afbce3767a630598c0b8d59ae0ceee7d"
+  },
+  "/Users/d430774/Sites/drupdater/pkg/composer/composer.go": {
+    "mtime": 1781808781.7986908,
+    "hash": "8bc55d6bdce8b1e52aa753c4e0502352"
+  },
+  "/Users/d430774/Sites/drupdater/pkg/composer/composer_test.go": {
+    "mtime": 1781808781.79928,
+    "hash": "2c1537804d09728c6aff98011112ef18"
+  },
+  "/Users/d430774/Sites/drupdater/pkg/rector/rector_test.go": {
+    "mtime": 1781673485.8347926,
+    "hash": "afdbd7ec6706901adbc3600debed7db4"
+  },
+  "/Users/d430774/Sites/drupdater/pkg/rector/rector.go": {
+    "mtime": 1781792482.1672363,
+    "hash": "deea3fde8b6a0df88bccf3459928ba2e"
+  },
+  "/Users/d430774/Sites/drupdater/pkg/drush/drush_test.go": {
+    "mtime": 1781673485.834293,
+    "hash": "520c809eea78d84969ce6f2062e614a6"
+  },
+  "/Users/d430774/Sites/drupdater/pkg/drush/drush.go": {
+    "mtime": 1781792482.1667912,
+    "hash": "bffb14b3daed62f7e4ddf6a7ef4d88ad"
+  },
+  "/Users/d430774/Sites/drupdater/pkg/repo/repo.go": {
+    "mtime": 1781863800.1674562,
+    "hash": "b1cf63b2c759c9294f9fefda235c5126"
+  },
+  "/Users/d430774/Sites/drupdater/pkg/repo/repo_test.go": {
+    "mtime": 1781863800.167739,
+    "hash": "62e034200372c8d9e569954878c52b6c"
+  },
+  "/Users/d430774/Sites/drupdater/pkg/repo/mocks_test.go": {
+    "mtime": 1781851746.1232822,
+    "hash": "ff0c2b8c08442f04485d0d8bca12efe6"
+  },
+  "/Users/d430774/Sites/drupdater/README.md": {
+    "mtime": 1781889706.3771796,
+    "hash": "ba2098db34afd14f51fcbd98132d765b"
+  },
+  "/Users/d430774/Sites/drupdater/log.txt": {
+    "mtime": 1781790577.4802704,
+    "hash": "8f548f549c888c7ed3f7637e75ce10da"
+  },
+  "/Users/d430774/Sites/drupdater/DEVELOPMENT.md": {
+    "mtime": 1781544133.631558,
+    "hash": "7f0904a3853d4e0733303144f09b79c3"
+  },
+  "/Users/d430774/Sites/drupdater/output.txt": {
+    "mtime": 1781790863.2664464,
+    "hash": "966d3d485df48a27cc9d9cca7190adf5"
+  },
+  "/Users/d430774/Sites/drupdater/CLAUDE.md": {
+    "mtime": 1781889706.3767986,
+    "hash": "eaaef195fc7708eed3e5c626e756c554"
+  },
+  "/Users/d430774/Sites/drupdater/internal/addon/testdata/composer_audit.md": {
+    "mtime": 1781813695.0709076,
+    "hash": "c9ff47b73757bfbc560b4823f665f5e8"
+  },
+  "/Users/d430774/Sites/drupdater/internal/addon/testdata/allowplugins.md": {
+    "mtime": 1781544133.6356668,
+    "hash": "84297f81dc9191dc92b2d80e10096e29"
+  },
+  "/Users/d430774/Sites/drupdater/internal/addon/testdata/update_hooks.md": {
+    "mtime": 1781544133.6361177,
+    "hash": "1a7f5d1d50ecf59e840e3092155e7cfd"
+  },
+  "/Users/d430774/Sites/drupdater/internal/addon/testdata/composer_patches_1.md": {
+    "mtime": 1781544133.6360269,
+    "hash": "eb28de477b6edd17f52d7cbe832d115d"
+  },
+  "/Users/d430774/Sites/drupdater/internal/addon/testdata/composer_diff.md": {
+    "mtime": 1781544133.6358905,
+    "hash": "d95f75ca5980be6f28e18bbb0eac42c2"
+  },
+  "/Users/d430774/Sites/drupdater/internal/services/testdata/dependency_update.md": {
+    "mtime": 1781544133.6383173,
+    "hash": "c45aa38f5e9a7e95784d4f122e4fbc2f"
+  }
+}

@@ -1,2 +1,5 @@
 .claude
 .idea
+
+graphify-out/cost.json        # local only
+graphify-out/cache/
