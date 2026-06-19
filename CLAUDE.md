@@ -25,7 +25,7 @@ go test -v -run TestName ./path/to/package/...
 
 Run the tool locally:
 ```bash
-make run REPO=<git-url> TOKEN=<token>
+make docker-run REPO=<git-url> TOKEN=<token>
 ```
 
 ## Architecture
