@@ -35,9 +35,7 @@ func TestRemoveDeprecations(t *testing.T) {
 	// Common test setup
 	logger := zap.NewNop()
 	worktree := NewMockWorktree(t)
-	config := internal.Config{
-		SkipRector: false,
-	}
+	config := internal.Config{}
 
 	t.Run("Rector is not installed", func(t *testing.T) {
 		// Setup

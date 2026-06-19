@@ -101,8 +101,9 @@ func TestCreateDispatcher(t *testing.T) {
 	logger := zaptest.NewLogger(t)
 
 	t.Run("returns a non-nil dispatcher with addons subscribed", func(t *testing.T) {
-		config := internal.Config{SkipCBF: true, SkipRector: true}
-		addons := createAddons(logger, config, nil, nil, nil, nil)
+		config := internal.Config{Addons: internal.AddonsConfig{Regular: []string{"composer_normalizer"}}}
+		addons, err := createAddons(logger, config, nil, nil, nil, nil)
+		require.NoError(t, err)
 		dispatcher := createDispatcher(addons)
 		assert.NotNil(t, dispatcher)
 	})
@@ -114,49 +115,43 @@ func TestCreateDispatcher(t *testing.T) {
 }
 
 func TestCreateAddons(t *testing.T) {
-	// Setup minimal test dependencies
 	logger := zaptest.NewLogger(t)
 
-	// Test with default config
-	t.Run("default config", func(t *testing.T) {
+	t.Run("mandatory addons plus the regular list", func(t *testing.T) {
 		config := internal.Config{
-			SkipCBF:    true,  // Skip code beautifier
-			SkipRector: true,  // Skip rector
-			Security:   false, // No security-only updates
+			Addons: internal.AddonsConfig{Regular: []string{"code_beautifier"}},
 		}
-
-		addons := createAddons(
-			logger,
-			config,
-			nil, // mock would be better here
-			nil, // mock would be better here
-			nil, // mock would be better here
-			nil, // mock would be better here
-		)
-
-		// Should have the basic addons (6 addons)
-		assert.Len(t, addons, 6)
+		addons, err := createAddons(logger, config, nil, nil, nil, nil)
+		require.NoError(t, err)
+		// 4 mandatory + code_beautifier
+		assert.Len(t, addons, 5)
 	})
 
-	// Test with security mode enabled
-	t.Run("security mode", func(t *testing.T) {
+	t.Run("security mode uses the security list", func(t *testing.T) {
 		config := internal.Config{
-			SkipCBF:    true,
-			SkipRector: true,
-			Security:   true, // Enable security-only updates
+			Security: true,
+			Addons: internal.AddonsConfig{
+				Regular:  []string{"code_beautifier"},
+				Security: []string{"composer_audit"},
+			},
 		}
+		addons, err := createAddons(logger, config, nil, nil, nil, nil)
+		require.NoError(t, err)
+		// 4 mandatory + composer_audit
+		assert.Len(t, addons, 5)
+	})
 
-		addons := createAddons(
-			logger,
-			config,
-			nil, // mock would be better here
-			nil, // mock would be better here
-			nil, // mock would be better here
-			nil, // mock would be better here
-		)
+	t.Run("a mandatory addon listed in the YAML is not duplicated", func(t *testing.T) {
+		config := internal.Config{Addons: internal.AddonsConfig{Regular: []string{"update_hooks"}}}
+		addons, err := createAddons(logger, config, nil, nil, nil, nil)
+		require.NoError(t, err)
+		assert.Len(t, addons, 4) // update_hooks is already mandatory
+	})
 
-		// Should have the basic addons + security addon
-		assert.Len(t, addons, 7)
+	t.Run("an unknown addon name is an error", func(t *testing.T) {
+		config := internal.Config{Addons: internal.AddonsConfig{Regular: []string{"does_not_exist"}}}
+		_, err := createAddons(logger, config, nil, nil, nil, nil)
+		require.Error(t, err)
 	})
 }
 
