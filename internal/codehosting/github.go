@@ -47,6 +47,15 @@ func (g Github) CreateMergeRequest(ctx context.Context, title string, descriptio
 	}, nil
 }
 
+// DeleteBranch removes a remote branch via the GitHub Git refs API.
+func (g *Github) DeleteBranch(ctx context.Context, branch string) error {
+	_, err := g.client.Git.DeleteRef(ctx, g.owner, g.repo, "refs/heads/"+branch)
+	if err != nil {
+		return fmt.Errorf("failed to delete branch: %w", err)
+	}
+	return nil
+}
+
 // logError logs an error. This is a placeholder for proper error handling.
 func (g *Github) logError(err error) {
 	// In a real implementation, this would use a proper logging mechanism

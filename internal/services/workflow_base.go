@@ -313,6 +313,12 @@ func (ws *WorkflowBaseService) publishWork(ctx context.Context, repository GitRe
 
 	mr, err := ws.platform.CreateMergeRequest(ctx, e.Title, description, updateBranchName, ws.config.Branch)
 	if err != nil {
+		if deleteErr := ws.platform.DeleteBranch(ctx, updateBranchName); deleteErr != nil {
+			ws.logger.Warn("failed to delete remote branch after MR creation failure",
+				zap.String("branch", updateBranchName),
+				zap.Error(deleteErr),
+			)
+		}
 		return fmt.Errorf("failed to create merge request: %w", err)
 	}
 	ws.logger.Info("merge request created", zap.String("url", mr.URL))

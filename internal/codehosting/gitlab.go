@@ -64,6 +64,15 @@ func (g *Gitlab) CreateMergeRequest(ctx context.Context, title string, descripti
 	}, nil
 }
 
+// DeleteBranch removes a remote branch via the GitLab Branches API.
+func (g *Gitlab) DeleteBranch(ctx context.Context, branch string) error {
+	_, err := g.client.Branches.DeleteBranch(g.projectPath, branch, gitlab.WithContext(ctx))
+	if err != nil {
+		return fmt.Errorf("failed to delete branch: %w", err)
+	}
+	return nil
+}
+
 func (g *Gitlab) GetUser(ctx context.Context) (name string, email string) {
 	user, _, err := g.client.Users.CurrentUser(gitlab.WithContext(ctx))
 	if err != nil {

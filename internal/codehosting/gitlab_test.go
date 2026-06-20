@@ -95,6 +95,48 @@ func TestGitlab_CreateMergeRequest_HonorsContext(t *testing.T) {
 	assert.ErrorIs(t, err, context.Canceled)
 }
 
+func TestGitlab_DeleteBranch_Success(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete && r.URL.Path == "/api/v4/projects/test_project/repository/branches/update-abc123" {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer mockServer.Close()
+
+	client, _ := gitlab.NewClient("", gitlab.WithBaseURL(mockServer.URL))
+	g := &Gitlab{client: client, projectPath: "test_project", fs: afero.NewMemMapFs()}
+
+	err := g.DeleteBranch(context.Background(), "update-abc123")
+	assert.NoError(t, err)
+}
+
+func TestGitlab_DeleteBranch_Error(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"message":"404 Branch Not Found"}`))
+	}))
+	defer mockServer.Close()
+
+	client, _ := gitlab.NewClient("", gitlab.WithBaseURL(mockServer.URL))
+	g := &Gitlab{client: client, projectPath: "test_project", fs: afero.NewMemMapFs()}
+
+	err := g.DeleteBranch(context.Background(), "nonexistent-branch")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to delete branch")
+}
+
+func TestGitlab_DeleteBranch_HonorsContext(t *testing.T) {
+	g := newGitlab("https://gitlab.com/user/repo", "dummy-token")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := g.DeleteBranch(ctx, "some-branch")
+	assert.ErrorIs(t, err, context.Canceled)
+}
+
 func TestGitlab_GetUser_HonorsContext(t *testing.T) {
 	g := newGitlab("https://gitlab.com/user/repo", "dummy-token")
 
