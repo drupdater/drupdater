@@ -180,6 +180,7 @@ falls back to the defaults shown below. Unknown keys are rejected, so typos fail
 ```yaml
 sites: [default]      # Drupal site directories to update
 timeout: 30m          # overall run timeout (Go duration string; 0 disables)
+commit_strategy: bulk # bulk (one commit for all packages) or per_package (one per package)
 addons:               # which configurable addons run in each mode
   normal:
     - code_beautifier        # phpcbf PHP code style fixes
@@ -188,6 +189,12 @@ addons:               # which configurable addons run in each mode
     - composer_normalizer
   security: []          # minimal by default: just the security fix, nothing else
 ```
+
+`commit_strategy` defaults to `bulk` (one `composer update` for everything, committed together).
+Set it to `per_package` to update one direct package at a time and produce one atomic commit per
+package (`Update drupal/core 10.1.8 → 10.3.14`) that bundles that package's composer, config,
+patch, and translation changes, so any single commit can be reverted cleanly. It is not supported
+with `--security` (a security run falls back to `bulk`).
 
 `--security` picks the `addons.security` list; otherwise `addons.normal` is used. Security runs
 default to no extra addons so nothing interferes with the package update — add entries here only

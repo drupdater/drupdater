@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/pkg/composer"
 
 	git "github.com/go-git/go-git/v5"
 	gitConfig "github.com/go-git/go-git/v5/config"
@@ -109,17 +110,33 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []interna
 		return err
 	}
 
-	// Update the shared code: composer update, commit, and create the update branch.
-	updateBranchName, err := ws.updateSharedCode(ctx, repository, worktree, path)
-	if err != nil {
-		return err
+	// per_package mode produces one atomic commit per direct package. It's incompatible with
+	// the composer_audit addon's whole-run semantics, so it only applies to normal updates;
+	// security runs fall back to bulk.
+	perPackage := ws.config.CommitStrategy == "per_package" && !ws.config.Security
+	if ws.config.CommitStrategy == "per_package" && ws.config.Security {
+		ws.logger.Warn("per_package commit strategy is not supported with --security; falling back to bulk")
 	}
 
-	// Run the update hooks and export config per site against the now-updated code.
-	if err := ws.forEachSite(ctx, func(ctx context.Context, site string) error {
-		return ws.updateSite(ctx, path, worktree, site)
-	}); err != nil {
-		return err
+	var updateBranchName string
+	if perPackage {
+		updateBranchName, err = ws.updatePerPackage(ctx, repository, worktree, path)
+		if err != nil {
+			return err
+		}
+	} else {
+		// Update the shared code: composer update, commit, and create the update branch.
+		updateBranchName, err = ws.updateSharedCode(ctx, repository, worktree, path)
+		if err != nil {
+			return err
+		}
+
+		// Run the update hooks and export config per site against the now-updated code.
+		if err := ws.forEachSite(ctx, func(ctx context.Context, site string) error {
+			return ws.updateSite(ctx, path, worktree, site)
+		}); err != nil {
+			return err
+		}
 	}
 
 	if !ws.config.DryRun {
@@ -240,6 +257,134 @@ func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context, repository 
 	}
 
 	return updateBranchName, nil
+}
+
+// updatePerPackage updates one direct package at a time, running the full site cycle for each
+// and squashing all of a package's side effects (composer, config, patches, translations) into
+// a single atomic commit. It returns the name of the created update branch.
+func (ws *WorkflowBaseService) updatePerPackage(ctx context.Context, repository GitRepository, worktree Worktree, path string) (string, error) {
+	ws.logger.Info("updating dependencies per package")
+
+	packages, err := ws.composer.Outdated(ctx, path)
+	if err != nil {
+		return "", fmt.Errorf("failed to list outdated packages: %w", err)
+	}
+	if len(packages) == 0 {
+		return "", AbortError{Msg: "no outdated packages detected"}
+	}
+
+	committed := 0
+	for _, pkg := range packages {
+		head, err := repository.Head()
+		if err != nil {
+			return "", fmt.Errorf("failed to read HEAD: %w", err)
+		}
+		start := head.Hash()
+
+		// Let the patches addon update patch entries for this package, and open plugins.
+		preComposerUpdateEvent := NewPreComposerUpdateEvent(ctx, path, worktree, []string{pkg}, []string{}, false)
+		if err := ws.dispatcher.FireEvent(preComposerUpdateEvent); err != nil {
+			return "", fmt.Errorf("failed to fire event: %w", err)
+		}
+
+		changes, err := ws.composer.Update(ctx, path, []string{pkg}, preComposerUpdateEvent.PackagesToKeep, preComposerUpdateEvent.MinimalChanges, false)
+		if err != nil {
+			return "", fmt.Errorf("failed to update %s: %w", pkg, err)
+		}
+		if len(changes) == 0 {
+			// Already updated as a transitive dependency of an earlier package: drop any patch
+			// commit and move on without emitting a commit for this package.
+			if err := worktree.Reset(&git.ResetOptions{Commit: start, Mode: git.SoftReset}); err != nil {
+				return "", fmt.Errorf("failed to reset worktree: %w", err)
+			}
+			ws.logger.Info("skipping package with no lock change", zap.String("package", pkg))
+			continue
+		}
+
+		postComposerUpdateEvent := NewPostComposerUpdateEvent(ctx, path, worktree)
+		if err := ws.dispatcher.FireEvent(postComposerUpdateEvent); err != nil {
+			return "", fmt.Errorf("failed to fire event: %w", err)
+		}
+
+		if err := worktree.AddGlob("composer.*"); err != nil {
+			return "", fmt.Errorf("failed to add composer.* files: %w", err)
+		}
+		if _, err := worktree.Commit("Update composer.json and composer.lock", &git.CommitOptions{}); err != nil {
+			return "", fmt.Errorf("failed to commit composer.json and composer.lock: %w", err)
+		}
+
+		// Run the update hooks and export config per site against the updated code.
+		if err := ws.forEachSite(ctx, func(ctx context.Context, site string) error {
+			return ws.updateSite(ctx, path, worktree, site)
+		}); err != nil {
+			return "", err
+		}
+
+		// Squash this package's composer/config/patch/translation commits into one atomic commit.
+		if err := worktree.Reset(&git.ResetOptions{Commit: start, Mode: git.SoftReset}); err != nil {
+			return "", fmt.Errorf("failed to reset worktree: %w", err)
+		}
+		if _, err := worktree.Commit(commitMessage(pkg, changes), &git.CommitOptions{}); err != nil {
+			return "", fmt.Errorf("failed to commit package %s: %w", pkg, err)
+		}
+		committed++
+	}
+
+	if committed == 0 {
+		return "", AbortError{Msg: "no changes detected"}
+	}
+
+	// Run the codebase-wide addons (phpcbf, rector) once, after all packages are updated.
+	postCodeUpdateEvent := NewPostCodeUpdateEvent(ctx, path, worktree)
+	if err := ws.dispatcher.FireEvent(postCodeUpdateEvent); err != nil {
+		return "", fmt.Errorf("failed to fire event: %w", err)
+	}
+
+	composerLockHash, err := ws.composer.GetLockHash(path)
+	if err != nil {
+		return "", err
+	}
+	updateBranchName := fmt.Sprintf("update-%s", composerLockHash)
+
+	// ponytail: the existence check runs after all the work; an already-existing branch only
+	// aborts at the end. Acceptable — move it before the loop if rerun cost becomes a problem.
+	exists, err := ws.repository.BranchExists(repository, updateBranchName)
+	if err != nil {
+		return "", fmt.Errorf("failed to check if branch exists: %w", err)
+	}
+	if exists {
+		return "", AbortError{Msg: fmt.Sprintf("branch %s already exists, skipping", updateBranchName)}
+	}
+
+	if err := worktree.Checkout(&git.CheckoutOptions{
+		Branch: plumbing.NewBranchReferenceName(updateBranchName),
+		Create: true,
+		Force:  false,
+		Keep:   true,
+	}); err != nil {
+		return "", fmt.Errorf("failed to checkout branch: %w", err)
+	}
+
+	return updateBranchName, nil
+}
+
+// commitMessage builds the atomic commit subject for a package from its change set.
+func commitMessage(pkg string, changes []composer.PackageChange) string {
+	for _, c := range changes {
+		if c.Package != pkg {
+			continue
+		}
+		switch c.Action {
+		case "Install":
+			return fmt.Sprintf("Install %s %s", pkg, c.To)
+		case "Remove":
+			return fmt.Sprintf("Remove %s %s", pkg, c.From)
+		default: // Upgrade, Downgrade
+			return fmt.Sprintf("Update %s %s → %s", pkg, c.From, c.To)
+		}
+	}
+	// Only the package's dependencies moved; the package itself stayed put.
+	return fmt.Sprintf("Update %s", pkg)
 }
 
 func (ws *WorkflowBaseService) updateSite(ctx context.Context, path string, worktree Worktree, site string) error {

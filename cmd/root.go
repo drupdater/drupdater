@@ -94,6 +94,7 @@ names you can set there. See the README for the full file format.`,
 			zap.Duration("timeout", config.Timeout),
 			zap.Strings("addons.normal", config.Addons.Normal),
 			zap.Strings("addons.security", config.Addons.Security),
+			zap.String("commit_strategy", config.CommitStrategy),
 		)
 
 		cache := NewCache()

@@ -227,6 +227,74 @@ func (_c *MockComposer_Install_Call) RunAndReturn(run func(ctx context.Context, 
 	return _c
 }
 
+// Outdated provides a mock function for the type MockComposer
+func (_mock *MockComposer) Outdated(ctx context.Context, dir string) ([]string, error) {
+	ret := _mock.Called(ctx, dir)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Outdated")
+	}
+
+	var r0 []string
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) ([]string, error)); ok {
+		return returnFunc(ctx, dir)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) []string); ok {
+		r0 = returnFunc(ctx, dir)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, dir)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockComposer_Outdated_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Outdated'
+type MockComposer_Outdated_Call struct {
+	*mock.Call
+}
+
+// Outdated is a helper method to define mock.On call
+//   - ctx context.Context
+//   - dir string
+func (_e *MockComposer_Expecter) Outdated(ctx any, dir any) *MockComposer_Outdated_Call {
+	return &MockComposer_Outdated_Call{Call: _e.mock.On("Outdated", ctx, dir)}
+}
+
+func (_c *MockComposer_Outdated_Call) Run(run func(ctx context.Context, dir string)) *MockComposer_Outdated_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockComposer_Outdated_Call) Return(strings []string, err error) *MockComposer_Outdated_Call {
+	_c.Call.Return(strings, err)
+	return _c
+}
+
+func (_c *MockComposer_Outdated_Call) RunAndReturn(run func(ctx context.Context, dir string) ([]string, error)) *MockComposer_Outdated_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Update provides a mock function for the type MockComposer
 func (_mock *MockComposer) Update(ctx context.Context, dir string, packagesToUpdate []string, packagesToKeep []string, minimalChanges bool, dryRun bool) ([]composer.PackageChange, error) {
 	ret := _mock.Called(ctx, dir, packagesToUpdate, packagesToKeep, minimalChanges, dryRun)
@@ -963,6 +1031,61 @@ func (_m *MockGitRepository) EXPECT() *MockGitRepository_Expecter {
 	return &MockGitRepository_Expecter{mock: &_m.Mock}
 }
 
+// Head provides a mock function for the type MockGitRepository
+func (_mock *MockGitRepository) Head() (*plumbing.Reference, error) {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Head")
+	}
+
+	var r0 *plumbing.Reference
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func() (*plumbing.Reference, error)); ok {
+		return returnFunc()
+	}
+	if returnFunc, ok := ret.Get(0).(func() *plumbing.Reference); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*plumbing.Reference)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func() error); ok {
+		r1 = returnFunc()
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockGitRepository_Head_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Head'
+type MockGitRepository_Head_Call struct {
+	*mock.Call
+}
+
+// Head is a helper method to define mock.On call
+func (_e *MockGitRepository_Expecter) Head() *MockGitRepository_Head_Call {
+	return &MockGitRepository_Head_Call{Call: _e.mock.On("Head")}
+}
+
+func (_c *MockGitRepository_Head_Call) Run(run func()) *MockGitRepository_Head_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockGitRepository_Head_Call) Return(reference *plumbing.Reference, err error) *MockGitRepository_Head_Call {
+	_c.Call.Return(reference, err)
+	return _c
+}
+
+func (_c *MockGitRepository_Head_Call) RunAndReturn(run func() (*plumbing.Reference, error)) *MockGitRepository_Head_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Push provides a mock function for the type MockGitRepository
 func (_mock *MockGitRepository) Push(o *git.PushOptions) error {
 	ret := _mock.Called(o)
@@ -1386,6 +1509,57 @@ func (_c *MockWorktree_Remove_Call) Return(hash plumbing.Hash, err error) *MockW
 }
 
 func (_c *MockWorktree_Remove_Call) RunAndReturn(run func(path string) (plumbing.Hash, error)) *MockWorktree_Remove_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Reset provides a mock function for the type MockWorktree
+func (_mock *MockWorktree) Reset(opts *git.ResetOptions) error {
+	ret := _mock.Called(opts)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Reset")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(*git.ResetOptions) error); ok {
+		r0 = returnFunc(opts)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockWorktree_Reset_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Reset'
+type MockWorktree_Reset_Call struct {
+	*mock.Call
+}
+
+// Reset is a helper method to define mock.On call
+//   - opts *git.ResetOptions
+func (_e *MockWorktree_Expecter) Reset(opts any) *MockWorktree_Reset_Call {
+	return &MockWorktree_Reset_Call{Call: _e.mock.On("Reset", opts)}
+}
+
+func (_c *MockWorktree_Reset_Call) Run(run func(opts *git.ResetOptions)) *MockWorktree_Reset_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *git.ResetOptions
+		if args[0] != nil {
+			arg0 = args[0].(*git.ResetOptions)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockWorktree_Reset_Call) Return(err error) *MockWorktree_Reset_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockWorktree_Reset_Call) RunAndReturn(run func(opts *git.ResetOptions) error) *MockWorktree_Reset_Call {
 	_c.Call.Return(run)
 	return _c
 }

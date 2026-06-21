@@ -21,6 +21,7 @@ import (
 type Repository interface {
 	Push(o *git.PushOptions) error
 	References() (storer.ReferenceIter, error)
+	Head() (*plumbing.Reference, error)
 }
 
 type Worktree interface {
@@ -30,6 +31,7 @@ type Worktree interface {
 	Commit(msg string, opts *git.CommitOptions) (plumbing.Hash, error)
 	Status() (git.Status, error)
 	Checkout(opts *git.CheckoutOptions) error
+	Reset(opts *git.ResetOptions) error
 }
 
 type GitRepositoryService struct {

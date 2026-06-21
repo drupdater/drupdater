@@ -14,6 +14,9 @@ type Config struct {
 	Verbose       bool
 	Timeout       time.Duration
 	Addons        AddonsConfig
+	// CommitStrategy is "bulk" (one commit for all packages, default) or "per_package"
+	// (one atomic commit per direct package, including its config/patch/translation changes).
+	CommitStrategy string
 }
 
 // AddonsConfig lists which configurable addons run in each mode. Mandatory addons

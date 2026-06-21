@@ -86,6 +86,230 @@ func TestStartUpdate(t *testing.T) {
 	vcsProvider.AssertExpectations(t)
 }
 
+func TestStartUpdatePerPackage(t *testing.T) {
+	// per_package mode: one atomic commit per outdated package. drupal/core has changes and
+	// produces a commit; drupal/token is already up to date (no changes) and is skipped.
+	logger := zap.NewNop()
+	installer := NewMockInstaller(t)
+	repositoryService := NewMockRepository(t)
+	vcsProvider := NewMockPlatform(t)
+	repository := NewMockGitRepository(t)
+	mockComposer := NewMockComposer(t)
+	drush := NewMockDrush(t)
+	ctx := context.Background()
+
+	config := internal.Config{
+		RepositoryURL:  "https://example.com/repo.git",
+		Branch:         "main",
+		Token:          "token",
+		Clone:          true,
+		Sites:          []string{"site1"},
+		CommitStrategy: "per_package",
+	}
+
+	worktree := NewMockWorktree(t)
+	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
+	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Reset(mock.Anything).Return(nil)
+	worktree.EXPECT().Checkout(mock.Anything).Return(nil)
+
+	installer.EXPECT().Install(mock.Anything, "/tmp", "site1").Return(nil)
+	installer.EXPECT().ConfigureDatabase(mock.Anything, "/tmp", "site1").Return(nil)
+
+	drush.EXPECT().UpdateSite(mock.Anything, "/tmp", "site1").Return(nil)
+	drush.EXPECT().ExportConfiguration(mock.Anything, "/tmp", "site1").Return(nil)
+	drush.EXPECT().ConfigResave(mock.Anything, "/tmp", "site1").Return(nil)
+
+	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil)
+	repositoryService.EXPECT().BranchExists(repository, mock.Anything).Return(false, nil)
+	repository.EXPECT().Head().Return(plumbing.NewHashReference(plumbing.HEAD, plumbing.ZeroHash), nil)
+	repository.EXPECT().Push(mock.Anything).Return(nil)
+
+	mockComposer.EXPECT().CheckPlatformReqs(mock.Anything, "/tmp").Return("", nil)
+	mockComposer.EXPECT().Install(mock.Anything, "/tmp").Return(nil)
+	mockComposer.EXPECT().Outdated(mock.Anything, "/tmp").Return([]string{"drupal/core", "drupal/token"}, nil)
+	mockComposer.EXPECT().Update(mock.Anything, "/tmp", []string{"drupal/core"}, mock.Anything, mock.Anything, false).Return([]composer.PackageChange{
+		{Action: "Upgrade", Package: "drupal/core", From: "9.0.0", To: "9.1.0"},
+	}, nil)
+	mockComposer.EXPECT().Update(mock.Anything, "/tmp", []string{"drupal/token"}, mock.Anything, mock.Anything, false).Return(nil, nil)
+	mockComposer.EXPECT().GetLockHash("/tmp").Return("dummy-hash", nil)
+
+	fixture, err := os.ReadFile("testdata/dependency_update.md")
+	assert.NoError(t, err)
+
+	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
+	vcsProvider.EXPECT().CreateMergeRequest(mock.Anything, mock.Anything, string(fixture), mock.Anything, config.Branch).Return(codehosting.MergeRequest{}, nil)
+
+	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
+	err = workflowService.StartUpdate(ctx, nil)
+
+	assert.NoError(t, err)
+	mockComposer.AssertExpectations(t)
+	drush.AssertExpectations(t)
+	vcsProvider.AssertExpectations(t)
+}
+
+func TestStartUpdatePerPackageNoOutdated(t *testing.T) {
+	// No outdated packages aborts cleanly.
+	logger := zap.NewNop()
+	installer := NewMockInstaller(t)
+	repositoryService := NewMockRepository(t)
+	vcsProvider := NewMockPlatform(t)
+	repository := NewMockGitRepository(t)
+	mockComposer := NewMockComposer(t)
+	drush := NewMockDrush(t)
+
+	config := internal.Config{
+		RepositoryURL:  "https://example.com/repo.git",
+		Branch:         "main",
+		Token:          "token",
+		Clone:          true,
+		Sites:          []string{"site1"},
+		CommitStrategy: "per_package",
+	}
+
+	worktree := NewMockWorktree(t)
+	installer.EXPECT().Install(mock.Anything, "/tmp", "site1").Return(nil)
+	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil)
+	mockComposer.EXPECT().CheckPlatformReqs(mock.Anything, "/tmp").Return("", nil)
+	mockComposer.EXPECT().Install(mock.Anything, "/tmp").Return(nil)
+	mockComposer.EXPECT().Outdated(mock.Anything, "/tmp").Return(nil, nil)
+	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
+
+	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
+	err := workflowService.StartUpdate(context.Background(), nil)
+
+	var abort AbortError
+	assert.ErrorAs(t, err, &abort)
+}
+
+func TestStartUpdatePerPackageBranchExists(t *testing.T) {
+	// An already-existing update branch aborts after the package loop.
+	logger := zap.NewNop()
+	installer := NewMockInstaller(t)
+	repositoryService := NewMockRepository(t)
+	vcsProvider := NewMockPlatform(t)
+	repository := NewMockGitRepository(t)
+	mockComposer := NewMockComposer(t)
+	drush := NewMockDrush(t)
+
+	config := internal.Config{
+		RepositoryURL:  "https://example.com/repo.git",
+		Branch:         "main",
+		Token:          "token",
+		Clone:          true,
+		Sites:          []string{"site1"},
+		CommitStrategy: "per_package",
+	}
+
+	worktree := NewMockWorktree(t)
+	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
+	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Reset(mock.Anything).Return(nil)
+
+	installer.EXPECT().Install(mock.Anything, "/tmp", "site1").Return(nil)
+	installer.EXPECT().ConfigureDatabase(mock.Anything, "/tmp", "site1").Return(nil)
+	drush.EXPECT().UpdateSite(mock.Anything, "/tmp", "site1").Return(nil)
+	drush.EXPECT().ExportConfiguration(mock.Anything, "/tmp", "site1").Return(nil)
+	drush.EXPECT().ConfigResave(mock.Anything, "/tmp", "site1").Return(nil)
+
+	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil)
+	repositoryService.EXPECT().BranchExists(repository, mock.Anything).Return(true, nil)
+	repository.EXPECT().Head().Return(plumbing.NewHashReference(plumbing.HEAD, plumbing.ZeroHash), nil)
+
+	mockComposer.EXPECT().CheckPlatformReqs(mock.Anything, "/tmp").Return("", nil)
+	mockComposer.EXPECT().Install(mock.Anything, "/tmp").Return(nil)
+	mockComposer.EXPECT().Outdated(mock.Anything, "/tmp").Return([]string{"drupal/core"}, nil)
+	mockComposer.EXPECT().Update(mock.Anything, "/tmp", []string{"drupal/core"}, mock.Anything, mock.Anything, false).Return([]composer.PackageChange{
+		{Action: "Upgrade", Package: "drupal/core", From: "9.0.0", To: "9.1.0"},
+	}, nil)
+	mockComposer.EXPECT().GetLockHash("/tmp").Return("dummy-hash", nil)
+
+	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
+
+	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
+	err := workflowService.StartUpdate(context.Background(), nil)
+
+	var abort AbortError
+	assert.ErrorAs(t, err, &abort)
+}
+
+func TestStartUpdatePerPackageSecurityFallsBackToBulk(t *testing.T) {
+	// per_package is unsupported in security mode: it must fall back to the bulk path
+	// (single composer.Update for all packages, no composer.Outdated call).
+	logger := zap.NewNop()
+	installer := NewMockInstaller(t)
+	repositoryService := NewMockRepository(t)
+	vcsProvider := NewMockPlatform(t)
+	repository := NewMockGitRepository(t)
+	mockComposer := NewMockComposer(t)
+	drush := NewMockDrush(t)
+
+	config := internal.Config{
+		RepositoryURL:  "https://example.com/repo.git",
+		Branch:         "main",
+		Token:          "token",
+		Clone:          true,
+		Sites:          []string{"site1"},
+		Security:       true,
+		CommitStrategy: "per_package",
+	}
+
+	worktree := NewMockWorktree(t)
+	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
+	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Checkout(mock.Anything).Return(nil)
+
+	installer.EXPECT().Install(mock.Anything, "/tmp", "site1").Return(nil)
+	installer.EXPECT().ConfigureDatabase(mock.Anything, "/tmp", "site1").Return(nil)
+	drush.EXPECT().UpdateSite(mock.Anything, "/tmp", "site1").Return(nil)
+	drush.EXPECT().ExportConfiguration(mock.Anything, "/tmp", "site1").Return(nil)
+	drush.EXPECT().ConfigResave(mock.Anything, "/tmp", "site1").Return(nil)
+
+	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil)
+	repositoryService.EXPECT().BranchExists(repository, mock.Anything).Return(false, nil)
+	repository.EXPECT().Push(mock.Anything).Return(nil)
+
+	mockComposer.EXPECT().CheckPlatformReqs(mock.Anything, "/tmp").Return("", nil)
+	mockComposer.EXPECT().Install(mock.Anything, "/tmp").Return(nil)
+	// Bulk path: one Update for everything; Outdated is never called.
+	mockComposer.EXPECT().Update(mock.Anything, "/tmp", mock.Anything, mock.Anything, false, false).Return([]composer.PackageChange{
+		{Action: "Upgrade", Package: "drupal/core", From: "9.0.0", To: "9.1.0"},
+	}, nil)
+	mockComposer.EXPECT().GetLockHash("/tmp").Return("dummy-hash", nil)
+
+	fixture, err := os.ReadFile("testdata/dependency_update.md")
+	assert.NoError(t, err)
+	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
+	vcsProvider.EXPECT().CreateMergeRequest(mock.Anything, mock.Anything, string(fixture), mock.Anything, config.Branch).Return(codehosting.MergeRequest{}, nil)
+
+	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
+	err = workflowService.StartUpdate(context.Background(), nil)
+
+	assert.NoError(t, err)
+	mockComposer.AssertExpectations(t)
+}
+
+func TestCommitMessage(t *testing.T) {
+	tests := []struct {
+		name    string
+		pkg     string
+		changes []composer.PackageChange
+		want    string
+	}{
+		{"upgrade", "drupal/core", []composer.PackageChange{{Action: "Upgrade", Package: "drupal/core", From: "9.0.0", To: "9.1.0"}}, "Update drupal/core 9.0.0 → 9.1.0"},
+		{"downgrade", "drupal/core", []composer.PackageChange{{Action: "Downgrade", Package: "drupal/core", From: "9.1.0", To: "9.0.0"}}, "Update drupal/core 9.1.0 → 9.0.0"},
+		{"install", "drupal/token", []composer.PackageChange{{Action: "Install", Package: "drupal/token", To: "1.12.0"}}, "Install drupal/token 1.12.0"},
+		{"remove", "drupal/old", []composer.PackageChange{{Action: "Remove", Package: "drupal/old", From: "1.0.0"}}, "Remove drupal/old 1.0.0"},
+		{"deps only", "drupal/core", []composer.PackageChange{{Action: "Upgrade", Package: "symfony/console", From: "6.0", To: "6.1"}}, "Update drupal/core"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, commitMessage(tt.pkg, tt.changes))
+		})
+	}
+}
+
 func TestStartUpdatePublishUsesLiveContext(t *testing.T) {
 	// Regression: publishWork must run on the outer (timeout-bounded) context, not the
 	// errgroup-derived context. The errgroup context is cancelled as soon as g.Wait()

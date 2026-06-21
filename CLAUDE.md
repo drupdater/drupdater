@@ -78,7 +78,14 @@ Events fired during the workflow: `PreComposerUpdateEvent`, `PostComposerUpdateE
 Config is split into two tiers, with no overlap:
 
 - **CLI flags** — how a given run is invoked (volatile): token (positional arg), plus the flags below.
-- **`.drupdater.yaml`** — what the project needs (committed at the repo root, read from `<working-dir>/.drupdater.yaml` or `--config`). Loaded by `internal/configfile.go`; a missing file falls back to built-in defaults, absent keys keep their default, and unknown keys are rejected (strict decode). Keys: `sites`, `timeout` (Go duration string, e.g. `30m`), and `addons.normal` / `addons.security`. Addon names in both lists are validated up front via `validateAddons`; `drupdater addons` lists valid names.
+- **`.drupdater.yaml`** — what the project needs (committed at the repo root, read from `<working-dir>/.drupdater.yaml` or `--config`). Loaded by `internal/configfile.go`; a missing file falls back to built-in defaults, absent keys keep their default, and unknown keys are rejected (strict decode). Keys: `sites`, `timeout` (Go duration string, e.g. `30m`), `commit_strategy` (`bulk` / `per_package`), and `addons.normal` / `addons.security`. Addon names in both lists are validated up front via `validateAddons`; `drupdater addons` lists valid names.
+
+### Commit strategy
+
+`commit_strategy` (default `bulk`) controls how the update is committed:
+
+- **`bulk`** — one `composer update` for all packages, one drush cycle, the existing addon commits. Fastest; the default.
+- **`per_package`** — iterate the direct outdated packages (`composer outdated --direct`) and produce one atomic commit per package (`Update drupal/core 10.1.8 → 10.3.14`) bundling that package's composer + config + patch + translation changes, so any single commit reverts cleanly. The package loop is serial (one working dir, incremental lock + DB); sites still run concurrently within each package. `code_beautifier` and `deprecations_remover` run once at the end. **Not supported with `--security`** (incompatible with `composer_audit`'s whole-run semantics) — a security run logs a warning and falls back to `bulk`. Implemented as a squash: existing components commit as usual, then the workflow soft-resets and re-commits everything as one commit per package.
 
 ### CLI Flags
 
@@ -98,6 +105,7 @@ Config is split into two tiers, with no overlap:
 ```yaml
 sites: [default]      # Drupal site names
 timeout: 30m          # overall run timeout (Go duration; 0 disables)
+commit_strategy: bulk # bulk (one commit) or per_package (one atomic commit per package)
 addons:               # configurable addons per mode; mandatory addons always run
   normal:
     - code_beautifier
