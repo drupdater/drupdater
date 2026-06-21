@@ -8,14 +8,12 @@ import (
 	"strings"
 
 	"github.com/google/go-github/v68/github"
-	"github.com/spf13/afero"
 )
 
 type Github struct {
 	client *github.Client
 	owner  string
 	repo   string
-	fs     afero.Fs
 }
 
 func newGithub(repositoryURL string, token string) *Github {
@@ -26,7 +24,6 @@ func newGithub(repositoryURL string, token string) *Github {
 		client: github.NewClient(nil).WithAuthToken(token),
 		owner:  strings.Split(u.Path, "/")[1],
 		repo:   strings.Split(u.Path, "/")[2],
-		fs:     afero.NewOsFs(),
 	}
 }
 

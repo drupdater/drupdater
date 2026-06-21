@@ -6,7 +6,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	gitlab "gitlab.com/gitlab-org/api/client-go"
 )
@@ -75,7 +74,6 @@ func TestCreateMergeRequest(t *testing.T) {
 	gitlab := &Gitlab{
 		client:      client,
 		projectPath: "test_project",
-		fs:          afero.NewMemMapFs(),
 	}
 
 	mr, err := gitlab.CreateMergeRequest(context.Background(), "Test MR", "This is a test MR", "source-branch", "target-branch")
@@ -106,7 +104,7 @@ func TestGitlab_DeleteBranch_Success(t *testing.T) {
 	defer mockServer.Close()
 
 	client, _ := gitlab.NewClient("", gitlab.WithBaseURL(mockServer.URL))
-	g := &Gitlab{client: client, projectPath: "test_project", fs: afero.NewMemMapFs()}
+	g := &Gitlab{client: client, projectPath: "test_project"}
 
 	err := g.DeleteBranch(context.Background(), "update-abc123")
 	assert.NoError(t, err)
@@ -120,7 +118,7 @@ func TestGitlab_DeleteBranch_Error(t *testing.T) {
 	defer mockServer.Close()
 
 	client, _ := gitlab.NewClient("", gitlab.WithBaseURL(mockServer.URL))
-	g := &Gitlab{client: client, projectPath: "test_project", fs: afero.NewMemMapFs()}
+	g := &Gitlab{client: client, projectPath: "test_project"}
 
 	err := g.DeleteBranch(context.Background(), "nonexistent-branch")
 	assert.Error(t, err)
@@ -159,7 +157,6 @@ func TestGetUser_ReturnsEmptyStringsOnError(t *testing.T) {
 	g := &Gitlab{
 		client:      client,
 		projectPath: "test_project",
-		fs:          afero.NewMemMapFs(),
 	}
 
 	name, email := g.GetUser(context.Background())
