@@ -8,14 +8,12 @@ import (
 	"strings"
 
 	"github.com/google/go-github/v68/github"
-	"github.com/spf13/afero"
 )
 
 type Github struct {
 	client *github.Client
 	owner  string
 	repo   string
-	fs     afero.Fs
 }
 
 func newGithub(repositoryURL string, token string) *Github {
@@ -26,7 +24,6 @@ func newGithub(repositoryURL string, token string) *Github {
 		client: github.NewClient(nil).WithAuthToken(token),
 		owner:  strings.Split(u.Path, "/")[1],
 		repo:   strings.Split(u.Path, "/")[2],
-		fs:     afero.NewOsFs(),
 	}
 }
 
@@ -45,6 +42,15 @@ func (g Github) CreateMergeRequest(ctx context.Context, title string, descriptio
 		ID:  int64(mr.GetNumber()),
 		URL: mr.GetHTMLURL(),
 	}, nil
+}
+
+// DeleteBranch removes a remote branch via the GitHub Git refs API.
+func (g *Github) DeleteBranch(ctx context.Context, branch string) error {
+	_, err := g.client.Git.DeleteRef(ctx, g.owner, g.repo, "refs/heads/"+branch)
+	if err != nil {
+		return fmt.Errorf("failed to delete branch: %w", err)
+	}
+	return nil
 }
 
 // logError logs an error. This is a placeholder for proper error handling.

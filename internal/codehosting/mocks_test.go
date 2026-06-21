@@ -121,6 +121,63 @@ func (_c *MockPlatform_CreateMergeRequest_Call) RunAndReturn(run func(ctx contex
 	return _c
 }
 
+// DeleteBranch provides a mock function for the type MockPlatform
+func (_mock *MockPlatform) DeleteBranch(ctx context.Context, branch string) error {
+	ret := _mock.Called(ctx, branch)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteBranch")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = returnFunc(ctx, branch)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockPlatform_DeleteBranch_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteBranch'
+type MockPlatform_DeleteBranch_Call struct {
+	*mock.Call
+}
+
+// DeleteBranch is a helper method to define mock.On call
+//   - ctx context.Context
+//   - branch string
+func (_e *MockPlatform_Expecter) DeleteBranch(ctx any, branch any) *MockPlatform_DeleteBranch_Call {
+	return &MockPlatform_DeleteBranch_Call{Call: _e.mock.On("DeleteBranch", ctx, branch)}
+}
+
+func (_c *MockPlatform_DeleteBranch_Call) Run(run func(ctx context.Context, branch string)) *MockPlatform_DeleteBranch_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockPlatform_DeleteBranch_Call) Return(err error) *MockPlatform_DeleteBranch_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockPlatform_DeleteBranch_Call) RunAndReturn(run func(ctx context.Context, branch string) error) *MockPlatform_DeleteBranch_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetUser provides a mock function for the type MockPlatform
 func (_mock *MockPlatform) GetUser(ctx context.Context) (string, string) {
 	ret := _mock.Called(ctx)

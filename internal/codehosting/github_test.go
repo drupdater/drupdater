@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/google/go-github/v68/github"
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -52,7 +51,6 @@ func TestGithub_CreateMergeRequest(t *testing.T) {
 		client: client,
 		owner:  "test_owner",
 		repo:   "test_project",
-		fs:     afero.NewMemMapFs(),
 	}
 
 	// Execute
@@ -73,7 +71,7 @@ func TestGithub_GetUser_Returns403FallbackSilently(t *testing.T) {
 	defer mockServer.Close()
 
 	client, _ := github.NewClient(nil).WithEnterpriseURLs(mockServer.URL, "")
-	gh := &Github{client: client, owner: "o", repo: "r", fs: afero.NewMemMapFs()}
+	gh := &Github{client: client, owner: "o", repo: "r"}
 
 	name, email := gh.GetUser(context.Background())
 
@@ -90,7 +88,7 @@ func TestGithub_GetUser_Returns403ErrorForBadCredentials(t *testing.T) {
 	defer mockServer.Close()
 
 	client, _ := github.NewClient(nil).WithEnterpriseURLs(mockServer.URL, "")
-	gh := &Github{client: client, owner: "o", repo: "r", fs: afero.NewMemMapFs()}
+	gh := &Github{client: client, owner: "o", repo: "r"}
 
 	name, email := gh.GetUser(context.Background())
 
@@ -107,7 +105,7 @@ func TestGithub_GetUser_ReturnsUserOnSuccess(t *testing.T) {
 	defer mockServer.Close()
 
 	client, _ := github.NewClient(nil).WithEnterpriseURLs(mockServer.URL, "")
-	gh := &Github{client: client, owner: "o", repo: "r", fs: afero.NewMemMapFs()}
+	gh := &Github{client: client, owner: "o", repo: "r"}
 
 	name, email := gh.GetUser(context.Background())
 
@@ -124,7 +122,7 @@ func TestGithub_GetUser_NoEmailFallsBackToNoreply(t *testing.T) {
 	defer mockServer.Close()
 
 	client, _ := github.NewClient(nil).WithEnterpriseURLs(mockServer.URL, "")
-	gh := &Github{client: client, owner: "o", repo: "r", fs: afero.NewMemMapFs()}
+	gh := &Github{client: client, owner: "o", repo: "r"}
 
 	name, email := gh.GetUser(context.Background())
 
@@ -136,7 +134,7 @@ func TestGithub_CreateMergeRequest_HonorsContext(t *testing.T) {
 	// A cancelled context must abort before any request is sent. This would have
 	// passed silently when the implementation used context.TODO().
 	client, _ := github.NewClient(nil).WithEnterpriseURLs("http://example.invalid", "")
-	gh := &Github{client: client, owner: "o", repo: "r", fs: afero.NewMemMapFs()}
+	gh := &Github{client: client, owner: "o", repo: "r"}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -147,7 +145,7 @@ func TestGithub_CreateMergeRequest_HonorsContext(t *testing.T) {
 
 func TestGithub_GetUser_HonorsContext(t *testing.T) {
 	client, _ := github.NewClient(nil).WithEnterpriseURLs("http://example.invalid", "")
-	gh := &Github{client: client, owner: "o", repo: "r", fs: afero.NewMemMapFs()}
+	gh := &Github{client: client, owner: "o", repo: "r"}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -156,6 +154,49 @@ func TestGithub_GetUser_HonorsContext(t *testing.T) {
 	name, email := gh.GetUser(ctx)
 	assert.Empty(t, name)
 	assert.Empty(t, email)
+}
+
+func TestGithub_DeleteBranch_Success(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete && r.URL.Path == "/api/v3/repos/test_owner/test_project/git/refs/heads/update-abc123" {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer mockServer.Close()
+
+	client, _ := github.NewClient(nil).WithEnterpriseURLs(mockServer.URL, "")
+	gh := &Github{client: client, owner: "test_owner", repo: "test_project"}
+
+	err := gh.DeleteBranch(context.Background(), "update-abc123")
+	assert.NoError(t, err)
+}
+
+func TestGithub_DeleteBranch_Error(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		_, _ = w.Write([]byte(`{"message":"Reference does not exist"}`))
+	}))
+	defer mockServer.Close()
+
+	client, _ := github.NewClient(nil).WithEnterpriseURLs(mockServer.URL, "")
+	gh := &Github{client: client, owner: "o", repo: "r"}
+
+	err := gh.DeleteBranch(context.Background(), "nonexistent-branch")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to delete branch")
+}
+
+func TestGithub_DeleteBranch_HonorsContext(t *testing.T) {
+	client, _ := github.NewClient(nil).WithEnterpriseURLs("http://example.invalid", "")
+	gh := &Github{client: client, owner: "o", repo: "r"}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := gh.DeleteBranch(ctx, "some-branch")
+	assert.ErrorIs(t, err, context.Canceled)
 }
 
 func TestIsGitHubActionsToken403_ReturnsFalseForNonGitHubError(t *testing.T) {

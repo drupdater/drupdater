@@ -6,7 +6,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	gitlab "gitlab.com/gitlab-org/api/client-go"
 )
@@ -75,7 +74,6 @@ func TestCreateMergeRequest(t *testing.T) {
 	gitlab := &Gitlab{
 		client:      client,
 		projectPath: "test_project",
-		fs:          afero.NewMemMapFs(),
 	}
 
 	mr, err := gitlab.CreateMergeRequest(context.Background(), "Test MR", "This is a test MR", "source-branch", "target-branch")
@@ -92,6 +90,48 @@ func TestGitlab_CreateMergeRequest_HonorsContext(t *testing.T) {
 	cancel()
 
 	_, err := g.CreateMergeRequest(ctx, "Test MR", "body", "source", "target")
+	assert.ErrorIs(t, err, context.Canceled)
+}
+
+func TestGitlab_DeleteBranch_Success(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete && r.URL.Path == "/api/v4/projects/test_project/repository/branches/update-abc123" {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer mockServer.Close()
+
+	client, _ := gitlab.NewClient("", gitlab.WithBaseURL(mockServer.URL))
+	g := &Gitlab{client: client, projectPath: "test_project"}
+
+	err := g.DeleteBranch(context.Background(), "update-abc123")
+	assert.NoError(t, err)
+}
+
+func TestGitlab_DeleteBranch_Error(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"message":"404 Branch Not Found"}`))
+	}))
+	defer mockServer.Close()
+
+	client, _ := gitlab.NewClient("", gitlab.WithBaseURL(mockServer.URL))
+	g := &Gitlab{client: client, projectPath: "test_project"}
+
+	err := g.DeleteBranch(context.Background(), "nonexistent-branch")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to delete branch")
+}
+
+func TestGitlab_DeleteBranch_HonorsContext(t *testing.T) {
+	g := newGitlab("https://gitlab.com/user/repo", "dummy-token")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := g.DeleteBranch(ctx, "some-branch")
 	assert.ErrorIs(t, err, context.Canceled)
 }
 
@@ -117,7 +157,6 @@ func TestGetUser_ReturnsEmptyStringsOnError(t *testing.T) {
 	g := &Gitlab{
 		client:      client,
 		projectPath: "test_project",
-		fs:          afero.NewMemMapFs(),
 	}
 
 	name, email := g.GetUser(context.Background())

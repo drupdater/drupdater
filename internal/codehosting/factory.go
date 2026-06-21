@@ -10,6 +10,9 @@ type Platform interface {
 	// CreateMergeRequest creates a merge/pull request on the platform.
 	CreateMergeRequest(ctx context.Context, title string, description string, sourceBranch string, targetBranch string) (MergeRequest, error)
 
+	// DeleteBranch removes a remote branch from the platform.
+	DeleteBranch(ctx context.Context, branch string) error
+
 	// GetUser returns the user name and email from the platform.
 	GetUser(ctx context.Context) (name string, email string)
 }

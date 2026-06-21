@@ -43,6 +43,7 @@ type Installer interface {
 
 type Platform interface {
 	CreateMergeRequest(ctx context.Context, title string, description string, sourceBranch string, targetBranch string) (codehosting.MergeRequest, error)
+	DeleteBranch(ctx context.Context, branch string) error
 	GetUser(ctx context.Context) (name string, email string)
 }
 

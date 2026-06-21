@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/spf13/afero"
 	gitlab "gitlab.com/gitlab-org/api/client-go"
 )
 
@@ -14,34 +13,26 @@ import (
 type Gitlab struct {
 	client      *gitlab.Client
 	projectPath string
-	fs          afero.Fs
 }
 
 // newGitlab creates a new GitLab client based on repository URL and token.
 func newGitlab(repositoryURL string, token string) *Gitlab {
 	u, err := url.Parse(repositoryURL)
 	if err != nil {
-		// Handle URL parsing error properly
-		return &Gitlab{
-			fs: afero.NewOsFs(),
-		}
+		return &Gitlab{}
 	}
 
 	baseURL := fmt.Sprintf("%s://%s", u.Scheme, u.Host)
 
 	gitlabClient, err := gitlab.NewClient(token, gitlab.WithBaseURL(baseURL))
 	if err != nil {
-		// Log error instead of panic
 		fmt.Printf("Error creating GitLab client: %v\n", err)
-		return &Gitlab{
-			fs: afero.NewOsFs(),
-		}
+		return &Gitlab{}
 	}
 
 	return &Gitlab{
 		client:      gitlabClient,
 		projectPath: strings.TrimSuffix(strings.Trim(u.Path, "/"), ".git"),
-		fs:          afero.NewOsFs(),
 	}
 }
 
@@ -62,6 +53,15 @@ func (g *Gitlab) CreateMergeRequest(ctx context.Context, title string, descripti
 		ID:  mr.IID,
 		URL: mr.WebURL,
 	}, nil
+}
+
+// DeleteBranch removes a remote branch via the GitLab Branches API.
+func (g *Gitlab) DeleteBranch(ctx context.Context, branch string) error {
+	_, err := g.client.Branches.DeleteBranch(g.projectPath, branch, gitlab.WithContext(ctx))
+	if err != nil {
+		return fmt.Errorf("failed to delete branch: %w", err)
+	}
+	return nil
 }
 
 func (g *Gitlab) GetUser(ctx context.Context) (name string, email string) {

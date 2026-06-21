@@ -32,28 +32,28 @@
     "hash": "9bad0d6dd8406e34285bbe8a8909b7da"
   },
   "/Users/d430774/Sites/drupdater/internal/codehosting/factory.go": {
-    "mtime": 1781774598.3593056,
-    "hash": "aea4a9118204359c15fd82a87c28d1c5"
+    "mtime": 1782017293.8999832,
+    "hash": "b954f97f481da9a71fb9ca8d508bf54f"
   },
   "/Users/d430774/Sites/drupdater/internal/codehosting/github_test.go": {
-    "mtime": 1781774598.3600657,
-    "hash": "6a357220a4b67c56c4263ef268683416"
+    "mtime": 1782017293.9006805,
+    "hash": "12d7a4776ded6a4ac9c06cdd86c4a470"
   },
   "/Users/d430774/Sites/drupdater/internal/codehosting/gitlab.go": {
-    "mtime": 1781774598.3603811,
-    "hash": "7f2a3081eb89cc5b4bf0911b3bb07d24"
+    "mtime": 1782017293.9011157,
+    "hash": "5e8c8efa2f73f7899292771857d267c5"
   },
   "/Users/d430774/Sites/drupdater/internal/codehosting/mocks_test.go": {
-    "mtime": 1781851746.120971,
-    "hash": "3a95f3729fb172226edc898a60eec241"
+    "mtime": 1782017293.9016478,
+    "hash": "ed6fb5e51a2e6098c1d6f799f1168ec5"
   },
   "/Users/d430774/Sites/drupdater/internal/codehosting/gitlab_test.go": {
-    "mtime": 1781774598.3606858,
-    "hash": "bdcf69253929934160c60459ccb8b28c"
+    "mtime": 1782017293.9013884,
+    "hash": "bbf2d85263f66d75a8281cd0c9da45b2"
   },
   "/Users/d430774/Sites/drupdater/internal/codehosting/github.go": {
-    "mtime": 1781804914.562015,
-    "hash": "bfc45bb47c338a1766303804c218e13d"
+    "mtime": 1782017293.9003515,
+    "hash": "9d805a702f794f7c713c6ce0316d261d"
   },
   "/Users/d430774/Sites/drupdater/internal/codehosting/factory_test.go": {
     "mtime": 1781759232.7221107,
@@ -148,24 +148,24 @@
     "hash": "cf12edb5249e70f0ec954083d846104a"
   },
   "/Users/d430774/Sites/drupdater/internal/services/interfaces.go": {
-    "mtime": 1781867599.9439144,
-    "hash": "28cb882e7bca835f41e9f24bf88e8fe1"
+    "mtime": 1782017293.9022403,
+    "hash": "a68d31103c131dfb6ccdddd176a02118"
   },
   "/Users/d430774/Sites/drupdater/internal/services/workflow_base.go": {
-    "mtime": 1781867591.0654578,
-    "hash": "f06e08a460b6501d37d8e5838ea5fd81"
+    "mtime": 1782017293.9035146,
+    "hash": "806ebb313f3eee8e69eed83236c42cbe"
   },
   "/Users/d430774/Sites/drupdater/internal/services/workflow_base_test.go": {
-    "mtime": 1781867628.3717275,
-    "hash": "1b70dfd1671d09d53f9b32ce9a8fd73b"
+    "mtime": 1782017293.904023,
+    "hash": "5ad2665a5f696253928a7b77b2ba71e4"
   },
   "/Users/d430774/Sites/drupdater/internal/services/event_test.go": {
     "mtime": 1781759232.7232013,
     "hash": "d718c40f5fa37dacd751d9d26179ee2f"
   },
   "/Users/d430774/Sites/drupdater/internal/services/mocks_test.go": {
-    "mtime": 1781863800.1663692,
-    "hash": "8c83504db465321eca9c247034afbfbc"
+    "mtime": 1782017293.9030185,
+    "hash": "773af5a38e83fe328aaf3624153b0492"
   },
   "/Users/d430774/Sites/drupdater/scripts/rector.php": {
     "mtime": 1781544133.641089,
@@ -248,7 +248,7 @@
     "hash": "7f0904a3853d4e0733303144f09b79c3"
   },
   "/Users/d430774/Sites/drupdater/CLAUDE.md": {
-    "mtime": 1781898077.850448,
+    "mtime": 1781899704.278146,
     "hash": "7fd745d7520ab11a816eea3040aa488c"
   },
   "/Users/d430774/Sites/drupdater/internal/addon/testdata/composer_audit.md": {
