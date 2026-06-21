@@ -1,219 +1,234 @@
 # Drupdater
 
+> Automated, reviewable Drupal updates — as a pull/merge request, on every schedule.
+
 [![CI](https://github.com/drupdater/drupdater/actions/workflows/go.yml/badge.svg)](https://github.com/drupdater/drupdater/actions/workflows/go.yml)
 [![Docker](https://ghcr-badge.egpl.dev/drupdater/drupdater-php8.3/latest_tag?trim=major&label=docker)](https://github.com/drupdater/drupdater/pkgs/container/drupdater-php8.3)
 [![License](https://img.shields.io/github/license/drupdater/drupdater)](LICENSE)
+[![Release](https://img.shields.io/github/v/tag/drupdater/drupdater?label=release)](https://github.com/drupdater/drupdater/tags)
 
-Drupdater is a standalone tool for automating Drupal site updates. It runs against your existing checkout (the one CI already provides), updates Composer dependencies, applies code quality fixes, exports Drupal configuration, and opens a pull/merge request on GitHub or GitLab with a detailed changelog — highlighting any security-related changes.
+**Drupdater** is a standalone CLI (shipped as a Docker image) that keeps Drupal
+sites up to date for you. Point it at a checkout in CI; it runs `composer update`,
+applies code-quality fixes, exports Drupal config, and opens a **pull request
+(GitHub) or merge request (GitLab)** with a detailed, human-reviewable changelog —
+security changes flagged.
 
-## Table of Contents
+You review and merge. Drupdater never deploys anything on its own.
 
-- [Features](#features)
+**Who it's for:** teams maintaining one or more Drupal sites who want routine and
+security updates to arrive as reviewable PRs on a schedule, instead of as a manual
+chore.
+
+> [!WARNING]
+> **Project status: pre-1.0 (`v0.x`).** Drupdater is in active development and
+> used in real pipelines, but the CLI surface and config format may still change
+> between minor versions. Pin to a specific image tag in production.
+
+## Contents
+
+- [How It Works](#how-it-works)
+- [Quick Start](#quick-start)
 - [Prerequisites](#prerequisites)
-- [Usage](#usage)
-  - [Command-Line](#command-line)
-  - [CI/CD Integration](#cicd-integration)
+- [CI/CD Integration](#cicd-integration)
+- [Tokens & Permissions](#tokens--permissions)
 - [Configuration](#configuration)
-  - [Flags](#flags)
-  - [Environment Variables](#environment-variables)
-- [FAQ](#faq)
+- [Troubleshooting](#troubleshooting)
+- [Architecture](#architecture)
+- [Development](#development)
+- [Contributing](#contributing)
+- [Security](#security)
+- [Support](#support)
+- [License](#license)
 
-## Features
+## How It Works
 
-- **Dependency updates** — runs `composer update` and commits the result.
-- **Security-only mode** — with `--security`, only vulnerable packages are updated.
-- **Patch management** — removes patches for packages that no longer need them, checks whether existing patches still apply, and automatically downloads updated patch files from Drupal.org.
-- **Code style fixing** — runs `phpcbf` to fix PHP code style issues; auto-generates a `phpcs.xml` baseline if one is missing.
-- **Deprecation removal** — runs `drupal-rector` to remove deprecated API usage.
-- **Composer plugin allow-listing** — detects newly required Composer plugins and adds them to `allow-plugins` in `composer.json`.
-- **`composer normalize`** — normalises `composer.json` formatting when `ergebnis/composer-normalize` is installed.
-- **Translation updates** — updates Drupal translation files via Drush when `locale_deploy` is enabled.
-- **Changelog generation** — includes a full dependency diff table and a list of pending database update hooks in the MR/PR description.
-- **Multi-site support** — updates multiple Drupal sites in a single repository with one merge request.
-- **GitHub and GitLab** — automatically creates a pull request (GitHub) or merge request (GitLab), including self-hosted GitLab instances.
+Drupdater runs against the checkout your CI already provides and works through
+four phases in a single working directory:
+
+```mermaid
+flowchart LR
+    A[Acquire checkout<br/>+ composer install] --> B[Install site<br/>baseline DB]
+    B --> C[composer update<br/>+ code fixes<br/>+ commit branch]
+    C --> D[Run update hooks<br/>+ export config]
+    D --> E[Open PR / MR<br/>with changelog]
+```
+
+1. **Acquire** the existing checkout (or `--clone` one for local testing) and run `composer install`.
+2. **Install** each Drupal site from config to build a baseline database.
+3. **Update shared code** — `composer update`, code-quality fixes, patch management, then commit to a new branch.
+4. **Update each site** — run database update hooks and export configuration.
+
+Finally it pushes the branch and opens a PR/MR (skipped with `--dry-run`).
+
+### What it does in each run
+
+- **Dependency updates** — `composer update`, committed.
+- **Security-only mode** (`--security`) — updates only packages with known vulnerabilities.
+- **Patch management** — drops obsolete patches, verifies remaining ones still apply, and pulls updated patch files from Drupal.org.
+- **Code style** — `phpcbf`, auto-generating a `phpcs.xml` baseline if missing.
+- **Deprecation removal** — `drupal-rector`.
+- **Composer hygiene** — auto-allow-lists new Composer plugins; runs `composer normalize` when `ergebnis/composer-normalize` is present.
+- **Translations** — updates interface translations via Drush when `locale_deploy` is enabled.
+- **Changelog** — full dependency diff table and pending DB update hooks in the PR/MR description.
+- **Multi-site** — updates several sites in one repo under a single PR/MR.
+- **GitHub & GitLab** — including self-hosted GitLab.
+
+## Quick Start
+
+Try it locally against any GitHub/GitLab repo. Pick the image matching your site's
+PHP version (`php8.3`, `php8.4`, `php8.5`):
+
+```bash
+docker run ghcr.io/drupdater/drupdater-php8.3:latest \
+  <token> --clone --repository-url https://github.com/you/your-drupal-site.git
+```
+
+- `<token>` — a personal access token allowed to push branches and open PRs/MRs.
+- `--clone --repository-url` — tells Drupdater to fetch the repo itself. In CI you
+  omit these; it uses the checkout already on disk (see below).
+
+Add `--dry-run` to do everything except create the branch and PR/MR.
 
 ## Prerequisites
 
-- Your Drupal site must be installable from configuration (i.e. `drush site-install --existing-config` works).
-- Your repository is hosted on GitHub or GitLab.
-- The checkout must have full git history so the update branch can be pushed — set `fetch-depth: 0` (GitHub Actions) or `GIT_DEPTH: 0` (GitLab CI). Shallow checkouts fail the push with `object not found`.
-- *(Optional)* A [Drupal.org GitLab access token](https://git.drupalcode.org) (`DRUPALCODE_ACCESS_TOKEN`) to enable automated patch management.
+- The site installs from configuration (`drush site-install --existing-config` works).
+- The repo is hosted on GitHub or GitLab.
+- **Full git history in the checkout** so the update branch can be pushed —
+  `fetch-depth: 0` (GitHub Actions) or `GIT_DEPTH: "0"` (GitLab CI). Shallow
+  checkouts fail with `object not found`.
+- *(Optional)* A [Drupal.org GitLab access token](https://git.drupalcode.org)
+  (`DRUPALCODE_ACCESS_TOKEN`) to enable patch management.
 
-## Usage
+## CI/CD Integration
 
-### Command-Line
+In CI, Drupdater runs against the checkout — no `--clone` needed. The recommended
+setup is two scheduled jobs: a **weekly full update** and a **daily security-only
+update**.
 
-By default Drupdater runs against the **existing checkout** in the working directory — which is exactly what CI provides — so it only needs a token. To run it standalone (no checkout on disk), add `--clone --repository-url <url>` and it will clone the repository itself.
+### GitLab CI
 
-Pick the image that matches the PHP version your site requires:
-
-```bash
-# PHP 8.3
-docker run ghcr.io/drupdater/drupdater-php8.3:latest <token> --clone --repository-url <repository_url>
-
-# PHP 8.4
-docker run ghcr.io/drupdater/drupdater-php8.4:latest <token> --clone --repository-url <repository_url>
-
-# PHP 8.5
-docker run ghcr.io/drupdater/drupdater-php8.5:latest <token> --clone --repository-url <repository_url>
-```
-
-Replace `<repository_url>` with your repository's HTTPS URL and `<token>` with a personal access token that has permission to push branches and create merge/pull requests.
-
-### CI/CD Integration
-
-#### GitLab CI
-
-**Weekly full update** — run via a [scheduled pipeline](https://docs.gitlab.com/ee/ci/pipelines/schedules.html) set to a weekly interval:
+Run via [scheduled pipelines](https://docs.gitlab.com/ee/ci/pipelines/schedules.html).
+Add a `DRUPDATER_SCHEDULE` variable per schedule to distinguish them.
 
 ```yaml
-drupdater:
+.drupdater_base:
   image:
     name: ghcr.io/drupdater/drupdater-php8.3:latest
     entrypoint: [""]
   variables:
-    GIT_DEPTH: "0"  # full history is required to push the update branch
+    GIT_DEPTH: "0"  # full history required to push the update branch
+
+drupdater:weekly:
+  extends: .drupdater_base
   script:
     - /opt/drupdater/bin $DRUPDATER_TOKEN
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule" && $DRUPDATER_SCHEDULE == "weekly"
-```
 
-**Daily security-only update** — run via a separate scheduled pipeline set to a daily interval. Add `DRUPDATER_SCHEDULE=daily` as a pipeline schedule variable to distinguish it from the weekly run:
-
-```yaml
-drupdater-security:
-  image:
-    name: ghcr.io/drupdater/drupdater-php8.3:latest
-    entrypoint: [""]
-  variables:
-    GIT_DEPTH: "0"  # full history is required to push the update branch
+drupdater:security:
+  extends: .drupdater_base
   script:
     - /opt/drupdater/bin $DRUPDATER_TOKEN --security
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule" && $DRUPDATER_SCHEDULE == "daily"
 ```
 
-#### GitHub Actions
+### GitHub Actions
 
-**Weekly full update:**
+**Weekly full update** (`.github/workflows/drupdater.yml`):
 
 ```yaml
 name: Drupdater
-
 on:
   schedule:
-    - cron: "0 4 * * 1"  # every Monday at 04:00 UTC
+    - cron: "0 4 * * 1"   # Mondays 04:00 UTC
   workflow_dispatch:
-
 permissions:
   contents: write
   pull-requests: write
-
 jobs:
   drupdater:
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/drupdater/drupdater-php8.3:latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
+      - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # full history is required to push the update branch
-      - name: Run Drupdater
-        run: /opt/drupdater/bin ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0   # full history required to push the update branch
+      - run: /opt/drupdater/bin ${{ secrets.GITHUB_TOKEN }}
 ```
 
-**Daily security-only update** — create a separate workflow file (e.g. `.github/workflows/drupdater-security.yml`) that runs every day and passes `--security` to only update packages with known vulnerabilities:
+For the **daily security update**, copy this into a second workflow file, change
+the cron to `"0 4 * * *"`, and append `--security` to the run command.
 
-```yaml
-name: Drupdater Security
+## Tokens & Permissions
 
-on:
-  schedule:
-    - cron: "0 4 * * *"  # every day at 04:00 UTC
-  workflow_dispatch:
+Drupdater needs a token that can **push branches** and **open PRs/MRs**.
 
-permissions:
-  contents: write
-  pull-requests: write
-
-jobs:
-  drupdater-security:
-    runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/drupdater/drupdater-php8.3:latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # full history is required to push the update branch
-      - name: Run Drupdater (security only)
-        run: /opt/drupdater/bin ${{ secrets.GITHUB_TOKEN }} --security
-```
-
-> **Note:** `GITHUB_TOKEN` is sufficient to push a branch and open a pull request. However, GitHub prevents workflows triggered by `GITHUB_TOKEN` from starting other workflows, so CI will not run automatically on the resulting PR. To have CI trigger on the Drupdater PR, use a [personal access token](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens) or a [GitHub App token](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-an-installation-access-token-for-a-github-app) stored as a repository secret instead.
+| Platform | Token | Notes |
+|----------|-------|-------|
+| GitHub | `GITHUB_TOKEN` | Enough to push and open a PR. **But** PRs opened with `GITHUB_TOKEN` do not trigger other workflows, so CI won't run on the Drupdater PR. To get CI on the PR, use a [PAT](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens) or [GitHub App token](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-an-installation-access-token-for-a-github-app) stored as a secret. |
+| GitLab | Project/Group access token or PAT | Needs `write_repository` and `api` scope. |
 
 ## Configuration
 
-### Flags
+Configuration is split in two: **CLI flags** (how a run is invoked) and
+**`.drupdater.yaml`** (what the project needs, committed to the repo).
 
-All flags are optional. Pass them after the required `<token>` argument.
+### CLI flags
+
+All flags are optional; pass them after the required `<token>`.
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--branch` | `main` | Branch to update and target for the MR. Only used with `--clone`; in checkout mode the branch is taken from the checkout (or the CI branch variable when in detached HEAD). |
+| `--branch` | `main` | Branch to update / MR target. Only used with `--clone`; in checkout mode the branch comes from the checkout (or the CI branch variable in detached HEAD). |
 | `--working-dir` | `.` | Path to the existing checkout to update in place. |
-| `--clone` | `false` | Clone the repository instead of using the existing checkout. Requires `--repository-url`. Intended for local testing. |
-| `--repository-url` | _(from `origin`)_ | Repository URL. Required with `--clone`; otherwise derived from the checkout's `origin` remote. |
-| `--security` | `false` | Only update packages with known security vulnerabilities. Selects the `addons.security` list from `.drupdater.yaml`. |
-| `--dry-run` | `false` | Run all update steps but skip branch creation and MR/PR creation. |
-| `--verbose` | `false` | Enable debug-level structured logging (also logs the resolved configuration). |
+| `--clone` | `false` | Clone instead of using the checkout. Requires `--repository-url`. For local testing. |
+| `--repository-url` | _(from `origin`)_ | Repo URL. Required with `--clone`; otherwise read from the `origin` remote. |
+| `--security` | `false` | Update only packages with known vulnerabilities. Selects the `addons.security` list. |
+| `--dry-run` | `false` | Run everything but skip branch and PR/MR creation. |
+| `--verbose` | `false` | Debug-level logging (also logs resolved config). |
 | `--config` | _(`<working-dir>/.drupdater.yaml`)_ | Path to the config file. |
 
 ### `.drupdater.yaml`
 
-Per-project settings live in a `.drupdater.yaml` committed at the repository root (read from
-`--working-dir`, or `--config`). The file is optional — a missing file, or any key left out,
-falls back to the defaults shown below. Unknown keys are rejected, so typos fail fast.
+Optional file at the repo root. Missing file or omitted keys fall back to the
+defaults below; unknown keys are rejected so typos fail fast.
 
 ```yaml
 sites: [default]      # Drupal site directories to update
-timeout: 30m          # overall run timeout (Go duration string; 0 disables)
-addons:               # which configurable addons run in each mode
+timeout: 30m          # overall run timeout (Go duration; 0 disables)
+addons:               # configurable addons per mode (mandatory addons always run)
   normal:
-    - code_beautifier        # phpcbf PHP code style fixes
+    - code_beautifier        # phpcbf code-style fixes
     - deprecations_remover   # drupal-rector deprecation removal
-    - translations_updater
-    - composer_normalizer
-  security: []          # minimal by default: just the security fix, nothing else
+    - translations_updater   # interface translations
+    - composer_normalizer    # normalize composer.json
+  security: []               # minimal by default — don't interfere with the fix
 ```
 
-`--security` picks the `addons.security` list; otherwise `addons.normal` is used. Security runs
-default to no extra addons so nothing interferes with the package update — add entries here only
-if you want code style, deprecation, or other changes applied during security updates too.
+`--security` selects `addons.security`; otherwise `addons.normal` runs. Run
+`drupdater addons` to list valid addon names.
 
-Run `drupdater addons` to list the addon names you can add to either list:
+### Environment variables
 
-| Addon | What it does |
-|-------|--------------|
-| `code_beautifier` | Runs `phpcbf` for PHP code style fixes. |
-| `deprecations_remover` | Runs `drupal-rector` to remove deprecated code. |
-| `translations_updater` | Updates Drupal interface translations. |
-| `composer_normalizer` | Normalizes `composer.json`. |
+| Variable | Purpose |
+|----------|---------|
+| `DRUPALCODE_ACCESS_TOKEN` | Drupal.org GitLab PAT. Required for patch management (detecting upstream-committed patches and downloading updated patch files). |
+| `COMPOSER_AUTH` | Composer auth JSON for private Packagist/registries. See [Composer docs](https://getcomposer.org/doc/03-cli.md#composer-auth). |
 
-### Environment Variables
+## Troubleshooting
 
-| Variable | Description |
-|----------|-------------|
-| `DRUPALCODE_ACCESS_TOKEN` | Drupal.org GitLab personal access token. Required for patch management: checking whether a patch is already committed upstream and downloading updated patch files automatically. |
-| `COMPOSER_AUTH` | Composer authentication JSON for accessing private Packagist repositories or other private registries. See the [Composer documentation](https://getcomposer.org/doc/03-cli.md#composer-auth) for the expected format. |
+| Symptom | Cause / Fix |
+|---------|-------------|
+| Push fails with `object not found` | Shallow checkout. Set `fetch-depth: 0` / `GIT_DEPTH: "0"`. |
+| PR is created but CI doesn't run on it (GitHub) | Expected with `GITHUB_TOKEN` — use a PAT or App token. See [Tokens & Permissions](#tokens--permissions). |
+| `composer install` fails on private packages | Provide `COMPOSER_AUTH` (see below). |
+| Site install fails | Confirm `drush site-install --existing-config` works locally first. |
+| Run aborts on an unknown addon name | The active addon list in `.drupdater.yaml` has a typo — `drupdater addons` lists valid names. |
 
-## FAQ
-
-### How do I use Drupdater with a private Packagist?
-
-Pass your credentials via the `COMPOSER_AUTH` environment variable:
+<details>
+<summary>Private Packagist example</summary>
 
 ```bash
 docker run \
@@ -221,10 +236,13 @@ docker run \
   ghcr.io/drupdater/drupdater-php8.3:latest \
   <token> --clone --repository-url <repository_url>
 ```
+</details>
 
-### How do I update multiple Drupal sites in one repository?
+<details>
+<summary>Updating multiple sites in one repository</summary>
 
-**1. Add the following snippet to your `web/sites/sites.php`** (or a file included by it) to resolve the active site directory from the `SITE_NAME` environment variable:
+**1.** Resolve the active site directory from the `SITE_NAME` env var in
+`web/sites/sites.php` (or a file it includes):
 
 ```php
 $site_name = getenv('SITE_NAME');
@@ -232,27 +250,72 @@ if (is_string($site_name) && $site_name !== "") {
   $scheme = $request->getScheme();
   $port = $request->getPort();
   $site = $request->getHost();
-
   if ($site !== '') {
-    // Add the port if using a non-standard port for http or https.
     if (('http' === $scheme && 80 != $port) || ('https' === $scheme && 443 != $port)) {
       $site = $port . '.' . $site;
     }
-    // Do not override existing entries in the $sites array.
     if (!isset($sites[$site])) {
       $sites[$site] = $site_name;
     }
-  }
-  else {
+  } else {
     $sites[str_replace('/', '.', dirname($script_name))] = $site_name;
   }
 }
 ```
 
-**2. List each site directory name under `sites` in `.drupdater.yaml`:**
+**2.** List each site directory under `sites` in `.drupdater.yaml`:
 
 ```yaml
 sites: [default, subsite_a, subsite_b]
 ```
 
-All sites will be updated in a single branch and covered by one merge/pull request.
+All sites are updated in one branch under a single PR/MR.
+</details>
+
+## Architecture
+
+Drupdater is a Go CLI (Cobra) that orchestrates external tools (Composer, Drush,
+PHPCBF, Rector) over a linear, event-driven workflow. Functionality is organized
+as **addons** subscribed to workflow events. For the full breakdown — workflow
+phases, the addon system, and the VCS provider abstraction — see
+[`CLAUDE.md`](CLAUDE.md).
+
+## Development
+
+Requires Go 1.26+ and `make`.
+
+```bash
+make build   # build the binary
+make test    # run all tests
+make lint    # vet + staticcheck + golangci-lint
+make fmt     # format
+make mock    # regenerate mocks (mockery v3)
+```
+
+Run a single test:
+
+```bash
+go test -v -run TestName ./path/to/package/...
+```
+
+## Contributing
+
+Contributions are welcome. Please open an issue to discuss substantial changes
+before opening a PR, run `make lint test` before submitting, and keep PRs
+focused. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for details.
+
+## Security
+
+Drupdater handles credentials and modifies dependency trees, so we take security
+seriously. **Do not file public issues for vulnerabilities.** Report them
+privately via [GitHub Security Advisories](https://github.com/drupdater/drupdater/security/advisories/new)
+or the contacts in [`SECURITY.md`](SECURITY.md).
+
+## Support
+
+- **Bugs / features:** [GitHub Issues](https://github.com/drupdater/drupdater/issues)
+- **Questions / ideas:** [GitHub Discussions](https://github.com/drupdater/drupdater/discussions)
+
+## License
+
+Licensed under the [Apache License 2.0](LICENSE).
