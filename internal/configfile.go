@@ -22,9 +22,10 @@ var defaultNormalAddons = []string{
 // fileConfig mirrors the YAML-settable keys of .drupdater.yaml. Timeout is a string because
 // yaml.v3 cannot decode a duration like "30m" into a time.Duration.
 type fileConfig struct {
-	Sites   []string     `yaml:"sites"`
-	Timeout string       `yaml:"timeout"`
-	Addons  AddonsConfig `yaml:"addons"`
+	Sites          []string     `yaml:"sites"`
+	Timeout        string       `yaml:"timeout"`
+	Addons         AddonsConfig `yaml:"addons"`
+	CommitStrategy string       `yaml:"commit_strategy"`
 }
 
 // defaultFileConfig returns a fileConfig pre-populated with defaults. Unmarshaling a YAML file
@@ -38,6 +39,7 @@ func defaultFileConfig() fileConfig {
 			Normal:   defaultNormalAddons,
 			Security: nil, // minimal by default; composer_audit is added automatically
 		},
+		CommitStrategy: "bulk",
 	}
 }
 
@@ -72,8 +74,12 @@ func applyFileConfig(fc fileConfig, c *Config) error {
 	if err != nil {
 		return fmt.Errorf("invalid timeout %q (use a Go duration like \"30m\" or \"2h\"): %w", fc.Timeout, err)
 	}
+	if fc.CommitStrategy != "bulk" && fc.CommitStrategy != "per_package" {
+		return fmt.Errorf("invalid commit_strategy %q (use \"bulk\" or \"per_package\")", fc.CommitStrategy)
+	}
 	c.Sites = fc.Sites
 	c.Timeout = timeout
 	c.Addons = fc.Addons
+	c.CommitStrategy = fc.CommitStrategy
 	return nil
 }

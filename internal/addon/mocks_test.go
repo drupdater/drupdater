@@ -2460,6 +2460,57 @@ func (_c *MockWorktree_Remove_Call) RunAndReturn(run func(path string) (plumbing
 	return _c
 }
 
+// Reset provides a mock function for the type MockWorktree
+func (_mock *MockWorktree) Reset(opts *git.ResetOptions) error {
+	ret := _mock.Called(opts)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Reset")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(*git.ResetOptions) error); ok {
+		r0 = returnFunc(opts)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockWorktree_Reset_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Reset'
+type MockWorktree_Reset_Call struct {
+	*mock.Call
+}
+
+// Reset is a helper method to define mock.On call
+//   - opts *git.ResetOptions
+func (_e *MockWorktree_Expecter) Reset(opts any) *MockWorktree_Reset_Call {
+	return &MockWorktree_Reset_Call{Call: _e.mock.On("Reset", opts)}
+}
+
+func (_c *MockWorktree_Reset_Call) Run(run func(opts *git.ResetOptions)) *MockWorktree_Reset_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 *git.ResetOptions
+		if args[0] != nil {
+			arg0 = args[0].(*git.ResetOptions)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockWorktree_Reset_Call) Return(err error) *MockWorktree_Reset_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockWorktree_Reset_Call) RunAndReturn(run func(opts *git.ResetOptions) error) *MockWorktree_Reset_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Status provides a mock function for the type MockWorktree
 func (_mock *MockWorktree) Status() (git.Status, error) {
 	ret := _mock.Called()

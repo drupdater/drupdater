@@ -120,6 +120,30 @@ func (s *CLI) Update(ctx context.Context, dir string, packages []string, package
 	return changes, nil
 }
 
+// Outdated returns the names of direct dependencies that have an available update, as the
+// candidate list for per-package update mode.
+func (s *CLI) Outdated(ctx context.Context, dir string) ([]string, error) {
+	out, err := s.execComposer(ctx, dir, "outdated", "--direct", "--format=json", "--no-ansi")
+	if err != nil {
+		return nil, fmt.Errorf("failed to list outdated packages: %w, output: %s", err, out)
+	}
+
+	var result struct {
+		Installed []struct {
+			Name string `json:"name"`
+		} `json:"installed"`
+	}
+	if err := json.Unmarshal([]byte(out), &result); err != nil {
+		return nil, fmt.Errorf("failed to parse composer outdated output: %w, output: %s", err, out)
+	}
+
+	names := make([]string, 0, len(result.Installed))
+	for _, pkg := range result.Installed {
+		names = append(names, pkg.Name)
+	}
+	return names, nil
+}
+
 func (s *CLI) Install(ctx context.Context, dir string) error {
 	out, err := s.execComposer(ctx, dir, "install", "--no-interaction", "--no-progress", "--optimize-autoloader")
 	if err != nil {

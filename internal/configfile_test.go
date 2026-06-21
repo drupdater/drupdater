@@ -61,4 +61,25 @@ func TestLoadConfigFile(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "timout")
 	})
+
+	t.Run("commit_strategy defaults to bulk", func(t *testing.T) {
+		var c Config
+		_, err := LoadConfigFile(filepath.Join(t.TempDir(), "absent.yaml"), &c)
+		require.NoError(t, err)
+		assert.Equal(t, "bulk", c.CommitStrategy)
+	})
+
+	t.Run("commit_strategy per_package is accepted", func(t *testing.T) {
+		var c Config
+		_, err := LoadConfigFile(writeConfig(t, "commit_strategy: per_package\n"), &c)
+		require.NoError(t, err)
+		assert.Equal(t, "per_package", c.CommitStrategy)
+	})
+
+	t.Run("invalid commit_strategy is an error", func(t *testing.T) {
+		var c Config
+		_, err := LoadConfigFile(writeConfig(t, "commit_strategy: nonsense\n"), &c)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "commit_strategy")
+	})
 }

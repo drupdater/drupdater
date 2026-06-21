@@ -109,6 +109,52 @@ func TestGetComposerUpdates(t *testing.T) {
 	assert.Equal(t, "v1.0.2", changes[4].To)
 }
 
+func TestOutdated(t *testing.T) {
+	service := &CLI{logger: zap.NewNop(), fs: afero.NewMemMapFs()}
+
+	t.Run("parses package names", func(t *testing.T) {
+		out := `{"installed":[{"name":"drupal/core"},{"name":"drupal/token"}]}`
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := append([]string{"-test.run=TestHelperProcess", "--", out}, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+
+		names, err := service.Outdated(t.Context(), "/tmp")
+		assert.NoError(t, err)
+		assert.Equal(t, []string{"drupal/core", "drupal/token"}, names)
+	})
+
+	t.Run("empty list", func(t *testing.T) {
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := append([]string{"-test.run=TestHelperProcess", "--", `{"installed":[]}`}, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+
+		names, err := service.Outdated(t.Context(), "/tmp")
+		assert.NoError(t, err)
+		assert.Empty(t, names)
+	})
+
+	t.Run("invalid json is an error", func(t *testing.T) {
+		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := append([]string{"-test.run=TestHelperProcess", "--", "not json"}, arg...)
+			cmd := exec.Command(os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+
+		_, err := service.Outdated(t.Context(), "/tmp")
+		assert.Error(t, err)
+	})
+}
+
 func TestGetInstalledPlugins(t *testing.T) {
 
 	t.Run("A list of plugins", func(t *testing.T) {
