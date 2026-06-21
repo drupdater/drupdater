@@ -1979,8 +1979,8 @@ func (_c *MockDrupalOrg_FindIssueNumber_Call) RunAndReturn(run func(text string)
 }
 
 // GetIssue provides a mock function for the type MockDrupalOrg
-func (_mock *MockDrupalOrg) GetIssue(issueID string) (*drupalorg.Issue, error) {
-	ret := _mock.Called(issueID)
+func (_mock *MockDrupalOrg) GetIssue(ctx context.Context, issueID string) (*drupalorg.Issue, error) {
+	ret := _mock.Called(ctx, issueID)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetIssue")
@@ -1988,18 +1988,18 @@ func (_mock *MockDrupalOrg) GetIssue(issueID string) (*drupalorg.Issue, error) {
 
 	var r0 *drupalorg.Issue
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(string) (*drupalorg.Issue, error)); ok {
-		return returnFunc(issueID)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (*drupalorg.Issue, error)); ok {
+		return returnFunc(ctx, issueID)
 	}
-	if returnFunc, ok := ret.Get(0).(func(string) *drupalorg.Issue); ok {
-		r0 = returnFunc(issueID)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) *drupalorg.Issue); ok {
+		r0 = returnFunc(ctx, issueID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*drupalorg.Issue)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(string) error); ok {
-		r1 = returnFunc(issueID)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, issueID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -2012,20 +2012,23 @@ type MockDrupalOrg_GetIssue_Call struct {
 }
 
 // GetIssue is a helper method to define mock.On call
+//   - ctx context.Context
 //   - issueID string
-func (_e *MockDrupalOrg_Expecter) GetIssue(issueID any) *MockDrupalOrg_GetIssue_Call {
-	return &MockDrupalOrg_GetIssue_Call{Call: _e.mock.On("GetIssue", issueID)}
+func (_e *MockDrupalOrg_Expecter) GetIssue(ctx any, issueID any) *MockDrupalOrg_GetIssue_Call {
+	return &MockDrupalOrg_GetIssue_Call{Call: _e.mock.On("GetIssue", ctx, issueID)}
 }
 
-func (_c *MockDrupalOrg_GetIssue_Call) Run(run func(issueID string)) *MockDrupalOrg_GetIssue_Call {
+func (_c *MockDrupalOrg_GetIssue_Call) Run(run func(ctx context.Context, issueID string)) *MockDrupalOrg_GetIssue_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 string
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(string)
+			arg0 = args[0].(context.Context)
 		}
-		run(
-			arg0,
-		)
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(arg0, arg1)
 	})
 	return _c
 }
@@ -2035,7 +2038,7 @@ func (_c *MockDrupalOrg_GetIssue_Call) Return(issue *drupalorg.Issue, err error)
 	return _c
 }
 
-func (_c *MockDrupalOrg_GetIssue_Call) RunAndReturn(run func(issueID string) (*drupalorg.Issue, error)) *MockDrupalOrg_GetIssue_Call {
+func (_c *MockDrupalOrg_GetIssue_Call) RunAndReturn(run func(context.Context, string) (*drupalorg.Issue, error)) *MockDrupalOrg_GetIssue_Call {
 	_c.Call.Return(run)
 	return _c
 }

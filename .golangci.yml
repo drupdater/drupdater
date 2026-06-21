@@ -2,6 +2,10 @@ version: "2"
 linters:
   enable:
     - revive
+    - bodyclose
+    - noctx
+    - nilerr
+    - testifylint
   exclusions:
     generated: lax
     presets:

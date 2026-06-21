@@ -1,6 +1,7 @@
 package drupalorg
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -34,8 +35,12 @@ type Issue struct {
 	} `json:"field_project"`
 }
 
-func (s *HTTPClient) GetIssue(issueID string) (*Issue, error) {
-	resp, err := s.client.Get(s.DrupalOrgBaseURL + "/api-d7/node/" + issueID + ".json")
+func (s *HTTPClient) GetIssue(ctx context.Context, issueID string) (*Issue, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.DrupalOrgBaseURL+"/api-d7/node/"+issueID+".json", nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build request: %w", err)
+	}
+	resp, err := s.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to make request: %w", err)
 	}

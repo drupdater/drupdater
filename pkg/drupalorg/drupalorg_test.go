@@ -1,6 +1,7 @@
 package drupalorg
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -31,7 +32,7 @@ func TestGetIssue_Timeout(t *testing.T) {
 		client:           &http.Client{Timeout: 10 * time.Millisecond},
 	}
 
-	issue, err := service.GetIssue("12345")
+	issue, err := service.GetIssue(context.Background(), "12345")
 	assert.Error(t, err)
 	assert.Nil(t, issue)
 }
@@ -62,7 +63,7 @@ func TestGetIssue(t *testing.T) {
 
 	// Call GetIssue method
 	issueID := "12345"
-	issue, err := service.GetIssue(issueID)
+	issue, err := service.GetIssue(context.Background(), issueID)
 
 	// Assertions
 	assert.NoError(t, err)
@@ -90,7 +91,7 @@ func TestGetIssue_Failure(t *testing.T) {
 
 	// Call GetIssue method
 	issueID := "12345"
-	issue, err := service.GetIssue(issueID)
+	issue, err := service.GetIssue(context.Background(), issueID)
 
 	// Assertions
 	assert.Error(t, err)

@@ -268,7 +268,7 @@ func TestUpdatePatches(t *testing.T) {
 		composerService.EXPECT().IsPackageInstalled(mock.Anything, "/tmp", "drupal/core").Return(true, nil)
 
 		drupalOrgService.EXPECT().FindIssueNumber("Issue #123456 \"With problems\"").Return("123456", true)
-		drupalOrgService.EXPECT().GetIssue("123456").Return(&drupalorg.Issue{
+		drupalOrgService.EXPECT().GetIssue(mock.Anything, "123456").Return(&drupalorg.Issue{
 			ID:     "123456",
 			Title:  "Alot of problems",
 			Status: "1",
@@ -322,7 +322,7 @@ func TestUpdatePatches(t *testing.T) {
 		worktree.EXPECT().Remove("patches/remote/0001-remote.patch").Return(plumbing.NewHash(""), nil)
 
 		drupalOrgService.EXPECT().FindIssueNumber("Issue #123456 \"With problems\"").Return("123456", true)
-		drupalOrgService.EXPECT().GetIssue("123456").Return(&drupalorg.Issue{
+		drupalOrgService.EXPECT().GetIssue(mock.Anything, "123456").Return(&drupalorg.Issue{
 			ID:     "123456",
 			Title:  "Alot of problems",
 			Status: "1",
@@ -422,7 +422,7 @@ func TestUpdatePatches(t *testing.T) {
 		composerService.EXPECT().IsPackageInstalled(mock.Anything, "/tmp", "drupal/core").Return(true, nil)
 
 		drupalOrgService.EXPECT().FindIssueNumber("Issue #123456 \"With problems\"").Return("123456", true)
-		drupalOrgService.EXPECT().GetIssue("123456").Return(&drupalorg.Issue{
+		drupalOrgService.EXPECT().GetIssue(mock.Anything, "123456").Return(&drupalorg.Issue{
 			ID:     "123456",
 			Title:  "Alot of problems",
 			Status: "1",
@@ -534,7 +534,7 @@ func TestUpdatePatches(t *testing.T) {
 		composerService.EXPECT().IsPackageInstalled(mock.Anything, "/tmp", "drupal/core").Return(true, nil)
 
 		drupalOrgService.EXPECT().FindIssueNumber("Issue #123456 \"With problems\"").Return("123456", true)
-		drupalOrgService.EXPECT().GetIssue("123456").Return(&drupalorg.Issue{
+		drupalOrgService.EXPECT().GetIssue(mock.Anything, "123456").Return(&drupalorg.Issue{
 			ID:     "123456",
 			Title:  "Alot of problems",
 			Status: "7",
@@ -608,7 +608,7 @@ func TestUpdatePatches(t *testing.T) {
 		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/remote/0001-remote.patch").Return(true, nil)
 
 		drupalOrgService.EXPECT().FindIssueNumber("Issue #123456 \"With problems\"").Return("123456", true)
-		drupalOrgService.EXPECT().GetIssue("123456").Return(&drupalorg.Issue{
+		drupalOrgService.EXPECT().GetIssue(mock.Anything, "123456").Return(&drupalorg.Issue{
 			ID:     "123456",
 			Title:  "Alot of problems",
 			Status: "7",

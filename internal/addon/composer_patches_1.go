@@ -267,7 +267,7 @@ func (h *ComposerPatches1) processSinglePatch(ctx context.Context, path string, 
 	var issue *drupalorg.Issue
 	if issueNumberExists {
 		var err error
-		issue, err = h.drupalOrg.GetIssue(issueNumber)
+		issue, err = h.drupalOrg.GetIssue(ctx, issueNumber)
 		if err != nil {
 			h.logger.Error("failed to get issue", zap.String("issue", issueNumber), zap.Error(err))
 			return
