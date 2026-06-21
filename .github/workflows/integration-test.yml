@@ -58,21 +58,26 @@ jobs:
           build-args: |
             PHP_VERSION=${{ inputs.php_version }}
 
-      - name: Run drupdater
+      - name: Clone project
         env:
           REPO_TOKEN: ${{ secrets.DRUPDATER_TEST_TOKEN }}
           REPOSITORY_URL: ${{ inputs.repository_url }}
           BRANCH: ${{ inputs.branch }}
+        run: |
+          git -c credential.helper='!f(){ echo username=oauth2; echo "password=$REPO_TOKEN"; };f' \
+            clone --branch "$BRANCH" --depth 1 "$REPOSITORY_URL" ./drupal-project
+
+      - name: Run drupdater
+        env:
+          REPO_TOKEN: ${{ secrets.DRUPDATER_TEST_TOKEN }}
           DRY_RUN: ${{ inputs.dry_run }}
           SECURITY: ${{ inputs.security }}
           VERBOSE: ${{ inputs.verbose }}
         run: |
-          args=(
-            --clone
-            --repository-url "$REPOSITORY_URL"
-            --branch "$BRANCH"
-          )
+          args=(--working-dir /workspace)
           [ "$DRY_RUN" = "true" ] && args+=(--dry-run)
           [ "$SECURITY" = "true" ] && args+=(--security)
           [ "$VERBOSE" = "true" ] && args+=(--verbose)
-          docker run --rm drupdater:test "$REPO_TOKEN" "${args[@]}"
+          docker run --rm \
+            -v "$(pwd)/drupal-project:/workspace" \
+            drupdater:test "$REPO_TOKEN" "${args[@]}"
