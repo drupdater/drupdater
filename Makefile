@@ -25,6 +25,7 @@ mock: ## Generate mocks
 
 lint: ## Run linters
 	golangci-lint run ./...
+	docker run --rm -i hadolint/hadolint < Dockerfile
 
 fmt: ## Format code
 	go fmt ./...
