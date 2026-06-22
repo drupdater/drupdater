@@ -1,8 +1,8 @@
 package repo
 
 import (
-	"crypto/md5"
 	"fmt"
+	"hash/fnv"
 	"io"
 	"net/url"
 	"os"
@@ -46,7 +46,9 @@ func NewGitRepositoryService(logger *zap.Logger) *GitRepositoryService {
 
 func (rs *GitRepositoryService) CloneRepository(repository string, branch string, token string, username string, email string) (Repository, Worktree, string, error) {
 
-	hash := fmt.Sprintf("%x", md5.Sum([]byte(repository)))
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(repository))
+	hash := fmt.Sprintf("%x", h.Sum64())
 	projectDir := filepath.Join(os.TempDir(), hash)
 	if err := rs.fs.MkdirAll(projectDir, os.ModePerm); err != nil {
 		return nil, nil, "", fmt.Errorf("failed to create project directory: %w", err)

@@ -9,6 +9,7 @@ import (
 
 	"github.com/maypok86/otter"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
 )
@@ -23,15 +24,15 @@ func TestExecDrush(t *testing.T) {
 		// in the real process environment via t.Setenv.
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
 		t.Setenv("GOCOVERDIR", "/tmp")
-		execCommand = func(_ context.Context, name string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, name string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", name}
 			cs = append(cs, arg...)
-			return exec.Command(os.Args[0], cs...)
+			return exec.CommandContext(ctx, os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
 
 		output, err := executor.execDrush(t.Context(), "/tmp", "test_site", "status")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "[composer exec -- drush status]", output)
 	})
 
@@ -45,17 +46,17 @@ func TestExecDrush(t *testing.T) {
 		// Capture the *exec.Cmd that execDrush builds so we can inspect its
 		// Env slice after execDrush has mutated it.
 		var cmdRef *exec.Cmd
-		execCommand = func(_ context.Context, name string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, name string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", name}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 			cmdRef = cmd
 			return cmd
 		}
 		defer func() { execCommand = exec.CommandContext }()
 
 		_, err := executor.execDrush(t.Context(), "/tmp", "expected_site", "status")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// The last element must be our intended SITE_NAME, not the inherited one.
 		assert.NotNil(t, cmdRef)
@@ -67,16 +68,16 @@ func TestExecDrush(t *testing.T) {
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
 		t.Setenv("GO_HELPER_PROCESS_ERROR", "1")
 		t.Setenv("GOCOVERDIR", "/tmp")
-		execCommand = func(_ context.Context, name string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, name string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", name}
 			cs = append(cs, arg...)
-			return exec.Command(os.Args[0], cs...)
+			return exec.CommandContext(ctx, os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
 
 		output, err := executor.execDrush(t.Context(), "/tmp", "test_site", "status")
-		assert.Error(t, err)
-		assert.Equal(t, "", output)
+		require.Error(t, err)
+		assert.Empty(t, output)
 	})
 }
 
@@ -115,10 +116,10 @@ func TestGetUpdateHooks(t *testing.T) {
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
 		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
 		t.Setenv("GOCOVERDIR", "/tmp")
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", data}
 			cs = append(cs, arg...)
-			return exec.Command(os.Args[0], cs...)
+			return exec.CommandContext(ctx, os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
 
@@ -128,7 +129,7 @@ func TestGetUpdateHooks(t *testing.T) {
 
 		updates, err := drush.GetUpdateHooks(t.Context(), "/tmp", "site1")
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		if len(updates) != 4 {
 			t.Errorf("Expected 4 updates, got %d", len(updates))
@@ -167,10 +168,10 @@ func TestGetUpdateHooks(t *testing.T) {
 
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
 		t.Setenv("GOCOVERDIR", "/tmp")
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", data}
 			cs = append(cs, arg...)
-			return exec.Command(os.Args[0], cs...)
+			return exec.CommandContext(ctx, os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
 
@@ -180,7 +181,7 @@ func TestGetUpdateHooks(t *testing.T) {
 
 		updates, err := drush.GetUpdateHooks(t.Context(), "/tmp", "site1")
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		if len(updates) != 0 {
 			t.Errorf("Expected 0 updates, got %d", len(updates))
@@ -199,26 +200,26 @@ func TestInstallSite(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
 		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", "ok"}
 			cs = append(cs, arg...)
-			return exec.Command(os.Args[0], cs...)
+			return exec.CommandContext(ctx, os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
-		assert.NoError(t, cli.InstallSite(t.Context(), "/tmp", "default"))
+		require.NoError(t, cli.InstallSite(t.Context(), "/tmp", "default"))
 	})
 
 	t.Run("error", func(t *testing.T) {
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
 		t.Setenv("GO_HELPER_PROCESS_ERROR", "1")
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--"}
 			cs = append(cs, arg...)
-			return exec.Command(os.Args[0], cs...)
+			return exec.CommandContext(ctx, os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
 		err := cli.InstallSite(t.Context(), "/tmp", "default")
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "default")
 	})
 }
@@ -231,14 +232,14 @@ func TestGetConfigSyncDir(t *testing.T) {
 		cli := NewCLI(logger, cache)
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
 		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", "/tmp/config/sync"}
 			cs = append(cs, arg...)
-			return exec.Command(os.Args[0], cs...)
+			return exec.CommandContext(ctx, os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
 		dir, err := cli.GetConfigSyncDir(t.Context(), "/tmp", "site1", false)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "/tmp/config/sync", dir)
 	})
 
@@ -247,14 +248,14 @@ func TestGetConfigSyncDir(t *testing.T) {
 		cli := NewCLI(logger, cache)
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
 		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", "/tmp/config/sync"}
 			cs = append(cs, arg...)
-			return exec.Command(os.Args[0], cs...)
+			return exec.CommandContext(ctx, os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
 		dir, err := cli.GetConfigSyncDir(t.Context(), "/tmp", "site1", true)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "config/sync", dir)
 	})
 
@@ -264,11 +265,11 @@ func TestGetConfigSyncDir(t *testing.T) {
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
 		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
 		callCount := 0
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			callCount++
 			cs := []string{"-test.run=TestHelperProcess", "--", "/cached/path"}
 			cs = append(cs, arg...)
-			return exec.Command(os.Args[0], cs...)
+			return exec.CommandContext(ctx, os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
 		v1, _ := cli.GetConfigSyncDir(t.Context(), "/tmp", "site1", false)
@@ -282,14 +283,14 @@ func TestGetConfigSyncDir(t *testing.T) {
 		cli := NewCLI(logger, cache)
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
 		t.Setenv("GO_HELPER_PROCESS_ERROR", "1")
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--"}
 			cs = append(cs, arg...)
-			return exec.Command(os.Args[0], cs...)
+			return exec.CommandContext(ctx, os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
 		_, err := cli.GetConfigSyncDir(t.Context(), "/tmp", "site1", false)
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 }
 
@@ -301,25 +302,25 @@ func TestExportConfiguration(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
 		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", "ok"}
 			cs = append(cs, arg...)
-			return exec.Command(os.Args[0], cs...)
+			return exec.CommandContext(ctx, os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
-		assert.NoError(t, cli.ExportConfiguration(t.Context(), "/tmp", "site1"))
+		require.NoError(t, cli.ExportConfiguration(t.Context(), "/tmp", "site1"))
 	})
 
 	t.Run("error", func(t *testing.T) {
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
 		t.Setenv("GO_HELPER_PROCESS_ERROR", "1")
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--"}
 			cs = append(cs, arg...)
-			return exec.Command(os.Args[0], cs...)
+			return exec.CommandContext(ctx, os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
-		assert.Error(t, cli.ExportConfiguration(t.Context(), "/tmp", "site1"))
+		require.Error(t, cli.ExportConfiguration(t.Context(), "/tmp", "site1"))
 	})
 }
 
@@ -331,25 +332,25 @@ func TestUpdateSite(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
 		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", "ok"}
 			cs = append(cs, arg...)
-			return exec.Command(os.Args[0], cs...)
+			return exec.CommandContext(ctx, os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
-		assert.NoError(t, cli.UpdateSite(t.Context(), "/tmp", "site1"))
+		require.NoError(t, cli.UpdateSite(t.Context(), "/tmp", "site1"))
 	})
 
 	t.Run("error", func(t *testing.T) {
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
 		t.Setenv("GO_HELPER_PROCESS_ERROR", "1")
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--"}
 			cs = append(cs, arg...)
-			return exec.Command(os.Args[0], cs...)
+			return exec.CommandContext(ctx, os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
-		assert.Error(t, cli.UpdateSite(t.Context(), "/tmp", "site1"))
+		require.Error(t, cli.UpdateSite(t.Context(), "/tmp", "site1"))
 	})
 }
 
@@ -361,25 +362,25 @@ func TestConfigResave(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
 		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", "ok"}
 			cs = append(cs, arg...)
-			return exec.Command(os.Args[0], cs...)
+			return exec.CommandContext(ctx, os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
-		assert.NoError(t, cli.ConfigResave(t.Context(), "/tmp", "site1"))
+		require.NoError(t, cli.ConfigResave(t.Context(), "/tmp", "site1"))
 	})
 
 	t.Run("error", func(t *testing.T) {
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
 		t.Setenv("GO_HELPER_PROCESS_ERROR", "1")
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--"}
 			cs = append(cs, arg...)
-			return exec.Command(os.Args[0], cs...)
+			return exec.CommandContext(ctx, os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
-		assert.Error(t, cli.ConfigResave(t.Context(), "/tmp", "site1"))
+		require.Error(t, cli.ConfigResave(t.Context(), "/tmp", "site1"))
 	})
 }
 
@@ -391,28 +392,28 @@ func TestIsModuleEnabled(t *testing.T) {
 	t.Run("enabled", func(t *testing.T) {
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
 		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", "mymodule"}
 			cs = append(cs, arg...)
-			return exec.Command(os.Args[0], cs...)
+			return exec.CommandContext(ctx, os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
 		enabled, err := cli.IsModuleEnabled(t.Context(), "/tmp", "site1", "mymodule")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.True(t, enabled)
 	})
 
 	t.Run("not enabled", func(t *testing.T) {
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
 		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", ""}
 			cs = append(cs, arg...)
-			return exec.Command(os.Args[0], cs...)
+			return exec.CommandContext(ctx, os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
 		enabled, err := cli.IsModuleEnabled(t.Context(), "/tmp", "site1", "mymodule")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.False(t, enabled)
 	})
 }
@@ -425,25 +426,25 @@ func TestLocalizeTranslations(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
 		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", "ok"}
 			cs = append(cs, arg...)
-			return exec.Command(os.Args[0], cs...)
+			return exec.CommandContext(ctx, os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
-		assert.NoError(t, cli.LocalizeTranslations(t.Context(), "/tmp", "site1"))
+		require.NoError(t, cli.LocalizeTranslations(t.Context(), "/tmp", "site1"))
 	})
 
 	t.Run("error", func(t *testing.T) {
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
 		t.Setenv("GO_HELPER_PROCESS_ERROR", "1")
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--"}
 			cs = append(cs, arg...)
-			return exec.Command(os.Args[0], cs...)
+			return exec.CommandContext(ctx, os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
-		assert.Error(t, cli.LocalizeTranslations(t.Context(), "/tmp", "site1"))
+		require.Error(t, cli.LocalizeTranslations(t.Context(), "/tmp", "site1"))
 	})
 }
 
@@ -455,14 +456,14 @@ func TestGetTranslationPath(t *testing.T) {
 		cli := NewCLI(logger, cache)
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
 		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", "/tmp/translations"}
 			cs = append(cs, arg...)
-			return exec.Command(os.Args[0], cs...)
+			return exec.CommandContext(ctx, os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
 		path, err := cli.GetTranslationPath(t.Context(), "/tmp", "site1", false)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "/tmp/translations", path)
 	})
 
@@ -471,14 +472,14 @@ func TestGetTranslationPath(t *testing.T) {
 		cli := NewCLI(logger, cache)
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
 		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", "/tmp/translations"}
 			cs = append(cs, arg...)
-			return exec.Command(os.Args[0], cs...)
+			return exec.CommandContext(ctx, os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
 		path, err := cli.GetTranslationPath(t.Context(), "/tmp", "site1", true)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "translations", path)
 	})
 
@@ -488,11 +489,11 @@ func TestGetTranslationPath(t *testing.T) {
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
 		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
 		callCount := 0
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			callCount++
 			cs := []string{"-test.run=TestHelperProcess", "--", "/cached/translations"}
 			cs = append(cs, arg...)
-			return exec.Command(os.Args[0], cs...)
+			return exec.CommandContext(ctx, os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
 		v1, _ := cli.GetTranslationPath(t.Context(), "/tmp", "site1", false)

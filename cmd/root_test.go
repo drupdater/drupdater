@@ -72,7 +72,7 @@ func TestHandleWorkflowError(t *testing.T) {
 		abortErr := services.AbortError{Msg: "branch already exists, skipping"}
 		result := handleWorkflowError(logger, abortErr)
 
-		assert.NoError(t, result)
+		require.NoError(t, result)
 		assert.Equal(t, 1, logs.Len())
 		assert.Equal(t, zap.WarnLevel, logs.All()[0].Level)
 		assert.Equal(t, "update aborted", logs.All()[0].Message)
@@ -86,14 +86,14 @@ func TestHandleWorkflowError(t *testing.T) {
 		regularErr := errors.New("something went wrong")
 		result := handleWorkflowError(logger, regularErr)
 
-		assert.ErrorIs(t, result, regularErr)
+		require.ErrorIs(t, result, regularErr)
 		assert.Equal(t, 1, logs.Len())
 		assert.Equal(t, zap.ErrorLevel, logs.All()[0].Level)
 	})
 
 	t.Run("errors.Unwrap returns nil for AbortError confirming fix is needed", func(t *testing.T) {
 		abortErr := services.AbortError{Msg: "no changes detected"}
-		assert.Nil(t, errors.Unwrap(abortErr), "AbortError has no wrapped error, so Unwrap returns nil")
+		require.NoError(t, errors.Unwrap(abortErr), "AbortError has no wrapped error, so Unwrap returns nil")
 		assert.Equal(t, "no changes detected", abortErr.Error())
 	})
 }

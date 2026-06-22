@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	gitlab "gitlab.com/gitlab-org/api/client-go"
 )
 
@@ -22,7 +23,7 @@ func TestGitlab_CreateMergeRequest(t *testing.T) {
 	t.Run("failed to get create mr", func(t *testing.T) {
 
 		_, err := gitlab.CreateMergeRequest(context.Background(), title, description, sourceBranch, targetBranch)
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 
 }
@@ -77,7 +78,7 @@ func TestCreateMergeRequest(t *testing.T) {
 	}
 
 	mr, err := gitlab.CreateMergeRequest(context.Background(), "Test MR", "This is a test MR", "source-branch", "target-branch")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, int64(1), mr.ID)
 	assert.Equal(t, "http://example.com", mr.URL)
 }
@@ -90,7 +91,7 @@ func TestGitlab_CreateMergeRequest_HonorsContext(t *testing.T) {
 	cancel()
 
 	_, err := g.CreateMergeRequest(ctx, "Test MR", "body", "source", "target")
-	assert.ErrorIs(t, err, context.Canceled)
+	require.ErrorIs(t, err, context.Canceled)
 }
 
 func TestGitlab_DeleteBranch_Success(t *testing.T) {
@@ -107,7 +108,7 @@ func TestGitlab_DeleteBranch_Success(t *testing.T) {
 	g := &Gitlab{client: client, projectPath: "test_project"}
 
 	err := g.DeleteBranch(context.Background(), "update-abc123")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestGitlab_DeleteBranch_Error(t *testing.T) {
@@ -121,7 +122,7 @@ func TestGitlab_DeleteBranch_Error(t *testing.T) {
 	g := &Gitlab{client: client, projectPath: "test_project"}
 
 	err := g.DeleteBranch(context.Background(), "nonexistent-branch")
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to delete branch")
 }
 
@@ -132,7 +133,7 @@ func TestGitlab_DeleteBranch_HonorsContext(t *testing.T) {
 	cancel()
 
 	err := g.DeleteBranch(ctx, "some-branch")
-	assert.ErrorIs(t, err, context.Canceled)
+	require.ErrorIs(t, err, context.Canceled)
 }
 
 func TestGitlab_GetUser_HonorsContext(t *testing.T) {
@@ -160,6 +161,6 @@ func TestGetUser_ReturnsEmptyStringsOnError(t *testing.T) {
 	}
 
 	name, email := g.GetUser(context.Background())
-	assert.Equal(t, "", name)
-	assert.Equal(t, "", email)
+	assert.Empty(t, name)
+	assert.Empty(t, email)
 }

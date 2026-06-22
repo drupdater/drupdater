@@ -8,6 +8,7 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/gookit/event"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
 
@@ -45,7 +46,7 @@ func TestDefaultComposerNormalize_PostComposerUpdateHandler_PackageInstalled(t *
 	err := normalize.postComposerUpdateHandler(e)
 
 	// Assert
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	composer.AssertExpectations(t)
 }
 
@@ -68,7 +69,7 @@ func TestDefaultComposerNormalize_PostComposerUpdateHandler_PackageNotInstalled(
 	err := normalize.postComposerUpdateHandler(e)
 
 	// Assert
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	composer.AssertExpectations(t)
 }
 
@@ -82,6 +83,6 @@ func TestDefaultComposerNormalize_RenderTemplate(t *testing.T) {
 	template, err := normalize.RenderTemplate()
 
 	// Assert
-	assert.NoError(t, err)
-	assert.Equal(t, "", template, "Template should be empty string")
+	require.NoError(t, err)
+	assert.Empty(t, template, "Template should be empty string")
 }

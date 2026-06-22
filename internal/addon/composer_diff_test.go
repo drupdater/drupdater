@@ -8,6 +8,7 @@ import (
 	"github.com/drupdater/drupdater/internal/services"
 	"github.com/gookit/event"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
 
@@ -57,7 +58,7 @@ func TestComposerDiff_PostComposerUpdateHandler_Success(t *testing.T) {
 	err := diff.postComposerUpdateHandler(mockEvent)
 
 	// Assert
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, expectedDiff, diff.table)
 	mockComposer.AssertExpectations(t)
 }
@@ -65,7 +66,7 @@ func TestComposerDiff_PostComposerUpdateHandler_Success(t *testing.T) {
 func TestComposerDiff_RenderTemplate(t *testing.T) {
 	// Setup - Read expected output from fixture file
 	fixture, err := os.ReadFile("testdata/composer_diff.md")
-	assert.NoError(t, err, "Failed to read test fixture")
+	require.NoError(t, err, "Failed to read test fixture")
 
 	expected := string(fixture)
 	logger := zap.NewNop()
@@ -79,7 +80,7 @@ func TestComposerDiff_RenderTemplate(t *testing.T) {
 	result, err := composerDiff.RenderTemplate()
 
 	// Assert
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, expected, result)
 	composerRunner.AssertExpectations(t)
 }

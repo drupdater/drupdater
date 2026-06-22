@@ -10,6 +10,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/gookit/event"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/mock"
 	"go.uber.org/zap"
 )
@@ -26,8 +27,8 @@ func TestTranslationsUpdater_SubscribedEvents(t *testing.T) {
 func TestTranslationsUpdater_RenderTemplate(t *testing.T) {
 	tu := &TranslationsUpdater{}
 	result, err := tu.RenderTemplate()
-	assert.NoError(t, err)
-	assert.Equal(t, "", result)
+	require.NoError(t, err)
+	assert.Empty(t, result)
 }
 
 func TestUpdateTranslationsEventHandlerWithoutLocaleDeploy(t *testing.T) {
@@ -49,7 +50,7 @@ func TestUpdateTranslationsEventHandlerWithoutLocaleDeploy(t *testing.T) {
 	err := handler.postSiteUpdateHandler(event)
 
 	// Assert
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	mockDrush.AssertExpectations(t)
 }
 
@@ -80,7 +81,7 @@ func TestUpdateTranslationsEventHandlerWithLocaleDeploy(t *testing.T) {
 	err := handler.postSiteUpdateHandler(event)
 
 	// Assert
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	mockDrush.AssertExpectations(t)
 	mockRepository.AssertExpectations(t)
 	worktree.AssertExpectations(t)

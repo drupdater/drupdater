@@ -8,6 +8,7 @@ import (
 	"github.com/drupdater/drupdater/internal/services"
 	"github.com/go-git/go-git/v5"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
 
@@ -64,7 +65,7 @@ func TestDefaultAllowPlugins_PreComposerUpdateHandler(t *testing.T) {
 	err := ap.preComposerUpdateHandler(e)
 
 	// Verify
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, existingPlugins, ap.allowPlugins)
 	composerRunner.AssertExpectations(t)
 }
@@ -106,7 +107,7 @@ func TestDefaultAllowPlugins_PostComposerUpdateHandler(t *testing.T) {
 	err := ap.postComposerUpdateHandler(e)
 
 	// Verify
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, []string{"new/plugin"}, ap.newAllowPlugins)
 	composerRunner.AssertExpectations(t)
 }
@@ -114,7 +115,7 @@ func TestDefaultAllowPlugins_PostComposerUpdateHandler(t *testing.T) {
 func TestDefaultAllowPlugins_RenderTemplate(t *testing.T) {
 	// Setup
 	fixture, err := os.ReadFile("testdata/allowplugins.md")
-	assert.NoError(t, err, "Failed to read test fixture")
+	require.NoError(t, err, "Failed to read test fixture")
 
 	expected := string(fixture)
 	logger := zap.NewNop()
@@ -128,7 +129,7 @@ func TestDefaultAllowPlugins_RenderTemplate(t *testing.T) {
 	result, err := ap.RenderTemplate()
 
 	// Verify
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, expected, result)
 }
 
@@ -144,6 +145,6 @@ func TestDefaultAllowPlugins_RenderTemplate_Empty(t *testing.T) {
 	result, err := ap.RenderTemplate()
 
 	// Verify
-	assert.NoError(t, err)
-	assert.Equal(t, "", result)
+	require.NoError(t, err)
+	assert.Empty(t, result)
 }

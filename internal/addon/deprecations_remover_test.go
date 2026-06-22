@@ -11,6 +11,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/gookit/event"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/mock"
 	"go.uber.org/zap"
 )
@@ -27,8 +28,8 @@ func TestDeprecationsRemover_SubscribedEvents(t *testing.T) {
 func TestDeprecationsRemover_RenderTemplate(t *testing.T) {
 	dr := &DeprecationsRemover{}
 	result, err := dr.RenderTemplate()
-	assert.NoError(t, err)
-	assert.Equal(t, "", result)
+	require.NoError(t, err)
+	assert.Empty(t, result)
 }
 
 func TestRemoveDeprecations(t *testing.T) {
@@ -61,7 +62,7 @@ func TestRemoveDeprecations(t *testing.T) {
 		err := updateRemoveDeprecations.postCodeUpdateHandler(postCodeUpdate)
 
 		// Assert
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		composer.AssertExpectations(t)
 		runner.AssertExpectations(t)
 		worktree.AssertExpectations(t)
@@ -101,7 +102,7 @@ func TestRemoveDeprecations(t *testing.T) {
 		err := updateRemoveDeprecations.postCodeUpdateHandler(postCodeUpdate)
 
 		// Assert
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		composer.AssertExpectations(t)
 		runner.AssertExpectations(t)
 		worktree.AssertExpectations(t)
@@ -129,7 +130,7 @@ func TestRemoveDeprecations(t *testing.T) {
 		err := updateRemoveDeprecations.postCodeUpdateHandler(postCodeUpdate)
 
 		// Assert
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		composer.AssertExpectations(t)
 		runner.AssertExpectations(t)
 		worktree.AssertExpectations(t)
@@ -150,7 +151,7 @@ func TestRemoveDeprecations(t *testing.T) {
 		err := updateRemoveDeprecations.postCodeUpdateHandler(postCodeUpdate)
 
 		// Assert
-		assert.Error(t, err)
+		require.Error(t, err)
 		composer.AssertExpectations(t)
 		runner.AssertExpectations(t)
 	})

@@ -173,7 +173,7 @@ func TestBranchExists(t *testing.T) {
 
 		found, err := service.BranchExists(repo, targetBranch)
 		require.Error(t, err)
-		assert.ErrorIs(t, err, iterErr)
+		require.ErrorIs(t, err, iterErr)
 		assert.False(t, found)
 	})
 
@@ -185,7 +185,7 @@ func TestBranchExists(t *testing.T) {
 
 		found, err := service.BranchExists(repo, targetBranch)
 		require.Error(t, err)
-		assert.ErrorIs(t, err, refsErr)
+		require.ErrorIs(t, err, refsErr)
 		assert.False(t, found)
 	})
 }
@@ -260,7 +260,7 @@ func TestGetCurrentBranch(t *testing.T) {
 
 		branch, err := service.GetCurrentBranch(dir)
 		require.NoError(t, err)
-		assert.Equal(t, "", branch)
+		assert.Empty(t, branch)
 	})
 
 	t.Run("errors on a non-repository path", func(t *testing.T) {

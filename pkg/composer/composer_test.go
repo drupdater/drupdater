@@ -11,6 +11,7 @@ import (
 
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
 
@@ -22,33 +23,33 @@ func TestExecComposer(t *testing.T) {
 	}
 
 	t.Run("successful execution", func(t *testing.T) {
-		execCommand = func(_ context.Context, name string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, name string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", name}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
 			return cmd
 		}
 		defer func() { execCommand = exec.CommandContext }()
 
 		output, err := service.execComposer(t.Context(), "/tmp", "update")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "composer", output)
 	})
 
 	t.Run("execution failure", func(t *testing.T) {
-		execCommand = func(_ context.Context, name string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, name string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", name}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
 			return cmd
 		}
 		defer func() { execCommand = exec.CommandContext }()
 
 		output, err := service.execComposer(t.Context(), "/tmp", "update")
-		assert.Error(t, err)
-		assert.Equal(t, "", output)
+		require.Error(t, err)
+		assert.Empty(t, output)
 	})
 
 }
@@ -69,10 +70,10 @@ func TestGetComposerUpdates(t *testing.T) {
 		fs:     fs,
 	}
 
-	execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+	execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 		cs := []string{"-test.run=TestHelperProcess", "--", logData}
 		cs = append(cs, arg...)
-		cmd := exec.Command(os.Args[0], cs...)
+		cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 		cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
 		return cmd
 	}
@@ -80,7 +81,7 @@ func TestGetComposerUpdates(t *testing.T) {
 
 	changes, err := service.Update(t.Context(), "/tmp", []string{}, []string{}, false, true)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, changes, 5)
 
 	assert.Equal(t, "Upgrade", changes[0].Action)
@@ -96,16 +97,16 @@ func TestGetComposerUpdates(t *testing.T) {
 	assert.Equal(t, "Remove", changes[2].Action)
 	assert.Equal(t, "behat/mink-selenium2-driver", changes[2].Package)
 	assert.Equal(t, "v1.7.0", changes[2].From)
-	assert.Equal(t, "", changes[2].To)
+	assert.Empty(t, changes[2].To)
 
 	assert.Equal(t, "Remove", changes[3].Action)
 	assert.Equal(t, "instaclick/php-webdriver", changes[3].Package)
 	assert.Equal(t, "1.4.19", changes[3].From)
-	assert.Equal(t, "", changes[3].To)
+	assert.Empty(t, changes[3].To)
 
 	assert.Equal(t, "Install", changes[4].Action)
 	assert.Equal(t, "tbachert/spi", changes[4].Package)
-	assert.Equal(t, "", changes[4].From)
+	assert.Empty(t, changes[4].From)
 	assert.Equal(t, "v1.0.2", changes[4].To)
 }
 
@@ -125,10 +126,10 @@ phpstan/extension-installer                    1.4.3   requires composer-plugin-
 tbachert/spi                                   v1.0.2  requires composer-plugin-api (^2.0)
 zaporylie/composer-drupal-optimizations        1.2.0   requires composer-plugin-api (^1.1 || ^2.0)`
 
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", data}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
 			return cmd
 		}
@@ -140,7 +141,7 @@ zaporylie/composer-drupal-optimizations        1.2.0   requires composer-plugin-
 
 		plugins, err := service.GetInstalledPlugins(t.Context(), "/tmp")
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, map[string]any{
 			"composer/installers":                            nil,
 			"cweagans/composer-patches":                      nil,
@@ -170,10 +171,10 @@ func TestRunComposerAudit(t *testing.T) {
 			logger: zap.NewNop(),
 		}
 
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", data}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
 			return cmd
 		}
@@ -181,7 +182,7 @@ func TestRunComposerAudit(t *testing.T) {
 
 		audit, err := service.Audit(t.Context(), "/tmp")
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Nil(t, audit.Advisories)
 	})
 
@@ -217,10 +218,10 @@ func TestRunComposerAudit(t *testing.T) {
 	   	    }
 	   	}`
 
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", data}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
 			return cmd
 		}
@@ -232,10 +233,10 @@ func TestRunComposerAudit(t *testing.T) {
 
 		audit, err := service.Audit(t.Context(), "/tmp")
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		assert.Len(t, audit.Advisories, 1)
-		assert.Equal(t, audit.Advisories, []Advisory{
+		assert.Equal(t, []Advisory{
 			{
 				ReportedAt:       "2025-01-29T06:52:00+00:00",
 				Severity:         "medium",
@@ -247,7 +248,7 @@ func TestRunComposerAudit(t *testing.T) {
 				AffectedVersions: ">=3.16.0,<3.19.0",
 				Title:            "Missing output escaping for the null coalesce operator",
 			},
-		})
+		}, audit.Advisories)
 	})
 }
 
@@ -258,7 +259,7 @@ func TestGetComposerLockHash(t *testing.T) {
 
 	fs := afero.NewMemMapFs()
 	err := afero.WriteFile(fs, "/test/composer.lock", []byte(data), 0644)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	service := &CLI{
 		logger: zap.NewNop(),
@@ -266,7 +267,7 @@ func TestGetComposerLockHash(t *testing.T) {
 	}
 	hash, err := service.GetLockHash("/test")
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "d3d29b1f6a1d8f2c3b9b8e1e4f5f9e3e", hash)
 }
 
@@ -279,34 +280,34 @@ func TestGetInstalledPackageVersion(t *testing.T) {
 	t.Run("returns version when versions array is non-empty", func(t *testing.T) {
 		data := `{"versions":["1.2.3"]}`
 
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", data}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
 			return cmd
 		}
 		defer func() { execCommand = exec.CommandContext }()
 
 		version, err := service.GetInstalledPackageVersion(t.Context(), "/tmp", "drupal/core")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "1.2.3", version)
 	})
 
 	t.Run("returns error when versions array is empty", func(t *testing.T) {
 		data := `{"versions":[]}`
 
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", data}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
 			return cmd
 		}
 		defer func() { execCommand = exec.CommandContext }()
 
 		version, err := service.GetInstalledPackageVersion(t.Context(), "/tmp", "drupal/core")
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no versions found for package drupal/core")
 		assert.Empty(t, version)
 	})
@@ -330,10 +331,10 @@ Package operations: 58 installs, 0 updates, 0 removals
 Generating autoload files
 Using version ^11.1 for drupal/core`
 
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", out}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
 			return cmd
 		}
@@ -345,7 +346,7 @@ Using version ^11.1 for drupal/core`
 		}
 
 		applies, err := service.CheckIfPatchApplies(t.Context(), "drupal/core", "1.0.0", "path/to/patch")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.True(t, applies)
 	})
 
@@ -358,17 +359,17 @@ Using version ^11.1 for drupal/core`
 			fs:     fs,
 		}
 
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--"}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
 			return cmd
 		}
 		defer func() { execCommand = exec.CommandContext }()
 
 		applies, err := service.CheckIfPatchApplies(t.Context(), "drupal/core", "1.0.0", "path/to/patch")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.False(t, applies)
 	})
 
@@ -380,10 +381,10 @@ Using version ^11.1 for drupal/core`
 		fs := afero.NewMemMapFs()
 
 		capturedPatchesJSON := ""
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", "ok"}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
 			return cmd
 		}
@@ -398,15 +399,15 @@ Using version ^11.1 for drupal/core`
 		// these would break raw string concatenation but must be escaped by
 		// json.Marshal, resulting in valid JSON.
 		_, err := service.CheckIfPatchApplies(t.Context(), `drupal/"core"`, `1.0\0`, `path/to/"patch"`)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Read back the written composer.patches.json and confirm it is valid JSON.
 		data, err := afero.ReadFile(fs, service.tempDir+"/composer.patches.json")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		capturedPatchesJSON = string(data)
 
 		var parsed map[string]any
-		assert.NoError(t, json.Unmarshal([]byte(capturedPatchesJSON), &parsed),
+		require.NoError(t, json.Unmarshal([]byte(capturedPatchesJSON), &parsed),
 			"composer.patches.json must be valid JSON even when values contain special characters")
 	})
 
@@ -416,28 +417,28 @@ func TestInstall(t *testing.T) {
 	service := &CLI{logger: zap.NewNop()}
 
 	t.Run("success", func(t *testing.T) {
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", "ok"}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
 			return cmd
 		}
 		defer func() { execCommand = exec.CommandContext }()
-		assert.NoError(t, service.Install(t.Context(), "/tmp"))
+		require.NoError(t, service.Install(t.Context(), "/tmp"))
 	})
 
 	t.Run("error", func(t *testing.T) {
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--"}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
 			return cmd
 		}
 		defer func() { execCommand = exec.CommandContext }()
 		err := service.Install(t.Context(), "/tmp")
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to install dependencies")
 	})
 }
@@ -446,29 +447,29 @@ func TestRemove(t *testing.T) {
 	service := &CLI{logger: zap.NewNop()}
 
 	t.Run("success", func(t *testing.T) {
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", "ok"}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
 			return cmd
 		}
 		defer func() { execCommand = exec.CommandContext }()
 		_, err := service.Remove(t.Context(), "/tmp", "drupal/core")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	})
 
 	t.Run("error", func(t *testing.T) {
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--"}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
 			return cmd
 		}
 		defer func() { execCommand = exec.CommandContext }()
 		_, err := service.Remove(t.Context(), "/tmp", "drupal/core")
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to remove package")
 	})
 }
@@ -476,17 +477,17 @@ func TestRemove(t *testing.T) {
 func TestNormalize(t *testing.T) {
 	service := &CLI{logger: zap.NewNop()}
 
-	execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+	execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 		cs := []string{"-test.run=TestHelperProcess", "--", "normalized"}
 		cs = append(cs, arg...)
-		cmd := exec.Command(os.Args[0], cs...)
+		cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 		cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
 		return cmd
 	}
 	defer func() { execCommand = exec.CommandContext }()
 
 	out, err := service.Normalize(t.Context(), "/tmp")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "normalized", out)
 }
 
@@ -494,32 +495,32 @@ func TestCheckPlatformReqs(t *testing.T) {
 	service := &CLI{logger: zap.NewNop()}
 
 	t.Run("requirements satisfied", func(t *testing.T) {
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", "php 8.3.0 success"}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
 			return cmd
 		}
 		defer func() { execCommand = exec.CommandContext }()
 
 		out, err := service.CheckPlatformReqs(t.Context(), "/tmp")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "php 8.3.0 success", out)
 	})
 
 	t.Run("requirements not satisfied", func(t *testing.T) {
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", "php 8.1.0 failed"}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
 			return cmd
 		}
 		defer func() { execCommand = exec.CommandContext }()
 
 		_, err := service.CheckPlatformReqs(t.Context(), "/tmp")
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 }
 
@@ -527,30 +528,30 @@ func TestDiff(t *testing.T) {
 	service := &CLI{logger: zap.NewNop()}
 
 	t.Run("without links", func(t *testing.T) {
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", "diff output"}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
 			return cmd
 		}
 		defer func() { execCommand = exec.CommandContext }()
 		out, err := service.Diff(t.Context(), "/tmp", false)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "diff output", out)
 	})
 
 	t.Run("with links", func(t *testing.T) {
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", "diff with links"}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
 			return cmd
 		}
 		defer func() { execCommand = exec.CommandContext }()
 		out, err := service.Diff(t.Context(), "/tmp", true)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "diff with links", out)
 	})
 }
@@ -558,17 +559,17 @@ func TestDiff(t *testing.T) {
 func TestGetConfig(t *testing.T) {
 	service := &CLI{logger: zap.NewNop()}
 
-	execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+	execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 		cs := []string{"-test.run=TestHelperProcess", "--", `"8.3"`}
 		cs = append(cs, arg...)
-		cmd := exec.Command(os.Args[0], cs...)
+		cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 		cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
 		return cmd
 	}
 	defer func() { execCommand = exec.CommandContext }()
 
 	val, err := service.GetConfig(t.Context(), "/tmp", "platform.php")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, `"8.3"`, val)
 }
 
@@ -576,27 +577,27 @@ func TestSetConfig(t *testing.T) {
 	service := &CLI{logger: zap.NewNop()}
 
 	t.Run("success", func(t *testing.T) {
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", "ok"}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
 			return cmd
 		}
 		defer func() { execCommand = exec.CommandContext }()
-		assert.NoError(t, service.SetConfig(t.Context(), "/tmp", "platform.php", "8.3"))
+		require.NoError(t, service.SetConfig(t.Context(), "/tmp", "platform.php", "8.3"))
 	})
 
 	t.Run("error", func(t *testing.T) {
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--"}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
 			return cmd
 		}
 		defer func() { execCommand = exec.CommandContext }()
-		assert.Error(t, service.SetConfig(t.Context(), "/tmp", "platform.php", "8.3"))
+		require.Error(t, service.SetConfig(t.Context(), "/tmp", "platform.php", "8.3"))
 	})
 }
 
@@ -604,30 +605,30 @@ func TestIsPackageInstalled(t *testing.T) {
 	service := &CLI{logger: zap.NewNop()}
 
 	t.Run("installed", func(t *testing.T) {
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", "ok"}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
 			return cmd
 		}
 		defer func() { execCommand = exec.CommandContext }()
 		installed, err := service.IsPackageInstalled(t.Context(), "/tmp", "drupal/core")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.True(t, installed)
 	})
 
 	t.Run("not installed", func(t *testing.T) {
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--"}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
 			return cmd
 		}
 		defer func() { execCommand = exec.CommandContext }()
 		installed, err := service.IsPackageInstalled(t.Context(), "/tmp", "drupal/core")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.False(t, installed)
 	})
 }
@@ -636,27 +637,27 @@ func TestUpdateLockHash(t *testing.T) {
 	service := &CLI{logger: zap.NewNop()}
 
 	t.Run("success", func(t *testing.T) {
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", "ok"}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
 			return cmd
 		}
 		defer func() { execCommand = exec.CommandContext }()
-		assert.NoError(t, service.UpdateLockHash(t.Context(), "/tmp"))
+		require.NoError(t, service.UpdateLockHash(t.Context(), "/tmp"))
 	})
 
 	t.Run("error", func(t *testing.T) {
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--"}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
 			return cmd
 		}
 		defer func() { execCommand = exec.CommandContext }()
-		assert.Error(t, service.UpdateLockHash(t.Context(), "/tmp"))
+		require.Error(t, service.UpdateLockHash(t.Context(), "/tmp"))
 	})
 }
 
@@ -664,16 +665,16 @@ func TestGetAllowPlugins(t *testing.T) {
 	service := &CLI{logger: zap.NewNop()}
 
 	t.Run("success", func(t *testing.T) {
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", `{"drupal/core-composer-scaffold":true,"phpro/grumphp-shim":false}`}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
 			return cmd
 		}
 		defer func() { execCommand = exec.CommandContext }()
 		plugins, err := service.GetAllowPlugins(t.Context(), "/tmp")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, map[string]bool{
 			"drupal/core-composer-scaffold": true,
 			"phpro/grumphp-shim":            false,
@@ -681,16 +682,16 @@ func TestGetAllowPlugins(t *testing.T) {
 	})
 
 	t.Run("invalid JSON", func(t *testing.T) {
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", "not-json"}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
 			return cmd
 		}
 		defer func() { execCommand = exec.CommandContext }()
 		_, err := service.GetAllowPlugins(t.Context(), "/tmp")
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 }
 
@@ -698,21 +699,21 @@ func TestSetAllowPlugins(t *testing.T) {
 	service := &CLI{logger: zap.NewNop()}
 
 	t.Run("success", func(t *testing.T) {
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", "ok"}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
 			return cmd
 		}
 		defer func() { execCommand = exec.CommandContext }()
 		err := service.SetAllowPlugins(t.Context(), "/tmp", map[string]bool{"drupal/core-composer-scaffold": true})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	})
 
 	t.Run("empty map", func(t *testing.T) {
 		err := service.SetAllowPlugins(t.Context(), "/tmp", map[string]bool{})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	})
 }
 
@@ -723,33 +724,33 @@ func TestGetCustomCodeDirectories(t *testing.T) {
 		_ = fs.MkdirAll("/tmp/web/themes/custom", 0755)
 
 		service := &CLI{logger: zap.NewNop(), fs: fs}
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", "web/"}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
 			return cmd
 		}
 		defer func() { execCommand = exec.CommandContext }()
 
 		dirs, err := service.GetCustomCodeDirectories(t.Context(), "/tmp")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.ElementsMatch(t, []string{"web/modules/custom", "web/themes/custom"}, dirs)
 	})
 
 	t.Run("GetConfig error", func(t *testing.T) {
 		service := &CLI{logger: zap.NewNop(), fs: afero.NewMemMapFs()}
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--"}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
 			return cmd
 		}
 		defer func() { execCommand = exec.CommandContext }()
 
 		_, err := service.GetCustomCodeDirectories(t.Context(), "/project")
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 }
 
@@ -769,9 +770,9 @@ func TestCheckIfPatchesApply(t *testing.T) {
 	patches := []string{"https://example.com/a.patch", "/repo/patches/b.patch"}
 
 	t.Run("returns true when require succeeds", func(t *testing.T) {
-		execCommand = func(_ context.Context, name string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, name string, arg ...string) *exec.Cmd {
 			cs := append([]string{"-test.run=TestHelperProcess", "--", name}, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
 			return cmd
 		}
@@ -779,19 +780,19 @@ func TestCheckIfPatchesApply(t *testing.T) {
 
 		service := &CLI{logger: zap.NewNop(), fs: afero.NewOsFs()}
 		ok, err := service.CheckIfPatchesApply(context.Background(), "drupal/core", "10.6.0", patches)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.True(t, ok)
 
 		// The patches are written in order as zero-padded keys.
 		written, err := afero.ReadFile(service.fs, service.tempDir+"/composer.patches.json")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.JSONEq(t, `{"patches":{"drupal/core":{"0000000000":"https://example.com/a.patch","0000000001":"/repo/patches/b.patch"}}}`, string(written))
 	})
 
 	t.Run("returns false when require fails", func(t *testing.T) {
-		execCommand = func(_ context.Context, name string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, name string, arg ...string) *exec.Cmd {
 			cs := append([]string{"-test.run=TestHelperProcess", "--", name}, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
 			return cmd
 		}
@@ -799,7 +800,7 @@ func TestCheckIfPatchesApply(t *testing.T) {
 
 		service := &CLI{logger: zap.NewNop(), fs: afero.NewOsFs()}
 		ok, err := service.CheckIfPatchesApply(context.Background(), "drupal/core", "10.6.0", patches)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.False(t, ok)
 	})
 
@@ -808,7 +809,7 @@ func TestCheckIfPatchesApply(t *testing.T) {
 		service.initOnce.Do(func() {}) // mark init as done so initTempDir is skipped
 
 		ok, err := service.CheckIfPatchesApply(context.Background(), "drupal/core", "10.6.0", patches)
-		assert.ErrorContains(t, err, "init failed")
+		require.ErrorContains(t, err, "init failed")
 		assert.False(t, ok)
 	})
 }
@@ -839,12 +840,12 @@ func TestGetDependencyPatches(t *testing.T) {
 	}`
 
 	fs := afero.NewMemMapFs()
-	assert.NoError(t, afero.WriteFile(fs, "/test/composer.lock", []byte(data), 0644))
+	require.NoError(t, afero.WriteFile(fs, "/test/composer.lock", []byte(data), 0644))
 
 	service := &CLI{logger: zap.NewNop(), fs: fs}
 	patches, err := service.GetDependencyPatches(context.Background(), "/test")
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, map[string]map[string]bool{
 		"drupal/core":  {"https://example.com/2869592.patch": true},
 		"drupal/views": {"https://example.com/views.patch": true},
@@ -853,23 +854,23 @@ func TestGetDependencyPatches(t *testing.T) {
 	t.Run("error when composer.lock is missing", func(t *testing.T) {
 		service := &CLI{logger: zap.NewNop(), fs: afero.NewMemMapFs()}
 		_, err := service.GetDependencyPatches(context.Background(), "/missing")
-		assert.ErrorContains(t, err, "failed to read composer.lock")
+		require.ErrorContains(t, err, "failed to read composer.lock")
 	})
 
 	t.Run("error when composer.lock is invalid JSON", func(t *testing.T) {
 		fs := afero.NewMemMapFs()
-		assert.NoError(t, afero.WriteFile(fs, "/bad/composer.lock", []byte("not-json"), 0644))
+		require.NoError(t, afero.WriteFile(fs, "/bad/composer.lock", []byte("not-json"), 0644))
 		service := &CLI{logger: zap.NewNop(), fs: fs}
 		_, err := service.GetDependencyPatches(context.Background(), "/bad")
-		assert.ErrorContains(t, err, "failed to unmarshal composer.lock")
+		require.ErrorContains(t, err, "failed to unmarshal composer.lock")
 	})
 
 	t.Run("returns empty map when no dependency declares patches", func(t *testing.T) {
 		fs := afero.NewMemMapFs()
-		assert.NoError(t, afero.WriteFile(fs, "/none/composer.lock", []byte(`{"packages":[{"name":"a/b"}]}`), 0644))
+		require.NoError(t, afero.WriteFile(fs, "/none/composer.lock", []byte(`{"packages":[{"name":"a/b"}]}`), 0644))
 		service := &CLI{logger: zap.NewNop(), fs: fs}
 		patches, err := service.GetDependencyPatches(context.Background(), "/none")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Empty(t, patches)
 	})
 }

@@ -52,7 +52,7 @@ type Repository interface {
 }
 
 type DrupalOrg interface {
-	GetIssue(issueID string) (*drupalorg.Issue, error)
+	GetIssue(ctx context.Context, issueID string) (*drupalorg.Issue, error)
 	FindIssueNumber(text string) (string, bool)
 }
 

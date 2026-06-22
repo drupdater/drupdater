@@ -267,7 +267,7 @@ func (h *ComposerPatches1) processSinglePatch(ctx context.Context, path string, 
 	var issue *drupalorg.Issue
 	if issueNumberExists {
 		var err error
-		issue, err = h.drupalOrg.GetIssue(issueNumber)
+		issue, err = h.drupalOrg.GetIssue(ctx, issueNumber)
 		if err != nil {
 			h.logger.Error("failed to get issue", zap.String("issue", issueNumber), zap.Error(err))
 			return
@@ -333,7 +333,7 @@ func (h *ComposerPatches1) processSinglePatch(ctx context.Context, path string, 
 	}
 	h.logger.Debug("fetched fork project", zap.Any("project", forkProject))
 
-	mergeRequests, err := h.fetchForkMergeRequests(issue.Project.MaschineName, int64(forkProject.ID))
+	mergeRequests, err := h.fetchForkMergeRequests(issue.Project.MaschineName, forkProject.ID)
 	if err != nil {
 		return
 	}

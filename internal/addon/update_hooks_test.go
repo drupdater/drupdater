@@ -10,6 +10,7 @@ import (
 	"github.com/drupdater/drupdater/pkg/drush"
 	"github.com/gookit/event"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
 
@@ -44,7 +45,7 @@ func TestUpdateHooks_SubscribedEvents(t *testing.T) {
 func TestUpdateHooks_RenderTemplate(t *testing.T) {
 	// Setup
 	fixture, err := os.ReadFile("testdata/update_hooks.md")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	expected := string(fixture)
 
 	logger := zap.NewNop()
@@ -65,7 +66,7 @@ func TestUpdateHooks_RenderTemplate(t *testing.T) {
 	result, err := ap.RenderTemplate()
 
 	// Assert
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, expected, result)
 }
 
@@ -82,8 +83,8 @@ func TestUpdateHooks_RenderTemplate_Empty(t *testing.T) {
 	result, err := ap.RenderTemplate()
 
 	// Assert
-	assert.NoError(t, err)
-	assert.Equal(t, "", result)
+	require.NoError(t, err)
+	assert.Empty(t, result)
 }
 
 func TestUpdateHooks_PreSiteUpdateHandler_Success(t *testing.T) {
@@ -111,7 +112,7 @@ func TestUpdateHooks_PreSiteUpdateHandler_Success(t *testing.T) {
 	err := updateHooks.preSiteUpdateHandler(mockEvent)
 
 	// Assert
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Contains(t, updateHooks.hooks, testSite)
 	assert.Equal(t, mockHooks, updateHooks.hooks[testSite])
 }
@@ -136,7 +137,7 @@ func TestUpdateHooks_PreSiteUpdateHandler_NoHooks(t *testing.T) {
 	err := updateHooks.preSiteUpdateHandler(mockEvent)
 
 	// Assert
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotContains(t, updateHooks.hooks, testSite)
 }
 
@@ -160,6 +161,6 @@ func TestUpdateHooks_PreSiteUpdateHandler_Error(t *testing.T) {
 	err := updateHooks.preSiteUpdateHandler(mockEvent)
 
 	// Assert
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to get update hooks")
 }

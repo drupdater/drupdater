@@ -1,12 +1,14 @@
 package drupalorg
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
 )
@@ -31,8 +33,8 @@ func TestGetIssue_Timeout(t *testing.T) {
 		client:           &http.Client{Timeout: 10 * time.Millisecond},
 	}
 
-	issue, err := service.GetIssue("12345")
-	assert.Error(t, err)
+	issue, err := service.GetIssue(context.Background(), "12345")
+	require.Error(t, err)
 	assert.Nil(t, issue)
 }
 
@@ -62,10 +64,10 @@ func TestGetIssue(t *testing.T) {
 
 	// Call GetIssue method
 	issueID := "12345"
-	issue, err := service.GetIssue(issueID)
+	issue, err := service.GetIssue(context.Background(), issueID)
 
 	// Assertions
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, issue)
 	assert.Equal(t, "12345", issue.ID)
 	assert.Equal(t, "Test Issue", issue.Title)
@@ -90,10 +92,10 @@ func TestGetIssue_Failure(t *testing.T) {
 
 	// Call GetIssue method
 	issueID := "12345"
-	issue, err := service.GetIssue(issueID)
+	issue, err := service.GetIssue(context.Background(), issueID)
 
 	// Assertions
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, issue)
 }
 
