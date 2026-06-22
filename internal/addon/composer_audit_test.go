@@ -10,6 +10,7 @@ import (
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/gookit/event"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
 
@@ -89,7 +90,7 @@ func TestComposerAudit_PreComposerUpdateHandler_WithAdvisories(t *testing.T) {
 	err := audit.preComposerUpdateHandler(mockEvent)
 
 	// Assert
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, mockAudit, audit.beforeAudit)
 	assert.Equal(t, []string{"drupal/core", "other/package", "drupal/core-recommended", "drupal/core-composer-scaffold"}, mockEvent.PackagesToUpdate)
 	assert.True(t, mockEvent.MinimalChanges)
@@ -119,7 +120,7 @@ func TestComposerAudit_PreComposerUpdateHandler_NoAdvisories(t *testing.T) {
 	err := audit.preComposerUpdateHandler(mockEvent)
 
 	// Assert
-	assert.ErrorAs(t, err, &services.AbortError{})
+	require.ErrorAs(t, err, &services.AbortError{})
 	assert.Equal(t, "No security advisories found", err.Error())
 	assert.Equal(t, mockAudit, audit.beforeAudit)
 	assert.Empty(t, mockEvent.PackagesToUpdate)
@@ -154,7 +155,7 @@ func TestComposerAudit_PostCodeUpdateHandler(t *testing.T) {
 	err := audit.postCodeUpdateHandler(mockEvent)
 
 	// Assert
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, mockAudit, audit.afterAudit)
 }
 
@@ -212,7 +213,7 @@ func TestComposerAudit_PreMergeRequestCreateHandler(t *testing.T) {
 	err := audit.preMergeRequestCreateHandler(mockEvent)
 
 	// Assert
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "2023-05-15: Drupal Security Updates", mockEvent.Title)
 }
 
@@ -248,11 +249,11 @@ func TestComposerAudit_RenderTemplate(t *testing.T) {
 	}
 
 	fixture, err := os.ReadFile("testdata/composer_audit.md")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	expected := string(fixture)
 
 	result, err := audit.RenderTemplate()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, expected, result)
 }
 
@@ -267,7 +268,7 @@ func TestComposerAudit_RenderTemplate_EscapesPipes(t *testing.T) {
 	}
 
 	result, err := audit.RenderTemplate()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Contains(t, result, "XSS via a\\|b second line")
 	assert.NotContains(t, result, "a|b")
 }

@@ -15,6 +15,7 @@ import (
 	"github.com/gookit/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
 
@@ -30,8 +31,8 @@ func TestCodeBeautifier_SubscribedEvents(t *testing.T) {
 func TestCodeBeautifier_RenderTemplate(t *testing.T) {
 	cb := &CodeBeautifier{}
 	result, err := cb.RenderTemplate()
-	assert.NoError(t, err)
-	assert.Equal(t, "", result)
+	require.NoError(t, err)
+	assert.Empty(t, result)
 }
 
 func TestCreatePHPCSConfig(t *testing.T) {
@@ -45,7 +46,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 
 		// Use a path that cannot be written to (root-owned directory)
 		_, err := cb.CreatePHPCSConfig(context.Background(), "/proc/nonexistent", worktree)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to create phpcs.xml")
 	})
 
@@ -61,7 +62,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 		cb := NewCodeBeautifier(logger, nil, internal.Config{}, composer)
 
 		created, err := cb.CreatePHPCSConfig(context.Background(), tmpDir, worktree)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.False(t, created)
 	})
 
@@ -79,7 +80,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 		cb := NewCodeBeautifier(logger, nil, internal.Config{}, composer)
 
 		created, err := cb.CreatePHPCSConfig(context.Background(), tmpDir, worktree)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.True(t, created)
 	})
 
@@ -96,7 +97,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 		cb := NewCodeBeautifier(logger, nil, internal.Config{}, composer)
 
 		_, err := cb.CreatePHPCSConfig(context.Background(), tmpDir, worktree)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to parse phpcs template")
 	})
 
@@ -121,7 +122,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 		cb := NewCodeBeautifier(logger, nil, internal.Config{}, composer)
 
 		_, err := cb.CreatePHPCSConfig(context.Background(), tmpDir, worktree)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to execute phpcs template")
 	})
 
@@ -137,7 +138,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 		cb := NewCodeBeautifier(logger, nil, internal.Config{}, composer)
 
 		_, err := cb.CreatePHPCSConfig(context.Background(), tmpDir, worktree)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Equal(t, assert.AnError, err)
 	})
 
@@ -154,7 +155,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 		cb := NewCodeBeautifier(logger, nil, internal.Config{}, composer)
 
 		_, err := cb.CreatePHPCSConfig(context.Background(), tmpDir, worktree)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to add file to commit")
 	})
 
@@ -172,7 +173,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 		cb := NewCodeBeautifier(logger, nil, internal.Config{}, composer)
 
 		_, err := cb.CreatePHPCSConfig(context.Background(), tmpDir, worktree)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Equal(t, assert.AnError, err)
 	})
 }
@@ -180,7 +181,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 func TestHasPHPCSPathDefinitions(t *testing.T) {
 	t.Run("returns false when neither file exists", func(t *testing.T) {
 		result, err := hasPHPCSPathDefinitions("/nonexistent/path")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.False(t, result)
 	})
 
@@ -191,10 +192,10 @@ func TestHasPHPCSPathDefinitions(t *testing.T) {
     <file>web/modules/custom</file>
 </ruleset>`
 		err := os.WriteFile(filepath.Join(tmpDir, "phpcs.xml"), []byte(content), 0600)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		result, err := hasPHPCSPathDefinitions(tmpDir)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.True(t, result)
 	})
 
@@ -205,10 +206,10 @@ func TestHasPHPCSPathDefinitions(t *testing.T) {
     <rule ref="Drupal"/>
 </ruleset>`
 		err := os.WriteFile(filepath.Join(tmpDir, "phpcs.xml"), []byte(content), 0600)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		result, err := hasPHPCSPathDefinitions(tmpDir)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.False(t, result)
 	})
 
@@ -219,20 +220,20 @@ func TestHasPHPCSPathDefinitions(t *testing.T) {
     <file>web/themes/custom</file>
 </ruleset>`
 		err := os.WriteFile(filepath.Join(tmpDir, "phpcs.xml.dist"), []byte(content), 0600)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		result, err := hasPHPCSPathDefinitions(tmpDir)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.True(t, result)
 	})
 
 	t.Run("returns error when phpcs.xml is not valid XML", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		err := os.WriteFile(filepath.Join(tmpDir, "phpcs.xml"), []byte("not valid xml"), 0600)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		result, err := hasPHPCSPathDefinitions(tmpDir)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to parse phpcs config")
 		assert.False(t, result)
 	})
@@ -241,10 +242,10 @@ func TestHasPHPCSPathDefinitions(t *testing.T) {
 		tmpDir := t.TempDir()
 		// Create phpcs.xml as a directory so Stat succeeds but ReadFile fails
 		err := os.MkdirAll(filepath.Join(tmpDir, "phpcs.xml"), 0755)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		result, err := hasPHPCSPathDefinitions(tmpDir)
-		assert.Error(t, err)
+		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to read phpcs config")
 		assert.False(t, result)
 	})
@@ -256,10 +257,10 @@ func TestHasPHPCSPathDefinitions(t *testing.T) {
     <rule ref="Drupal"/>
 </ruleset>`
 		err := os.WriteFile(filepath.Join(tmpDir, "phpcs.xml.dist"), []byte(content), 0600)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		result, err := hasPHPCSPathDefinitions(tmpDir)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.False(t, result)
 	})
 }
@@ -287,7 +288,7 @@ func TestCodingStyles(t *testing.T) {
 		postCodeUpdate := services.NewPostCodeUpdateEvent(t.Context(), "/tmp", worktree)
 
 		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		runner.AssertExpectations(t)
 		composer.AssertExpectations(t)
@@ -310,7 +311,7 @@ func TestCodingStyles(t *testing.T) {
 		postCodeUpdate := services.NewPostCodeUpdateEvent(t.Context(), "/tmp", worktree)
 
 		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 
 	t.Run("No config file found", func(t *testing.T) {
@@ -344,7 +345,7 @@ func TestCodingStyles(t *testing.T) {
 
 		// Execute and verify
 		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Verify all expectations were met
 		runner.AssertExpectations(t)
@@ -380,7 +381,7 @@ func TestCodingStyles(t *testing.T) {
 		updateCodingStyles := NewCodeBeautifier(logger, runner, internal.Config{}, composer)
 		postCodeUpdate := services.NewPostCodeUpdateEvent(t.Context(), "/tmp", worktree)
 		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		runner.AssertExpectations(t)
 		composer.AssertExpectations(t)
 	})
@@ -409,7 +410,7 @@ func TestCodingStyles(t *testing.T) {
 		updateCodingStyles := NewCodeBeautifier(logger, runner, internal.Config{}, composer)
 		postCodeUpdate := services.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", worktree)
 		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		runner.AssertExpectations(t)
 		composer.AssertExpectations(t)
 	})
@@ -460,7 +461,7 @@ func TestCodingStyles(t *testing.T) {
 		postCodeUpdate := services.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", worktree)
 		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
 
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		runner.AssertExpectations(t)
 		composer.AssertExpectations(t)
 	})
@@ -507,7 +508,7 @@ func TestCodingStyles(t *testing.T) {
 		postCodeUpdate := services.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", worktree)
 		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
 
-		assert.Error(t, err)
+		require.Error(t, err)
 		runner.AssertExpectations(t)
 		composer.AssertExpectations(t)
 	})

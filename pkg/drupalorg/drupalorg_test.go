@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
 )
@@ -33,7 +34,7 @@ func TestGetIssue_Timeout(t *testing.T) {
 	}
 
 	issue, err := service.GetIssue(context.Background(), "12345")
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, issue)
 }
 
@@ -66,7 +67,7 @@ func TestGetIssue(t *testing.T) {
 	issue, err := service.GetIssue(context.Background(), issueID)
 
 	// Assertions
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, issue)
 	assert.Equal(t, "12345", issue.ID)
 	assert.Equal(t, "Test Issue", issue.Title)
@@ -94,7 +95,7 @@ func TestGetIssue_Failure(t *testing.T) {
 	issue, err := service.GetIssue(context.Background(), issueID)
 
 	// Assertions
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, issue)
 }
 

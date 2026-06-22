@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
 
@@ -16,47 +17,47 @@ func TestPhpcsRun(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		data := `{"files":{},"totals":{"errors":2,"warnings":0,"fixable":1}}`
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", data}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
 			return cmd
 		}
 		defer func() { execCommand = exec.CommandContext }()
 
 		result, err := cli.Run(t.Context(), "/tmp")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, 2, result.Totals.Errors)
 		assert.Equal(t, 1, result.Totals.Fixable)
 	})
 
 	t.Run("invalid JSON", func(t *testing.T) {
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", "not-json"}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
 			return cmd
 		}
 		defer func() { execCommand = exec.CommandContext }()
 
 		_, err := cli.Run(t.Context(), "/tmp")
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 
 	t.Run("exec error", func(t *testing.T) {
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--"}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
 			return cmd
 		}
 		defer func() { execCommand = exec.CommandContext }()
 
 		_, err := cli.Run(t.Context(), "/tmp")
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 }
 
@@ -64,31 +65,31 @@ func TestPhpcsRunCBF(t *testing.T) {
 	cli := NewCLI(zap.NewNop())
 
 	t.Run("success", func(t *testing.T) {
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", "ok"}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
 			return cmd
 		}
 		defer func() { execCommand = exec.CommandContext }()
 
 		err := cli.RunCBF(t.Context(), "/tmp")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	})
 
 	t.Run("error", func(t *testing.T) {
-		execCommand = func(_ context.Context, _ string, arg ...string) *exec.Cmd {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--"}
 			cs = append(cs, arg...)
-			cmd := exec.Command(os.Args[0], cs...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
 			return cmd
 		}
 		defer func() { execCommand = exec.CommandContext }()
 
 		err := cli.RunCBF(t.Context(), "/tmp")
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 }
 

@@ -15,6 +15,7 @@ import (
 	"github.com/gookit/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	gitlab "gitlab.com/gitlab-org/api/client-go"
 	"go.uber.org/zap"
 )
@@ -32,8 +33,8 @@ func TestComposerPatches1_RenderTemplate_NoChanges(t *testing.T) {
 	logger := zap.NewNop()
 	h := &ComposerPatches1{logger: logger, patchUpdates: PatchUpdates{}}
 	result, err := h.RenderTemplate()
-	assert.NoError(t, err)
-	assert.Equal(t, "", result)
+	require.NoError(t, err)
+	assert.Empty(t, result)
 }
 
 func TestUpdatePatches(t *testing.T) {
@@ -800,7 +801,7 @@ func TestUpdatePatches(t *testing.T) {
 func TestComposer_Patches_1_RenderTemplate(t *testing.T) {
 	// Setup
 	fixture, err := os.ReadFile("testdata/composer_patches_1.md")
-	assert.NoError(t, err, "Failed to read test fixture")
+	require.NoError(t, err, "Failed to read test fixture")
 
 	expected := string(fixture)
 	logger := zap.NewNop()
@@ -847,7 +848,7 @@ func TestComposer_Patches_1_RenderTemplate(t *testing.T) {
 	result, err := ap.RenderTemplate()
 
 	// Verify
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, expected, result)
 }
 
@@ -866,10 +867,10 @@ func TestDownloadFile(t *testing.T) {
 		h := &ComposerPatches1{logger: logger, httpClient: server.Client()}
 
 		err := h.downloadFile(t.Context(), server.URL+"/patch.diff", dir, "patch.diff")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		data, err := os.ReadFile(dir + "/patch.diff")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, content, string(data))
 	})
 
@@ -883,14 +884,14 @@ func TestDownloadFile(t *testing.T) {
 		h := &ComposerPatches1{logger: logger, httpClient: server.Client()}
 
 		err := h.downloadFile(t.Context(), server.URL+"/patch.diff", dir, "patch.diff")
-		assert.ErrorContains(t, err, "status code 404")
+		require.ErrorContains(t, err, "status code 404")
 	})
 
 	t.Run("invalid url", func(t *testing.T) {
 		h := &ComposerPatches1{logger: logger, httpClient: http.DefaultClient}
 
 		err := h.downloadFile(t.Context(), "not-a-valid-url", t.TempDir(), "patch.diff")
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 
 	t.Run("mock http client", func(t *testing.T) {
@@ -905,10 +906,10 @@ func TestDownloadFile(t *testing.T) {
 		h := &ComposerPatches1{logger: logger, httpClient: mockClient}
 
 		err := h.downloadFile(t.Context(), "http://example.com/patch.diff", dir, "patch.diff")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		data, err := os.ReadFile(dir + "/patch.diff")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, content, string(data))
 	})
 }

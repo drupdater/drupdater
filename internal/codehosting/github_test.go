@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/go-github/v68/github"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGithub_GetOwner(t *testing.T) {
@@ -57,7 +58,7 @@ func TestGithub_CreateMergeRequest(t *testing.T) {
 	mr, err := gh.CreateMergeRequest(context.Background(), "Test MR", "This is a test MR", "source-branch", "target-branch")
 
 	// Assert
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, int64(1), mr.ID)
 	assert.Equal(t, "http://example.com", mr.URL)
 }
@@ -140,7 +141,7 @@ func TestGithub_CreateMergeRequest_HonorsContext(t *testing.T) {
 	cancel()
 
 	_, err := gh.CreateMergeRequest(ctx, "Test MR", "body", "source", "target")
-	assert.ErrorIs(t, err, context.Canceled)
+	require.ErrorIs(t, err, context.Canceled)
 }
 
 func TestGithub_GetUser_HonorsContext(t *testing.T) {
@@ -170,7 +171,7 @@ func TestGithub_DeleteBranch_Success(t *testing.T) {
 	gh := &Github{client: client, owner: "test_owner", repo: "test_project"}
 
 	err := gh.DeleteBranch(context.Background(), "update-abc123")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestGithub_DeleteBranch_Error(t *testing.T) {
@@ -184,7 +185,7 @@ func TestGithub_DeleteBranch_Error(t *testing.T) {
 	gh := &Github{client: client, owner: "o", repo: "r"}
 
 	err := gh.DeleteBranch(context.Background(), "nonexistent-branch")
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to delete branch")
 }
 
@@ -196,7 +197,7 @@ func TestGithub_DeleteBranch_HonorsContext(t *testing.T) {
 	cancel()
 
 	err := gh.DeleteBranch(ctx, "some-branch")
-	assert.ErrorIs(t, err, context.Canceled)
+	require.ErrorIs(t, err, context.Canceled)
 }
 
 func TestIsGitHubActionsToken403_ReturnsFalseForNonGitHubError(t *testing.T) {

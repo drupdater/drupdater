@@ -426,7 +426,7 @@ func (s *CLI) CheckIfPatchApplies(ctx context.Context, packageName string, packa
 
 	// Run composer require in the temporary directory
 	if _, err := s.Require(ctx, s.tempDir, packageName+":"+packageVersion, "--with-all-dependencies", "--quiet"); err != nil {
-		return false, nil
+		return false, nil //nolint:nilerr // composer failure means the patch does not apply, not an error
 	}
 
 	return true, nil
@@ -455,7 +455,7 @@ func (s *CLI) CheckIfPatchesApply(ctx context.Context, packageName string, packa
 	}
 
 	if _, err := s.Require(ctx, s.tempDir, packageName+":"+packageVersion, "--with-all-dependencies", "--quiet"); err != nil {
-		return false, nil
+		return false, nil //nolint:nilerr // composer failure means the patches do not apply, not an error
 	}
 	return true, nil
 }
@@ -483,7 +483,7 @@ func (s *CLI) GetInstalledPlugins(ctx context.Context, dir string) (map[string]a
 func (s *CLI) IsPackageInstalled(ctx context.Context, dir string, packageToCheck string) (bool, error) {
 	_, err := s.execComposer(ctx, dir, "show", "--locked", "--quiet", packageToCheck)
 	if err != nil {
-		return false, nil
+		return false, nil //nolint:nilerr // composer show failure means the package is not installed, not an error
 	}
 	return true, nil
 }

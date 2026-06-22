@@ -14,6 +14,7 @@ import (
 	"github.com/gookit/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
 
@@ -57,7 +58,7 @@ func TestStartUpdate(t *testing.T) {
 	repository.EXPECT().Push(mock.Anything).Return(nil)
 
 	fixture, err := os.ReadFile("testdata/dependency_update.md")
-	assert.NoError(t, err, "Failed to read test fixture")
+	require.NoError(t, err, "Failed to read test fixture")
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
 	vcsProvider.EXPECT().CreateMergeRequest(mock.Anything, mock.Anything, string(fixture), mock.Anything, config.Branch).Return(codehosting.MergeRequest{}, nil)
@@ -77,7 +78,7 @@ func TestStartUpdate(t *testing.T) {
 	err = workflowService.StartUpdate(ctx, nil)
 
 	// Assert
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	installer.AssertExpectations(t)
 	repositoryService.AssertExpectations(t)
 	repository.AssertExpectations(t)
@@ -128,7 +129,7 @@ func TestStartUpdatePublishUsesLiveContext(t *testing.T) {
 	repository.EXPECT().Push(mock.Anything).Return(nil)
 
 	fixture, err := os.ReadFile("testdata/dependency_update.md")
-	assert.NoError(t, err, "Failed to read test fixture")
+	require.NoError(t, err, "Failed to read test fixture")
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
 
@@ -148,8 +149,8 @@ func TestStartUpdatePublishUsesLiveContext(t *testing.T) {
 	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
 	err = workflowService.StartUpdate(ctx, nil)
 
-	assert.NoError(t, err)
-	assert.NoError(t, publishCtxErr, "publishWork must receive a live (non-cancelled) context")
+	require.NoError(t, err)
+	require.NoError(t, publishCtxErr, "publishWork must receive a live (non-cancelled) context")
 	vcsProvider.AssertExpectations(t)
 }
 
@@ -204,7 +205,7 @@ func TestStartUpdateSiteFailureDoesNotPublish(t *testing.T) {
 	err := workflowService.StartUpdate(ctx, nil)
 
 	// Assert: the error surfaces and no MR was published.
-	assert.ErrorIs(t, err, updateErr)
+	require.ErrorIs(t, err, updateErr)
 	repository.AssertNotCalled(t, "Push", mock.Anything)
 	vcsProvider.AssertNotCalled(t, "CreateMergeRequest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
@@ -251,7 +252,7 @@ func TestStartUpdateTimeout(t *testing.T) {
 	err := workflowService.StartUpdate(ctx, nil)
 
 	// Assert: the deadline propagates and nothing is published.
-	assert.ErrorIs(t, err, context.DeadlineExceeded)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
 	repository.AssertNotCalled(t, "Push", mock.Anything)
 	vcsProvider.AssertNotCalled(t, "CreateMergeRequest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
@@ -292,7 +293,7 @@ func TestStartUpdatePlatformReqsFail(t *testing.T) {
 	err := workflowService.StartUpdate(ctx, nil)
 
 	// Assert: aborts with a clear message and never updates or publishes.
-	assert.ErrorContains(t, err, "PHP platform requirements not satisfied")
+	require.ErrorContains(t, err, "PHP platform requirements not satisfied")
 	mockComposer.AssertNotCalled(t, "Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 	repository.AssertNotCalled(t, "Push", mock.Anything)
 	vcsProvider.AssertNotCalled(t, "CreateMergeRequest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -345,7 +346,7 @@ func TestStartUpdateNoChanges(t *testing.T) {
 
 	// Assert: should get an AbortError, not a nil or other error
 	var abortErr AbortError
-	assert.ErrorAs(t, err, &abortErr)
+	require.ErrorAs(t, err, &abortErr)
 	installer.AssertExpectations(t)
 	repositoryService.AssertExpectations(t)
 	repository.AssertExpectations(t)
@@ -406,7 +407,7 @@ func TestStartUpdateBranchAlreadyExists(t *testing.T) {
 
 	// Assert: should get an AbortError, not a nil or other error
 	var abortErr AbortError
-	assert.ErrorAs(t, err, &abortErr)
+	require.ErrorAs(t, err, &abortErr)
 	assert.Contains(t, err.Error(), "already exists")
 	repositoryService.AssertExpectations(t)
 }
@@ -465,7 +466,7 @@ func TestStartUpdateWithDryRun(t *testing.T) {
 	err := workflowService.StartUpdate(ctx, nil)
 
 	// Assert
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	installer.AssertExpectations(t)
 	repositoryService.AssertExpectations(t)
 	repository.AssertExpectations(t)
@@ -528,7 +529,7 @@ func TestPublishWorkDeletesBranchOnMRFailure(t *testing.T) {
 	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
 	err := workflowService.StartUpdate(ctx, nil)
 
-	assert.ErrorIs(t, err, mrErr)
+	require.ErrorIs(t, err, mrErr)
 	vcsProvider.AssertExpectations(t)
 }
 
@@ -588,8 +589,8 @@ func TestPublishWorkLogsWarningWhenDeleteBranchFails(t *testing.T) {
 	err := workflowService.StartUpdate(ctx, nil)
 
 	// The original MR error surfaces; the delete error is only logged.
-	assert.ErrorIs(t, err, mrErr)
-	assert.NotErrorIs(t, err, deleteErr)
+	require.ErrorIs(t, err, mrErr)
+	require.NotErrorIs(t, err, deleteErr)
 	vcsProvider.AssertExpectations(t)
 }
 
@@ -643,7 +644,7 @@ func TestPublishWorkPushFails(t *testing.T) {
 	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
 	err := workflowService.StartUpdate(ctx, nil)
 
-	assert.ErrorIs(t, err, pushErr)
+	require.ErrorIs(t, err, pushErr)
 	vcsProvider.AssertNotCalled(t, "CreateMergeRequest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
 
@@ -687,7 +688,7 @@ func TestStartUpdateGetLockHashError(t *testing.T) {
 	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
 	err := workflowService.StartUpdate(ctx, nil)
 
-	assert.ErrorIs(t, err, hashErr)
+	require.ErrorIs(t, err, hashErr)
 	repository.AssertNotCalled(t, "Push", mock.Anything)
 }
 
@@ -732,8 +733,8 @@ func TestStartUpdateBranchExistsError(t *testing.T) {
 	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
 	err := workflowService.StartUpdate(ctx, nil)
 
-	assert.ErrorContains(t, err, "failed to check if branch exists")
-	assert.ErrorIs(t, err, branchErr)
+	require.ErrorContains(t, err, "failed to check if branch exists")
+	require.ErrorIs(t, err, branchErr)
 }
 
 func TestStartUpdateConfigResaveError(t *testing.T) {
@@ -781,7 +782,7 @@ func TestStartUpdateConfigResaveError(t *testing.T) {
 	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
 	err := workflowService.StartUpdate(ctx, nil)
 
-	assert.ErrorIs(t, err, resaveErr)
+	require.ErrorIs(t, err, resaveErr)
 	repository.AssertNotCalled(t, "Push", mock.Anything)
 }
 
@@ -831,7 +832,7 @@ func TestStartUpdateExportConfigurationError(t *testing.T) {
 	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
 	err := workflowService.StartUpdate(ctx, nil)
 
-	assert.ErrorIs(t, err, exportErr)
+	require.ErrorIs(t, err, exportErr)
 	repository.AssertNotCalled(t, "Push", mock.Anything)
 }
 
@@ -840,7 +841,7 @@ func TestGenerateDescription_UnknownTemplate(t *testing.T) {
 	ws := NewWorkflowBaseService(logger, internal.Config{}, nil, nil, nil, nil, nil, nil)
 
 	_, err := ws.GenerateDescription(nil, "nonexistent.go.tmpl")
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to execute template")
 }
 
@@ -890,8 +891,8 @@ func TestStartUpdateFireEventError(t *testing.T) {
 	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, dispatcher)
 	err := workflowService.StartUpdate(ctx, nil)
 
-	assert.ErrorContains(t, err, "failed to fire event")
-	assert.ErrorContains(t, err, "event bus unavailable")
+	require.ErrorContains(t, err, "failed to fire event")
+	require.ErrorContains(t, err, "event bus unavailable")
 }
 
 func TestStartUpdateUsesExistingCheckout(t *testing.T) {
@@ -934,7 +935,7 @@ func TestStartUpdateUsesExistingCheckout(t *testing.T) {
 	repository.EXPECT().Push(mock.Anything).Return(nil)
 
 	fixture, err := os.ReadFile("testdata/dependency_update.md")
-	assert.NoError(t, err, "Failed to read test fixture")
+	require.NoError(t, err, "Failed to read test fixture")
 	vcsProvider.EXPECT().CreateMergeRequest(mock.Anything, mock.Anything, string(fixture), mock.Anything, config.Branch).Return(codehosting.MergeRequest{}, nil)
 
 	mockComposer.EXPECT().Update(mock.Anything, checkout, mock.Anything, mock.Anything, false, false).Return([]composer.PackageChange{
@@ -946,7 +947,7 @@ func TestStartUpdateUsesExistingCheckout(t *testing.T) {
 	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
 	err = workflowService.StartUpdate(ctx, nil)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	repositoryService.AssertExpectations(t)
 	repositoryService.AssertNotCalled(t, "CloneRepository", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
