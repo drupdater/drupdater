@@ -34,7 +34,7 @@ func TestRectorRun(t *testing.T) {
 		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", data}
 			cs = append(cs, arg...)
-			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...) //nolint:gosec // test helper process
 			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
 			return cmd
 		}
@@ -51,7 +51,7 @@ func TestRectorRun(t *testing.T) {
 		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--"}
 			cs = append(cs, arg...)
-			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...) //nolint:gosec // test helper process
 			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
 			return cmd
 		}
@@ -66,7 +66,7 @@ func TestRectorRun(t *testing.T) {
 		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", "not-json"}
 			cs = append(cs, arg...)
-			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...) //nolint:gosec // test helper process
 			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
 			return cmd
 		}

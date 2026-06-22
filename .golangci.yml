@@ -6,6 +6,14 @@ linters:
     - noctx
     - nilerr
     - testifylint
+    - staticcheck
+    - govet
+    - errcheck
+    - gosec
+    - gocyclo
+    - misspell
+    - unconvert
+    - unparam
   exclusions:
     generated: lax
     presets:
@@ -13,6 +21,10 @@ linters:
       - common-false-positives
       - legacy
       - std-error-handling
+    rules:
+      - linters: [gosec]
+        path: _test\.go
+        text: "G204|G702"
     paths:
       - third_party$
       - builtin$

@@ -3,9 +3,9 @@ package services
 import (
 	"bytes"
 	"context"
-	"crypto/md5"
 	"embed"
 	"fmt"
+	"hash/fnv"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -155,7 +155,9 @@ func (ws *WorkflowBaseService) forEachSite(ctx context.Context, fn func(context.
 // in checkout mode it's the SQLite databases and private files written beside the checkout.
 func (ws *WorkflowBaseService) cleanup(path string) {
 	if ws.config.Clone {
-		tmpDirName := filepath.Join(os.TempDir(), fmt.Sprintf("%x", md5.Sum([]byte(ws.config.RepositoryURL))))
+		h := fnv.New64a()
+		_, _ = h.Write([]byte(ws.config.RepositoryURL))
+		tmpDirName := filepath.Join(os.TempDir(), fmt.Sprintf("%x", h.Sum64()))
 		os.RemoveAll(tmpDirName)
 		return
 	}

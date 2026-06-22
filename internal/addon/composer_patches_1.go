@@ -333,7 +333,7 @@ func (h *ComposerPatches1) processSinglePatch(ctx context.Context, path string, 
 	}
 	h.logger.Debug("fetched fork project", zap.Any("project", forkProject))
 
-	mergeRequests, err := h.fetchForkMergeRequests(issue.Project.MaschineName, int64(forkProject.ID))
+	mergeRequests, err := h.fetchForkMergeRequests(issue.Project.MaschineName, forkProject.ID)
 	if err != nil {
 		return
 	}
