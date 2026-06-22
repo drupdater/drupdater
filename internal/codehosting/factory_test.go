@@ -27,6 +27,12 @@ func TestDefaultVcsProviderFactory_Create(t *testing.T) {
 			expectedType:  &Github{},
 		},
 		{
+			name:          "returns bitbucket platform for bitbucket URLs",
+			repositoryURL: "https://bitbucket.org/some/repo",
+			token:         "dummy-token",
+			expectedType:  &Bitbucket{},
+		},
+		{
 			name:          "defaults to gitlab platform for unknown providers",
 			repositoryURL: "https://gitfoo.com/some/repo",
 			token:         "dummy-token",

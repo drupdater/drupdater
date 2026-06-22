@@ -37,6 +37,8 @@ func (vpf *DefaultVcsProviderFactory) Create(repositoryURL string, token string)
 	switch vpf.getProvider(repositoryURL) {
 	case "github":
 		return newGithub(repositoryURL, token)
+	case "bitbucket":
+		return newBitbucket(repositoryURL, token)
 	default:
 		return newGitlab(repositoryURL, token)
 	}
@@ -49,6 +51,9 @@ func (vpf *DefaultVcsProviderFactory) getProvider(repositoryURL string) string {
 	}
 	if strings.Contains(repositoryURL, "github") {
 		return "github"
+	}
+	if strings.Contains(repositoryURL, "bitbucket") {
+		return "bitbucket"
 	}
 	return ""
 }
