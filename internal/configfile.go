@@ -19,11 +19,22 @@ var defaultNormalAddons = []string{
 	"composer_normalizer",
 }
 
-// fileConfig mirrors the YAML-settable keys of .drupdater.yaml. Timeout is a string because
-// yaml.v3 cannot decode a duration like "30m" into a time.Duration.
+// flexTimeout captures the raw scalar of the `timeout` key so both a quoted duration
+// ("30m") and a bare number (0, which YAML decodes as an int) are accepted; the value is
+// parsed as a Go duration later. Without this, `timeout: 0` — the documented way to disable
+// the timeout — would fail to decode into a string field.
+type flexTimeout string
+
+func (t *flexTimeout) UnmarshalYAML(node *yaml.Node) error {
+	*t = flexTimeout(node.Value)
+	return nil
+}
+
+// fileConfig mirrors the YAML-settable keys of .drupdater.yaml. Timeout is captured as a raw
+// scalar because yaml.v3 cannot decode a duration like "30m" into a time.Duration.
 type fileConfig struct {
 	Sites   []string     `yaml:"sites"`
-	Timeout string       `yaml:"timeout"`
+	Timeout flexTimeout  `yaml:"timeout"`
 	Addons  AddonsConfig `yaml:"addons"`
 }
 
@@ -68,9 +79,9 @@ func LoadConfigFile(path string, c *Config) (found bool, err error) {
 }
 
 func applyFileConfig(fc fileConfig, c *Config) error {
-	timeout, err := time.ParseDuration(fc.Timeout)
+	timeout, err := time.ParseDuration(string(fc.Timeout))
 	if err != nil {
-		return fmt.Errorf("invalid timeout %q (use a Go duration like \"30m\" or \"2h\"): %w", fc.Timeout, err)
+		return fmt.Errorf("invalid timeout %q (use a Go duration like \"30m\" or \"2h\", or 0 to disable): %w", string(fc.Timeout), err)
 	}
 	c.Sites = fc.Sites
 	c.Timeout = timeout

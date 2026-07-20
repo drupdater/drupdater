@@ -9,11 +9,19 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	gitlab "gitlab.com/gitlab-org/api/client-go"
+	"go.uber.org/zap"
 )
+
+func newTestGitlab(t *testing.T) *Gitlab {
+	t.Helper()
+	g, err := newGitlab("gitlab.com", "user/repo", "dummy-token", zap.NewNop())
+	require.NoError(t, err)
+	return g
+}
 
 func TestGitlab_CreateMergeRequest(t *testing.T) {
 
-	gitlab := newGitlab("https://gitlab.com/user/repo", "dummy-token")
+	gitlab := newTestGitlab(t)
 
 	title := "Test MR"
 	sourceBranch := "feature-branch"
@@ -29,27 +37,13 @@ func TestGitlab_CreateMergeRequest(t *testing.T) {
 }
 
 func TestGitlab_getBaseUrl(t *testing.T) {
-
-	tt := []string{"https://gitlab.com/user/repo", "https://gitlab.com/user/repo.git", "https://gitlab.com/user/repo/", "https://gitlab.com/group/user/repo.git"}
-
-	for _, url := range tt {
-		gitlab := newGitlab(url, "dummy-token")
-
-		assert.Equal(t, "gitlab.com", gitlab.client.BaseURL().Host)
-	}
+	g := newTestGitlab(t)
+	assert.Equal(t, "gitlab.com", g.client.BaseURL().Host)
 }
 
-func TestGitlab_getProjectPath(t *testing.T) {
-
-	tt := []string{"https://gitlab.com/user/repo", "https://gitlab.com/user/repo.git", "https://gitlab.com/user/repo/"}
-
-	for _, url := range tt {
-
-		gitlab := newGitlab(url, "dummy-token")
-
-		expectedProjectPath := "user/repo"
-		assert.Equal(t, expectedProjectPath, gitlab.projectPath)
-	}
+func TestNewGitlab_MissingHost(t *testing.T) {
+	_, err := newGitlab("", "user/repo", "dummy-token", zap.NewNop())
+	require.Error(t, err)
 }
 
 func TestCreateMergeRequest(t *testing.T) {
@@ -85,7 +79,7 @@ func TestCreateMergeRequest(t *testing.T) {
 
 func TestGitlab_CreateMergeRequest_HonorsContext(t *testing.T) {
 	// A cancelled context must abort before the request is sent.
-	g := newGitlab("https://gitlab.com/user/repo", "dummy-token")
+	g := newTestGitlab(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -127,7 +121,7 @@ func TestGitlab_DeleteBranch_Error(t *testing.T) {
 }
 
 func TestGitlab_DeleteBranch_HonorsContext(t *testing.T) {
-	g := newGitlab("https://gitlab.com/user/repo", "dummy-token")
+	g := newTestGitlab(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -137,7 +131,7 @@ func TestGitlab_DeleteBranch_HonorsContext(t *testing.T) {
 }
 
 func TestGitlab_GetUser_HonorsContext(t *testing.T) {
-	g := newGitlab("https://gitlab.com/user/repo", "dummy-token")
+	g := newTestGitlab(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()

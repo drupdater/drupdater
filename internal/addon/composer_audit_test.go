@@ -159,6 +159,29 @@ func TestComposerAudit_PostCodeUpdateHandler(t *testing.T) {
 	assert.Equal(t, mockAudit, audit.afterAudit)
 }
 
+func TestAdvisoryKey(t *testing.T) {
+	// CVE takes precedence; without it the advisory ID is used; without either, package+title.
+	assert.Equal(t, "cve:CVE-1", advisoryKey(composer.Advisory{CVE: "CVE-1", AdvisoryID: "A1"}))
+	assert.Equal(t, "id:A1", advisoryKey(composer.Advisory{AdvisoryID: "A1", PackageName: "drupal/foo"}))
+	assert.Equal(t, "pkg:drupal/foo|Title", advisoryKey(composer.Advisory{PackageName: "drupal/foo", Title: "Title"}))
+}
+
+func TestComposerAudit_GetFixedAdvisories_NoCVEAdvisoriesDoNotCollide(t *testing.T) {
+	// Two advisories without a CVE must be treated as distinct: one fixed, one remaining.
+	audit := &ComposerAudit{logger: zap.NewNop()}
+	audit.beforeAudit = composer.Audit{Advisories: []composer.Advisory{
+		{AdvisoryID: "A1", PackageName: "drupal/foo", Title: "foo"},
+		{AdvisoryID: "A2", PackageName: "drupal/bar", Title: "bar"},
+	}}
+	audit.afterAudit = composer.Audit{Advisories: []composer.Advisory{
+		{AdvisoryID: "A2", PackageName: "drupal/bar", Title: "bar"},
+	}}
+
+	fixed := audit.GetFixedAdvisories()
+	require.Len(t, fixed, 1)
+	assert.Equal(t, "A1", fixed[0].AdvisoryID)
+}
+
 // TestComposerAudit_GetFixedAdvisories tests the method that compares before/after advisories
 func TestComposerAudit_GetFixedAdvisories(t *testing.T) {
 	// Setup

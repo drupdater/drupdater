@@ -3,37 +3,34 @@ package codehosting
 import (
 	"context"
 	"fmt"
-	"net/url"
-	"strings"
 
 	gitlab "gitlab.com/gitlab-org/api/client-go"
+	"go.uber.org/zap"
 )
 
 // Gitlab implements the Platform interface for GitLab repositories.
 type Gitlab struct {
 	client      *gitlab.Client
 	projectPath string
+	logger      *zap.Logger
 }
 
-// newGitlab creates a new GitLab client based on repository URL and token.
-func newGitlab(repositoryURL string, token string) *Gitlab {
-	u, err := url.Parse(repositoryURL)
-	if err != nil {
-		return &Gitlab{}
+// newGitlab creates a new GitLab client for the given host and "group/project" path.
+func newGitlab(host string, path string, token string, logger *zap.Logger) (*Gitlab, error) {
+	if host == "" {
+		return nil, fmt.Errorf("could not determine GitLab host from repository URL")
 	}
 
-	baseURL := fmt.Sprintf("%s://%s", u.Scheme, u.Host)
-
-	gitlabClient, err := gitlab.NewClient(token, gitlab.WithBaseURL(baseURL))
+	gitlabClient, err := gitlab.NewClient(token, gitlab.WithBaseURL("https://"+host))
 	if err != nil {
-		fmt.Printf("Error creating GitLab client: %v\n", err)
-		return &Gitlab{}
+		return nil, fmt.Errorf("failed to create GitLab client: %w", err)
 	}
 
 	return &Gitlab{
 		client:      gitlabClient,
-		projectPath: strings.TrimSuffix(strings.Trim(u.Path, "/"), ".git"),
-	}
+		projectPath: path,
+		logger:      logger,
+	}, nil
 }
 
 // CreateMergeRequest creates a merge request on GitLab.
@@ -67,7 +64,9 @@ func (g *Gitlab) DeleteBranch(ctx context.Context, branch string) error {
 func (g *Gitlab) GetUser(ctx context.Context) (name string, email string) {
 	user, _, err := g.client.Users.CurrentUser(gitlab.WithContext(ctx))
 	if err != nil {
-		fmt.Printf("Error getting GitLab user: %v\n", err)
+		if g.logger != nil {
+			g.logger.Error("failed to get GitLab user", zap.Error(err))
+		}
 		return "", ""
 	}
 

@@ -49,6 +49,13 @@ func TestLoadConfigFile(t *testing.T) {
 		assert.Equal(t, 90*time.Second, c.Timeout)
 	})
 
+	t.Run("timeout 0 disables the timeout", func(t *testing.T) {
+		var c Config
+		_, err := LoadConfigFile(writeConfig(t, "timeout: 0\n"), &c)
+		require.NoError(t, err)
+		assert.Equal(t, time.Duration(0), c.Timeout)
+	})
+
 	t.Run("invalid timeout is an error", func(t *testing.T) {
 		var c Config
 		_, err := LoadConfigFile(writeConfig(t, "timeout: not-a-duration\n"), &c)

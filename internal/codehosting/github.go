@@ -4,27 +4,33 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/url"
 	"strings"
 
 	"github.com/google/go-github/v68/github"
+	"go.uber.org/zap"
 )
 
 type Github struct {
 	client *github.Client
 	owner  string
 	repo   string
+	logger *zap.Logger
 }
 
-func newGithub(repositoryURL string, token string) *Github {
-
-	u, _ := url.Parse(repositoryURL)
+// newGithub builds a GitHub platform from an "owner/repo" path. It returns an error rather
+// than panicking when the path does not carry both segments.
+func newGithub(path string, token string, logger *zap.Logger) (*Github, error) {
+	owner, repo, found := strings.Cut(strings.Trim(path, "/"), "/")
+	if !found || owner == "" || repo == "" {
+		return nil, fmt.Errorf("could not determine owner and repository from %q", path)
+	}
 
 	return &Github{
 		client: github.NewClient(nil).WithAuthToken(token),
-		owner:  strings.Split(u.Path, "/")[1],
-		repo:   strings.Split(u.Path, "/")[2],
-	}
+		owner:  owner,
+		repo:   repo,
+		logger: logger,
+	}, nil
 }
 
 func (g Github) CreateMergeRequest(ctx context.Context, title string, description string, sourceBranch string, targetBranch string) (MergeRequest, error) {
@@ -53,12 +59,6 @@ func (g *Github) DeleteBranch(ctx context.Context, branch string) error {
 	return nil
 }
 
-// logError logs an error. This is a placeholder for proper error handling.
-func (g *Github) logError(err error) {
-	// In a real implementation, this would use a proper logging mechanism
-	fmt.Printf("Error: %v\n", err)
-}
-
 // GetUser returns the name and email of the authenticated user.
 // When called with a GITHUB_TOKEN (Actions bot), GET /user returns 403 with the
 // message "Resource not accessible by integration"; in that case we fall back to
@@ -72,7 +72,9 @@ func (g *Github) GetUser(ctx context.Context) (name string, email string) {
 		if isGitHubActionsToken403(resp, err) {
 			return "github-actions[bot]", "41898282+github-actions[bot]@users.noreply.github.com"
 		}
-		g.logError(fmt.Errorf("failed to get user: %w", err))
+		if g.logger != nil {
+			g.logger.Error("failed to get user", zap.Error(err))
+		}
 		return "", ""
 	}
 

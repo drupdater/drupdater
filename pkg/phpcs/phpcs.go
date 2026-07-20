@@ -1,6 +1,7 @@
 package phpcs
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"os/exec"
@@ -33,6 +34,23 @@ func (s *CLI) execComposer(ctx context.Context, dir string, args ...string) (str
 	return output, err
 }
 
+// execComposerJSON runs composer and returns only stdout, so PHP notices or warnings written
+// to stderr can't corrupt the JSON report.
+func (s *CLI) execComposerJSON(ctx context.Context, dir string, args ...string) (string, error) {
+	command := execCommand(ctx, "composer", args...)
+	command.Dir = dir
+
+	var stdout, stderr bytes.Buffer
+	command.Stdout = &stdout
+	command.Stderr = &stderr
+	err := command.Run()
+
+	output := strings.TrimSuffix(stdout.String(), "\n")
+	s.logger.Debug(command.String() + "\nstdout: " + output + "\nstderr: " + strings.TrimSuffix(stderr.String(), "\n"))
+
+	return output, err
+}
+
 type ReturnOutput struct {
 	Files  map[string]ReturnOutputFile `json:"files"`
 	Totals ReturnOutputTotals          `json:"totals"`
@@ -60,7 +78,7 @@ type ReturnOutputTotals struct {
 }
 
 func (s *CLI) Run(ctx context.Context, dir string) (ReturnOutput, error) {
-	out, err := s.execComposer(ctx, dir, "exec", "--", "phpcs", "--report=json", "-q", "--runtime-set", "ignore_errors_on_exit", "1", "--runtime-set", "ignore_warnings_on_exit", "1")
+	out, err := s.execComposerJSON(ctx, dir, "exec", "--", "phpcs", "--report=json", "-q", "--runtime-set", "ignore_errors_on_exit", "1", "--runtime-set", "ignore_warnings_on_exit", "1")
 	if err != nil {
 		return ReturnOutput{}, err
 	}

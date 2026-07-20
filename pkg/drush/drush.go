@@ -1,6 +1,7 @@
 package drush
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -40,6 +41,26 @@ func (e *CLI) execDrush(ctx context.Context, dir string, site string, args ...st
 	e.logger.Debug(command.String() + "\n" + output)
 
 	return output, err
+}
+
+// execDrushStreams runs drush and returns stdout and stderr separately. Commands whose stdout
+// is parsed as JSON must use this: drush writes notices to stderr, and folding them into stdout
+// (as CombinedOutput does) would corrupt the JSON.
+func (e *CLI) execDrushStreams(ctx context.Context, dir string, site string, args ...string) (stdout string, stderr string, err error) {
+	command := execCommand(ctx, "composer", append([]string{"exec", "--", "drush"}, args...)...)
+	command.Dir = dir
+	command.Env = append(os.Environ(), "SITE_NAME="+site)
+
+	var so, se bytes.Buffer
+	command.Stdout = &so
+	command.Stderr = &se
+	err = command.Run()
+
+	stdout = strings.TrimSuffix(so.String(), "\n")
+	stderr = strings.TrimSuffix(se.String(), "\n")
+	e.logger.Debug(command.String() + "\nstdout: " + stdout + "\nstderr: " + stderr)
+
+	return stdout, stderr, err
 }
 
 func (e *CLI) InstallSite(ctx context.Context, dir string, site string) error {
@@ -119,17 +140,21 @@ type UpdateHook struct {
 }
 
 func (e *CLI) GetUpdateHooks(ctx context.Context, dir string, site string) (map[string]UpdateHook, error) {
-	data, err := e.execDrush(ctx, dir, site, "updatedb-status", "--format=json")
+	stdout, stderr, err := e.execDrushStreams(ctx, dir, site, "updatedb-status", "--format=json")
 	if err != nil {
 		return nil, err
 	}
 
-	if strings.Contains(data, "No database updates required") {
+	// "No database updates required" is a drush notice; depending on the version it lands on
+	// stdout or stderr. An empty stdout means the same thing (nothing to parse).
+	if strings.Contains(stdout, "No database updates required") ||
+		strings.Contains(stderr, "No database updates required") ||
+		strings.TrimSpace(stdout) == "" {
 		return nil, nil
 	}
 
 	var updates map[string]UpdateHook
-	if err := json.Unmarshal([]byte(data), &updates); err != nil {
+	if err := json.Unmarshal([]byte(stdout), &updates); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal update hooks: %w", err)
 	}
 

@@ -114,23 +114,35 @@ func (ca *ComposerAudit) postCodeUpdateHandler(e event.Event) error {
 	return nil
 }
 
-// GetFixedAdvisories returns the list of security advisories that were fixed by the update.
+// GetFixedAdvisories returns the list of security advisories that were fixed by the update:
+// those present before but not after. Advisories are identified by CVE, falling back to the
+// advisory ID (and finally package+title) so advisories without a CVE — which would all share
+// the empty string — don't collide and get miscounted.
 func (ca *ComposerAudit) GetFixedAdvisories() []composer.Advisory {
-	// Get advisories from before that are not present in after
+	afterKeys := make(map[string]bool, len(ca.afterAudit.Advisories))
+	for _, afterAdvisory := range ca.afterAudit.Advisories {
+		afterKeys[advisoryKey(afterAdvisory)] = true
+	}
+
 	var fixed = make([]composer.Advisory, 0)
 	for _, beforeAdvisory := range ca.beforeAudit.Advisories {
-		found := false
-		for _, afterAdvisory := range ca.afterAudit.Advisories {
-			if beforeAdvisory.CVE == afterAdvisory.CVE {
-				found = true
-				break
-			}
-		}
-		if !found {
+		if !afterKeys[advisoryKey(beforeAdvisory)] {
 			fixed = append(fixed, beforeAdvisory)
 		}
 	}
 	return fixed
+}
+
+// advisoryKey returns a stable identity for an advisory that does not collapse distinct
+// advisories which happen to lack a CVE.
+func advisoryKey(a composer.Advisory) string {
+	if a.CVE != "" {
+		return "cve:" + a.CVE
+	}
+	if a.AdvisoryID != "" {
+		return "id:" + a.AdvisoryID
+	}
+	return "pkg:" + a.PackageName + "|" + a.Title
 }
 
 func (ca *ComposerAudit) preMergeRequestCreateHandler(e event.Event) error {
