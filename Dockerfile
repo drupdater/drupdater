@@ -1,7 +1,7 @@
 ARG PHP_VERSION=8.3
 
 # Build go binary.
-FROM golang:1.26.4-bookworm AS build
+FROM golang:1.26.4-trixie AS build
 
 RUN mkdir -p /build/
 
@@ -18,7 +18,7 @@ RUN --mount=type=cache,target=/gomod-cache --mount=type=cache,target=/go-cache G
 
 
 # Build php image.
-FROM php:${PHP_VERSION}-cli-bookworm AS base
+FROM php:${PHP_VERSION}-cli-trixie AS base
 
 RUN echo "memory_limit = -1" > "$PHP_INI_DIR/conf.d/memory-limit.ini"
 

@@ -204,12 +204,12 @@
     "hash": "afbce3767a630598c0b8d59ae0ceee7d"
   },
   "/Users/d430774/Sites/drupdater/pkg/composer/composer.go": {
-    "mtime": 1784555178.4966733,
-    "hash": "ace8d35f63c9b9b79855573c2a94e140"
+    "mtime": 1784558628.0476365,
+    "hash": "1d44f0b11b7444f4ea7a167da642c08a"
   },
   "/Users/d430774/Sites/drupdater/pkg/composer/composer_test.go": {
-    "mtime": 1784555106.916464,
-    "hash": "ee6b3000ccbb32fec9c290948a071b35"
+    "mtime": 1784558644.171725,
+    "hash": "c0c9c7490c75c7a7256028915e8b031a"
   },
   "/Users/d430774/Sites/drupdater/pkg/rector/rector_test.go": {
     "mtime": 1782105620.430034,
