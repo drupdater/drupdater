@@ -104,6 +104,7 @@ addons:               # configurable addons per mode; mandatory addons always ru
     - deprecations_remover
     - translations_updater
     - composer_normalizer
+    - unsupported_modules
   security: []            # minimal by default; composer_audit is added automatically
 ```
 
