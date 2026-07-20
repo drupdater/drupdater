@@ -182,12 +182,13 @@ func TestValidateAddons(t *testing.T) {
 func TestConfigurableAddons(t *testing.T) {
 	names := configurableAddons()
 
-	// Exactly the four configurable addons, sorted, and nothing mandatory.
+	// Exactly the five configurable addons, sorted, and nothing mandatory.
 	assert.Equal(t, []string{
 		"code_beautifier",
 		"composer_normalizer",
 		"deprecations_remover",
 		"translations_updater",
+		"unsupported_modules",
 	}, names)
 
 	for _, mandatory := range append(mandatoryAddons, "composer_audit") {

@@ -40,6 +40,7 @@ type Drush interface {
 	LocalizeTranslations(ctx context.Context, dir string, site string) error
 	GetTranslationPath(ctx context.Context, dir string, site string, relative bool) (string, error)
 	GetUpdateHooks(ctx context.Context, dir string, site string) (map[string]drush.UpdateHook, error)
+	GetUnsupportedModules(ctx context.Context, dir string, site string) ([]drush.UnsupportedModule, error)
 }
 
 type PHPCS interface {

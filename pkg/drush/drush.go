@@ -139,6 +139,36 @@ type UpdateHook struct {
 	Type        string `json:"type"`
 }
 
+// UnsupportedModule describes an installed module that has reached end-of-life according to
+// Drupal's update status service: no supported release exists, so it is not going to receive
+// further fixes.
+type UnsupportedModule struct {
+	Name               string `json:"name"`
+	InstalledVersion   string `json:"installed_version"`
+	RecommendedVersion string `json:"recommended_version"`
+}
+
+// GetUnsupportedModules returns the installed modules whose update status is NOT_SUPPORTED. It
+// relies on the bundled unsupported-modules.php script, which itself returns an empty result
+// when the Drupal update module is not enabled.
+func (e *CLI) GetUnsupportedModules(ctx context.Context, dir string, site string) ([]UnsupportedModule, error) {
+	stdout, stderr, err := e.execDrushStreams(ctx, dir, site, "php:script", "/opt/drupdater/unsupported-modules.php")
+	if err != nil {
+		return nil, fmt.Errorf("failed to check for unsupported modules: %w, output: %s", err, stderr)
+	}
+
+	if strings.TrimSpace(stdout) == "" {
+		return nil, nil
+	}
+
+	var modules []UnsupportedModule
+	if err := json.Unmarshal([]byte(stdout), &modules); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal unsupported modules: %w", err)
+	}
+
+	return modules, nil
+}
+
 func (e *CLI) GetUpdateHooks(ctx context.Context, dir string, site string) (map[string]UpdateHook, error) {
 	stdout, stderr, err := e.execDrushStreams(ctx, dir, site, "updatedb-status", "--format=json")
 	if err != nil {

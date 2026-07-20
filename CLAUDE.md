@@ -51,7 +51,7 @@ The site databases are SQLite files written beside the working directory (`{dir}
 
 Addons implement the `Addon` interface and subscribe to workflow events via `gookit/event`. They hook into pre/post composer update and pre/post site update events.
 
-Which addons run is data-driven: `cmd/root.go` holds an `addonRegistry` (name → constructor) and `mandatoryAddons`. Four addons always run — `composer_allow_plugins`, `composer_patches`, `composer_diff`, `update_hooks` — and `composer_audit` is additionally mandatory in security mode. The rest are *configurable* and listed per mode in `.drupdater.yaml` under `addons.regular` / `addons.security`; `--security` selects which list is used. Configurable addon names: `code_beautifier`, `deprecations_remover`, `translations_updater`, `composer_normalizer`. An unknown name in the active list aborts the run.
+Which addons run is data-driven: `cmd/root.go` holds an `addonRegistry` (name → constructor) and `mandatoryAddons`. Four addons always run — `composer_allow_plugins`, `composer_patches`, `composer_diff`, `update_hooks` — and `composer_audit` is additionally mandatory in security mode. The rest are *configurable* and listed per mode in `.drupdater.yaml` under `addons.regular` / `addons.security`; `--security` selects which list is used. Configurable addon names: `code_beautifier`, `deprecations_remover`, `translations_updater`, `composer_normalizer`, `unsupported_modules`. An unknown name in the active list aborts the run.
 
 Addons use Go templates in `internal/addon/templates/` to render the MR description sections.
 
@@ -104,6 +104,7 @@ addons:               # configurable addons per mode; mandatory addons always ru
     - deprecations_remover
     - translations_updater
     - composer_normalizer
+    - unsupported_modules
   security: []            # minimal by default; composer_audit is added automatically
 ```
 

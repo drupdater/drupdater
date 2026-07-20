@@ -204,6 +204,7 @@ addons:               # configurable addons per mode (mandatory addons always ru
     - deprecations_remover   # drupal-rector deprecation removal
     - translations_updater   # interface translations
     - composer_normalizer    # normalize composer.json
+    - unsupported_modules    # report modules with no supported release
   security: []               # minimal by default — don't interfere with the fix
 ```
 

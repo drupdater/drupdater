@@ -17,6 +17,7 @@ var defaultNormalAddons = []string{
 	"deprecations_remover",
 	"translations_updater",
 	"composer_normalizer",
+	"unsupported_modules",
 }
 
 // flexTimeout captures the raw scalar of the `timeout` key so both a quoted duration
