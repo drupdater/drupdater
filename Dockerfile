@@ -23,7 +23,7 @@ FROM php:${PHP_VERSION}-cli-bookworm AS base
 RUN echo "memory_limit = -1" > "$PHP_INI_DIR/conf.d/memory-limit.ini"
 
 COPY --from=ghcr.io/mlocati/php-extension-installer:2 /usr/bin/install-php-extensions /usr/local/bin/
-RUN install-php-extensions pdo_mysql gd zip imagick intl igbinary
+RUN install-php-extensions pdo_mysql gd zip imagick intl
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends git unzip patch sqlite3 \

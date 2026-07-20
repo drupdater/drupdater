@@ -1,16 +1,16 @@
-# Graph Report - drupdater  (2026-06-21)
+# Graph Report - drupdater  (2026-06-22)
 
 ## Corpus Check
-- 69 files · ~54,731 words
+- 69 files · ~54,673 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1116 nodes · 1558 edges · 119 communities (45 shown, 74 thin omitted)
-- Extraction: 86% EXTRACTED · 14% INFERRED · 0% AMBIGUOUS · INFERRED: 219 edges (avg confidence: 0.8)
+- 1192 nodes · 1680 edges · 132 communities (48 shown, 84 thin omitted)
+- Extraction: 86% EXTRACTED · 14% INFERRED · 0% AMBIGUOUS · INFERRED: 236 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `f7929042`
+- Built from commit: `435f0251`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -122,26 +122,39 @@
 - [[_COMMUNITY_Community 104|Community 104]]
 - [[_COMMUNITY_Community 105|Community 105]]
 - [[_COMMUNITY_Community 106|Community 106]]
+- [[_COMMUNITY_Community 107|Community 107]]
 - [[_COMMUNITY_Community 108|Community 108]]
 - [[_COMMUNITY_Community 109|Community 109]]
 - [[_COMMUNITY_Community 110|Community 110]]
 - [[_COMMUNITY_Community 111|Community 111]]
 - [[_COMMUNITY_Community 112|Community 112]]
-- [[_COMMUNITY_Community 113|Community 113]]
 - [[_COMMUNITY_Community 114|Community 114]]
 - [[_COMMUNITY_Community 115|Community 115]]
+- [[_COMMUNITY_Community 116|Community 116]]
+- [[_COMMUNITY_Community 117|Community 117]]
+- [[_COMMUNITY_Community 118|Community 118]]
+- [[_COMMUNITY_Community 119|Community 119]]
+- [[_COMMUNITY_Community 120|Community 120]]
+- [[_COMMUNITY_Community 121|Community 121]]
+- [[_COMMUNITY_Community 122|Community 122]]
+- [[_COMMUNITY_Community 123|Community 123]]
+- [[_COMMUNITY_Community 124|Community 124]]
+- [[_COMMUNITY_Community 125|Community 125]]
+- [[_COMMUNITY_Community 126|Community 126]]
+- [[_COMMUNITY_Community 127|Community 127]]
+- [[_COMMUNITY_Community 128|Community 128]]
 
 ## God Nodes (most connected - your core abstractions)
-1. `CLI` - 24 edges
-2. `MockComposer` - 20 edges
-3. `MockComposer_Expecter` - 19 edges
-4. `NewWorkflowBaseService()` - 19 edges
-5. `NewMockGitRepository()` - 18 edges
-6. `NewMockInstaller()` - 18 edges
-7. `ComposerPatches1` - 13 edges
-8. `cmd/root.go` - 13 edges
-9. `CLI` - 11 edges
-10. `WorkflowBaseService` - 9 edges
+1. `CLI` - 25 edges
+2. `NewWorkflowBaseService()` - 23 edges
+3. `NewMockGitRepository()` - 22 edges
+4. `NewMockInstaller()` - 22 edges
+5. `MockComposer` - 20 edges
+6. `MockComposer_Expecter` - 19 edges
+7. `Drupdater` - 19 edges
+8. `ComposerPatches1` - 13 edges
+9. `cmd/root.go` - 13 edges
+10. `CLI` - 11 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `testdata/composer_audit.md` --semantically_similar_to--> `Addon Go templates (internal/addon/templates/)`  [INFERRED] [semantically similar]
@@ -160,67 +173,71 @@
 - **Core workflow execution chain: entry → orchestration → external tools** — root_cmd, workflow_base, pkg_composer, pkg_drush, pkg_repo [EXTRACTED 1.00]
 - **VCS provider factory pattern for GitHub and GitLab** — vcs_provider_factory, github_provider, gitlab_provider [EXTRACTED 1.00]
 
-## Communities (119 total, 74 thin omitted)
+## Communities (132 total, 84 thin omitted)
 
 ### Community 0 - "Composer Audit Addon"
-Cohesion: 0.05
-Nodes (12): MockRepository, MockRepository_Expecter, MockRepository_Push_Call, MockRepository_References_Call, MockWorktree, MockWorktree_Add_Call, MockWorktree_AddGlob_Call, MockWorktree_Checkout_Call (+4 more)
-
-### Community 1 - "Mock Repository"
 Cohesion: 0.06
 Nodes (19): CodeBeautifier, TestPreComposerUpdateHandler(), NewComposerPatches1(), TestComposer_Patches_1_RenderTemplate(), TestDownloadFile(), TestUpdatePatches(), ComposerPatches1, ConflictPatch (+11 more)
+
+### Community 1 - "Mock Repository"
+Cohesion: 0.04
+Nodes (7): MockComposer, MockComposer_Expecter, MockDrush, MockGitRepository, MockRepository, MockRepository_Expecter, MockWorktree
 
 ### Community 2 - "Addon System & CLI"
 Cohesion: 0.05
 Nodes (41): Addon interface, Addon System (internal/addon/), Addon Go templates (internal/addon/templates/), Execute(), code_beautifier addon, composer_allow_plugins addon, composer_audit addon, composer_diff addon (+33 more)
 
 ### Community 3 - "VCS Provider Factory"
-Cohesion: 0.05
-Nodes (6): MockComposer, MockComposer_Expecter, MockPlatform, MockRepository, MockRepository_Expecter, MockWorktree_Expecter
+Cohesion: 0.04
+Nodes (4): MockComposer, MockDrush_Expecter, MockWorktree, MockWorktree_Expecter
 
 ### Community 4 - "Code Beautifier & Patches"
+Cohesion: 0.06
+Nodes (39): Architecture, CI/CD Integration, CLI flags, code:bash (# PHP 8.3), code:bash (go test -v -run TestName ./path/to/package/...), code:yaml (drupdater:), code:yaml (drupdater-security:), code:yaml (name: Drupdater) (+31 more)
+
+### Community 5 - "Mock Composer & Repo"
 Cohesion: 0.09
 Nodes (8): AdvisoriesMap, Advisory, Audit, CLI, lockPackage, PackageChange, patchTestConfig, Source
 
-### Community 5 - "Mock Composer & Repo"
-Cohesion: 0.07
-Nodes (9): MockDrupalOrg_Expecter, MockHTTPClient, MockHTTPClient_Expecter, MockPHPCS, MockPHPCS_Expecter, MockRector, MockRector_Expecter, MockRepository (+1 more)
-
 ### Community 6 - "Audit Data & CLI"
+Cohesion: 0.21
+Nodes (28): NewMockGitRepository(), NewMockInstaller(), TemplateData, commitMessage(), NewWorkflowBaseService(), TestCommitMessage(), TestGenerateDescription_UnknownTemplate(), TestPublishWorkDeletesBranchOnMRFailure() (+20 more)
+
+### Community 7 - "Mock Drush & Events"
 Cohesion: 0.09
 Nodes (7): MockComposer, MockComposer_Expecter, MockComposer_GetConfig_Call, MockDrush, MockDrush_Expecter, MockDrush_GetConfigSyncDir_Call, MockDrush_InstallSite_Call
 
-### Community 7 - "Mock Drush & Events"
-Cohesion: 0.08
-Nodes (25): CI/CD Integration, code:bash (# PHP 8.3), code:yaml (drupdater:), code:yaml (drupdater-security:), code:yaml (name: Drupdater), code:yaml (name: Drupdater Security), code:yaml (sites: [default]      # Drupal site directories to update), code:bash (docker run \) (+17 more)
-
 ### Community 8 - "Mock Drush Calls"
-Cohesion: 0.26
-Nodes (22): NewMockGitRepository(), NewMockInstaller(), TemplateData, NewWorkflowBaseService(), TestGenerateDescription_UnknownTemplate(), TestPublishWorkDeletesBranchOnMRFailure(), TestPublishWorkLogsWarningWhenDeleteBranchFails(), TestPublishWorkPushFails() (+14 more)
+Cohesion: 0.08
+Nodes (8): MockDrupalOrg_Expecter, MockHTTPClient, MockHTTPClient_Expecter, MockPHPCS_Expecter, MockRector, MockRector_Expecter, MockRepository, MockRepository_Expecter
 
 ### Community 9 - "Mock Composer Config"
-Cohesion: 0.08
-Nodes (6): MockDrush_Expecter, MockEventDispatcher_Expecter, MockGitRepository_Expecter, MockInstaller, MockInstaller_Expecter, NewMockEventDispatcher()
+Cohesion: 0.11
+Nodes (10): TestCheckPlatformReqs(), TestExecComposer(), TestGetAllowPlugins(), TestGetCustomCodeDirectories(), TestGetInstalledPackageVersion(), TestInstall(), TestOutdated(), TestRemove() (+2 more)
 
 ### Community 10 - "Mock DrupalOrg & HTTP"
 Cohesion: 0.11
-Nodes (9): TestCheckPlatformReqs(), TestExecComposer(), TestGetAllowPlugins(), TestGetCustomCodeDirectories(), TestGetInstalledPackageVersion(), TestInstall(), TestRemove(), TestSetConfig() (+1 more)
+Nodes (5): MockPlatform, MockPlatform_CreateMergeRequest_Call, MockPlatform_DeleteBranch_Call, MockPlatform_Expecter, MockPlatform_GetUser_Call
 
 ### Community 11 - "Composer/Drush Tests"
 Cohesion: 0.11
-Nodes (5): MockPlatform, MockPlatform_CreateMergeRequest_Call, MockPlatform_DeleteBranch_Call, MockPlatform_Expecter, MockPlatform_GetUser_Call
-
-### Community 12 - "Mock Composer Ops"
-Cohesion: 0.11
 Nodes (8): Github, isGitHubActionsToken403(), newGithub(), TestGithub_DeleteBranch_Error(), TestGithub_GetOwner(), TestGithub_GetRepo(), TestIsGitHubActionsToken403_ReturnsFalseForNonGitHubError(), TestIsGitHubActionsToken403_ReturnsTrueWhenRespFallback()
 
-### Community 14 - "Mock Call Builders"
+### Community 12 - "Mock Composer Ops"
 Cohesion: 0.1
-Nodes (18): Addon System (`internal/addon/`), Architecture, CLI Flags, code:bash (make build          # Build binary), code:bash (go test -v -run TestName ./path/to/package/...), code:bash (make docker-run REPO=<git-url> TOKEN=<token>), code:yaml (sites: [default]      # Drupal site names), Commands (+10 more)
+Nodes (5): MockEventDispatcher_Expecter, MockInstaller, MockInstaller_Expecter, MockPlatform_Expecter, NewMockEventDispatcher()
+
+### Community 13 - "Mock Composer Expecter"
+Cohesion: 0.1
+Nodes (19): Addon System (`internal/addon/`), Architecture, CLI Flags, code:bash (make build          # Build binary), code:bash (go test -v -run TestName ./path/to/package/...), code:bash (make docker-run REPO=<git-url> TOKEN=<token>), code:yaml (sites: [default]      # Drupal site names), Commands (+11 more)
+
+### Community 15 - "Mock Event/Drush Calls"
+Cohesion: 0.13
+Nodes (5): MockComposer_GetConfig_Call, MockComposer_GetInstalledPackageVersion_Call, MockDrush_GetUpdateHooks_Call, MockHTTPClient_Do_Call, MockWorktree_Status_Call
 
 ### Community 16 - "Mock Addon"
 Cohesion: 0.13
-Nodes (5): MockComposer_GetInstalledPackageVersion_Call, MockComposer_IsPackageInstalled_Call, MockComposer_Normalize_Call, MockDrush_IsModuleEnabled_Call, MockHTTPClient_Do_Call
+Nodes (5): MockEventDispatcher_FireEvent_Call, MockGitRepository_Push_Call, MockInstaller_ConfigureDatabase_Call, MockRepository_GetRemoteURL_Call, MockWorktree_AddGlob_Call
 
 ### Community 17 - "Mock Platform (VCS)"
 Cohesion: 0.15
@@ -235,116 +252,124 @@ Cohesion: 0.16
 Nodes (12): addonDeps, configurableAddons(), handleWorkflowError(), NewCache(), resolveCheckoutBranch(), TestConfigurableAddons(), TestHandleWorkflowError(), TestNewCache() (+4 more)
 
 ### Community 20 - "CLI Root Setup"
-Cohesion: 0.19
-Nodes (11): NewComposerAudit(), TestComposerAudit_PostCodeUpdateHandler(), TestComposerAudit_PreComposerUpdateHandler_NoAdvisories(), TestComposerAudit_PreComposerUpdateHandler_WithAdvisories(), TestComposerAudit_RenderTemplate(), TestComposerAudit_RenderTemplate_EscapesPipes(), TestNewComposerAudit(), NewPostCodeUpdateEvent() (+3 more)
+Cohesion: 0.18
+Nodes (4): MockRepository_Head_Call, MockRepository_Push_Call, MockWorktree_Reset_Call, MockWorktree_Status_Call
 
 ### Community 21 - "AllowPlugins Addon"
-Cohesion: 0.17
-Nodes (4): MockComposer_GetLockHash_Call, MockDrush_ExportConfiguration_Call, MockEventDispatcher_FireEvent_Call, MockWorktree_Checkout_Call
-
-### Community 22 - "Drush Config Commands"
 Cohesion: 0.2
 Nodes (8): NewComposerAllowPlugins(), TestDefaultAllowPlugins_PostComposerUpdateHandler(), TestDefaultAllowPlugins_PreComposerUpdateHandler(), TestDefaultAllowPlugins_RenderTemplate(), TestDefaultAllowPlugins_RenderTemplate_Empty(), TestDefaultAllowPlugins_SubscribedEvents(), TestNewDefaultAllowPlugins(), ComposerAllowPlugins
 
-### Community 24 - "Composer Diff Addon"
+### Community 23 - "Deprecations Remover"
 Cohesion: 0.15
-Nodes (3): MockComposer_Update_Call, MockComposer_UpdateLockHash_Call, MockDrupalOrg_GetIssue_Call
+Nodes (3): MockComposer_CheckIfPatchApplies_Call, MockComposer_UpdateLockHash_Call, MockWorktree_Reset_Call
 
-### Community 25 - "Service Factories"
+### Community 24 - "Composer Diff Addon"
 Cohesion: 0.18
 Nodes (6): NewTranslationsUpdater(), TestUpdateTranslationsEventHandlerWithLocaleDeploy(), TestUpdateTranslationsEventHandlerWithoutLocaleDeploy(), TranslationsUpdater, NewPostSiteUpdateEvent(), TestNewPostSiteUpdateEvent()
 
+### Community 25 - "Service Factories"
+Cohesion: 0.21
+Nodes (8): NewComposerNormalizer(), TestDefaultComposerNormalize_PostComposerUpdateHandler_PackageInstalled(), TestDefaultComposerNormalize_PostComposerUpdateHandler_PackageNotInstalled(), TestDefaultComposerNormalize_RenderTemplate(), TestDefaultComposerNormalize_SubscribedEvents(), ComposerNormalizer, NewPostComposerUpdateEvent(), TestNewPostComposerUpdateEvent()
+
 ### Community 26 - "Repo Test Helpers"
-Cohesion: 0.23
-Nodes (7): NewComposerNormalizer(), TestDefaultComposerNormalize_PostComposerUpdateHandler_PackageInstalled(), TestDefaultComposerNormalize_PostComposerUpdateHandler_PackageNotInstalled(), TestDefaultComposerNormalize_RenderTemplate(), TestDefaultComposerNormalize_SubscribedEvents(), ComposerNormalizer, NewPostComposerUpdateEvent()
+Cohesion: 0.26
+Nodes (8): NewComposerAudit(), TestComposerAudit_PostCodeUpdateHandler(), TestComposerAudit_PreComposerUpdateHandler_NoAdvisories(), TestComposerAudit_PreComposerUpdateHandler_WithAdvisories(), TestComposerAudit_RenderTemplate(), TestComposerAudit_RenderTemplate_EscapesPipes(), TestNewComposerAudit(), NewPreComposerUpdateEvent()
 
 ### Community 27 - "Drush CLI Tests"
+Cohesion: 0.17
+Nodes (11): Before you start, code:bash (git clone https://github.com/drupdater/drupdater.git), code:bash (make test    # run all tests), code:bash (go test -v -run TestName ./path/to/package/...), Commit messages, Contributing to Drupdater, Development setup, Project layout (+3 more)
+
+### Community 28 - "Git Repository Service"
 Cohesion: 0.22
 Nodes (5): NewComposerDiff(), TestComposerDiff_PostComposerUpdateHandler_Success(), TestComposerDiff_RenderTemplate(), TestNewComposerDiff(), ComposerDiff
 
-### Community 28 - "Git Repository Service"
+### Community 29 - "Composer/PHPCS Runner"
 Cohesion: 0.18
 Nodes (4): NewDeprecationsRemover(), TestRemoveDeprecations(), DeprecationsRemover, NewMockRector()
-
-### Community 29 - "Composer/PHPCS Runner"
-Cohesion: 0.25
-Nodes (7): errorReferenceIter, NewGitRepositoryService(), TestBranchExists(), TestGetCurrentBranch(), TestGetRemoteURL(), TestIsSomethingStaged(), TestOpenRepository()
-
-### Community 30 - "Core Service Interfaces"
-Cohesion: 0.18
-Nodes (6): TestConfigResave(), TestExportConfiguration(), TestGetConfigSyncDir(), TestInstallSite(), TestLocalizeTranslations(), TestUpdateSite()
 
 ### Community 31 - "CodeBeautifier Tests"
 Cohesion: 0.24
 Nodes (9): createAddons(), createDispatcher(), NewLogger(), TestCreateAddons(), TestCreateDispatcher(), TestGetIssue(), TestGetIssue_Failure(), TestGetIssue_Timeout() (+1 more)
 
 ### Community 32 - "ComposerAudit Methods"
+Cohesion: 0.25
+Nodes (7): errorReferenceIter, NewGitRepositoryService(), TestBranchExists(), TestGetCurrentBranch(), TestGetRemoteURL(), TestIsSomethingStaged(), TestOpenRepository()
+
+### Community 33 - "Mock Config Calls"
+Cohesion: 0.18
+Nodes (6): TestConfigResave(), TestExportConfiguration(), TestGetConfigSyncDir(), TestInstallSite(), TestLocalizeTranslations(), TestUpdateSite()
+
+### Community 34 - "Mock EventDispatcher"
 Cohesion: 0.24
 Nodes (4): GitRepositoryService, prepareCheckout(), Repository, Worktree
 
-### Community 33 - "Mock Config Calls"
-Cohesion: 0.36
-Nodes (8): NewUpdateHooks(), TestNewUpdateHooks(), TestUpdateHooks_PreSiteUpdateHandler_Error(), TestUpdateHooks_PreSiteUpdateHandler_NoHooks(), TestUpdateHooks_PreSiteUpdateHandler_Success(), TestUpdateHooks_RenderTemplate(), TestUpdateHooks_RenderTemplate_Empty(), NewPreSiteUpdateEvent()
-
-### Community 34 - "Mock EventDispatcher"
+### Community 35 - "Config File Loading"
 Cohesion: 0.2
 Nodes (7): AbortError, PostCodeUpdateEvent, PostComposerUpdateEvent, PostSiteUpdateEvent, PreComposerUpdateEvent, PreMergeRequestCreateEvent, PreSiteUpdateEvent
 
-### Community 35 - "Config File Loading"
+### Community 36 - "External Tool Interfaces"
+Cohesion: 0.36
+Nodes (8): NewUpdateHooks(), TestNewUpdateHooks(), TestUpdateHooks_PreSiteUpdateHandler_Error(), TestUpdateHooks_PreSiteUpdateHandler_NoHooks(), TestUpdateHooks_PreSiteUpdateHandler_Success(), TestUpdateHooks_RenderTemplate(), TestUpdateHooks_RenderTemplate_Empty(), NewPreSiteUpdateEvent()
+
+### Community 37 - "Rector CLI"
 Cohesion: 0.24
 Nodes (5): CLI, ReturnOutput, ReturnOutputFile, ReturnOutputFileMessage, ReturnOutputTotals
 
-### Community 36 - "External Tool Interfaces"
+### Community 38 - "Drupal.org HTTP Client"
 Cohesion: 0.29
 Nodes (3): Composer, Drush, Installer
 
-### Community 37 - "Rector CLI"
+### Community 39 - "Core Interfaces"
 Cohesion: 0.22
 Nodes (6): NewCodeBeautifier(), TestCodingStyles(), TestCreatePHPCSConfig(), TestHasPHPCSPathDefinitions(), NewMockPHPCS(), phpcsRuleset
 
-### Community 41 - "Mock Drush Subset"
+### Community 43 - "Utility Group 43"
 Cohesion: 0.36
 Nodes (6): applyFileConfig(), defaultFileConfig(), LoadConfigFile(), TestLoadConfigFile(), writeConfig(), fileConfig
 
-### Community 42 - "Utility Group 42"
+### Community 44 - "Utility Group 44"
 Cohesion: 0.25
 Nodes (7): Composer, DrupalOrg, Drush, HTTPClient, PHPCS, Rector, Repository
 
-### Community 45 - "Utility Group 45"
+### Community 46 - "Utility Group 46"
 Cohesion: 0.29
 Nodes (4): CLI, ReturnOutput, ReturnOutputFillDiff, ReturnOutputTotals
 
-### Community 47 - "Utility Group 47"
+### Community 48 - "Utility Group 48"
+Cohesion: 0.29
+Nodes (5): NewPreMergeRequestCreateEvent(), TestNewPostCodeUpdateEvent(), TestNewPreComposerUpdateEvent(), TestNewPreMergeRequestCreateEvent(), TestNewPreSiteUpdateEvent()
+
+### Community 49 - "Utility Group 49"
 Cohesion: 0.29
 Nodes (6): Composer, Drush, EventDispatcher, Installer, Platform, Repository
 
-### Community 48 - "Utility Group 48"
+### Community 50 - "Utility Group 50"
 Cohesion: 0.29
 Nodes (4): NewHTTPClient(), TestNewHTTPClient_HasTimeout(), HTTPClient, Issue
 
-### Community 50 - "Utility Group 50"
-Cohesion: 0.33
-Nodes (4): NewPreMergeRequestCreateEvent(), TestNewPostComposerUpdateEvent(), TestNewPreMergeRequestCreateEvent(), TestNewPreSiteUpdateEvent()
+### Community 121 - "Community 121"
+Cohesion: 0.5
+Nodes (3): Reporting a vulnerability, Security Policy, Supported versions
 
 ## Knowledge Gaps
-- **100 isolated node(s):** `addonDeps`, `Config`, `AddonsConfig`, `Addon`, `fileConfig` (+95 more)
+- **115 isolated node(s):** `addonDeps`, `Config`, `AddonsConfig`, `Addon`, `fileConfig` (+110 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **74 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **84 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `TestGenerateDescription_UnknownTemplate()` connect `Mock Drush Calls` to `Mock DrupalOrg & HTTP`?**
-  _High betweenness centrality (0.224) - this node is a cross-community bridge._
-- **Are the 18 inferred relationships involving `NewWorkflowBaseService()` (e.g. with `TestStartUpdate()` and `TestStartUpdatePublishUsesLiveContext()`) actually correct?**
-  _`NewWorkflowBaseService()` has 18 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 17 inferred relationships involving `NewMockGitRepository()` (e.g. with `TestStartUpdate()` and `TestStartUpdatePublishUsesLiveContext()`) actually correct?**
-  _`NewMockGitRepository()` has 17 INFERRED edges - model-reasoned connections that need verification._
+- **Why does `TestGenerateDescription_UnknownTemplate()` connect `Audit Data & CLI` to `Mock Composer Config`?**
+  _High betweenness centrality (0.227) - this node is a cross-community bridge._
+- **Why does `NewMockGitRepository()` connect `Audit Data & CLI` to `Mock Composer Ops`?**
+  _High betweenness centrality (0.117) - this node is a cross-community bridge._
+- **Are the 22 inferred relationships involving `NewWorkflowBaseService()` (e.g. with `TestStartUpdate()` and `TestStartUpdatePublishUsesLiveContext()`) actually correct?**
+  _`NewWorkflowBaseService()` has 22 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 21 inferred relationships involving `NewMockGitRepository()` (e.g. with `TestStartUpdate()` and `TestStartUpdatePublishUsesLiveContext()`) actually correct?**
+  _`NewMockGitRepository()` has 21 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 21 inferred relationships involving `NewMockInstaller()` (e.g. with `TestStartUpdate()` and `TestStartUpdatePublishUsesLiveContext()`) actually correct?**
+  _`NewMockInstaller()` has 21 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `addonDeps`, `Config`, `AddonsConfig` to the rest of the system?**
-  _100 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _115 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Composer Audit Addon` be split into smaller, more focused modules?**
-  _Cohesion score 0.05 - nodes in this community are weakly interconnected._
-- **Should `Mock Repository` be split into smaller, more focused modules?**
   _Cohesion score 0.06 - nodes in this community are weakly interconnected._
-- **Should `Addon System & CLI` be split into smaller, more focused modules?**
-  _Cohesion score 0.05 - nodes in this community are weakly interconnected._

@@ -495,8 +495,9 @@ func TestCheckPlatformReqs(t *testing.T) {
 	service := &CLI{logger: zap.NewNop()}
 
 	t.Run("requirements satisfied", func(t *testing.T) {
+		json := `[{"name":"php","version":"8.3.0","status":"success","failed_requirement":null,"provider":null}]`
 		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
-			cs := []string{"-test.run=TestHelperProcess", "--", "php 8.3.0 success"}
+			cs := []string{"-test.run=TestHelperProcess", "--", json}
 			cs = append(cs, arg...)
 			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
@@ -506,12 +507,64 @@ func TestCheckPlatformReqs(t *testing.T) {
 
 		out, err := service.CheckPlatformReqs(t.Context(), "/tmp")
 		require.NoError(t, err)
-		assert.Equal(t, "php 8.3.0 success", out)
+		assert.Empty(t, out)
 	})
 
-	t.Run("requirements not satisfied", func(t *testing.T) {
+	t.Run("php requirement not satisfied", func(t *testing.T) {
+		json := `[{"name":"php","version":"8.1.0","status":"failed","failed_requirement":{"source":"drupal/core","type":"requires","target":"php","constraint":">=8.3"},"provider":null}]`
 		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
-			cs := []string{"-test.run=TestHelperProcess", "--", "php 8.1.0 failed"}
+			cs := []string{"-test.run=TestHelperProcess", "--", json}
+			cs = append(cs, arg...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+
+		out, err := service.CheckPlatformReqs(t.Context(), "/tmp")
+		require.Error(t, err)
+		assert.Contains(t, out, "php")
+		assert.Contains(t, out, ">=8.3")
+	})
+
+	t.Run("php requirement missing entirely", func(t *testing.T) {
+		json := `[{"name":"php-64bit","version":"n/a","status":"missing","failed_requirement":{"source":"drupal/core","type":"requires","target":"php-64bit","constraint":"*"},"provider":null}]`
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", json}
+			cs = append(cs, arg...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+
+		out, err := service.CheckPlatformReqs(t.Context(), "/tmp")
+		require.Error(t, err)
+		assert.Contains(t, out, "php-64bit")
+	})
+
+	t.Run("failed extension requirement is ignored", func(t *testing.T) {
+		json := `[
+			{"name":"php","version":"8.3.0","status":"success","failed_requirement":null,"provider":null},
+			{"name":"ext-gd","version":"n/a","status":"missing","failed_requirement":{"source":"drupal/core","type":"requires","target":"ext-gd","constraint":"*"},"provider":null}
+		]`
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", json}
+			cs = append(cs, arg...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+
+		out, err := service.CheckPlatformReqs(t.Context(), "/tmp")
+		require.NoError(t, err)
+		assert.Empty(t, out)
+	})
+
+	t.Run("exec failure with unparsable output", func(t *testing.T) {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", "not json"}
 			cs = append(cs, arg...)
 			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
@@ -519,8 +572,24 @@ func TestCheckPlatformReqs(t *testing.T) {
 		}
 		defer func() { execCommand = exec.CommandContext }()
 
-		_, err := service.CheckPlatformReqs(t.Context(), "/tmp")
+		out, err := service.CheckPlatformReqs(t.Context(), "/tmp")
 		require.Error(t, err)
+		assert.Empty(t, out)
+	})
+
+	t.Run("unparsable output without exec error", func(t *testing.T) {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", "not json"}
+			cs = append(cs, arg...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+
+		out, err := service.CheckPlatformReqs(t.Context(), "/tmp")
+		require.Error(t, err)
+		assert.Contains(t, out, "not json")
 	})
 }
 

@@ -53,7 +53,7 @@ type PackageChange struct {
 }
 
 func (s *CLI) Update(ctx context.Context, dir string, packages []string, packagesToKeep []string, minimalChanges bool, dryRun bool) ([]PackageChange, error) {
-	args := append([]string{"update", "--no-interaction", "--no-progress", "--optimize-autoloader", "--with-all-dependencies", "--no-ansi"}, packages...)
+	args := append([]string{"update", "--no-interaction", "--no-progress", "--optimize-autoloader", "--with-all-dependencies", "--no-ansi", "--ignore-platform-req=ext-*"}, packages...)
 	for _, packageToKeep := range packagesToKeep {
 		args = append(args, fmt.Sprintf("--with=%s", packageToKeep))
 	}
@@ -121,7 +121,7 @@ func (s *CLI) Update(ctx context.Context, dir string, packages []string, package
 }
 
 func (s *CLI) Install(ctx context.Context, dir string) error {
-	out, err := s.execComposer(ctx, dir, "install", "--no-interaction", "--no-progress", "--optimize-autoloader")
+	out, err := s.execComposer(ctx, dir, "install", "--no-interaction", "--no-progress", "--optimize-autoloader", "--ignore-platform-req=ext-*")
 	if err != nil {
 		return fmt.Errorf("failed to install dependencies: %w, output: %s", err, out)
 	}
@@ -231,12 +231,58 @@ func (c *Audit) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// CheckPlatformReqs verifies the platform (PHP version and extensions) satisfies the
-// requirements in composer.lock. `composer update` enforces the same checks, so this lets
-// us fail fast with a clear message instead of mid-update. A non-nil error means a
-// requirement is unmet; the returned output names the offending requirement(s).
+// platformRequirementConstraint describes the unmet constraint for a failed/missing row of
+// `composer check-platform-reqs --format=json` output.
+type platformRequirementConstraint struct {
+	Constraint string `json:"constraint"`
+}
+
+// platformRequirement is one row of `composer check-platform-reqs --format=json` output.
+// Status is "success", "failed" (version constraint mismatch), or "missing" (package absent).
+type platformRequirement struct {
+	Name              string                         `json:"name"`
+	Version           string                         `json:"version"`
+	Status            string                         `json:"status"`
+	FailedRequirement *platformRequirementConstraint `json:"failed_requirement"`
+}
+
+// CheckPlatformReqs verifies the PHP version satisfies the requirements in composer.lock.
+// `composer update` enforces the same check, so this lets us fail fast with a clear message
+// instead of mid-update. Extension requirements (ext-*) are ignored: this tool doesn't
+// control which extensions its own PHP runtime has loaded, so failing on those would block
+// updates for a concern the operator can't act on here. A non-nil error means the PHP
+// version requirement is unmet; the returned output names the offending requirement(s).
 func (s *CLI) CheckPlatformReqs(ctx context.Context, dir string) (string, error) {
-	return s.execComposer(ctx, dir, "check-platform-reqs", "--lock", "--no-ansi")
+	out, err := s.execComposer(ctx, dir, "check-platform-reqs", "--lock", "--no-ansi", "--format=json")
+
+	var requirements []platformRequirement
+	if jsonErr := json.Unmarshal([]byte(out), &requirements); jsonErr != nil {
+		if err != nil {
+			return out, err
+		}
+		return out, fmt.Errorf("failed to parse composer check-platform-reqs output: %w, output: %s", jsonErr, out)
+	}
+
+	var failed []string
+	for _, req := range requirements {
+		if strings.HasPrefix(req.Name, "ext-") {
+			continue
+		}
+		if req.Status == "success" {
+			continue
+		}
+		required := "?"
+		if req.FailedRequirement != nil {
+			required = req.FailedRequirement.Constraint
+		}
+		failed = append(failed, fmt.Sprintf("%s: required %s, found %s (%s)", req.Name, required, req.Version, req.Status))
+	}
+
+	if len(failed) > 0 {
+		return strings.Join(failed, "\n"), fmt.Errorf("unmet platform requirements")
+	}
+
+	return "", nil
 }
 
 func (s *CLI) Normalize(ctx context.Context, dir string) (string, error) {
