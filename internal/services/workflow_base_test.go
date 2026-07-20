@@ -1031,7 +1031,7 @@ func TestCleanup(t *testing.T) {
 		base := t.TempDir()
 		work := filepath.Join(base, "checkout")
 		require.NoError(t, os.MkdirAll(work, 0o755))
-		require.NoError(t, os.WriteFile(filepath.Join(base, "site1.sqlite"), []byte("x"), 0o644))
+		require.NoError(t, os.WriteFile(filepath.Join(base, "site1.sqlite"), []byte("x"), 0o600))
 		require.NoError(t, os.MkdirAll(filepath.Join(base, "private"), 0o755))
 
 		ws := &WorkflowBaseService{logger: logger, config: internal.Config{Sites: []string{"site1"}}}

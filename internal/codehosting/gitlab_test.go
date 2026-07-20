@@ -12,16 +12,16 @@ import (
 	"go.uber.org/zap"
 )
 
-func newTestGitlab(t *testing.T, host, path string) *Gitlab {
+func newTestGitlab(t *testing.T) *Gitlab {
 	t.Helper()
-	g, err := newGitlab(host, path, "dummy-token", zap.NewNop())
+	g, err := newGitlab("gitlab.com", "user/repo", "dummy-token", zap.NewNop())
 	require.NoError(t, err)
 	return g
 }
 
 func TestGitlab_CreateMergeRequest(t *testing.T) {
 
-	gitlab := newTestGitlab(t, "gitlab.com", "user/repo")
+	gitlab := newTestGitlab(t)
 
 	title := "Test MR"
 	sourceBranch := "feature-branch"
@@ -37,7 +37,7 @@ func TestGitlab_CreateMergeRequest(t *testing.T) {
 }
 
 func TestGitlab_getBaseUrl(t *testing.T) {
-	g := newTestGitlab(t, "gitlab.com", "user/repo")
+	g := newTestGitlab(t)
 	assert.Equal(t, "gitlab.com", g.client.BaseURL().Host)
 }
 
@@ -79,7 +79,7 @@ func TestCreateMergeRequest(t *testing.T) {
 
 func TestGitlab_CreateMergeRequest_HonorsContext(t *testing.T) {
 	// A cancelled context must abort before the request is sent.
-	g := newTestGitlab(t, "gitlab.com", "user/repo")
+	g := newTestGitlab(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -121,7 +121,7 @@ func TestGitlab_DeleteBranch_Error(t *testing.T) {
 }
 
 func TestGitlab_DeleteBranch_HonorsContext(t *testing.T) {
-	g := newTestGitlab(t, "gitlab.com", "user/repo")
+	g := newTestGitlab(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -131,7 +131,7 @@ func TestGitlab_DeleteBranch_HonorsContext(t *testing.T) {
 }
 
 func TestGitlab_GetUser_HonorsContext(t *testing.T) {
-	g := newTestGitlab(t, "gitlab.com", "user/repo")
+	g := newTestGitlab(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()

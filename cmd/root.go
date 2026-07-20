@@ -139,7 +139,7 @@ names you can set there. See the README for the full file format.`,
 			// CI mounts the checkout owned by a different user than the container runs as, so
 			// the git binary (invoked by drush/composer) refuses it as "dubious ownership".
 			// Mark it safe so those child processes can run git against it.
-			ensureGitSafeDirectory(logger, config.WorkingDir)
+			ensureGitSafeDirectory(cmd.Context(), logger, config.WorkingDir)
 		}
 
 		vcsProviderFactory := codehosting.NewDefaultVcsProviderFactory()
@@ -191,14 +191,14 @@ func resolveCheckoutBranch(git *repo.GitRepositoryService, workingDir string) (s
 // ensureGitSafeDirectory adds dir to git's global safe.directory list unless it (or "*") is
 // already trusted, so repeated checkout-mode runs on a developer machine don't append a
 // duplicate entry to the user's global gitconfig on every invocation.
-func ensureGitSafeDirectory(logger *zap.Logger, dir string) {
+func ensureGitSafeDirectory(ctx context.Context, logger *zap.Logger, dir string) {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
 		logger.Warn("failed to resolve checkout path for safe.directory", zap.Error(err))
 		return
 	}
 
-	if out, err := exec.Command("git", "config", "--global", "--get-all", "safe.directory").Output(); err == nil {
+	if out, err := exec.CommandContext(ctx, "git", "config", "--global", "--get-all", "safe.directory").Output(); err == nil {
 		for _, entry := range strings.Split(string(out), "\n") {
 			if entry == abs || entry == "*" {
 				return
@@ -206,7 +206,7 @@ func ensureGitSafeDirectory(logger *zap.Logger, dir string) {
 		}
 	}
 
-	if out, err := exec.Command("git", "config", "--global", "--add", "safe.directory", abs).CombinedOutput(); err != nil {
+	if out, err := exec.CommandContext(ctx, "git", "config", "--global", "--add", "safe.directory", abs).CombinedOutput(); err != nil {
 		logger.Warn("failed to mark checkout as a safe git directory", zap.String("output", string(out)), zap.Error(err))
 	}
 }
