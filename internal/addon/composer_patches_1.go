@@ -173,8 +173,11 @@ func (h *ComposerPatches1) updatePatches(ctx context.Context, path string, workt
 	for _, op := range operations {
 		switch op.Action {
 		case "Upgrade", "Downgrade":
-			for description, patchPath := range patches[op.Package] {
-				h.processSinglePatch(ctx, path, worktree, op, description, patchPath, patches, &updates)
+			// processSinglePatch mutates patches[op.Package] (it deletes the current key and
+			// may insert a rewritten "Issue #..." key). Snapshot the entries first so a newly
+			// inserted key isn't visited again in the same pass, which would double-process it.
+			for _, e := range snapshotPatches(patches[op.Package]) {
+				h.processSinglePatch(ctx, path, worktree, op, e.description, e.patchPath, patches, &updates)
 			}
 			if len(patches[op.Package]) > 1 {
 				h.validateCombinedPatches(ctx, path, op, patches, &updates)
@@ -185,6 +188,30 @@ func (h *ComposerPatches1) updatePatches(ctx context.Context, path string, workt
 	}
 
 	return updates, patches
+}
+
+// patchEntry is a single description→path pair snapshotted from a patch map.
+type patchEntry struct {
+	description string
+	patchPath   string
+}
+
+// snapshotPatches copies a package's description→path map into a stable slice so callers can
+// iterate while mutating the underlying map.
+func snapshotPatches(m map[string]string) []patchEntry {
+	entries := make([]patchEntry, 0, len(m))
+	for description, patchPath := range m {
+		entries = append(entries, patchEntry{description: description, patchPath: patchPath})
+	}
+	return entries
+}
+
+// isRemotePatch reports whether a patch reference is a remote (http/https) URL. A bare
+// absolute path such as "/patches/x.diff" is a local file, not remote, so scheme is checked
+// explicitly rather than relying on url.ParseRequestURI (which accepts absolute paths too).
+func isRemotePatch(patchPath string) bool {
+	u, err := url.Parse(patchPath)
+	return err == nil && (u.Scheme == "http" || u.Scheme == "https")
 }
 
 // removeDependencyProvidedPatches drops root patches whose patch file is already applied
@@ -206,7 +233,7 @@ func (h *ComposerPatches1) removeDependencyProvidedPatches(ctx context.Context, 
 			continue
 		}
 		for description, patchPath := range byDescription {
-			if _, err := url.ParseRequestURI(patchPath); err != nil {
+			if !isRemotePatch(patchPath) {
 				continue
 			}
 			if !depFiles[patchPath] {
@@ -230,7 +257,7 @@ func (h *ComposerPatches1) removeUninstalledPackagePatches(ctx context.Context, 
 			continue
 		}
 		for description, patchPath := range patches[packageName] {
-			if _, err := url.ParseRequestURI(patchPath); err != nil {
+			if !isRemotePatch(patchPath) {
 				if _, err := worktree.Remove(patchPath); err != nil {
 					h.logger.Error("failed to remove patch", zap.String("patch", patchPath), zap.Error(err))
 				}
@@ -248,7 +275,7 @@ func (h *ComposerPatches1) removePackagePatches(worktree Worktree, op composer.P
 	for description, patchPath := range patches[op.Package] {
 		h.logger.Debug("removing patch", zap.String("package", op.Package), zap.String("patch", patchPath))
 		removed = append(removed, RemovedPatch{Package: op.Package, PatchPath: patchPath, PatchDescription: description, Reason: fmt.Sprintf("%s is no longer installed", op.Package)})
-		if _, err := url.ParseRequestURI(patchPath); err != nil {
+		if !isRemotePatch(patchPath) {
 			if _, err := worktree.Remove(patchPath); err != nil {
 				h.logger.Error("failed to remove patch", zap.String("patch", patchPath), zap.Error(err))
 			}
@@ -291,7 +318,7 @@ func (h *ComposerPatches1) processSinglePatch(ctx context.Context, path string, 
 						delete(patches, op.Package)
 					}
 					h.logger.Info("removing patch: issue fixed in new version", zap.String("package", op.Package), zap.String("patch", patchPath))
-					updates.Removed = append(updates.Removed, RemovedPatch{Package: op.Package, PatchPath: patchPath, Reason: fmt.Sprintf("Issue [#%s](%s) is fixed in %s %s", issue.ID, issue.Title, op.Package, op.To), PatchDescription: description})
+					updates.Removed = append(updates.Removed, RemovedPatch{Package: op.Package, PatchPath: patchPath, Reason: fmt.Sprintf("Issue [#%s](%s) is fixed in %s %s", issue.ID, issue.URL, op.Package, op.To), PatchDescription: description})
 				}
 				return
 			}
@@ -302,9 +329,8 @@ func (h *ComposerPatches1) processSinglePatch(ctx context.Context, path string, 
 	}
 
 	absolutePath := patchPath
-	externalPatch := true
-	if _, err := url.ParseRequestURI(patchPath); err != nil {
-		externalPatch = false
+	externalPatch := isRemotePatch(patchPath)
+	if !externalPatch {
 		absolutePath = path + "/" + patchPath
 	}
 
@@ -322,6 +348,14 @@ func (h *ComposerPatches1) processSinglePatch(ctx context.Context, path string, 
 
 	if !issueNumberExists {
 		h.logger.Info("patch does not apply, keeping current package version", zap.String("package", op.Package), zap.String("version", op.From), zap.String("patch", patchPath))
+		updates.Conflicts = append(updates.Conflicts, ConflictPatch{Package: op.Package, FixedVersion: op.From, PatchPath: patchPath, NewVersion: op.To, PatchDescription: description})
+		return
+	}
+
+	// Locating a newer patch from the issue fork needs the drupalcode GitLab client, which is
+	// only configured when DRUPALCODE_ACCESS_TOKEN is set. Without it, keep the current version.
+	if h.gitlab == nil {
+		h.logger.Info("patch does not apply and no drupalcode client is configured, keeping current package version", zap.String("package", op.Package), zap.String("version", op.From), zap.String("patch", patchPath))
 		updates.Conflicts = append(updates.Conflicts, ConflictPatch{Package: op.Package, FixedVersion: op.From, PatchPath: patchPath, NewVersion: op.To, PatchDescription: description})
 		return
 	}
@@ -430,10 +464,13 @@ func (h *ComposerPatches1) fetchForkMergeRequests(projectMachineName string, for
 	return mergeRequests, nil
 }
 
+// cleanURLString turns an issue title into a safe file name component: lower-cased, spaces
+// mapped to underscores, and anything outside [a-z0-9-_.] stripped so the result can never
+// contain a path separator or other characters that would break os.Create.
 func (h *ComposerPatches1) cleanURLString(s string) string {
 	s = strings.ToLower(s)
 	s = strings.ReplaceAll(s, " ", "_")
-	re := regexp.MustCompile(`[^a-zA-Z0-9\-._~:/?#\[\]@!$&'()*+,;=]`)
+	re := regexp.MustCompile(`[^a-zA-Z0-9\-_.]`)
 	return re.ReplaceAllString(s, "")
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -322,6 +323,8 @@ func TestStartUpdateNoChanges(t *testing.T) {
 	// installCode runs concurrently with updateSharedCode and always completes.
 	// installSite may or may not run depending on goroutine scheduling after cancel.
 	worktree := NewMockWorktree(t)
+	// updateSharedCode checks out a dedicated work branch before doing any work.
+	worktree.EXPECT().Checkout(mock.Anything).Return(nil).Maybe()
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
 
@@ -378,6 +381,8 @@ func TestStartUpdateBranchAlreadyExists(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	// updateSharedCode checks out a dedicated work branch before doing any work.
+	worktree.EXPECT().Checkout(mock.Anything).Return(nil).Maybe()
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
 
@@ -671,6 +676,8 @@ func TestStartUpdateGetLockHashError(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	// updateSharedCode checks out a dedicated work branch before doing any work.
+	worktree.EXPECT().Checkout(mock.Anything).Return(nil).Maybe()
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
 	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil)
@@ -715,6 +722,8 @@ func TestStartUpdateBranchExistsError(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	// updateSharedCode checks out a dedicated work branch before doing any work.
+	worktree.EXPECT().Checkout(mock.Anything).Return(nil).Maybe()
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
 	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil)
@@ -867,6 +876,8 @@ func TestStartUpdateFireEventError(t *testing.T) {
 	}
 
 	worktree := NewMockWorktree(t)
+	// updateSharedCode checks out a dedicated work branch before firing the first event.
+	worktree.EXPECT().Checkout(mock.Anything).Return(nil).Maybe()
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
 
@@ -950,4 +961,83 @@ func TestStartUpdateUsesExistingCheckout(t *testing.T) {
 	require.NoError(t, err)
 	repositoryService.AssertExpectations(t)
 	repositoryService.AssertNotCalled(t, "CloneRepository", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestStartUpdateWorkBranchCheckoutError(t *testing.T) {
+	// If the up-front work-branch checkout fails, updateSharedCode aborts before touching
+	// dependencies and nothing is published.
+	logger := zap.NewNop()
+	installer := NewMockInstaller(t)
+	repositoryService := NewMockRepository(t)
+	vcsProvider := NewMockPlatform(t)
+	repository := NewMockGitRepository(t)
+	mockComposer := NewMockComposer(t)
+	drush := NewMockDrush(t)
+	ctx := context.Background()
+
+	config := internal.Config{
+		RepositoryURL: "https://example.com/repo.git",
+		Branch:        "main",
+		Token:         "token",
+		Clone:         true,
+		Sites:         []string{"site1"},
+	}
+
+	worktree := NewMockWorktree(t)
+	checkoutErr := errors.New("cannot create branch")
+	worktree.EXPECT().Checkout(mock.Anything).Return(checkoutErr)
+
+	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
+	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil)
+	mockComposer.EXPECT().CheckPlatformReqs(mock.Anything, "/tmp").Return("", nil)
+	mockComposer.EXPECT().Install(mock.Anything, "/tmp").Return(nil)
+	installer.EXPECT().Install(mock.Anything, "/tmp", "site1").Return(nil)
+
+	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
+	err := workflowService.StartUpdate(ctx, nil)
+
+	require.ErrorIs(t, err, checkoutErr)
+	require.ErrorContains(t, err, "failed to create work branch")
+	repository.AssertNotCalled(t, "Push", mock.Anything)
+}
+
+func TestCleanup(t *testing.T) {
+	logger := zap.NewNop()
+
+	t.Run("clone mode removes only this run's clone, not a sibling", func(t *testing.T) {
+		parent, err := os.MkdirTemp(os.TempDir(), "drupdater-clone-test")
+		require.NoError(t, err)
+		defer os.RemoveAll(parent)
+
+		clone := filepath.Join(parent, "repoAAA")
+		sibling := filepath.Join(parent, "repoBBB")
+		require.NoError(t, os.MkdirAll(clone, 0o755))
+		require.NoError(t, os.MkdirAll(sibling, 0o755))
+
+		ws := &WorkflowBaseService{logger: logger, config: internal.Config{Clone: true}}
+		ws.cleanup(clone)
+
+		assert.NoDirExists(t, clone)
+		assert.DirExists(t, sibling) // a concurrent run's clone must survive
+	})
+
+	t.Run("clone mode refuses to remove the temp dir itself", func(t *testing.T) {
+		ws := &WorkflowBaseService{logger: logger, config: internal.Config{Clone: true}}
+		ws.cleanup(os.TempDir())
+		assert.DirExists(t, os.TempDir())
+	})
+
+	t.Run("checkout mode removes the sqlite databases and private dir", func(t *testing.T) {
+		base := t.TempDir()
+		work := filepath.Join(base, "checkout")
+		require.NoError(t, os.MkdirAll(work, 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(base, "site1.sqlite"), []byte("x"), 0o644))
+		require.NoError(t, os.MkdirAll(filepath.Join(base, "private"), 0o755))
+
+		ws := &WorkflowBaseService{logger: logger, config: internal.Config{Sites: []string{"site1"}}}
+		ws.cleanup(work)
+
+		assert.NoFileExists(t, filepath.Join(base, "site1.sqlite"))
+		assert.NoDirExists(t, filepath.Join(base, "private"))
+	})
 }

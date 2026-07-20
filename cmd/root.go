@@ -12,6 +12,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"sort"
+	"strings"
 	"syscall"
 
 	"github.com/drupdater/drupdater/internal"
@@ -40,14 +41,17 @@ var configFile string
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "drupdater token",
+	Use:   "drupdater [token]",
 	Short: "Drupal Updater",
 	Long: `Drupal Updater is a tool to update Drupal dependencies and create merge requests.
+
+The access token is read from the first argument, or from the DRUPDATER_TOKEN environment
+variable when no argument is given (which keeps it out of the process list and shell history).
 
 Project settings (sites, timeout, and which addons run) are read from .drupdater.yaml in the
 working directory; override the path with --config. Run "drupdater addons" to list the addon
 names you can set there. See the README for the full file format.`,
-	Args: cobra.ExactArgs(1),
+	Args: cobra.MaximumNArgs(1),
 	PreRunE: func(_ *cobra.Command, _ []string) error {
 		// --clone needs an explicit repository URL; checkout mode derives it from origin.
 		if config.Clone && config.RepositoryURL == "" {
@@ -66,11 +70,20 @@ names you can set there. See the README for the full file format.`,
 		cmd.SilenceUsage = true
 		cmd.SilenceErrors = true
 
-		// Parse command line arguments
-		config.Token = args[0]
-
 		// Initialize the logger first so config errors are reported (errors are silenced by Cobra).
 		logger := NewLogger(config)
+
+		// The token comes from the positional argument, or DRUPDATER_TOKEN when it's omitted.
+		if len(args) == 1 {
+			config.Token = args[0]
+		} else {
+			config.Token = os.Getenv("DRUPDATER_TOKEN")
+		}
+		if config.Token == "" {
+			err := errors.New("no token provided: pass it as the argument or set DRUPDATER_TOKEN")
+			logger.Error("missing token", zap.Error(err))
+			return err
+		}
 
 		// Load per-project config from .drupdater.yaml (sites, timeout, addons). A missing file
 		// falls back to built-in defaults.
@@ -126,15 +139,15 @@ names you can set there. See the README for the full file format.`,
 			// CI mounts the checkout owned by a different user than the container runs as, so
 			// the git binary (invoked by drush/composer) refuses it as "dubious ownership".
 			// Mark it safe so those child processes can run git against it.
-			if abs, err := filepath.Abs(config.WorkingDir); err == nil {
-				if out, err := exec.Command("git", "config", "--global", "--add", "safe.directory", abs).CombinedOutput(); err != nil {
-					logger.Warn("failed to mark checkout as a safe git directory", zap.String("output", string(out)), zap.Error(err))
-				}
-			}
+			ensureGitSafeDirectory(logger, config.WorkingDir)
 		}
 
 		vcsProviderFactory := codehosting.NewDefaultVcsProviderFactory()
-		platform := vcsProviderFactory.Create(config.RepositoryURL, config.Token)
+		platform, err := vcsProviderFactory.Create(config.RepositoryURL, config.Token, logger)
+		if err != nil {
+			logger.Error("failed to create VCS provider", zap.Error(err))
+			return err
+		}
 
 		// Create the event dispatcher and register addons as subscribers
 		addons, err := createAddons(logger, config, drush, composer, drupalOrg, git)
@@ -173,6 +186,29 @@ func resolveCheckoutBranch(git *repo.GitRepositoryService, workingDir string) (s
 		return "", errors.New("could not determine the target branch: the checkout is in detached HEAD and no CI branch variable (GITHUB_REF_NAME, CI_COMMIT_REF_NAME) is set")
 	}
 	return branch, nil
+}
+
+// ensureGitSafeDirectory adds dir to git's global safe.directory list unless it (or "*") is
+// already trusted, so repeated checkout-mode runs on a developer machine don't append a
+// duplicate entry to the user's global gitconfig on every invocation.
+func ensureGitSafeDirectory(logger *zap.Logger, dir string) {
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		logger.Warn("failed to resolve checkout path for safe.directory", zap.Error(err))
+		return
+	}
+
+	if out, err := exec.Command("git", "config", "--global", "--get-all", "safe.directory").Output(); err == nil {
+		for _, entry := range strings.Split(string(out), "\n") {
+			if entry == abs || entry == "*" {
+				return
+			}
+		}
+	}
+
+	if out, err := exec.Command("git", "config", "--global", "--add", "safe.directory", abs).CombinedOutput(); err != nil {
+		logger.Warn("failed to mark checkout as a safe git directory", zap.String("output", string(out)), zap.Error(err))
+	}
 }
 
 // addonDeps carries everything the addon constructors need.

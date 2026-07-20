@@ -415,6 +415,23 @@ func TestCodingStyles(t *testing.T) {
 		composer.AssertExpectations(t)
 	})
 
+	t.Run("somethingStaged reports staged changes and propagates errors", func(t *testing.T) {
+		wt := NewMockWorktree(t)
+		wt.EXPECT().Status().Return(git.Status{"a": &git.FileStatus{Staging: git.Unmodified}}, nil).Once()
+		staged, err := somethingStaged(wt)
+		require.NoError(t, err)
+		assert.False(t, staged)
+
+		wt.EXPECT().Status().Return(git.Status{"a": &git.FileStatus{Staging: git.Modified}}, nil).Once()
+		staged, err = somethingStaged(wt)
+		require.NoError(t, err)
+		assert.True(t, staged)
+
+		wt.EXPECT().Status().Return(nil, assert.AnError).Once()
+		_, err = somethingStaged(wt)
+		require.Error(t, err)
+	})
+
 	t.Run("Fixable", func(t *testing.T) {
 
 		fileExists = func(_ string) bool {
@@ -455,7 +472,39 @@ func TestCodingStyles(t *testing.T) {
 		composer.EXPECT().IsPackageInstalled(mock.Anything, "/path/to/repo", "drupal/coder").Return(true, nil)
 
 		worktree.EXPECT().Add("file1.php").Return(plumbing.NewHash(""), nil)
+		worktree.EXPECT().Status().Return(git.Status{"file1.php": &git.FileStatus{Staging: git.Modified}}, nil)
 		worktree.EXPECT().Commit("Update coding styles", &git.CommitOptions{}).Return(plumbing.NewHash(""), nil)
+
+		updateCodingStyles := NewCodeBeautifier(logger, runner, internal.Config{}, composer)
+		postCodeUpdate := services.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", worktree)
+		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
+
+		require.NoError(t, err)
+		runner.AssertExpectations(t)
+		composer.AssertExpectations(t)
+	})
+
+	t.Run("Fixable but nothing staged skips the commit", func(t *testing.T) {
+		fileExists = func(_ string) bool { return true }
+		oldFn := hasPHPCSPathDefinitions
+		hasPHPCSPathDefinitions = func(_ string) (bool, error) { return true, nil }
+		defer func() { hasPHPCSPathDefinitions = oldFn }()
+
+		runner := NewMockPHPCS(t)
+		runner.EXPECT().Run(mock.Anything, "/path/to/repo").Return(phpcs.ReturnOutput{
+			Totals: phpcs.ReturnOutputTotals{Warnings: 1, Fixable: 1},
+			Files: map[string]phpcs.ReturnOutputFile{
+				"file1.php": {Warnings: 1, Messages: []phpcs.ReturnOutputFileMessage{{Fixable: true}}},
+			},
+		}, nil)
+		runner.EXPECT().RunCBF(mock.Anything, "/path/to/repo").Return(nil)
+
+		composer := NewMockComposer(t)
+		composer.EXPECT().IsPackageInstalled(mock.Anything, "/path/to/repo", "drupal/coder").Return(true, nil)
+
+		worktree.EXPECT().Add("file1.php").Return(plumbing.NewHash(""), nil)
+		worktree.EXPECT().Status().Return(git.Status{}, nil)
+		// No Commit expectation: an empty index must not trigger a commit.
 
 		updateCodingStyles := NewCodeBeautifier(logger, runner, internal.Config{}, composer)
 		postCodeUpdate := services.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", worktree)

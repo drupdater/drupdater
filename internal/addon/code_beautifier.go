@@ -147,8 +147,34 @@ func (cb *CodeBeautifier) postCodeUpdateHandler(e event.Event) error {
 		}
 	}
 
+	// phpcbf may not have changed anything on disk (some "fixable" issues aren't actually
+	// auto-fixable, and RunCBF errors are only logged), which would make an empty commit that
+	// go-git rejects. Only commit when something is actually staged.
+	staged, err := somethingStaged(event.Worktree())
+	if err != nil {
+		return fmt.Errorf("failed to check worktree status: %w", err)
+	}
+	if !staged {
+		cb.logger.Debug("no coding style changes to commit")
+		return nil
+	}
+
 	_, err = event.Worktree().Commit("Update coding styles", &git.CommitOptions{})
 	return err
+}
+
+// somethingStaged reports whether the worktree has any staged change.
+func somethingStaged(worktree Worktree) (bool, error) {
+	status, err := worktree.Status()
+	if err != nil {
+		return false, err
+	}
+	for _, s := range status {
+		if s.Staging != git.Unmodified {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 var phpcsTemplateStr = `<?xml version="1.0" encoding="UTF-8"?>

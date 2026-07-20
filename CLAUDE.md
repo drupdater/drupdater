@@ -77,7 +77,7 @@ Events fired during the workflow: `PreComposerUpdateEvent`, `PostComposerUpdateE
 
 Config is split into two tiers, with no overlap:
 
-- **CLI flags** — how a given run is invoked (volatile): token (positional arg), plus the flags below.
+- **CLI flags** — how a given run is invoked (volatile): token (positional arg, or the `DRUPDATER_TOKEN` env var when the arg is omitted), plus the flags below.
 - **`.drupdater.yaml`** — what the project needs (committed at the repo root, read from `<working-dir>/.drupdater.yaml` or `--config`). Loaded by `internal/configfile.go`; a missing file falls back to built-in defaults, absent keys keep their default, and unknown keys are rejected (strict decode). Keys: `sites`, `timeout` (Go duration string, e.g. `30m`), and `addons.normal` / `addons.security`. Addon names in both lists are validated up front via `validateAddons`; `drupdater addons` lists valid names.
 
 ### CLI Flags

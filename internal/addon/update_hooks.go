@@ -2,6 +2,7 @@ package addon
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/services"
@@ -19,6 +20,8 @@ type UpdateHooks struct {
 	logger *zap.Logger
 	drush  Drush
 
+	// mu guards hooks: preSiteUpdateHandler runs concurrently for each site.
+	mu    sync.Mutex
 	hooks UpdateHooksPerSite
 }
 
@@ -61,7 +64,9 @@ func (uh *UpdateHooks) preSiteUpdateHandler(e event.Event) error {
 		uh.logger.Debug("no update hooks found")
 		return nil
 	}
+	uh.mu.Lock()
 	uh.hooks[evt.Site()] = hooks
+	uh.mu.Unlock()
 	uh.logger.Info("update hooks found", zap.String("site", evt.Site()), zap.Int("count", len(hooks)))
 
 	return nil

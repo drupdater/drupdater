@@ -10,11 +10,13 @@ import (
 	"github.com/google/go-github/v68/github"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 func TestGithub_GetOwner(t *testing.T) {
 	// Setup
-	gh := newGithub("https://github.com/owner/repo", "dummy-token")
+	gh, err := newGithub("owner/repo", "dummy-token", zap.NewNop())
+	require.NoError(t, err)
 
 	// Assert
 	assert.Equal(t, "owner", gh.owner)
@@ -22,10 +24,16 @@ func TestGithub_GetOwner(t *testing.T) {
 
 func TestGithub_GetRepo(t *testing.T) {
 	// Setup
-	gh := newGithub("https://github.com/owner/repo", "dummy-token")
+	gh, err := newGithub("owner/repo", "dummy-token", zap.NewNop())
+	require.NoError(t, err)
 
 	// Assert
 	assert.Equal(t, "repo", gh.repo)
+}
+
+func TestNewGithub_InvalidPath(t *testing.T) {
+	_, err := newGithub("owner", "dummy-token", zap.NewNop())
+	require.Error(t, err)
 }
 
 func TestGithub_CreateMergeRequest(t *testing.T) {

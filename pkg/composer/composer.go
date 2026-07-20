@@ -1,6 +1,7 @@
 package composer
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -44,6 +45,25 @@ func (s *CLI) execComposer(ctx context.Context, dir string, args ...string) (str
 	return output, err
 }
 
+// execComposerJSON runs composer and returns only stdout, keeping stderr out of the result.
+// Commands whose output is parsed as JSON must use this: composer prints warnings and notices
+// (e.g. "Composer plugins have been disabled") to stderr, and folding them into stdout would
+// corrupt the JSON. stderr is still captured for the debug log.
+func (s *CLI) execComposerJSON(ctx context.Context, dir string, args ...string) (string, error) {
+	command := execCommand(ctx, "composer", args...)
+	command.Dir = dir
+
+	var stdout, stderr bytes.Buffer
+	command.Stdout = &stdout
+	command.Stderr = &stderr
+	err := command.Run()
+
+	output := strings.TrimSuffix(stdout.String(), "\n")
+	s.logger.Debug(command.String() + "\nstdout: " + output + "\nstderr: " + strings.TrimSuffix(stderr.String(), "\n"))
+
+	return output, err
+}
+
 // PackageChange represents an individual package operation
 type PackageChange struct {
 	Action  string // Install, Upgrade, Remove, Downgrade
@@ -71,11 +91,13 @@ func (s *CLI) Update(ctx context.Context, dir string, packages []string, package
 		return changes, fmt.Errorf("failed to update dependencies: %w, output: %s, arg: %v", err, out, args)
 	}
 
-	// Regular expression to capture upgrade operations
-	upgradeRegex := regexp.MustCompile(`- Upgrading ([\w\-/]+) \(([\w\.\-]+) => ([\w\.\-]+)\)`)
-	downgradingRegex := regexp.MustCompile(`- Downgrading ([\w\-/]+) \(([\w\.\-]+) => ([\w\.\-]+)\)`)
-	removeRegex := regexp.MustCompile(`- Removing ([\w\-/]+) \(([\w\.\-]+)\)`)
-	installRegex := regexp.MustCompile(`- Installing ([\w\-/]+) \(([\w\.\-]+)\)`)
+	// Regular expression to capture composer operations. The version character class includes
+	// "+" so build-metadata versions (e.g. 1.0.0+21AF26D3) and "~" are matched too.
+	const version = `[\w.\-+~]+`
+	upgradeRegex := regexp.MustCompile(`- Upgrading ([\w\-/]+) \((` + version + `) => (` + version + `)\)`)
+	downgradingRegex := regexp.MustCompile(`- Downgrading ([\w\-/]+) \((` + version + `) => (` + version + `)\)`)
+	removeRegex := regexp.MustCompile(`- Removing ([\w\-/]+) \((` + version + `)\)`)
+	installRegex := regexp.MustCompile(`- Installing ([\w\-/]+) \((` + version + `)\)`)
 
 	// Match upgrades
 	for _, match := range upgradeRegex.FindAllStringSubmatch(out, -1) {
@@ -146,7 +168,7 @@ func (s *CLI) Remove(ctx context.Context, dir string, packages ...string) (strin
 
 func (s *CLI) Audit(ctx context.Context, dir string) (Audit, error) {
 	var composerAudit Audit
-	out, err := s.execComposer(ctx, dir, "audit", "--format=json", "--locked", "--no-plugins")
+	out, err := s.execComposerJSON(ctx, dir, "audit", "--format=json", "--locked", "--no-plugins")
 	if err != nil {
 		// Some errors are expected for audit and don't affect the parsing
 		s.logger.Debug("composer audit returned error", zap.Error(err))
@@ -266,7 +288,7 @@ func (s *CLI) Diff(ctx context.Context, dir string, withLinks bool) (string, err
 }
 
 func (s *CLI) GetInstalledPackageVersion(ctx context.Context, dir string, packageName string) (string, error) {
-	out, err := s.execComposer(ctx, dir, "show", packageName, "--locked", "--no-ansi", "--format=json")
+	out, err := s.execComposerJSON(ctx, dir, "show", packageName, "--locked", "--no-ansi", "--format=json")
 	if err != nil {
 		return "", err
 	}
@@ -288,13 +310,11 @@ func (s *CLI) GetInstalledPackageVersion(ctx context.Context, dir string, packag
 func (s *CLI) GetAllowPlugins(ctx context.Context, dir string) (map[string]bool, error) {
 	allowPluginsJSON, err := s.GetConfig(ctx, dir, "allow-plugins")
 	if err != nil {
-		s.logger.Error("failed to set composer config", zap.Error(err))
+		return nil, fmt.Errorf("failed to get composer allow-plugins config: %w", err)
 	}
 
 	var allowPlugins map[string]bool
-
-	err = json.Unmarshal([]byte(allowPluginsJSON), &allowPlugins)
-	if err != nil {
+	if err := json.Unmarshal([]byte(allowPluginsJSON), &allowPlugins); err != nil {
 		return nil, err
 	}
 
@@ -312,8 +332,9 @@ func (s *CLI) SetAllowPlugins(ctx context.Context, dir string, plugins map[strin
 }
 
 func (s *CLI) GetConfig(ctx context.Context, dir string, key string) (string, error) {
-	//ctx = context.Background()
-	return s.execComposer(ctx, dir, "config", "--json", key)
+	// Read from stdout only: the value is consumed as JSON/plain text and composer emits
+	// unrelated warnings on stderr that would otherwise corrupt it.
+	return s.execComposerJSON(ctx, dir, "config", "--json", key)
 }
 
 func (s *CLI) SetConfig(ctx context.Context, dir string, key string, value string) error {
@@ -366,6 +387,9 @@ type lockPackage struct {
 
 func (s *CLI) initTempDir() {
 	s.tempDir, s.initErr = afero.TempDir(s.fs, "", "composer-service")
+	if s.initErr != nil {
+		return
+	}
 
 	// Create a composer.json file
 	composerJSON := `{
@@ -467,8 +491,11 @@ func (s *CLI) GetInstalledPlugins(ctx context.Context, dir string) (map[string]a
 		return nil, err
 	}
 
+	// Match "<package> <version> requires ..." lines. The version token is matched loosely
+	// (any non-space run) so pre-release and dev versions like 1.0.0-beta1 or dev-main are
+	// captured, not just plain numeric versions.
 	var packages = make(map[string]any)
-	reg := regexp.MustCompile(`(?m)^(\S+)\s+v?[\d\.]+\s+requires`)
+	reg := regexp.MustCompile(`(?m)^(\S+)\s+\S+\s+requires\b`)
 	matches := reg.FindAllStringSubmatch(out, -1)
 
 	for _, match := range matches {

@@ -5,10 +5,11 @@ import (
 	"context"
 	"embed"
 	"fmt"
-	"hash/fnv"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
+	"sync"
 	"text/template"
 	"time"
 
@@ -39,6 +40,11 @@ type WorkflowBaseService struct {
 	composer   Composer
 	dispatcher EventDispatcher
 	current    time.Time
+
+	// siteCommitMu serializes the git-committing tail of updateSite. Sites are updated
+	// concurrently, but they share one working tree and git index, and drush config:export
+	// commits via git itself, so the staging/commit steps must not overlap.
+	siteCommitMu sync.Mutex
 }
 
 func NewWorkflowBaseService(
@@ -151,14 +157,17 @@ func (ws *WorkflowBaseService) forEachSite(ctx context.Context, fn func(context.
 	return g.Wait()
 }
 
-// cleanup removes the artifacts the run created. In clone mode that's the whole temp clone;
-// in checkout mode it's the SQLite databases and private files written beside the checkout.
+// cleanup removes the artifacts the run created. In clone mode that's this run's own temp
+// clone; in checkout mode it's the SQLite databases and private files written beside the
+// checkout.
 func (ws *WorkflowBaseService) cleanup(path string) {
 	if ws.config.Clone {
-		h := fnv.New64a()
-		_, _ = h.Write([]byte(ws.config.RepositoryURL))
-		tmpDirName := filepath.Join(os.TempDir(), fmt.Sprintf("%x", h.Sum64()))
-		os.RemoveAll(tmpDirName)
+		// Remove only this run's clone directory, not the shared per-URL parent, so a
+		// concurrent run of the same repository isn't wiped out. The clone always lives in a
+		// unique sub-directory of the temp dir; guard against removing the temp dir itself.
+		if rel, err := filepath.Rel(os.TempDir(), path); err == nil && rel != "." && !strings.HasPrefix(rel, "..") {
+			os.RemoveAll(path)
+		}
 		return
 	}
 	parent := filepath.Dir(path)
@@ -170,6 +179,20 @@ func (ws *WorkflowBaseService) cleanup(path string) {
 
 func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context, repository GitRepository, worktree Worktree, path string) (string, error) {
 	ws.logger.Info("updating dependencies")
+
+	// Do all of the update work on a dedicated branch. In checkout mode the run operates on the
+	// branch the user (or CI) has checked out, and the addons commit as they go; without this,
+	// an abort ("branch already exists") or a mid-run failure would leave those commits — and a
+	// modified composer.json — on that branch. The final, hash-named branch is branched from
+	// this one once the composer.lock hash is known.
+	workBranch := fmt.Sprintf("drupdater/work-%d", ws.current.UnixNano())
+	if err := worktree.Checkout(&git.CheckoutOptions{
+		Branch: plumbing.NewBranchReferenceName(workBranch),
+		Create: true,
+		Keep:   true,
+	}); err != nil {
+		return "", fmt.Errorf("failed to create work branch: %w", err)
+	}
 
 	preComposerUpdateEvent := NewPreComposerUpdateEvent(ctx, path, worktree, []string{}, []string{}, false)
 	if err := ws.dispatcher.FireEvent(preComposerUpdateEvent); err != nil {
@@ -231,7 +254,7 @@ func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context, repository 
 		return "", AbortError{Msg: fmt.Sprintf("branch %s already exists, skipping", updateBranchName)}
 	}
 
-	// Create final branch for changes
+	// Create the final branch from the work branch's tip (carrying the accumulated commits).
 	if err := worktree.Checkout(&git.CheckoutOptions{
 		Branch: plumbing.NewBranchReferenceName(updateBranchName),
 		Create: true,
@@ -265,6 +288,18 @@ func (ws *WorkflowBaseService) updateSite(ctx context.Context, path string, work
 		return fmt.Errorf("failed to resave config: %w", err)
 
 	}
+
+	// The remaining steps stage and commit into the shared working tree (the post-site-update
+	// addons via go-git, and drush config:export via git directly), so run them one site at a
+	// time even though the sites themselves are updated concurrently.
+	return ws.commitSiteChanges(ctx, path, worktree, site)
+}
+
+// commitSiteChanges runs the post-site-update event and configuration export under a lock so
+// the git operations of concurrently-updated sites don't race on the shared index.
+func (ws *WorkflowBaseService) commitSiteChanges(ctx context.Context, path string, worktree Worktree, site string) error {
+	ws.siteCommitMu.Lock()
+	defer ws.siteCommitMu.Unlock()
 
 	postSiteUpdateEvent := NewPostSiteUpdateEvent(ctx, path, worktree, site)
 	if err := ws.dispatcher.FireEvent(postSiteUpdateEvent); err != nil {

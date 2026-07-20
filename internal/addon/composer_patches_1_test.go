@@ -20,6 +20,45 @@ import (
 	"go.uber.org/zap"
 )
 
+func TestIsRemotePatch(t *testing.T) {
+	tests := []struct {
+		name  string
+		patch string
+		want  bool
+	}{
+		{name: "https URL", patch: "https://www.drupal.org/files/x.patch", want: true},
+		{name: "http URL", patch: "http://example.com/x.patch", want: true},
+		{name: "relative local path", patch: "patches/core/x.patch", want: false},
+		{name: "absolute local path is not remote", patch: "/patches/core/x.patch", want: false},
+		{name: "empty", patch: "", want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, isRemotePatch(tt.patch))
+		})
+	}
+}
+
+func TestCleanURLString(t *testing.T) {
+	h := &ComposerPatches1{}
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{name: "spaces become underscores and lower-cased", in: "Alot of Problems", want: "alot_of_problems"},
+		{name: "path separators and reserved chars are stripped", in: "fix a/b: [x]?#", want: "fix_ab_x"},
+		{name: "keeps dots, dashes and underscores", in: "v1.2-beta_final", want: "v1.2-beta_final"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := h.cleanURLString(tt.in)
+			assert.Equal(t, tt.want, got)
+			assert.NotContains(t, got, "/") // never yields a path separator
+		})
+	}
+}
+
 func TestComposerPatches1_SubscribedEvents(t *testing.T) {
 	h := &ComposerPatches1{}
 	events := h.SubscribedEvents()
@@ -518,6 +557,53 @@ func TestUpdatePatches(t *testing.T) {
 			},
 		}, report)
 		assert.True(t, report.Changes())
+
+		composerService.AssertExpectations(t)
+		drupalOrgService.AssertExpectations(t)
+	})
+
+	t.Run("Current patch fails and no gitlab client records a conflict", func(t *testing.T) {
+		// When DRUPALCODE_ACCESS_TOKEN is unset the gitlab client is nil; the fork lookup
+		// must be skipped instead of panicking, and the package kept at its current version.
+		composerService := NewMockComposer(t)
+		composerService.EXPECT().GetDependencyPatches(mock.Anything, "/tmp").Return(nil, nil).Maybe()
+		drupalOrgService := NewMockDrupalOrg(t)
+		worktree := NewMockWorktree(t)
+
+		composerService.EXPECT().IsPackageInstalled(mock.Anything, "/tmp", "drupal/core").Return(true, nil)
+
+		drupalOrgService.EXPECT().FindIssueNumber("Issue #123456 \"With problems\"").Return("123456", true)
+		drupalOrgService.EXPECT().GetIssue(mock.Anything, "123456").Return(&drupalorg.Issue{
+			ID:     "123456",
+			Title:  "Alot of problems",
+			Status: "1",
+			URL:    "https://www.drupal.org/node/123456",
+			Project: struct {
+				MaschineName string `json:"machine_name"`
+			}{MaschineName: "drupal"},
+		}, nil)
+
+		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/remote/0001-remote.patch").Return(false, nil)
+
+		updater := &ComposerPatches1{
+			logger:    logger,
+			composer:  composerService,
+			drupalOrg: drupalOrgService,
+			gitlab:    nil,
+		}
+
+		operations := []composer.PackageChange{
+			{Action: "Upgrade", Package: "drupal/core", From: "8.7.0", To: "8.8.0"},
+		}
+		patches := map[string]map[string]string{
+			"drupal/core": {"Issue #123456 \"With problems\"": "patches/remote/0001-remote.patch"},
+		}
+
+		report, _ := updater.updatePatches(t.Context(), "/tmp", worktree, operations, patches)
+		require.Len(t, report.Conflicts, 1)
+		assert.Equal(t, "drupal/core", report.Conflicts[0].Package)
+		assert.Equal(t, "8.7.0", report.Conflicts[0].FixedVersion)
+		assert.Equal(t, "8.8.0", report.Conflicts[0].NewVersion)
 
 		composerService.AssertExpectations(t)
 		drupalOrgService.AssertExpectations(t)

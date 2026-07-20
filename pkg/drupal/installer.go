@@ -103,7 +103,9 @@ if (isset($settings['config_exclude_modules'])) {
 
 	siteLogger.Debug("writing settings", zap.String("path", settingsPath), zap.String("settings", settings))
 
-	// If the file doesn't exist, create it, or append to the file
+	// Append the database and file settings to the site's existing settings.php. The file is
+	// expected to already exist (every installed Drupal site has one); a missing file is an
+	// error rather than something to create, since our snippet alone is not a valid settings.php.
 	f, err := is.fs.OpenFile(settingsPath, os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to open settings file: %w", err)
@@ -142,7 +144,11 @@ func (is *Installer) isSqliteModuleEnabled(ctx context.Context, dir string, site
 	}
 
 	// Check if the sqlite module is enabled
-	if enabled, exists := config["module"].(map[string]any)["sqlite"]; exists && enabled == 0 {
+	modules, ok := config["module"].(map[string]any)
+	if !ok {
+		return false, fmt.Errorf("core extension file %s has no module section", coreExtensionPath)
+	}
+	if enabled, exists := modules["sqlite"]; exists && enabled == 0 {
 		siteLogger.Debug("sqlite module is enabled")
 		return true, nil
 	}
@@ -172,7 +178,11 @@ func (is *Installer) addSqliteModule(ctx context.Context, dir string, site strin
 		return fmt.Errorf("failed to unmarshal core extension file: %w", err)
 	}
 
-	config["module"].(map[string]any)["sqlite"] = 0
+	modules, ok := config["module"].(map[string]any)
+	if !ok {
+		return fmt.Errorf("core extension file %s has no module section", coreExtensionPath)
+	}
+	modules["sqlite"] = 0
 
 	// Marshal the updated config back to YAML
 	updatedConfig, err := yaml.Marshal(config)
@@ -208,16 +218,26 @@ func (is *Installer) RemoveProfile(ctx context.Context, dir string, site string)
 
 	profiles := []string{"standard"}
 
-	// Read all lines into a slice, excluding the target line
+	// Read all lines into a slice, excluding both the "profile: <name>" key and the profile's
+	// own entry in the module list (profiles are listed under module: with a high weight). A
+	// line is dropped if it matches any configured profile; it is kept only when it matches
+	// none — checking that once per line (not once per profile) so extra profiles can't
+	// duplicate the kept lines.
 	var lines []string
 	scanner := bufio.NewScanner(fileToRead)
 	for scanner.Scan() {
 		line := scanner.Text()
+		trimmed := strings.TrimSpace(line)
 
+		keep := true
 		for _, profile := range profiles {
-			if strings.TrimSpace(line) != "profile: "+profile && !strings.Contains(line, profile+":") {
-				lines = append(lines, line)
+			if trimmed == "profile: "+profile || strings.HasPrefix(trimmed, profile+":") {
+				keep = false
+				break
 			}
+		}
+		if keep {
+			lines = append(lines, line)
 		}
 	}
 	if err := scanner.Err(); err != nil {
