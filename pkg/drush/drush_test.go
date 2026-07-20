@@ -192,6 +192,126 @@ func TestGetUpdateHooks(t *testing.T) {
 
 }
 
+func TestGetUnsupportedModules(t *testing.T) {
+	logger := zap.NewNop()
+
+	t.Run("JSON of unsupported modules", func(t *testing.T) {
+		data := `[{"name":"module_a","installed_version":"1.0.0","recommended_version":"None"},{"name":"module_b","installed_version":"2.3.1","recommended_version":"3.0.0"}]`
+
+		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
+		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
+		t.Setenv("GOCOVERDIR", "/tmp")
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", data}
+			cs = append(cs, arg...)
+			return exec.CommandContext(ctx, os.Args[0], cs...)
+		}
+		defer func() { execCommand = exec.CommandContext }()
+
+		drush := CLI{
+			logger: logger,
+		}
+
+		modules, err := drush.GetUnsupportedModules(t.Context(), "/tmp", "site1")
+
+		require.NoError(t, err)
+		assert.Equal(t, []UnsupportedModule{
+			{Name: "module_a", InstalledVersion: "1.0.0", RecommendedVersion: "None"},
+			{Name: "module_b", InstalledVersion: "2.3.1", RecommendedVersion: "3.0.0"},
+		}, modules)
+	})
+
+	t.Run("no unsupported modules", func(t *testing.T) {
+		data := `[]`
+
+		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
+		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
+		t.Setenv("GOCOVERDIR", "/tmp")
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", data}
+			cs = append(cs, arg...)
+			return exec.CommandContext(ctx, os.Args[0], cs...)
+		}
+		defer func() { execCommand = exec.CommandContext }()
+
+		drush := CLI{
+			logger: logger,
+		}
+
+		modules, err := drush.GetUnsupportedModules(t.Context(), "/tmp", "site1")
+
+		require.NoError(t, err)
+		assert.Empty(t, modules)
+	})
+
+	t.Run("empty output", func(t *testing.T) {
+		data := ``
+
+		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
+		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
+		t.Setenv("GOCOVERDIR", "/tmp")
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", data}
+			cs = append(cs, arg...)
+			return exec.CommandContext(ctx, os.Args[0], cs...)
+		}
+		defer func() { execCommand = exec.CommandContext }()
+
+		drush := CLI{
+			logger: logger,
+		}
+
+		modules, err := drush.GetUnsupportedModules(t.Context(), "/tmp", "site1")
+
+		require.NoError(t, err)
+		assert.Nil(t, modules)
+	})
+
+	t.Run("execution failure", func(t *testing.T) {
+		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
+		t.Setenv("GO_HELPER_PROCESS_ERROR", "1")
+		t.Setenv("GOCOVERDIR", "/tmp")
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--"}
+			cs = append(cs, arg...)
+			return exec.CommandContext(ctx, os.Args[0], cs...)
+		}
+		defer func() { execCommand = exec.CommandContext }()
+
+		drush := CLI{
+			logger: logger,
+		}
+
+		modules, err := drush.GetUnsupportedModules(t.Context(), "/tmp", "site1")
+
+		require.Error(t, err)
+		assert.Nil(t, modules)
+	})
+
+	t.Run("invalid JSON", func(t *testing.T) {
+		data := `not json`
+
+		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
+		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
+		t.Setenv("GOCOVERDIR", "/tmp")
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", data}
+			cs = append(cs, arg...)
+			return exec.CommandContext(ctx, os.Args[0], cs...)
+		}
+		defer func() { execCommand = exec.CommandContext }()
+
+		drush := CLI{
+			logger: logger,
+		}
+
+		modules, err := drush.GetUnsupportedModules(t.Context(), "/tmp", "site1")
+
+		require.Error(t, err)
+		assert.Nil(t, modules)
+	})
+}
+
 func TestInstallSite(t *testing.T) {
 	logger := zap.NewNop()
 	cache, _ := otter.MustBuilder[string, string](100).Build()

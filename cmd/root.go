@@ -236,8 +236,9 @@ var addonRegistry = map[string]func(addonDeps) internal.Addon{
 	"composer_patches": func(d addonDeps) internal.Addon {
 		return addon.NewComposerPatches1(d.logger, d.composer, d.drupalOrg, http.DefaultClient)
 	},
-	"composer_diff": func(d addonDeps) internal.Addon { return addon.NewComposerDiff(d.logger, d.composer) },
-	"update_hooks":  func(d addonDeps) internal.Addon { return addon.NewUpdateHooks(d.logger, d.drush) },
+	"composer_diff":       func(d addonDeps) internal.Addon { return addon.NewComposerDiff(d.logger, d.composer) },
+	"update_hooks":        func(d addonDeps) internal.Addon { return addon.NewUpdateHooks(d.logger, d.drush) },
+	"unsupported_modules": func(d addonDeps) internal.Addon { return addon.NewUnsupportedModules(d.logger, d.drush) },
 }
 
 // mandatoryAddons always run, regardless of the .drupdater.yaml addon lists.

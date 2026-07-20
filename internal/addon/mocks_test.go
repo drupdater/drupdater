@@ -1442,6 +1442,80 @@ func (_c *MockDrush_GetTranslationPath_Call) RunAndReturn(run func(ctx context.C
 	return _c
 }
 
+// GetUnsupportedModules provides a mock function for the type MockDrush
+func (_mock *MockDrush) GetUnsupportedModules(ctx context.Context, dir string, site string) ([]drush.UnsupportedModule, error) {
+	ret := _mock.Called(ctx, dir, site)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetUnsupportedModules")
+	}
+
+	var r0 []drush.UnsupportedModule
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) ([]drush.UnsupportedModule, error)); ok {
+		return returnFunc(ctx, dir, site)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) []drush.UnsupportedModule); ok {
+		r0 = returnFunc(ctx, dir, site)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]drush.UnsupportedModule)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = returnFunc(ctx, dir, site)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockDrush_GetUnsupportedModules_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetUnsupportedModules'
+type MockDrush_GetUnsupportedModules_Call struct {
+	*mock.Call
+}
+
+// GetUnsupportedModules is a helper method to define mock.On call
+//   - ctx context.Context
+//   - dir string
+//   - site string
+func (_e *MockDrush_Expecter) GetUnsupportedModules(ctx any, dir any, site any) *MockDrush_GetUnsupportedModules_Call {
+	return &MockDrush_GetUnsupportedModules_Call{Call: _e.mock.On("GetUnsupportedModules", ctx, dir, site)}
+}
+
+func (_c *MockDrush_GetUnsupportedModules_Call) Run(run func(ctx context.Context, dir string, site string)) *MockDrush_GetUnsupportedModules_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockDrush_GetUnsupportedModules_Call) Return(unsupportedModules []drush.UnsupportedModule, err error) *MockDrush_GetUnsupportedModules_Call {
+	_c.Call.Return(unsupportedModules, err)
+	return _c
+}
+
+func (_c *MockDrush_GetUnsupportedModules_Call) RunAndReturn(run func(ctx context.Context, dir string, site string) ([]drush.UnsupportedModule, error)) *MockDrush_GetUnsupportedModules_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetUpdateHooks provides a mock function for the type MockDrush
 func (_mock *MockDrush) GetUpdateHooks(ctx context.Context, dir string, site string) (map[string]drush.UpdateHook, error) {
 	ret := _mock.Called(ctx, dir, site)
@@ -2028,7 +2102,10 @@ func (_c *MockDrupalOrg_GetIssue_Call) Run(run func(ctx context.Context, issueID
 		if args[1] != nil {
 			arg1 = args[1].(string)
 		}
-		run(arg0, arg1)
+		run(
+			arg0,
+			arg1,
+		)
 	})
 	return _c
 }
@@ -2038,7 +2115,7 @@ func (_c *MockDrupalOrg_GetIssue_Call) Return(issue *drupalorg.Issue, err error)
 	return _c
 }
 
-func (_c *MockDrupalOrg_GetIssue_Call) RunAndReturn(run func(context.Context, string) (*drupalorg.Issue, error)) *MockDrupalOrg_GetIssue_Call {
+func (_c *MockDrupalOrg_GetIssue_Call) RunAndReturn(run func(ctx context.Context, issueID string) (*drupalorg.Issue, error)) *MockDrupalOrg_GetIssue_Call {
 	_c.Call.Return(run)
 	return _c
 }

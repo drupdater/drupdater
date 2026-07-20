@@ -1,0 +1,9 @@
+## ⚠️ Unsupported modules
+
+The following installed modules have reached end-of-life: they have no supported upgrade path, so they will not receive further fixes. Consider planning a replacement.
+
+| Module | Installed version | Recommended version |
+| ------ | ------------------ | -------------------- |
+{{ range . -}}
+| {{ .Name | cell }} | {{ .InstalledVersion | cell }} | {{ .RecommendedVersion | cell }} |
+{{ end -}}
