@@ -510,6 +510,26 @@ func TestCheckPlatformReqs(t *testing.T) {
 		assert.Empty(t, out)
 	})
 
+	t.Run("output prefixed with composer's informational line", func(t *testing.T) {
+		json := "Checking platform requirements using the lock file\n" +
+			`[` +
+			`{"name":"php","version":"8.4.23","status":"success","failed_requirement":null,"provider":null},` +
+			`{"name":"ext-igbinary","version":"n/a","status":"missing","failed_requirement":{"source":"drupal/igbinary","type":"requires","target":"ext-igbinary","constraint":"*"},"provider":null}` +
+			`]`
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", json}
+			cs = append(cs, arg...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+
+		out, err := service.CheckPlatformReqs(t.Context(), "/tmp")
+		require.NoError(t, err)
+		assert.Empty(t, out)
+	})
+
 	t.Run("php requirement not satisfied", func(t *testing.T) {
 		json := `[{"name":"php","version":"8.1.0","status":"failed","failed_requirement":{"source":"drupal/core","type":"requires","target":"php","constraint":">=8.3"},"provider":null}]`
 		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {

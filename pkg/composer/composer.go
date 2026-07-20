@@ -255,8 +255,16 @@ type platformRequirement struct {
 func (s *CLI) CheckPlatformReqs(ctx context.Context, dir string) (string, error) {
 	out, err := s.execComposer(ctx, dir, "check-platform-reqs", "--lock", "--no-ansi", "--format=json")
 
+	// composer prints an informational line ("Checking platform requirements using the
+	// lock file") ahead of the JSON payload; combined stdout/stderr output can interleave
+	// it before the array, so extract the array itself rather than parsing the whole blob.
+	jsonPayload := out
+	if start, end := strings.Index(out, "["), strings.LastIndex(out, "]"); start != -1 && end > start {
+		jsonPayload = out[start : end+1]
+	}
+
 	var requirements []platformRequirement
-	if jsonErr := json.Unmarshal([]byte(out), &requirements); jsonErr != nil {
+	if jsonErr := json.Unmarshal([]byte(jsonPayload), &requirements); jsonErr != nil {
 		if err != nil {
 			return out, err
 		}
