@@ -1,7 +1,7 @@
 ARG PHP_VERSION=8.3
 
 # Build go binary.
-FROM golang:1.26.4-bookworm AS build
+FROM golang:1.26.4-trixie AS build
 
 RUN mkdir -p /build/
 
@@ -18,12 +18,12 @@ RUN --mount=type=cache,target=/gomod-cache --mount=type=cache,target=/go-cache G
 
 
 # Build php image.
-FROM php:${PHP_VERSION}-cli-bookworm AS base
+FROM php:${PHP_VERSION}-cli-trixie AS base
 
 RUN echo "memory_limit = -1" > "$PHP_INI_DIR/conf.d/memory-limit.ini"
 
 COPY --from=ghcr.io/mlocati/php-extension-installer:2 /usr/bin/install-php-extensions /usr/local/bin/
-RUN install-php-extensions pdo_mysql gd zip imagick intl igbinary
+RUN install-php-extensions pdo_mysql gd zip Imagick/imagick@3.8.1 intl
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends git unzip patch sqlite3 \
