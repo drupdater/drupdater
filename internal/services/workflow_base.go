@@ -94,8 +94,9 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []interna
 		ws.cleanup(path)
 	}()
 
-	// Fail fast if the runtime PHP/extensions don't satisfy the project's platform
+	// Fail fast if the runtime PHP version doesn't satisfy the project's platform
 	// requirements; composer update would otherwise fail mid-run with confusing output.
+	// Extension requirements are deliberately not checked here (see CheckPlatformReqs).
 	if out, err := ws.composer.CheckPlatformReqs(ctx, path); err != nil {
 		return fmt.Errorf("PHP platform requirements not satisfied:\n%s", out)
 	}

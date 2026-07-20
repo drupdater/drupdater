@@ -5,47 +5,38 @@ declare(strict_types=1);
 use Rector\Config\RectorConfig;
 use DrupalRector\Rector\Deprecation\DeprecationHelperRemoveRector;
 use DrupalRector\Rector\ValueObject\DeprecationHelperRemoveConfiguration;
+use DrupalRector\Set\DrupalSetProvider;
 
-return static function(RectorConfig $rectorConfig): void {
-  if (class_exists('DrupalFinder\DrupalFinderComposerRuntime')) {
-    $drupalFinder = new DrupalFinder\DrupalFinderComposerRuntime();
-  }
-  else {
-    $drupalFinder = new DrupalFinder\DrupalFinder();
-    $drupalFinder->locateRoot(__DIR__);
-  }
+if (class_exists('DrupalFinder\DrupalFinderComposerRuntime')) {
+  $drupalFinder = new DrupalFinder\DrupalFinderComposerRuntime();
+}
+else {
+  $drupalFinder = new DrupalFinder\DrupalFinder();
+  $drupalFinder->locateRoot(__DIR__);
+}
+$drupalRoot = $drupalFinder->getDrupalRoot();
 
-  [$major, $minor] = explode('.', \Drupal::VERSION);
-  $setLists = [];
-  for ($i = 0; $i <= $minor; $i++) {
-    $fileName = $drupalFinder->getVendorDir() . "/palantirnet/drupal-rector/config/drupal-$major/drupal-$major.$i-deprecations.php";
-    if (file_exists($fileName)) {
-      $setLists[] = $fileName;
-    }
-  }
-  for ($i = 8; $i < $major; $i++) {
-    $fileName = $drupalFinder->getVendorDir() . "/palantirnet/drupal-rector/config/drupal-$i/drupal-$i-all-deprecations.php";
-    if (file_exists($fileName)) {
-      $setLists[] = $fileName;
-    }
-  }
-  $rectorConfig->sets($setLists);
-
-  $rectorConfig->ruleWithConfiguration(DeprecationHelperRemoveRector::class, [
+// Composer-based sets pick the deprecation sets to run from the installed
+// `drupal/core` version, so the manual vendor-directory walk to build a set
+// list is no longer needed.
+return RectorConfig::configure()
+  ->withSetProviders(DrupalSetProvider::class)
+  ->withComposerBased(drupal: TRUE)
+  ->withConfiguredRule(DeprecationHelperRemoveRector::class, [
     new DeprecationHelperRemoveConfiguration(\Drupal::VERSION),
-  ]);
-
-  $drupalRoot = $drupalFinder->getDrupalRoot();
-  $rectorConfig->autoloadPaths([
+  ])
+  ->withAutoloadPaths([
     $drupalRoot . '/core',
     $drupalRoot . '/modules',
     $drupalRoot . '/profiles',
     $drupalRoot . '/themes',
-  ]);
-
-  $rectorConfig->fileExtensions(
+  ])
+  ->withFileExtensions(
     ['php', 'module', 'theme', 'install', 'profile', 'inc', 'engine']
+  )
+  ->withImportNames(
+    importNames: TRUE,
+    importDocBlockNames: FALSE,
+    importShortClasses: FALSE,
+    removeUnusedImports: FALSE
   );
-  $rectorConfig->importNames(TRUE, FALSE);
-  $rectorConfig->importShortClasses(FALSE);
-};
