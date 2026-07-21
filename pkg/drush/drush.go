@@ -103,9 +103,16 @@ func (e *CLI) ConfigResave(ctx context.Context, dir string, site string) error {
 	return err
 }
 
+// IsModuleEnabled uses execDrushStreams, not execDrush: the latter merges stdout and stderr, and
+// any notice drush writes to stderr (a contrib module deprecation warning, for instance) would
+// get folded into the compared value, breaking the exact-match check below and reporting an
+// enabled module as not enabled.
 func (e *CLI) IsModuleEnabled(ctx context.Context, dir string, site string, module string) (bool, error) {
-	out, err := e.execDrush(ctx, dir, site, "pm:list", "--status=enabled", "--field=name", "--filter="+module)
-	return out == module, err
+	stdout, stderr, err := e.execDrushStreams(ctx, dir, site, "pm:list", "--status=enabled", "--field=name", "--filter="+module)
+	if err != nil {
+		return false, fmt.Errorf("failed to check if module %s is enabled: %w, output: %s", module, err, stderr)
+	}
+	return strings.TrimSpace(stdout) == module, nil
 }
 
 func (e *CLI) LocalizeTranslations(ctx context.Context, dir string, site string) error {
@@ -122,6 +129,14 @@ func (e *CLI) GetTranslationPath(ctx context.Context, dir string, site string, r
 	translationPath, err := e.execDrush(ctx, dir, site, "ev", "print realpath(\\Drupal::config('locale.settings')->get('translation.path'))")
 	if err != nil {
 		return "", err
+	}
+	// An empty result must never reach a caller that passes it to git: an empty path given to
+	// go-git's Worktree.Add stages the entire working tree, not "nothing". realpath() returns
+	// false (printed as nothing) when the target doesn't exist on disk, regardless of whether
+	// translation.path is configured — the usual reason here is that nothing has been localized
+	// into this site's translation directory yet, so it was never created.
+	if strings.TrimSpace(translationPath) == "" {
+		return "", fmt.Errorf("translation path for site %s does not resolve to an existing directory", site)
 	}
 
 	if relative {

@@ -536,6 +536,23 @@ func TestIsModuleEnabled(t *testing.T) {
 		require.NoError(t, err)
 		assert.False(t, enabled)
 	})
+
+	t.Run("enabled despite a stderr notice from drush", func(t *testing.T) {
+		// A notice drush writes to stderr (a contrib module deprecation warning, for example)
+		// must not affect the result: it would if this read combined stdout+stderr output.
+		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
+		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
+		t.Setenv("GO_HELPER_PROCESS_STDERR_NOISE", "1")
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", "mymodule"}
+			cs = append(cs, arg...)
+			return exec.CommandContext(ctx, os.Args[0], cs...)
+		}
+		defer func() { execCommand = exec.CommandContext }()
+		enabled, err := cli.IsModuleEnabled(t.Context(), "/tmp", "site1", "mymodule")
+		require.NoError(t, err)
+		assert.True(t, enabled)
+	})
 }
 
 func TestLocalizeTranslations(t *testing.T) {
@@ -621,6 +638,25 @@ func TestGetTranslationPath(t *testing.T) {
 		assert.Equal(t, v1, v2)
 		assert.Equal(t, 1, callCount)
 	})
+
+	t.Run("unconfigured translation path errors instead of returning empty", func(t *testing.T) {
+		// locale.settings.translation.path unset means realpath('') resolves to false, which
+		// drush prints as an empty line. An empty path must never reach a caller: passed to
+		// go-git's Worktree.Add, it stages the entire working tree instead of "nothing".
+		cache, _ := otter.MustBuilder[string, string](100).Build()
+		cli := NewCLI(logger, cache)
+		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
+		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", ""}
+			cs = append(cs, arg...)
+			return exec.CommandContext(ctx, os.Args[0], cs...)
+		}
+		defer func() { execCommand = exec.CommandContext }()
+		path, err := cli.GetTranslationPath(t.Context(), "/tmp", "site1", false)
+		require.Error(t, err)
+		assert.Empty(t, path)
+	})
 }
 
 func TestHelperProcess(*testing.T) {
@@ -631,6 +667,9 @@ func TestHelperProcess(*testing.T) {
 		os.Exit(1)
 	}
 	if os.Getenv("GO_HELPER_PROCESS_RAW") == "1" {
+		if os.Getenv("GO_HELPER_PROCESS_STDERR_NOISE") == "1" {
+			fmt.Fprintln(os.Stderr, "Deprecated function some_contrib_module_hook(): ...")
+		}
 		fmt.Fprintf(os.Stdout, "%v\n", os.Args[3])
 		os.Exit(0)
 	}

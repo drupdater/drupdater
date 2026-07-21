@@ -3,7 +3,6 @@ package repo
 import (
 	"fmt"
 	"hash/fnv"
-	"io"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -13,14 +12,13 @@ import (
 
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/storer"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"go.uber.org/zap"
 )
 
 type Repository interface {
 	Push(o *git.PushOptions) error
-	References() (storer.ReferenceIter, error)
+	Remote(name string) (*git.Remote, error)
 }
 
 type Worktree interface {
@@ -154,26 +152,29 @@ func prepareCheckout(checkout *git.Repository, username string, email string) (R
 	return checkout, w, w.Filesystem.Root(), nil
 }
 
-func (rs *GitRepositoryService) BranchExists(repository Repository, branch string) (bool, error) {
-	// Get list of remote branches
-	remoteRefs, err := repository.References()
+// BranchExists checks the actual remote for the branch, not the checkout's cached
+// refs/remotes/origin/* — those go stale as soon as a branch is deleted on the remote (e.g. a
+// host auto-deleting the source branch on merge) without an intervening fetch/prune, which
+// would otherwise cause a false-positive match against a branch that no longer exists.
+func (rs *GitRepositoryService) BranchExists(repository Repository, branch string, token string) (bool, error) {
+	remote, err := repository.Remote("origin")
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("failed to get origin remote: %w", err)
 	}
 
-	// Iterate through the references and check if branch exists
-	remoteBranchRef := fmt.Sprintf("refs/remotes/origin/%s", branch)
+	refs, err := remote.List(&git.ListOptions{
+		Auth: &http.BasicAuth{
+			Username: "du", // yes, this can be anything except an empty string
+			Password: token,
+		},
+	})
+	if err != nil {
+		return false, fmt.Errorf("failed to list remote refs: %w", err)
+	}
 
-	for {
-		ref, err := remoteRefs.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return false, fmt.Errorf("iterating remote refs: %w", err)
-		}
-
-		if ref.Name().String() == remoteBranchRef {
+	branchRef := plumbing.NewBranchReferenceName(branch).String()
+	for _, ref := range refs {
+		if ref.Name().String() == branchRef {
 			return true, nil
 		}
 	}
