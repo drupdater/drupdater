@@ -5,13 +5,7 @@ paths:
   - ".golangci.yml"
 ---
 
-After writing or modifying Go code, the Dockerfile, or lint configuration, run:
-
-```bash
-make lint
-```
-
-Work is only complete when `make lint` reports zero issues.
+`make lint` runs automatically on `git commit` (pre-commit hook) — read its output before committing. Work is only complete when it reports zero issues.
 
 ## Environment setup (Claude Code web / remote sessions)
 
