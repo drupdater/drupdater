@@ -45,8 +45,12 @@ func (tu *TranslationsUpdater) postSiteUpdateHandler(e event.Event) error {
 	evt := e.(*services.PostSiteUpdateEvent)
 
 	enabled, err := tu.drush.IsModuleEnabled(evt.Context(), evt.Path(), evt.Site(), "locale_deploy")
-	if !enabled || err != nil {
+	if err != nil {
 		return err
+	}
+	if !enabled {
+		tu.logger.Info("locale_deploy not enabled, skipping translations update", zap.String("site", evt.Site()))
+		return nil
 	}
 
 	tu.logger.Info("updating translations")
@@ -57,7 +61,8 @@ func (tu *TranslationsUpdater) postSiteUpdateHandler(e event.Event) error {
 
 	translationPath, err := tu.drush.GetTranslationPath(evt.Context(), evt.Path(), evt.Site(), true)
 	if err != nil {
-		return err
+		tu.logger.Info("translation path not available, skipping translations update", zap.String("site", evt.Site()), zap.Error(err))
+		return nil
 	}
 
 	_, err = evt.Worktree().Add(translationPath)

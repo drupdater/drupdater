@@ -7,7 +7,6 @@ package repo
 import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/storer"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -89,57 +88,64 @@ func (_c *MockRepository_Push_Call) RunAndReturn(run func(o *git.PushOptions) er
 	return _c
 }
 
-// References provides a mock function for the type MockRepository
-func (_mock *MockRepository) References() (storer.ReferenceIter, error) {
-	ret := _mock.Called()
+// Remote provides a mock function for the type MockRepository
+func (_mock *MockRepository) Remote(name string) (*git.Remote, error) {
+	ret := _mock.Called(name)
 
 	if len(ret) == 0 {
-		panic("no return value specified for References")
+		panic("no return value specified for Remote")
 	}
 
-	var r0 storer.ReferenceIter
+	var r0 *git.Remote
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func() (storer.ReferenceIter, error)); ok {
-		return returnFunc()
+	if returnFunc, ok := ret.Get(0).(func(string) (*git.Remote, error)); ok {
+		return returnFunc(name)
 	}
-	if returnFunc, ok := ret.Get(0).(func() storer.ReferenceIter); ok {
-		r0 = returnFunc()
+	if returnFunc, ok := ret.Get(0).(func(string) *git.Remote); ok {
+		r0 = returnFunc(name)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(storer.ReferenceIter)
+			r0 = ret.Get(0).(*git.Remote)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func() error); ok {
-		r1 = returnFunc()
+	if returnFunc, ok := ret.Get(1).(func(string) error); ok {
+		r1 = returnFunc(name)
 	} else {
 		r1 = ret.Error(1)
 	}
 	return r0, r1
 }
 
-// MockRepository_References_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'References'
-type MockRepository_References_Call struct {
+// MockRepository_Remote_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Remote'
+type MockRepository_Remote_Call struct {
 	*mock.Call
 }
 
-// References is a helper method to define mock.On call
-func (_e *MockRepository_Expecter) References() *MockRepository_References_Call {
-	return &MockRepository_References_Call{Call: _e.mock.On("References")}
+// Remote is a helper method to define mock.On call
+//   - name string
+func (_e *MockRepository_Expecter) Remote(name any) *MockRepository_Remote_Call {
+	return &MockRepository_Remote_Call{Call: _e.mock.On("Remote", name)}
 }
 
-func (_c *MockRepository_References_Call) Run(run func()) *MockRepository_References_Call {
+func (_c *MockRepository_Remote_Call) Run(run func(name string)) *MockRepository_Remote_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run()
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }
 
-func (_c *MockRepository_References_Call) Return(referenceIter storer.ReferenceIter, err error) *MockRepository_References_Call {
-	_c.Call.Return(referenceIter, err)
+func (_c *MockRepository_Remote_Call) Return(remote *git.Remote, err error) *MockRepository_Remote_Call {
+	_c.Call.Return(remote, err)
 	return _c
 }
 
-func (_c *MockRepository_References_Call) RunAndReturn(run func() (storer.ReferenceIter, error)) *MockRepository_References_Call {
+func (_c *MockRepository_Remote_Call) RunAndReturn(run func(name string) (*git.Remote, error)) *MockRepository_Remote_Call {
 	_c.Call.Return(run)
 	return _c
 }

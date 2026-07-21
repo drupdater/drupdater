@@ -12,7 +12,6 @@ import (
 	"github.com/drupdater/drupdater/pkg/repo"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/storer"
 	"github.com/gookit/event"
 	mock "github.com/stretchr/testify/mock"
 )
@@ -563,8 +562,8 @@ func (_m *MockRepository) EXPECT() *MockRepository_Expecter {
 }
 
 // BranchExists provides a mock function for the type MockRepository
-func (_mock *MockRepository) BranchExists(repository repo.Repository, branch string) (bool, error) {
-	ret := _mock.Called(repository, branch)
+func (_mock *MockRepository) BranchExists(repository repo.Repository, branch string, token string) (bool, error) {
+	ret := _mock.Called(repository, branch, token)
 
 	if len(ret) == 0 {
 		panic("no return value specified for BranchExists")
@@ -572,16 +571,16 @@ func (_mock *MockRepository) BranchExists(repository repo.Repository, branch str
 
 	var r0 bool
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(repo.Repository, string) (bool, error)); ok {
-		return returnFunc(repository, branch)
+	if returnFunc, ok := ret.Get(0).(func(repo.Repository, string, string) (bool, error)); ok {
+		return returnFunc(repository, branch, token)
 	}
-	if returnFunc, ok := ret.Get(0).(func(repo.Repository, string) bool); ok {
-		r0 = returnFunc(repository, branch)
+	if returnFunc, ok := ret.Get(0).(func(repo.Repository, string, string) bool); ok {
+		r0 = returnFunc(repository, branch, token)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
-	if returnFunc, ok := ret.Get(1).(func(repo.Repository, string) error); ok {
-		r1 = returnFunc(repository, branch)
+	if returnFunc, ok := ret.Get(1).(func(repo.Repository, string, string) error); ok {
+		r1 = returnFunc(repository, branch, token)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -596,11 +595,12 @@ type MockRepository_BranchExists_Call struct {
 // BranchExists is a helper method to define mock.On call
 //   - repository repo.Repository
 //   - branch string
-func (_e *MockRepository_Expecter) BranchExists(repository any, branch any) *MockRepository_BranchExists_Call {
-	return &MockRepository_BranchExists_Call{Call: _e.mock.On("BranchExists", repository, branch)}
+//   - token string
+func (_e *MockRepository_Expecter) BranchExists(repository any, branch any, token any) *MockRepository_BranchExists_Call {
+	return &MockRepository_BranchExists_Call{Call: _e.mock.On("BranchExists", repository, branch, token)}
 }
 
-func (_c *MockRepository_BranchExists_Call) Run(run func(repository repo.Repository, branch string)) *MockRepository_BranchExists_Call {
+func (_c *MockRepository_BranchExists_Call) Run(run func(repository repo.Repository, branch string, token string)) *MockRepository_BranchExists_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 repo.Repository
 		if args[0] != nil {
@@ -610,9 +610,14 @@ func (_c *MockRepository_BranchExists_Call) Run(run func(repository repo.Reposit
 		if args[1] != nil {
 			arg1 = args[1].(string)
 		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
 		run(
 			arg0,
 			arg1,
+			arg2,
 		)
 	})
 	return _c
@@ -623,7 +628,7 @@ func (_c *MockRepository_BranchExists_Call) Return(b bool, err error) *MockRepos
 	return _c
 }
 
-func (_c *MockRepository_BranchExists_Call) RunAndReturn(run func(repository repo.Repository, branch string) (bool, error)) *MockRepository_BranchExists_Call {
+func (_c *MockRepository_BranchExists_Call) RunAndReturn(run func(repository repo.Repository, branch string, token string) (bool, error)) *MockRepository_BranchExists_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1014,57 +1019,64 @@ func (_c *MockGitRepository_Push_Call) RunAndReturn(run func(o *git.PushOptions)
 	return _c
 }
 
-// References provides a mock function for the type MockGitRepository
-func (_mock *MockGitRepository) References() (storer.ReferenceIter, error) {
-	ret := _mock.Called()
+// Remote provides a mock function for the type MockGitRepository
+func (_mock *MockGitRepository) Remote(name string) (*git.Remote, error) {
+	ret := _mock.Called(name)
 
 	if len(ret) == 0 {
-		panic("no return value specified for References")
+		panic("no return value specified for Remote")
 	}
 
-	var r0 storer.ReferenceIter
+	var r0 *git.Remote
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func() (storer.ReferenceIter, error)); ok {
-		return returnFunc()
+	if returnFunc, ok := ret.Get(0).(func(string) (*git.Remote, error)); ok {
+		return returnFunc(name)
 	}
-	if returnFunc, ok := ret.Get(0).(func() storer.ReferenceIter); ok {
-		r0 = returnFunc()
+	if returnFunc, ok := ret.Get(0).(func(string) *git.Remote); ok {
+		r0 = returnFunc(name)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(storer.ReferenceIter)
+			r0 = ret.Get(0).(*git.Remote)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func() error); ok {
-		r1 = returnFunc()
+	if returnFunc, ok := ret.Get(1).(func(string) error); ok {
+		r1 = returnFunc(name)
 	} else {
 		r1 = ret.Error(1)
 	}
 	return r0, r1
 }
 
-// MockGitRepository_References_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'References'
-type MockGitRepository_References_Call struct {
+// MockGitRepository_Remote_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Remote'
+type MockGitRepository_Remote_Call struct {
 	*mock.Call
 }
 
-// References is a helper method to define mock.On call
-func (_e *MockGitRepository_Expecter) References() *MockGitRepository_References_Call {
-	return &MockGitRepository_References_Call{Call: _e.mock.On("References")}
+// Remote is a helper method to define mock.On call
+//   - name string
+func (_e *MockGitRepository_Expecter) Remote(name any) *MockGitRepository_Remote_Call {
+	return &MockGitRepository_Remote_Call{Call: _e.mock.On("Remote", name)}
 }
 
-func (_c *MockGitRepository_References_Call) Run(run func()) *MockGitRepository_References_Call {
+func (_c *MockGitRepository_Remote_Call) Run(run func(name string)) *MockGitRepository_Remote_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run()
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }
 
-func (_c *MockGitRepository_References_Call) Return(referenceIter storer.ReferenceIter, err error) *MockGitRepository_References_Call {
-	_c.Call.Return(referenceIter, err)
+func (_c *MockGitRepository_Remote_Call) Return(remote *git.Remote, err error) *MockGitRepository_Remote_Call {
+	_c.Call.Return(remote, err)
 	return _c
 }
 
-func (_c *MockGitRepository_References_Call) RunAndReturn(run func() (storer.ReferenceIter, error)) *MockGitRepository_References_Call {
+func (_c *MockGitRepository_Remote_Call) RunAndReturn(run func(name string) (*git.Remote, error)) *MockGitRepository_Remote_Call {
 	_c.Call.Return(run)
 	return _c
 }

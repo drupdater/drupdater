@@ -86,3 +86,31 @@ func TestUpdateTranslationsEventHandlerWithLocaleDeploy(t *testing.T) {
 	mockRepository.AssertExpectations(t)
 	worktree.AssertExpectations(t)
 }
+
+func TestUpdateTranslationsEventHandlerSkipsWhenTranslationPathUnavailable(t *testing.T) {
+	// A GetTranslationPath failure (e.g. locale.settings.translation.path unset) must be a soft
+	// skip, not a fatal error: nothing must be staged or committed on this path, since an empty
+	// path handed to Worktree.Add would stage the entire working tree instead of nothing.
+	mockDrush := NewMockDrush(t)
+	mockRepository := NewMockRepository(t)
+	logger := zap.NewNop()
+	handler := NewTranslationsUpdater(logger, mockDrush, mockRepository)
+
+	worktree := NewMockWorktree(t)
+	path := "/tmp"
+	ctx := context.Background()
+
+	mockDrush.EXPECT().IsModuleEnabled(mock.Anything, "/tmp", "example.com", "locale_deploy").Return(true, nil)
+	mockDrush.EXPECT().LocalizeTranslations(mock.Anything, "/tmp", "example.com").Return(nil)
+	mockDrush.EXPECT().GetTranslationPath(mock.Anything, "/tmp", "example.com", true).Return("", assert.AnError)
+
+	// Execute
+	event := services.NewPostSiteUpdateEvent(ctx, path, worktree, "example.com")
+	err := handler.postSiteUpdateHandler(event)
+
+	// Assert
+	require.NoError(t, err)
+	mockDrush.AssertExpectations(t)
+	worktree.AssertNotCalled(t, "Add", mock.Anything)
+	worktree.AssertNotCalled(t, "Commit", mock.Anything, mock.Anything)
+}

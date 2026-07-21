@@ -186,7 +186,9 @@ func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context, repository 
 	// an abort ("branch already exists") or a mid-run failure would leave those commits — and a
 	// modified composer.json — on that branch. The final, hash-named branch is branched from
 	// this one once the composer.lock hash is known.
-	workBranch := fmt.Sprintf("drupdater/work-%d", ws.current.UnixNano())
+	// Flat name, not "drupdater/work-<ts>": a target repo with a branch literally named
+	// "drupdater" would make refs/heads/drupdater a file, blocking any nested drupdater/* ref.
+	workBranch := fmt.Sprintf("drupdater-work-%d", ws.current.UnixNano())
 	if err := worktree.Checkout(&git.CheckoutOptions{
 		Branch: plumbing.NewBranchReferenceName(workBranch),
 		Create: true,
@@ -247,7 +249,7 @@ func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context, repository 
 	updateBranchName := fmt.Sprintf("update-%s", composerLockHash)
 
 	// Check if branch already exists
-	exists, err := ws.repository.BranchExists(repository, updateBranchName)
+	exists, err := ws.repository.BranchExists(repository, updateBranchName, ws.config.Token)
 	if err != nil {
 		return "", fmt.Errorf("failed to check if branch exists: %w", err)
 	}
