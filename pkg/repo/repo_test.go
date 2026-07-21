@@ -8,27 +8,12 @@ import (
 	gitConfig "github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/go-git/go-git/v5/plumbing/storer"
+	"github.com/go-git/go-git/v5/storage/memory"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
-
-// errorReferenceIter is a storer.ReferenceIter that always returns an error from Next.
-type errorReferenceIter struct {
-	err error
-}
-
-func (e *errorReferenceIter) Next() (*plumbing.Reference, error) {
-	return nil, e.err
-}
-
-func (e *errorReferenceIter) ForEach(func(*plumbing.Reference) error) error {
-	return e.err
-}
-
-func (e *errorReferenceIter) Close() {}
 
 type mockWorktree struct {
 	status git.Status
@@ -127,65 +112,91 @@ func TestIsSomethingStaged(t *testing.T) {
 	}
 }
 
+// remoteToLocalRepo creates a real local git repo with the given branches (all pointing at one
+// empty commit) and returns a *git.Remote whose "origin" points at it. BranchExists is exercised
+// against this real, live listing rather than a hand-rolled fake of go-git's ref format, so the
+// test would catch a mismatch against go-git's actual wire format.
+func remoteToLocalRepo(t *testing.T, branches ...string) *git.Remote {
+	t.Helper()
+	dir := t.TempDir()
+	r, err := git.PlainInit(dir, false)
+	require.NoError(t, err)
+	wt, err := r.Worktree()
+	require.NoError(t, err)
+	hash, err := wt.Commit("init", &git.CommitOptions{
+		AllowEmptyCommits: true,
+		Author:            &object.Signature{Name: "t", Email: "t@example.com"},
+	})
+	require.NoError(t, err)
+	for _, b := range branches {
+		require.NoError(t, r.Storer.SetReference(plumbing.NewHashReference(plumbing.NewBranchReferenceName(b), hash)))
+	}
+
+	return git.NewRemote(memory.NewStorage(), &gitConfig.RemoteConfig{
+		Name: "origin",
+		URLs: []string{dir},
+	})
+}
+
 func TestBranchExists(t *testing.T) {
 	logger := zap.NewNop()
 	service := NewGitRepositoryService(logger)
 
-	const targetBranch = "my-feature"
-	const remoteBranchRef = "refs/remotes/origin/my-feature"
-	const otherRef = "refs/remotes/origin/main"
-
 	t.Run("branch found", func(t *testing.T) {
-		refs := []*plumbing.Reference{
-			plumbing.NewReferenceFromStrings(otherRef, "abc123"),
-			plumbing.NewReferenceFromStrings(remoteBranchRef, "def456"),
-		}
-		iter := storer.NewReferenceSliceIter(refs)
-
+		remote := remoteToLocalRepo(t, "main", "my-feature")
 		repo := NewMockRepository(t)
-		repo.EXPECT().References().Return(iter, nil)
+		repo.EXPECT().Remote("origin").Return(remote, nil)
 
-		found, err := service.BranchExists(repo, targetBranch)
+		found, err := service.BranchExists(repo, "my-feature", "")
 		require.NoError(t, err)
 		assert.True(t, found)
 	})
 
 	t.Run("branch not found", func(t *testing.T) {
-		refs := []*plumbing.Reference{
-			plumbing.NewReferenceFromStrings(otherRef, "abc123"),
-		}
-		iter := storer.NewReferenceSliceIter(refs)
-
+		remote := remoteToLocalRepo(t, "main")
 		repo := NewMockRepository(t)
-		repo.EXPECT().References().Return(iter, nil)
+		repo.EXPECT().Remote("origin").Return(remote, nil)
 
-		found, err := service.BranchExists(repo, targetBranch)
+		found, err := service.BranchExists(repo, "my-feature", "")
 		require.NoError(t, err)
 		assert.False(t, found)
 	})
 
-	t.Run("iterator error", func(t *testing.T) {
-		iterErr := errors.New("storage corruption")
-		iter := &errorReferenceIter{err: iterErr}
-
+	t.Run("branch deleted on remote since the last fetch is not reported as existing", func(t *testing.T) {
+		// A checkout with a stale cached refs/remotes/origin/my-feature (e.g. left over from a
+		// branch that was merged and auto-deleted on the host) must not produce a false
+		// positive: BranchExists queries the live remote, not the checkout's own refs.
+		remote := remoteToLocalRepo(t, "main")
 		repo := NewMockRepository(t)
-		repo.EXPECT().References().Return(iter, nil)
+		repo.EXPECT().Remote("origin").Return(remote, nil)
 
-		found, err := service.BranchExists(repo, targetBranch)
-		require.Error(t, err)
-		require.ErrorIs(t, err, iterErr)
+		found, err := service.BranchExists(repo, "my-feature", "")
+		require.NoError(t, err)
 		assert.False(t, found)
 	})
 
-	t.Run("references error", func(t *testing.T) {
-		refsErr := errors.New("network failure")
+	t.Run("remote lookup error", func(t *testing.T) {
+		remoteErr := errors.New("no such remote")
 
 		repo := NewMockRepository(t)
-		repo.EXPECT().References().Return(nil, refsErr)
+		repo.EXPECT().Remote("origin").Return(nil, remoteErr)
 
-		found, err := service.BranchExists(repo, targetBranch)
+		found, err := service.BranchExists(repo, "my-feature", "")
 		require.Error(t, err)
-		require.ErrorIs(t, err, refsErr)
+		require.ErrorIs(t, err, remoteErr)
+		assert.False(t, found)
+	})
+
+	t.Run("remote list error", func(t *testing.T) {
+		remote := git.NewRemote(memory.NewStorage(), &gitConfig.RemoteConfig{
+			Name: "origin",
+			URLs: []string{t.TempDir()}, // empty dir: not a git repo, List() must fail
+		})
+		repo := NewMockRepository(t)
+		repo.EXPECT().Remote("origin").Return(remote, nil)
+
+		found, err := service.BranchExists(repo, "my-feature", "")
+		require.Error(t, err)
 		assert.False(t, found)
 	})
 }

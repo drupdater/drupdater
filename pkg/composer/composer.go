@@ -73,7 +73,7 @@ type PackageChange struct {
 }
 
 func (s *CLI) Update(ctx context.Context, dir string, packages []string, packagesToKeep []string, minimalChanges bool, dryRun bool) ([]PackageChange, error) {
-	args := append([]string{"update", "--no-interaction", "--no-progress", "--optimize-autoloader", "--with-all-dependencies", "--no-ansi", "--ignore-platform-req=ext-*"}, packages...)
+	args := append([]string{"update", "--no-interaction", "--no-progress", "--optimize-autoloader", "--with-all-dependencies", "--no-ansi", "--ignore-platform-reqs"}, packages...)
 	for _, packageToKeep := range packagesToKeep {
 		args = append(args, fmt.Sprintf("--with=%s", packageToKeep))
 	}
@@ -143,7 +143,7 @@ func (s *CLI) Update(ctx context.Context, dir string, packages []string, package
 }
 
 func (s *CLI) Install(ctx context.Context, dir string) error {
-	out, err := s.execComposer(ctx, dir, "install", "--no-interaction", "--no-progress", "--optimize-autoloader", "--ignore-platform-req=ext-*")
+	out, err := s.execComposer(ctx, dir, "install", "--no-interaction", "--no-progress", "--optimize-autoloader", "--ignore-platform-reqs")
 	if err != nil {
 		return fmt.Errorf("failed to install dependencies: %w, output: %s", err, out)
 	}
@@ -151,7 +151,7 @@ func (s *CLI) Install(ctx context.Context, dir string) error {
 }
 
 func (s *CLI) Require(ctx context.Context, dir string, args ...string) (string, error) {
-	out, err := s.execComposer(ctx, dir, append([]string{"require"}, args...)...)
+	out, err := s.execComposer(ctx, dir, append([]string{"require", "--ignore-platform-reqs"}, args...)...)
 	if err != nil {
 		return "", fmt.Errorf("failed to require package: %w, output: %s", err, out)
 	}
@@ -159,7 +159,7 @@ func (s *CLI) Require(ctx context.Context, dir string, args ...string) (string, 
 }
 
 func (s *CLI) Remove(ctx context.Context, dir string, packages ...string) (string, error) {
-	out, err := s.execComposer(ctx, dir, append([]string{"remove"}, packages...)...)
+	out, err := s.execComposer(ctx, dir, append([]string{"remove", "--ignore-platform-reqs"}, packages...)...)
 	if err != nil {
 		return "", fmt.Errorf("failed to remove package: %w, output: %s", err, out)
 	}
@@ -269,8 +269,9 @@ type platformRequirement struct {
 }
 
 // CheckPlatformReqs verifies the PHP version satisfies the requirements in composer.lock.
-// `composer update` enforces the same check, so this lets us fail fast with a clear message
-// instead of mid-update. Extension requirements (ext-*) are ignored: this tool doesn't
+// `Update` runs with --ignore-platform-reqs and no longer enforces this itself, so this is
+// the only fail-fast check, run ahead of time for a clear message instead of a mid-update
+// failure. Extension requirements (ext-*) are ignored: this tool doesn't
 // control which extensions its own PHP runtime has loaded, so failing on those would block
 // updates for a concern the operator can't act on here. A non-nil error means the PHP
 // version requirement is unmet; the returned output names the offending requirement(s).
@@ -589,7 +590,7 @@ func (s *CLI) GetLockHash(dir string) (string, error) {
 }
 
 func (s *CLI) UpdateLockHash(ctx context.Context, dir string) error {
-	_, err := s.execComposer(ctx, dir, "update", "--lock", "--no-install")
+	_, err := s.execComposer(ctx, dir, "update", "--lock", "--no-install", "--ignore-platform-reqs")
 	return err
 }
 
