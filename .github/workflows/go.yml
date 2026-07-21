@@ -8,6 +8,11 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -23,12 +28,22 @@ jobs:
       uses: actions/setup-go@v5
       with:
         go-version-file: go.mod
+        cache: true
 
     - name: Build
       run: go build -v ./...
 
     - name: Test
       run: go test -v ./... -coverprofile=coverage.txt
+
+    - name: Coverage Summary
+      if: always()
+      run: |
+        echo "## Go Test Coverage" >> $GITHUB_STEP_SUMMARY
+        go tool cover -func=coverage.txt \
+          | tail -1 \
+          | awk '{print "**Total:** " $3}' \
+          >> $GITHUB_STEP_SUMMARY
 
     - name: Upload results to Codecov
       if: always()
@@ -44,7 +59,35 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+          cache: true
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v7
         with:
           version: v2.12.2
+
+  lint-dockerfile:
+    name: lint-dockerfile
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+
+  govulncheck:
+    name: govulncheck
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: golang/govulncheck-action@v1
+        with:
+          go-version-file: go.mod
+          go-package: ./...
