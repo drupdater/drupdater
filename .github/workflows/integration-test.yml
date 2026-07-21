@@ -21,6 +21,7 @@ on:
           - '8.2'
           - '8.3'
           - '8.4'
+          - '8.5'
       dry_run:
         description: 'Skip branch and MR creation'
         required: false
@@ -36,6 +37,10 @@ on:
         required: false
         default: false
         type: boolean
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
 
 jobs:
   integration-test:
@@ -57,6 +62,8 @@ jobs:
           tags: drupdater:test
           build-args: |
             PHP_VERSION=${{ inputs.php_version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Clone project
         env:

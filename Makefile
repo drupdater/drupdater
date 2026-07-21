@@ -25,7 +25,7 @@ mock: ## Generate mocks
 
 lint: ## Run linters
 	golangci-lint run ./...
-	docker run --rm -i hadolint/hadolint < Dockerfile
+	docker run --rm -i -e XDG_CONFIG_HOME=/bin -v ${PWD}/.hadolint.yaml:/bin/hadolint.yaml hadolint/hadolint < Dockerfile
 
 fmt: ## Format code
 	go fmt ./...
