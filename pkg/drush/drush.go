@@ -195,7 +195,7 @@ func (e *CLI) GetUpdateHooks(ctx context.Context, dir string, site string) (map[
 	if strings.Contains(stdout, "No database updates required") ||
 		strings.Contains(stderr, "No database updates required") ||
 		strings.TrimSpace(stdout) == "" {
-		return nil, nil
+		return map[string]UpdateHook{}, nil
 	}
 
 	var updates map[string]UpdateHook

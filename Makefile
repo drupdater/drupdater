@@ -27,6 +27,9 @@ lint: ## Run linters
 	golangci-lint run ./...
 	docker run --rm -i -e XDG_CONFIG_HOME=/bin -v ${PWD}/.hadolint.yaml:/bin/hadolint.yaml hadolint/hadolint < Dockerfile
 
+deadcode: ## Find unreachable functions
+	go tool deadcode -test ./...
+
 fmt: ## Format code
 	go fmt ./...
 
