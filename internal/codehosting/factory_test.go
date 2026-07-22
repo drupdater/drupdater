@@ -45,6 +45,9 @@ func TestDefaultVcsProviderFactory_Create(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("GITHUB_ACTIONS", "")
+			t.Setenv("GITLAB_CI", "")
+
 			factory := NewDefaultVcsProviderFactory()
 
 			provider, err := factory.Create(tt.repositoryURL, "dummy-token", zap.NewNop())
@@ -95,6 +98,8 @@ func TestDefaultVcsProviderFactory_Create_CIEnvVars(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("GITHUB_ACTIONS", "")
+			t.Setenv("GITLAB_CI", "")
 			t.Setenv(tt.envKey, tt.envValue)
 
 			factory := NewDefaultVcsProviderFactory()
@@ -158,6 +163,9 @@ func TestProviderFromEnv(t *testing.T) {
 }
 
 func TestDefaultVcsProviderFactory_Create_InvalidURL(t *testing.T) {
+	t.Setenv("GITHUB_ACTIONS", "")
+	t.Setenv("GITLAB_CI", "")
+
 	factory := NewDefaultVcsProviderFactory()
 
 	_, err := factory.Create("", "dummy-token", zap.NewNop())
