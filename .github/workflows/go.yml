@@ -88,7 +88,7 @@ jobs:
           go-version-file: go.mod
           cache: true
       - name: Check for dead code
-        run: go tool deadcode -test ./... 2>&1 | grep -v '_test\.go' | tee /tmp/deadcode.txt; [ ! -s /tmp/deadcode.txt ]
+        run: go tool deadcode -test ./... | tee /tmp/deadcode.txt; [ ! -s /tmp/deadcode.txt ]
 
   govulncheck:
     name: govulncheck

@@ -182,12 +182,7 @@ func TestGetUpdateHooks(t *testing.T) {
 		updates, err := drush.GetUpdateHooks(t.Context(), "/tmp", "site1")
 
 		require.NoError(t, err)
-
-		if len(updates) != 0 {
-			t.Errorf("Expected 0 updates, got %d", len(updates))
-		}
-
-		assert.Nil(t, updates)
+		assert.Empty(t, updates)
 	})
 
 }
