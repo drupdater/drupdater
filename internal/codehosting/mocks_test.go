@@ -37,6 +37,60 @@ func (_m *MockPlatform) EXPECT() *MockPlatform_Expecter {
 	return &MockPlatform_Expecter{mock: &_m.Mock}
 }
 
+// EnableAutoMerge provides a mock function for the type MockPlatform
+func (_mock *MockPlatform) EnableAutoMerge(ctx context.Context, mr MergeRequest) error {
+	ret := _mock.Called(ctx, mr)
+
+	if len(ret) == 0 {
+		panic("no return value specified for EnableAutoMerge")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, MergeRequest) error); ok {
+		r0 = returnFunc(ctx, mr)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockPlatform_EnableAutoMerge_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'EnableAutoMerge'
+type MockPlatform_EnableAutoMerge_Call struct {
+	*mock.Call
+}
+
+// EnableAutoMerge is a helper method to define mock.On call
+//   - ctx context.Context
+//   - mr MergeRequest
+func (_e *MockPlatform_Expecter) EnableAutoMerge(ctx any, mr any) *MockPlatform_EnableAutoMerge_Call {
+	return &MockPlatform_EnableAutoMerge_Call{Call: _e.mock.On("EnableAutoMerge", ctx, mr)}
+}
+
+func (_c *MockPlatform_EnableAutoMerge_Call) Run(run func(ctx context.Context, mr MergeRequest)) *MockPlatform_EnableAutoMerge_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 MergeRequest
+		if args[1] != nil {
+			arg1 = args[1].(MergeRequest)
+		}
+		run(arg0, arg1)
+	})
+	return _c
+}
+
+func (_c *MockPlatform_EnableAutoMerge_Call) Return(err error) *MockPlatform_EnableAutoMerge_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockPlatform_EnableAutoMerge_Call) RunAndReturn(run func(ctx context.Context, mr MergeRequest) error) *MockPlatform_EnableAutoMerge_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateMergeRequest provides a mock function for the type MockPlatform
 func (_mock *MockPlatform) CreateMergeRequest(ctx context.Context, title string, description string, sourceBranch string, targetBranch string) (MergeRequest, error) {
 	ret := _mock.Called(ctx, title, description, sourceBranch, targetBranch)

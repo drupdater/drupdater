@@ -68,4 +68,21 @@ func TestLoadConfigFile(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "timout")
 	})
+
+	t.Run("auto_merge per mode is read correctly", func(t *testing.T) {
+		var c Config
+		_, err := LoadConfigFile(writeConfig(t, "auto_merge:\n  normal: true\n  security: false\n"), &c)
+		require.NoError(t, err)
+		assert.True(t, c.AutoMerge.Normal)
+		assert.False(t, c.AutoMerge.Security)
+	})
+
+	t.Run("auto_merge defaults to false for both modes", func(t *testing.T) {
+		var c Config
+		found, err := LoadConfigFile(filepath.Join(t.TempDir(), "absent.yaml"), &c)
+		require.NoError(t, err)
+		assert.False(t, found)
+		assert.False(t, c.AutoMerge.Normal)
+		assert.False(t, c.AutoMerge.Security)
+	})
 }

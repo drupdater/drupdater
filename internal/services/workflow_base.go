@@ -363,6 +363,17 @@ func (ws *WorkflowBaseService) publishWork(ctx context.Context, repository GitRe
 	}
 	ws.logger.Info("merge request created", zap.String("url", mr.URL))
 
+	autoMerge := ws.config.AutoMerge.Normal
+	if ws.config.Security {
+		autoMerge = ws.config.AutoMerge.Security
+	}
+	if autoMerge {
+		if err := ws.platform.EnableAutoMerge(ctx, mr); err != nil {
+			return fmt.Errorf("failed to enable auto merge: %w", err)
+		}
+		ws.logger.Info("auto merge enabled", zap.String("url", mr.URL))
+	}
+
 	return nil
 }
 

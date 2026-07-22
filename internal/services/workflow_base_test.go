@@ -845,6 +845,179 @@ func TestStartUpdateExportConfigurationError(t *testing.T) {
 	repository.AssertNotCalled(t, "Push", mock.Anything)
 }
 
+func TestStartUpdateWithAutoMerge(t *testing.T) {
+	// When AutoMerge.Normal is true and Security is false, EnableAutoMerge must be called.
+	logger := zap.NewNop()
+	installer := NewMockInstaller(t)
+	repositoryService := NewMockRepository(t)
+	vcsProvider := NewMockPlatform(t)
+	repository := NewMockGitRepository(t)
+	mockComposer := NewMockComposer(t)
+	drush := NewMockDrush(t)
+	ctx := context.Background()
+
+	config := internal.Config{
+		RepositoryURL: "https://example.com/repo.git",
+		Branch:        "main",
+		Token:         "token",
+		Clone:         true,
+		Sites:         []string{"site1"},
+		DryRun:        false,
+		AutoMerge:     internal.AutoMergeConfig{Normal: true, Security: false},
+	}
+
+	worktree := NewMockWorktree(t)
+	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
+	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Checkout(mock.Anything).Return(nil)
+
+	installer.EXPECT().Install(mock.Anything, "/tmp", "site1").Return(nil)
+	installer.EXPECT().ConfigureDatabase(mock.Anything, "/tmp", "site1").Return(nil)
+
+	drush.EXPECT().UpdateSite(mock.Anything, "/tmp", "site1").Return(nil)
+	drush.EXPECT().ExportConfiguration(mock.Anything, "/tmp", "site1").Return(nil)
+	drush.EXPECT().ConfigResave(mock.Anything, "/tmp", "site1").Return(nil)
+
+	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil)
+	mockComposer.EXPECT().CheckPlatformReqs(mock.Anything, "/tmp").Return("", nil)
+	repositoryService.EXPECT().BranchExists(repository, mock.Anything, mock.Anything).Return(false, nil)
+	repository.EXPECT().Push(mock.Anything).Return(nil)
+
+	fixture, err := os.ReadFile("testdata/dependency_update.md")
+	require.NoError(t, err)
+
+	createdMR := codehosting.MergeRequest{ID: 42, URL: "http://example.com/mr/42"}
+	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
+	vcsProvider.EXPECT().CreateMergeRequest(mock.Anything, mock.Anything, string(fixture), mock.Anything, config.Branch).Return(createdMR, nil)
+	vcsProvider.EXPECT().EnableAutoMerge(mock.Anything, createdMR).Return(nil)
+
+	mockComposer.EXPECT().Update(mock.Anything, "/tmp", mock.Anything, mock.Anything, false, false).Return([]composer.PackageChange{
+		{Package: "drupal/core", From: "9.0.0", To: "9.1.0"},
+	}, nil)
+	mockComposer.EXPECT().Install(mock.Anything, "/tmp").Return(nil)
+	mockComposer.EXPECT().GetLockHash("/tmp").Return("dummy-hash", nil)
+
+	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
+	err = workflowService.StartUpdate(ctx, nil)
+
+	require.NoError(t, err)
+	vcsProvider.AssertExpectations(t)
+}
+
+func TestStartUpdateAutoMergeError(t *testing.T) {
+	// When EnableAutoMerge fails, the error must propagate.
+	logger := zap.NewNop()
+	installer := NewMockInstaller(t)
+	repositoryService := NewMockRepository(t)
+	vcsProvider := NewMockPlatform(t)
+	repository := NewMockGitRepository(t)
+	mockComposer := NewMockComposer(t)
+	drush := NewMockDrush(t)
+	ctx := context.Background()
+
+	config := internal.Config{
+		RepositoryURL: "https://example.com/repo.git",
+		Branch:        "main",
+		Token:         "token",
+		Clone:         true,
+		Sites:         []string{"site1"},
+		DryRun:        false,
+		AutoMerge:     internal.AutoMergeConfig{Normal: true, Security: false},
+	}
+
+	worktree := NewMockWorktree(t)
+	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
+	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Checkout(mock.Anything).Return(nil)
+
+	installer.EXPECT().Install(mock.Anything, "/tmp", "site1").Return(nil)
+	installer.EXPECT().ConfigureDatabase(mock.Anything, "/tmp", "site1").Return(nil)
+
+	drush.EXPECT().UpdateSite(mock.Anything, "/tmp", "site1").Return(nil)
+	drush.EXPECT().ExportConfiguration(mock.Anything, "/tmp", "site1").Return(nil)
+	drush.EXPECT().ConfigResave(mock.Anything, "/tmp", "site1").Return(nil)
+
+	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil)
+	mockComposer.EXPECT().CheckPlatformReqs(mock.Anything, "/tmp").Return("", nil)
+	repositoryService.EXPECT().BranchExists(repository, mock.Anything, mock.Anything).Return(false, nil)
+	repository.EXPECT().Push(mock.Anything).Return(nil)
+
+	createdMR := codehosting.MergeRequest{ID: 42, URL: "http://example.com/mr/42"}
+	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
+	vcsProvider.EXPECT().CreateMergeRequest(mock.Anything, mock.Anything, mock.Anything, mock.Anything, config.Branch).Return(createdMR, nil)
+	autoMergeErr := errors.New("auto-merge not allowed")
+	vcsProvider.EXPECT().EnableAutoMerge(mock.Anything, createdMR).Return(autoMergeErr)
+
+	mockComposer.EXPECT().Update(mock.Anything, "/tmp", mock.Anything, mock.Anything, false, false).Return([]composer.PackageChange{
+		{Package: "drupal/core", From: "9.0.0", To: "9.1.0"},
+	}, nil)
+	mockComposer.EXPECT().Install(mock.Anything, "/tmp").Return(nil)
+	mockComposer.EXPECT().GetLockHash("/tmp").Return("dummy-hash", nil)
+
+	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
+	err := workflowService.StartUpdate(ctx, nil)
+
+	require.ErrorIs(t, err, autoMergeErr)
+	require.ErrorContains(t, err, "failed to enable auto merge")
+}
+
+func TestStartUpdateAutoMergeSkippedWhenDisabled(t *testing.T) {
+	// With AutoMerge zero value (all false), EnableAutoMerge must NOT be called.
+	logger := zap.NewNop()
+	installer := NewMockInstaller(t)
+	repositoryService := NewMockRepository(t)
+	vcsProvider := NewMockPlatform(t)
+	repository := NewMockGitRepository(t)
+	mockComposer := NewMockComposer(t)
+	drush := NewMockDrush(t)
+	ctx := context.Background()
+
+	config := internal.Config{
+		RepositoryURL: "https://example.com/repo.git",
+		Branch:        "main",
+		Token:         "token",
+		Clone:         true,
+		Sites:         []string{"site1"},
+		DryRun:        false,
+		AutoMerge:     internal.AutoMergeConfig{Normal: false, Security: false},
+	}
+
+	worktree := NewMockWorktree(t)
+	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
+	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Checkout(mock.Anything).Return(nil)
+
+	installer.EXPECT().Install(mock.Anything, "/tmp", "site1").Return(nil)
+	installer.EXPECT().ConfigureDatabase(mock.Anything, "/tmp", "site1").Return(nil)
+
+	drush.EXPECT().UpdateSite(mock.Anything, "/tmp", "site1").Return(nil)
+	drush.EXPECT().ExportConfiguration(mock.Anything, "/tmp", "site1").Return(nil)
+	drush.EXPECT().ConfigResave(mock.Anything, "/tmp", "site1").Return(nil)
+
+	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil)
+	mockComposer.EXPECT().CheckPlatformReqs(mock.Anything, "/tmp").Return("", nil)
+	repositoryService.EXPECT().BranchExists(repository, mock.Anything, mock.Anything).Return(false, nil)
+	repository.EXPECT().Push(mock.Anything).Return(nil)
+
+	fixture, err := os.ReadFile("testdata/dependency_update.md")
+	require.NoError(t, err)
+
+	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
+	vcsProvider.EXPECT().CreateMergeRequest(mock.Anything, mock.Anything, string(fixture), mock.Anything, config.Branch).Return(codehosting.MergeRequest{}, nil)
+
+	mockComposer.EXPECT().Update(mock.Anything, "/tmp", mock.Anything, mock.Anything, false, false).Return([]composer.PackageChange{
+		{Package: "drupal/core", From: "9.0.0", To: "9.1.0"},
+	}, nil)
+	mockComposer.EXPECT().Install(mock.Anything, "/tmp").Return(nil)
+	mockComposer.EXPECT().GetLockHash("/tmp").Return("dummy-hash", nil)
+
+	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
+	err = workflowService.StartUpdate(ctx, nil)
+
+	require.NoError(t, err)
+	vcsProvider.AssertNotCalled(t, "EnableAutoMerge", mock.Anything, mock.Anything)
+}
+
 func TestGenerateDescription_UnknownTemplate(t *testing.T) {
 	logger := zap.NewNop()
 	ws := NewWorkflowBaseService(logger, internal.Config{}, nil, nil, nil, nil, nil, nil)

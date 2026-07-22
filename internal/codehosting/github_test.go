@@ -208,6 +208,79 @@ func TestGithub_DeleteBranch_HonorsContext(t *testing.T) {
 	require.ErrorIs(t, err, context.Canceled)
 }
 
+func TestGithub_EnableAutoMerge_Success(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v3/repos/owner/repo/pulls/1":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"number":1,"node_id":"PR_kwDOABCDEF123"}`))
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v3/graphql":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"data":{"enablePullRequestAutoMerge":{"pullRequest":{"autoMergeRequest":{"mergeMethod":"MERGE"}}}}}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer mockServer.Close()
+
+	client, _ := github.NewClient(nil).WithEnterpriseURLs(mockServer.URL, "")
+	gh := &Github{client: client, owner: "owner", repo: "repo"}
+
+	err := gh.EnableAutoMerge(context.Background(), MergeRequest{ID: 1})
+	require.NoError(t, err)
+}
+
+func TestGithub_EnableAutoMerge_GraphQLError(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v3/repos/owner/repo/pulls/1":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"number":1,"node_id":"PR_kwDOABCDEF123"}`))
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v3/graphql":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"errors":[{"message":"Auto-merge is not allowed for this repository"}]}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer mockServer.Close()
+
+	client, _ := github.NewClient(nil).WithEnterpriseURLs(mockServer.URL, "")
+	gh := &Github{client: client, owner: "owner", repo: "repo"}
+
+	err := gh.EnableAutoMerge(context.Background(), MergeRequest{ID: 1})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "Auto-merge is not allowed for this repository")
+}
+
+func TestGithub_EnableAutoMerge_GetPRError(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"message":"Not Found"}`))
+	}))
+	defer mockServer.Close()
+
+	client, _ := github.NewClient(nil).WithEnterpriseURLs(mockServer.URL, "")
+	gh := &Github{client: client, owner: "owner", repo: "repo"}
+
+	err := gh.EnableAutoMerge(context.Background(), MergeRequest{ID: 1})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "could not enable auto merge for PR 1")
+}
+
+func TestGithub_EnableAutoMerge_HonorsContext(t *testing.T) {
+	client, _ := github.NewClient(nil).WithEnterpriseURLs("http://example.invalid", "")
+	gh := &Github{client: client, owner: "o", repo: "r"}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := gh.EnableAutoMerge(ctx, MergeRequest{ID: 1})
+	require.Error(t, err)
+}
+
 func TestIsGitHubActionsToken403_ReturnsFalseForNonGitHubError(t *testing.T) {
 	result := isGitHubActionsToken403(nil, errors.New("plain network error"))
 	assert.False(t, result)

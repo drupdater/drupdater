@@ -11,6 +11,7 @@ type Config struct {
 	Sites         []string
 	Security      bool
 	DryRun        bool
+	AutoMerge     AutoMergeConfig
 	Verbose       bool
 	Timeout       time.Duration
 	Addons        AddonsConfig
@@ -22,4 +23,10 @@ type Config struct {
 type AddonsConfig struct {
 	Normal   []string `yaml:"normal"`
 	Security []string `yaml:"security"`
+}
+
+// AutoMergeConfig controls whether the MR/PR is set to auto-merge per update mode.
+type AutoMergeConfig struct {
+	Normal   bool `yaml:"normal"`
+	Security bool `yaml:"security"`
 }

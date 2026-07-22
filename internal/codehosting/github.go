@@ -85,6 +85,45 @@ func (g *Github) GetUser(ctx context.Context) (name string, email string) {
 	return user.GetName(), email
 }
 
+// EnableAutoMerge enables auto-merge on a GitHub pull request via the GraphQL API.
+// When all required status checks pass the PR is merged automatically.
+func (g *Github) EnableAutoMerge(ctx context.Context, mr MergeRequest) error {
+	pr, _, err := g.client.PullRequests.Get(ctx, g.owner, g.repo, int(mr.ID))
+	if err != nil {
+		return fmt.Errorf("could not enable auto merge for PR %d: %w", mr.ID, err)
+	}
+
+	body := struct {
+		Query     string         `json:"query"`
+		Variables map[string]any `json:"variables"`
+	}{
+		Query: `mutation($prId: ID!) {
+			enablePullRequestAutoMerge(input: {pullRequestId: $prId, mergeMethod: MERGE}) {
+				pullRequest { autoMergeRequest { mergeMethod } }
+			}
+		}`,
+		Variables: map[string]any{"prId": pr.GetNodeID()},
+	}
+
+	req, err := g.client.NewRequest("POST", "graphql", body)
+	if err != nil {
+		return fmt.Errorf("could not enable auto merge for PR %d: %w", mr.ID, err)
+	}
+
+	var result struct {
+		Errors []struct {
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+	if _, err = g.client.Do(ctx, req, &result); err != nil {
+		return fmt.Errorf("could not enable auto merge for PR %d: %w", mr.ID, err)
+	}
+	if len(result.Errors) > 0 {
+		return fmt.Errorf("could not enable auto merge for PR %d: %s", mr.ID, result.Errors[0].Message)
+	}
+	return nil
+}
+
 // isGitHubActionsToken403 reports whether the error is the specific 403 returned
 // by GitHub for an Actions integration token (GITHUB_TOKEN) that cannot access
 // the /user endpoint. Such responses carry the message

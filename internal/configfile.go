@@ -34,9 +34,10 @@ func (t *flexTimeout) UnmarshalYAML(node *yaml.Node) error {
 // fileConfig mirrors the YAML-settable keys of .drupdater.yaml. Timeout is captured as a raw
 // scalar because yaml.v3 cannot decode a duration like "30m" into a time.Duration.
 type fileConfig struct {
-	Sites   []string     `yaml:"sites"`
-	Timeout flexTimeout  `yaml:"timeout"`
-	Addons  AddonsConfig `yaml:"addons"`
+	Sites     []string     `yaml:"sites"`
+	Timeout   flexTimeout  `yaml:"timeout"`
+	Addons    AddonsConfig `yaml:"addons"`
+	AutoMerge AutoMergeConfig `yaml:"auto_merge"`
 }
 
 // defaultFileConfig returns a fileConfig pre-populated with defaults. Unmarshaling a YAML file
@@ -87,5 +88,6 @@ func applyFileConfig(fc fileConfig, c *Config) error {
 	c.Sites = fc.Sites
 	c.Timeout = timeout
 	c.Addons = fc.Addons
+	c.AutoMerge = fc.AutoMerge
 	return nil
 }
