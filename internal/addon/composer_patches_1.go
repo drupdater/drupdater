@@ -285,7 +285,7 @@ func (h *ComposerPatches1) removePackagePatches(worktree Worktree, op composer.P
 	return removed
 }
 
-func (h *ComposerPatches1) processSinglePatch(ctx context.Context, path string, worktree Worktree, op composer.PackageChange, description, patchPath string, patches map[string]map[string]string, updates *PatchUpdates) {
+func (h *ComposerPatches1) processSinglePatch(ctx context.Context, path string, worktree Worktree, op composer.PackageChange, description, patchPath string, patches map[string]map[string]string, updates *PatchUpdates) { //nolint:cyclop
 	issueNumber, issueNumberExists := h.drupalOrg.FindIssueNumber(description)
 	if !issueNumberExists {
 		issueNumber, issueNumberExists = h.drupalOrg.FindIssueNumber(patchPath)
