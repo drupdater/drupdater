@@ -76,6 +76,20 @@ jobs:
         with:
           dockerfile: Dockerfile
 
+  deadcode:
+    name: deadcode
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Check for dead code
+        run: go tool deadcode -test ./... | tee /tmp/deadcode.txt; [ ! -s /tmp/deadcode.txt ]
+
   govulncheck:
     name: govulncheck
     runs-on: ubuntu-latest

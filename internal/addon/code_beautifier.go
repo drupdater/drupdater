@@ -89,7 +89,7 @@ var hasPHPCSPathDefinitions = func(path string) (bool, error) {
 	return len(ruleset.Files) > 0, nil
 }
 
-func (cb *CodeBeautifier) postCodeUpdateHandler(e event.Event) error {
+func (cb *CodeBeautifier) postCodeUpdateHandler(e event.Event) error { //nolint:cyclop
 	event := e.(*services.PostCodeUpdateEvent)
 	cb.logger.Info("updating coding styles")
 
