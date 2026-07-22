@@ -846,7 +846,7 @@ func TestStartUpdateExportConfigurationError(t *testing.T) {
 }
 
 func TestStartUpdateWithAutoMerge(t *testing.T) {
-	// When AutoMerge is true, EnableAutoMerge must be called after MR creation.
+	// When AutoMerge.Normal is true and Security is false, EnableAutoMerge must be called.
 	logger := zap.NewNop()
 	installer := NewMockInstaller(t)
 	repositoryService := NewMockRepository(t)
@@ -863,7 +863,7 @@ func TestStartUpdateWithAutoMerge(t *testing.T) {
 		Clone:         true,
 		Sites:         []string{"site1"},
 		DryRun:        false,
-		AutoMerge:     true,
+		AutoMerge:     internal.AutoMergeConfig{Normal: true, Security: false},
 	}
 
 	worktree := NewMockWorktree(t)
@@ -922,7 +922,7 @@ func TestStartUpdateAutoMergeError(t *testing.T) {
 		Clone:         true,
 		Sites:         []string{"site1"},
 		DryRun:        false,
-		AutoMerge:     true,
+		AutoMerge:     internal.AutoMergeConfig{Normal: true, Security: false},
 	}
 
 	worktree := NewMockWorktree(t)
@@ -962,7 +962,7 @@ func TestStartUpdateAutoMergeError(t *testing.T) {
 }
 
 func TestStartUpdateAutoMergeSkippedWhenDisabled(t *testing.T) {
-	// With AutoMerge: false (default), EnableAutoMerge must NOT be called.
+	// With AutoMerge zero value (all false), EnableAutoMerge must NOT be called.
 	logger := zap.NewNop()
 	installer := NewMockInstaller(t)
 	repositoryService := NewMockRepository(t)
@@ -979,7 +979,7 @@ func TestStartUpdateAutoMergeSkippedWhenDisabled(t *testing.T) {
 		Clone:         true,
 		Sites:         []string{"site1"},
 		DryRun:        false,
-		AutoMerge:     false,
+		AutoMerge:     internal.AutoMergeConfig{Normal: false, Security: false},
 	}
 
 	worktree := NewMockWorktree(t)

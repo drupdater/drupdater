@@ -37,7 +37,7 @@ type fileConfig struct {
 	Sites     []string     `yaml:"sites"`
 	Timeout   flexTimeout  `yaml:"timeout"`
 	Addons    AddonsConfig `yaml:"addons"`
-	AutoMerge bool         `yaml:"auto_merge"`
+	AutoMerge AutoMergeConfig `yaml:"auto_merge"`
 }
 
 // defaultFileConfig returns a fileConfig pre-populated with defaults. Unmarshaling a YAML file
