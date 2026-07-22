@@ -20,6 +20,9 @@ type Platform interface {
 
 	// GetUser returns the user name and email from the platform.
 	GetUser(ctx context.Context) (name string, email string)
+
+	// EnableAutoMerge sets the merge/pull request to merge automatically when all conditions are met.
+	EnableAutoMerge(ctx context.Context, mr MergeRequest) error
 }
 
 // MergeRequest represents a merge or pull request on a code hosting platform.

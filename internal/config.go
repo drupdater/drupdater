@@ -11,6 +11,7 @@ type Config struct {
 	Sites         []string
 	Security      bool
 	DryRun        bool
+	AutoMerge     bool
 	Verbose       bool
 	Timeout       time.Duration
 	Addons        AddonsConfig
