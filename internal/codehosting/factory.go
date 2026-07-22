@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"os"
 	"strings"
 
 	"go.uber.org/zap"
@@ -43,12 +44,30 @@ func (vpf *DefaultVcsProviderFactory) Create(repositoryURL string, token string,
 		return nil, err
 	}
 
-	switch providerFromHost(host) {
+	provider := providerFromEnv()
+	if provider == "" {
+		provider = providerFromHost(host)
+	}
+
+	switch provider {
 	case "github":
 		return newGithub(path, token, logger)
 	default:
 		return newGitlab(host, path, token, logger)
 	}
+}
+
+// providerFromEnv returns the VCS provider from CI environment variables, which are
+// authoritative and work for self-hosted instances whose hostnames don't contain the
+// provider name. Returns "" when no CI environment is detected.
+func providerFromEnv() string {
+	if os.Getenv("GITHUB_ACTIONS") == "true" {
+		return "github"
+	}
+	if os.Getenv("GITLAB_CI") == "true" {
+		return "gitlab"
+	}
+	return ""
 }
 
 // providerFromHost determines the VCS provider type from the repository host. Matching on the

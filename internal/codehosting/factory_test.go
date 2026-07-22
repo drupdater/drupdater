@@ -45,6 +45,9 @@ func TestDefaultVcsProviderFactory_Create(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("GITHUB_ACTIONS", "")
+			t.Setenv("GITLAB_CI", "")
+
 			factory := NewDefaultVcsProviderFactory()
 
 			provider, err := factory.Create(tt.repositoryURL, "dummy-token", zap.NewNop())
@@ -55,7 +58,114 @@ func TestDefaultVcsProviderFactory_Create(t *testing.T) {
 	}
 }
 
+func TestDefaultVcsProviderFactory_Create_CIEnvVars(t *testing.T) {
+	tests := []struct {
+		name          string
+		repositoryURL string
+		envKey        string
+		envValue      string
+		expectedType  any
+	}{
+		{
+			name:          "GITHUB_ACTIONS overrides hostname detection for self-hosted GitHub",
+			repositoryURL: "https://git.company.com/owner/repo",
+			envKey:        "GITHUB_ACTIONS",
+			envValue:      "true",
+			expectedType:  &Github{},
+		},
+		{
+			name:          "GITLAB_CI overrides hostname detection for self-hosted GitLab",
+			repositoryURL: "https://git.company.com/group/repo",
+			envKey:        "GITLAB_CI",
+			envValue:      "true",
+			expectedType:  &Gitlab{},
+		},
+		{
+			name:          "GITHUB_ACTIONS wins over gitlab.com URL",
+			repositoryURL: "https://gitlab.com/owner/repo",
+			envKey:        "GITHUB_ACTIONS",
+			envValue:      "true",
+			expectedType:  &Github{},
+		},
+		{
+			name:          "GITLAB_CI wins over github.com URL",
+			repositoryURL: "https://github.com/owner/repo",
+			envKey:        "GITLAB_CI",
+			envValue:      "true",
+			expectedType:  &Gitlab{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("GITHUB_ACTIONS", "")
+			t.Setenv("GITLAB_CI", "")
+			t.Setenv(tt.envKey, tt.envValue)
+
+			factory := NewDefaultVcsProviderFactory()
+			provider, err := factory.Create(tt.repositoryURL, "dummy-token", zap.NewNop())
+
+			require.NoError(t, err)
+			assert.IsType(t, tt.expectedType, provider)
+		})
+	}
+}
+
+func TestProviderFromEnv(t *testing.T) {
+	tests := []struct {
+		name     string
+		env      map[string]string
+		expected string
+	}{
+		{
+			name:     "returns github when GITHUB_ACTIONS is true",
+			env:      map[string]string{"GITHUB_ACTIONS": "true"},
+			expected: "github",
+		},
+		{
+			name:     "returns gitlab when GITLAB_CI is true",
+			env:      map[string]string{"GITLAB_CI": "true"},
+			expected: "gitlab",
+		},
+		{
+			name:     "returns empty when no CI env vars are set",
+			env:      map[string]string{},
+			expected: "",
+		},
+		{
+			name:     "GITHUB_ACTIONS=false does not trigger github detection",
+			env:      map[string]string{"GITHUB_ACTIONS": "false"},
+			expected: "",
+		},
+		{
+			name:     "GITLAB_CI=false does not trigger gitlab detection",
+			env:      map[string]string{"GITLAB_CI": "false"},
+			expected: "",
+		},
+		{
+			name:     "GITHUB_ACTIONS takes priority over GITLAB_CI",
+			env:      map[string]string{"GITHUB_ACTIONS": "true", "GITLAB_CI": "true"},
+			expected: "github",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("GITHUB_ACTIONS", "")
+			t.Setenv("GITLAB_CI", "")
+			for k, v := range tt.env {
+				t.Setenv(k, v)
+			}
+
+			assert.Equal(t, tt.expected, providerFromEnv())
+		})
+	}
+}
+
 func TestDefaultVcsProviderFactory_Create_InvalidURL(t *testing.T) {
+	t.Setenv("GITHUB_ACTIONS", "")
+	t.Setenv("GITLAB_CI", "")
+
 	factory := NewDefaultVcsProviderFactory()
 
 	_, err := factory.Create("", "dummy-token", zap.NewNop())
