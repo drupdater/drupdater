@@ -38,8 +38,8 @@ func (_m *MockDrush) EXPECT() *MockDrush_Expecter {
 }
 
 // GetConfigSyncDir provides a mock function for the type MockDrush
-func (_mock *MockDrush) GetConfigSyncDir(ctx context.Context, path string, site string, create bool) (string, error) {
-	ret := _mock.Called(ctx, path, site, create)
+func (_mock *MockDrush) GetConfigSyncDir(ctx context.Context, path string, site string, relative bool) (string, error) {
+	ret := _mock.Called(ctx, path, site, relative)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetConfigSyncDir")
@@ -48,15 +48,15 @@ func (_mock *MockDrush) GetConfigSyncDir(ctx context.Context, path string, site 
 	var r0 string
 	var r1 error
 	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, bool) (string, error)); ok {
-		return returnFunc(ctx, path, site, create)
+		return returnFunc(ctx, path, site, relative)
 	}
 	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, bool) string); ok {
-		r0 = returnFunc(ctx, path, site, create)
+		r0 = returnFunc(ctx, path, site, relative)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string, bool) error); ok {
-		r1 = returnFunc(ctx, path, site, create)
+		r1 = returnFunc(ctx, path, site, relative)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -72,12 +72,12 @@ type MockDrush_GetConfigSyncDir_Call struct {
 //   - ctx context.Context
 //   - path string
 //   - site string
-//   - create bool
-func (_e *MockDrush_Expecter) GetConfigSyncDir(ctx any, path any, site any, create any) *MockDrush_GetConfigSyncDir_Call {
-	return &MockDrush_GetConfigSyncDir_Call{Call: _e.mock.On("GetConfigSyncDir", ctx, path, site, create)}
+//   - relative bool
+func (_e *MockDrush_Expecter) GetConfigSyncDir(ctx any, path any, site any, relative any) *MockDrush_GetConfigSyncDir_Call {
+	return &MockDrush_GetConfigSyncDir_Call{Call: _e.mock.On("GetConfigSyncDir", ctx, path, site, relative)}
 }
 
-func (_c *MockDrush_GetConfigSyncDir_Call) Run(run func(ctx context.Context, path string, site string, create bool)) *MockDrush_GetConfigSyncDir_Call {
+func (_c *MockDrush_GetConfigSyncDir_Call) Run(run func(ctx context.Context, path string, site string, relative bool)) *MockDrush_GetConfigSyncDir_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -110,7 +110,7 @@ func (_c *MockDrush_GetConfigSyncDir_Call) Return(s string, err error) *MockDrus
 	return _c
 }
 
-func (_c *MockDrush_GetConfigSyncDir_Call) RunAndReturn(run func(ctx context.Context, path string, site string, create bool) (string, error)) *MockDrush_GetConfigSyncDir_Call {
+func (_c *MockDrush_GetConfigSyncDir_Call) RunAndReturn(run func(ctx context.Context, path string, site string, relative bool) (string, error)) *MockDrush_GetConfigSyncDir_Call {
 	_c.Call.Return(run)
 	return _c
 }

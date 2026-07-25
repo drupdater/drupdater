@@ -50,7 +50,7 @@ func TestComposerAudit_SubscribedEvents(t *testing.T) {
 	assert.Equal(t, event.Max, preComposerEvent.Priority)
 
 	postCodeEvent := events["post-code-update"].(event.ListenerItem)
-	assert.Equal(t, event.Normal, postCodeEvent.Priority)
+	assert.Equal(t, event.BelowNormal, postCodeEvent.Priority)
 
 	preMergeEvent := events["pre-merge-request-create"].(event.ListenerItem)
 	assert.Equal(t, event.Normal, preMergeEvent.Priority)

@@ -1100,6 +1100,61 @@ func (_m *MockGitRepository) EXPECT() *MockGitRepository_Expecter {
 	return &MockGitRepository_Expecter{mock: &_m.Mock}
 }
 
+// Head provides a mock function for the type MockGitRepository
+func (_mock *MockGitRepository) Head() (*plumbing.Reference, error) {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Head")
+	}
+
+	var r0 *plumbing.Reference
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func() (*plumbing.Reference, error)); ok {
+		return returnFunc()
+	}
+	if returnFunc, ok := ret.Get(0).(func() *plumbing.Reference); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*plumbing.Reference)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func() error); ok {
+		r1 = returnFunc()
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockGitRepository_Head_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Head'
+type MockGitRepository_Head_Call struct {
+	*mock.Call
+}
+
+// Head is a helper method to define mock.On call
+func (_e *MockGitRepository_Expecter) Head() *MockGitRepository_Head_Call {
+	return &MockGitRepository_Head_Call{Call: _e.mock.On("Head")}
+}
+
+func (_c *MockGitRepository_Head_Call) Run(run func()) *MockGitRepository_Head_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockGitRepository_Head_Call) Return(reference *plumbing.Reference, err error) *MockGitRepository_Head_Call {
+	_c.Call.Return(reference, err)
+	return _c
+}
+
+func (_c *MockGitRepository_Head_Call) RunAndReturn(run func() (*plumbing.Reference, error)) *MockGitRepository_Head_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Push provides a mock function for the type MockGitRepository
 func (_mock *MockGitRepository) Push(o *git.PushOptions) error {
 	ret := _mock.Called(o)
@@ -1147,6 +1202,74 @@ func (_c *MockGitRepository_Push_Call) Return(err error) *MockGitRepository_Push
 }
 
 func (_c *MockGitRepository_Push_Call) RunAndReturn(run func(o *git.PushOptions) error) *MockGitRepository_Push_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Reference provides a mock function for the type MockGitRepository
+func (_mock *MockGitRepository) Reference(name plumbing.ReferenceName, resolved bool) (*plumbing.Reference, error) {
+	ret := _mock.Called(name, resolved)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Reference")
+	}
+
+	var r0 *plumbing.Reference
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(plumbing.ReferenceName, bool) (*plumbing.Reference, error)); ok {
+		return returnFunc(name, resolved)
+	}
+	if returnFunc, ok := ret.Get(0).(func(plumbing.ReferenceName, bool) *plumbing.Reference); ok {
+		r0 = returnFunc(name, resolved)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*plumbing.Reference)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(plumbing.ReferenceName, bool) error); ok {
+		r1 = returnFunc(name, resolved)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockGitRepository_Reference_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Reference'
+type MockGitRepository_Reference_Call struct {
+	*mock.Call
+}
+
+// Reference is a helper method to define mock.On call
+//   - name plumbing.ReferenceName
+//   - resolved bool
+func (_e *MockGitRepository_Expecter) Reference(name any, resolved any) *MockGitRepository_Reference_Call {
+	return &MockGitRepository_Reference_Call{Call: _e.mock.On("Reference", name, resolved)}
+}
+
+func (_c *MockGitRepository_Reference_Call) Run(run func(name plumbing.ReferenceName, resolved bool)) *MockGitRepository_Reference_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 plumbing.ReferenceName
+		if args[0] != nil {
+			arg0 = args[0].(plumbing.ReferenceName)
+		}
+		var arg1 bool
+		if args[1] != nil {
+			arg1 = args[1].(bool)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockGitRepository_Reference_Call) Return(reference *plumbing.Reference, err error) *MockGitRepository_Reference_Call {
+	_c.Call.Return(reference, err)
+	return _c
+}
+
+func (_c *MockGitRepository_Reference_Call) RunAndReturn(run func(name plumbing.ReferenceName, resolved bool) (*plumbing.Reference, error)) *MockGitRepository_Reference_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -2084,6 +2207,285 @@ func (_c *MockEventDispatcher_FireEvent_Call) Return(err error) *MockEventDispat
 }
 
 func (_c *MockEventDispatcher_FireEvent_Call) RunAndReturn(run func(e event.Event) error) *MockEventDispatcher_FireEvent_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// NewMockShallowCloneChecker creates a new instance of MockShallowCloneChecker. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
+// The first argument is typically a *testing.T value.
+func NewMockShallowCloneChecker(t interface {
+	mock.TestingT
+	Cleanup(func())
+}) *MockShallowCloneChecker {
+	mock := &MockShallowCloneChecker{}
+	mock.Mock.Test(t)
+
+	t.Cleanup(func() { mock.AssertExpectations(t) })
+
+	return mock
+}
+
+// MockShallowCloneChecker is an autogenerated mock type for the ShallowCloneChecker type
+type MockShallowCloneChecker struct {
+	mock.Mock
+}
+
+type MockShallowCloneChecker_Expecter struct {
+	mock *mock.Mock
+}
+
+func (_m *MockShallowCloneChecker) EXPECT() *MockShallowCloneChecker_Expecter {
+	return &MockShallowCloneChecker_Expecter{mock: &_m.Mock}
+}
+
+// IsShallowClone provides a mock function for the type MockShallowCloneChecker
+func (_mock *MockShallowCloneChecker) IsShallowClone(path string) (bool, error) {
+	ret := _mock.Called(path)
+
+	if len(ret) == 0 {
+		panic("no return value specified for IsShallowClone")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(string) (bool, error)); ok {
+		return returnFunc(path)
+	}
+	if returnFunc, ok := ret.Get(0).(func(string) bool); ok {
+		r0 = returnFunc(path)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(string) error); ok {
+		r1 = returnFunc(path)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockShallowCloneChecker_IsShallowClone_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IsShallowClone'
+type MockShallowCloneChecker_IsShallowClone_Call struct {
+	*mock.Call
+}
+
+// IsShallowClone is a helper method to define mock.On call
+//   - path string
+func (_e *MockShallowCloneChecker_Expecter) IsShallowClone(path any) *MockShallowCloneChecker_IsShallowClone_Call {
+	return &MockShallowCloneChecker_IsShallowClone_Call{Call: _e.mock.On("IsShallowClone", path)}
+}
+
+func (_c *MockShallowCloneChecker_IsShallowClone_Call) Run(run func(path string)) *MockShallowCloneChecker_IsShallowClone_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockShallowCloneChecker_IsShallowClone_Call) Return(b bool, err error) *MockShallowCloneChecker_IsShallowClone_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *MockShallowCloneChecker_IsShallowClone_Call) RunAndReturn(run func(path string) (bool, error)) *MockShallowCloneChecker_IsShallowClone_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// NewMockPlatformReqsChecker creates a new instance of MockPlatformReqsChecker. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
+// The first argument is typically a *testing.T value.
+func NewMockPlatformReqsChecker(t interface {
+	mock.TestingT
+	Cleanup(func())
+}) *MockPlatformReqsChecker {
+	mock := &MockPlatformReqsChecker{}
+	mock.Mock.Test(t)
+
+	t.Cleanup(func() { mock.AssertExpectations(t) })
+
+	return mock
+}
+
+// MockPlatformReqsChecker is an autogenerated mock type for the PlatformReqsChecker type
+type MockPlatformReqsChecker struct {
+	mock.Mock
+}
+
+type MockPlatformReqsChecker_Expecter struct {
+	mock *mock.Mock
+}
+
+func (_m *MockPlatformReqsChecker) EXPECT() *MockPlatformReqsChecker_Expecter {
+	return &MockPlatformReqsChecker_Expecter{mock: &_m.Mock}
+}
+
+// CheckPlatformReqs provides a mock function for the type MockPlatformReqsChecker
+func (_mock *MockPlatformReqsChecker) CheckPlatformReqs(ctx context.Context, dir string) (string, error) {
+	ret := _mock.Called(ctx, dir)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CheckPlatformReqs")
+	}
+
+	var r0 string
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (string, error)); ok {
+		return returnFunc(ctx, dir)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) string); ok {
+		r0 = returnFunc(ctx, dir)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, dir)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockPlatformReqsChecker_CheckPlatformReqs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CheckPlatformReqs'
+type MockPlatformReqsChecker_CheckPlatformReqs_Call struct {
+	*mock.Call
+}
+
+// CheckPlatformReqs is a helper method to define mock.On call
+//   - ctx context.Context
+//   - dir string
+func (_e *MockPlatformReqsChecker_Expecter) CheckPlatformReqs(ctx any, dir any) *MockPlatformReqsChecker_CheckPlatformReqs_Call {
+	return &MockPlatformReqsChecker_CheckPlatformReqs_Call{Call: _e.mock.On("CheckPlatformReqs", ctx, dir)}
+}
+
+func (_c *MockPlatformReqsChecker_CheckPlatformReqs_Call) Run(run func(ctx context.Context, dir string)) *MockPlatformReqsChecker_CheckPlatformReqs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockPlatformReqsChecker_CheckPlatformReqs_Call) Return(s string, err error) *MockPlatformReqsChecker_CheckPlatformReqs_Call {
+	_c.Call.Return(s, err)
+	return _c
+}
+
+func (_c *MockPlatformReqsChecker_CheckPlatformReqs_Call) RunAndReturn(run func(ctx context.Context, dir string) (string, error)) *MockPlatformReqsChecker_CheckPlatformReqs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// NewMockComposerConfigGetter creates a new instance of MockComposerConfigGetter. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
+// The first argument is typically a *testing.T value.
+func NewMockComposerConfigGetter(t interface {
+	mock.TestingT
+	Cleanup(func())
+}) *MockComposerConfigGetter {
+	mock := &MockComposerConfigGetter{}
+	mock.Mock.Test(t)
+
+	t.Cleanup(func() { mock.AssertExpectations(t) })
+
+	return mock
+}
+
+// MockComposerConfigGetter is an autogenerated mock type for the ComposerConfigGetter type
+type MockComposerConfigGetter struct {
+	mock.Mock
+}
+
+type MockComposerConfigGetter_Expecter struct {
+	mock *mock.Mock
+}
+
+func (_m *MockComposerConfigGetter) EXPECT() *MockComposerConfigGetter_Expecter {
+	return &MockComposerConfigGetter_Expecter{mock: &_m.Mock}
+}
+
+// GetConfig provides a mock function for the type MockComposerConfigGetter
+func (_mock *MockComposerConfigGetter) GetConfig(ctx context.Context, dir string, key string) (string, error) {
+	ret := _mock.Called(ctx, dir, key)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetConfig")
+	}
+
+	var r0 string
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) (string, error)); ok {
+		return returnFunc(ctx, dir, key)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) string); ok {
+		r0 = returnFunc(ctx, dir, key)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = returnFunc(ctx, dir, key)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockComposerConfigGetter_GetConfig_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetConfig'
+type MockComposerConfigGetter_GetConfig_Call struct {
+	*mock.Call
+}
+
+// GetConfig is a helper method to define mock.On call
+//   - ctx context.Context
+//   - dir string
+//   - key string
+func (_e *MockComposerConfigGetter_Expecter) GetConfig(ctx any, dir any, key any) *MockComposerConfigGetter_GetConfig_Call {
+	return &MockComposerConfigGetter_GetConfig_Call{Call: _e.mock.On("GetConfig", ctx, dir, key)}
+}
+
+func (_c *MockComposerConfigGetter_GetConfig_Call) Run(run func(ctx context.Context, dir string, key string)) *MockComposerConfigGetter_GetConfig_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockComposerConfigGetter_GetConfig_Call) Return(s string, err error) *MockComposerConfigGetter_GetConfig_Call {
+	_c.Call.Return(s, err)
+	return _c
+}
+
+func (_c *MockComposerConfigGetter_GetConfig_Call) RunAndReturn(run func(ctx context.Context, dir string, key string) (string, error)) *MockComposerConfigGetter_GetConfig_Call {
 	_c.Call.Return(run)
 	return _c
 }

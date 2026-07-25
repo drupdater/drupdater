@@ -504,7 +504,7 @@ func (h *ComposerPatches1) downloadFile(ctx context.Context, url, folder string,
 		return fmt.Errorf("failed to download file: status code %d", resp.StatusCode)
 	}
 
-	if err = os.MkdirAll(folder, os.ModePerm); err != nil {
+	if err = os.MkdirAll(folder, 0o755); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 

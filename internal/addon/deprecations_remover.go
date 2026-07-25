@@ -27,8 +27,13 @@ func NewDeprecationsRemover(logger *zap.Logger, rector Rector, composer Composer
 // SubscribedEvents returns the events this addon listens to
 func (dr *DeprecationsRemover) SubscribedEvents() map[string]any {
 	return map[string]any{
+		// Above Normal: this handler temporarily requires palantirnet/drupal-rector (see below),
+		// and code_beautifier's own "post-code-update" listener (Normal) may commit composer.*
+		// via AddGlob if it installs drupal/coder — it must never run in between the require and
+		// the cleanup this handler does before returning, or it would sweep up an unrelated,
+		// half-finished composer.json/composer.lock diff into its own commit.
 		"post-code-update": event.ListenerItem{
-			Priority: event.Normal,
+			Priority: event.AboveNormal,
 			Listener: event.ListenerFunc(dr.postCodeUpdateHandler),
 		},
 	}
@@ -68,6 +73,13 @@ func (dr *DeprecationsRemover) postCodeUpdateHandler(e event.Event) error {
 		if _, err := dr.composer.Remove(evt.Context(), evt.Path(), "palantirnet/drupal-rector"); err != nil {
 			return err
 		}
+		// Commit whatever composer.json/composer.lock diff remains from temporarily requiring
+		// rector (a version-solving pass rarely restores the lock file byte-for-byte). Doing this
+		// here, rather than leaving the files dirty, means no other "post-code-update" listener's
+		// own worktree.AddGlob("composer.*") can ever sweep this unrelated diff into its commit.
+		if err := dr.commitTemporaryRectorCleanup(evt.Worktree()); err != nil {
+			return err
+		}
 	}
 
 	if deprecationRemovalResult.Totals.ChangedFiles == 0 {
@@ -84,5 +96,22 @@ func (dr *DeprecationsRemover) postCodeUpdateHandler(e event.Event) error {
 	dr.logger.Debug("committing deprecation removals")
 	_, err = evt.Worktree().Commit("Remove deprecations", &git.CommitOptions{})
 
+	return err
+}
+
+// commitTemporaryRectorCleanup commits any composer.json/composer.lock diff left over from
+// temporarily requiring palantirnet/drupal-rector, or does nothing if removing it left no trace.
+func (dr *DeprecationsRemover) commitTemporaryRectorCleanup(worktree Worktree) error {
+	if err := worktree.AddGlob("composer.*"); err != nil {
+		return err
+	}
+	staged, err := stagedAnyOf(worktree, []string{"composer.json", "composer.lock"})
+	if err != nil {
+		return err
+	}
+	if !staged {
+		return nil
+	}
+	_, err = worktree.Commit("Remove temporary drupal-rector installation", &git.CommitOptions{})
 	return err
 }

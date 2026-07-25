@@ -36,8 +36,14 @@ func (cd *ComposerDiff) SubscribedEvents() map[string]any {
 	}
 }
 
-// RenderTemplate returns the rendered template for this addon.
+// RenderTemplate returns the rendered template for this addon, or "" if there is no dependency
+// diff to show (e.g. the postComposerUpdateHandler never ran, or composer diff reported no
+// visible change), matching how every other addon's RenderTemplate omits its section rather than
+// emitting an empty header.
 func (cd *ComposerDiff) RenderTemplate() (string, error) {
+	if cd.table == "" {
+		return "", nil
+	}
 	return cd.Render("composer_diff.go.tmpl", cd.table)
 }
 

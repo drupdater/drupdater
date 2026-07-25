@@ -134,6 +134,7 @@ func (cb *CodeBeautifier) postCodeUpdateHandler(e event.Event) error { //nolint:
 
 	cb.logger.Debug("adding files to commit", zap.Any("files", codingStyleUpdateResult.Files))
 
+	var addedFiles []string
 	for file := range codingStyleUpdateResult.Files {
 		if (codingStyleUpdateResult.Files[file].Errors + codingStyleUpdateResult.Files[file].Warnings) == 0 {
 			continue
@@ -143,12 +144,16 @@ func (cb *CodeBeautifier) postCodeUpdateHandler(e event.Event) error { //nolint:
 		if _, err := event.Worktree().Add(relativePath); err != nil {
 			return fmt.Errorf("failed to add file to commit: %w", err)
 		}
+		addedFiles = append(addedFiles, relativePath)
 	}
 
 	// phpcbf may not have changed anything on disk (some "fixable" issues aren't actually
 	// auto-fixable, and RunCBF errors are only logged), which would make an empty commit that
-	// go-git rejects. Only commit when something is actually staged.
-	staged, err := somethingStaged(event.Worktree())
+	// go-git rejects. Only commit when something this handler added is actually staged — checked
+	// against just those paths, not the whole index, so a same-event listener's own uncommitted
+	// change (e.g. deprecations_remover's composer.* diff, if it were ever left dangling) can
+	// never get swept into this commit.
+	staged, err := stagedAnyOf(event.Worktree(), addedFiles)
 	if err != nil {
 		return fmt.Errorf("failed to check worktree status: %w", err)
 	}
@@ -161,14 +166,18 @@ func (cb *CodeBeautifier) postCodeUpdateHandler(e event.Event) error { //nolint:
 	return err
 }
 
-// somethingStaged reports whether the worktree has any staged change.
-func somethingStaged(worktree Worktree) (bool, error) {
+// stagedAnyOf reports whether any of paths has a staged (non-Unmodified) change in worktree. An
+// empty paths list is "nothing to check" and short-circuits without querying git status.
+func stagedAnyOf(worktree Worktree, paths []string) (bool, error) {
+	if len(paths) == 0 {
+		return false, nil
+	}
 	status, err := worktree.Status()
 	if err != nil {
 		return false, err
 	}
-	for _, s := range status {
-		if s.Staging != git.Unmodified {
+	for _, p := range paths {
+		if s, ok := status[p]; ok && s.Staging != git.Unmodified {
 			return true, nil
 		}
 	}

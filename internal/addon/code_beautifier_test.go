@@ -461,21 +461,32 @@ func TestCodingStyles(t *testing.T) {
 		composer.AssertExpectations(t)
 	})
 
-	t.Run("somethingStaged reports staged changes and propagates errors", func(t *testing.T) {
+	t.Run("stagedAnyOf reports staged changes and propagates errors, scoped to given paths", func(t *testing.T) {
 		wt := NewMockWorktree(t)
 		wt.EXPECT().Status().Return(git.Status{"a": &git.FileStatus{Staging: git.Unmodified}}, nil).Once()
-		staged, err := somethingStaged(wt)
+		staged, err := stagedAnyOf(wt, []string{"a"})
 		require.NoError(t, err)
 		assert.False(t, staged)
 
 		wt.EXPECT().Status().Return(git.Status{"a": &git.FileStatus{Staging: git.Modified}}, nil).Once()
-		staged, err = somethingStaged(wt)
+		staged, err = stagedAnyOf(wt, []string{"a"})
 		require.NoError(t, err)
 		assert.True(t, staged)
 
+		// A staged change to a path the caller didn't ask about must not count.
+		wt.EXPECT().Status().Return(git.Status{"b": &git.FileStatus{Staging: git.Modified}}, nil).Once()
+		staged, err = stagedAnyOf(wt, []string{"a"})
+		require.NoError(t, err)
+		assert.False(t, staged)
+
 		wt.EXPECT().Status().Return(nil, assert.AnError).Once()
-		_, err = somethingStaged(wt)
+		_, err = stagedAnyOf(wt, []string{"a"})
 		require.Error(t, err)
+
+		// An empty path list short-circuits without even querying git status.
+		staged, err = stagedAnyOf(wt, nil)
+		require.NoError(t, err)
+		assert.False(t, staged)
 	})
 
 	t.Run("Fixable", func(t *testing.T) {

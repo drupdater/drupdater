@@ -84,3 +84,14 @@ func TestComposerDiff_RenderTemplate(t *testing.T) {
 	assert.Equal(t, expected, result)
 	composerRunner.AssertExpectations(t)
 }
+
+func TestComposerDiff_RenderTemplate_NoDiff(t *testing.T) {
+	// An empty table (postComposerUpdateHandler never ran) must render nothing, not an empty
+	// "Dependency updates" header.
+	diff := NewComposerDiff(zap.NewNop(), NewMockComposer(t))
+
+	result, err := diff.RenderTemplate()
+
+	require.NoError(t, err)
+	assert.Empty(t, result)
+}

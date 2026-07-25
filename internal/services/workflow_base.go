@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"embed"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -70,7 +71,7 @@ func NewWorkflowBaseService(
 	}
 }
 
-func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []internal.Addon) error {
+func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []internal.Addon) (err error) {
 	start := time.Now()
 
 	// Bound the whole run so a wedged subprocess or network call can't hang forever.
@@ -95,8 +96,16 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []interna
 	if err != nil {
 		return err
 	}
+
+	// Capture the checkout's current HEAD before any branch is created, so a failed or aborted
+	// run can restore it below — see captureOriginalHead.
+	originalRef := ws.captureOriginalHead(repository)
+
 	defer func() {
 		ws.logger.Info("update run finished", zap.Duration("duration", time.Since(start)))
+		if err != nil && originalRef != nil {
+			ws.restoreOriginalCheckout(worktree, originalRef)
+		}
 		ws.cleanup(path)
 	}()
 
@@ -143,6 +152,43 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []interna
 		return ws.publishWork(ctx, repository, updateBranchName, addons)
 	}
 	return nil
+}
+
+// captureOriginalHead returns the checkout's current HEAD in checkout mode, or nil in clone mode
+// (a clone's whole temp directory is discarded by cleanup regardless, so there is nothing to
+// restore there) or if HEAD could not be read. It is used by StartUpdate to put a checkout-mode
+// run's working directory back exactly where it found it if the run does not complete
+// successfully — otherwise a failed or aborted run leaves the checkout on drupdater's own
+// throwaway work branch, with composer.json's allow-plugins possibly still left at true by
+// composer_allow_plugins' own pre-composer-update handler and never reverted. Best-effort: a
+// failure to read HEAD only means the restore is skipped, not that the run itself aborts over
+// what is otherwise a safety net.
+func (ws *WorkflowBaseService) captureOriginalHead(repository GitRepository) *plumbing.Reference {
+	if ws.config.Clone {
+		return nil
+	}
+	ref, err := repository.Head()
+	if err != nil {
+		ws.logger.Warn("failed to determine current HEAD, checkout will not be restored if the run fails", zap.Error(err))
+		return nil
+	}
+	return ref
+}
+
+// restoreOriginalCheckout switches worktree back to originalRef, discarding any uncommitted
+// changes and stray commits accumulated on drupdater's own throwaway work branch. It runs only
+// to tidy up after a run that has already failed or been aborted, so an error here is logged,
+// not returned: it must never mask the original failure.
+func (ws *WorkflowBaseService) restoreOriginalCheckout(worktree Worktree, originalRef *plumbing.Reference) {
+	opts := &git.CheckoutOptions{Force: true}
+	if originalRef.Name().IsBranch() {
+		opts.Branch = originalRef.Name()
+	} else {
+		opts.Hash = originalRef.Hash()
+	}
+	if err := worktree.Checkout(opts); err != nil {
+		ws.logger.Warn("failed to restore checkout to its original state", zap.Error(err))
+	}
 }
 
 // acquireWorkingCopy returns the single working directory the run operates on. By default it
@@ -269,13 +315,8 @@ func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context, repository 
 
 	updateBranchName := fmt.Sprintf("update-%s", composerLockHash)
 
-	// Check if branch already exists
-	exists, err := ws.repository.BranchExists(repository, updateBranchName, ws.config.Token)
-	if err != nil {
-		return "", fmt.Errorf("failed to check if branch exists: %w", err)
-	}
-	if exists {
-		return "", AbortError{Msg: fmt.Sprintf("branch %s already exists, skipping", updateBranchName)}
+	if err := ws.ensureUpdateBranchAvailable(repository, updateBranchName); err != nil {
+		return "", err
 	}
 
 	// Create the final branch from the work branch's tip (carrying the accumulated commits).
@@ -289,6 +330,32 @@ func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context, repository 
 	}
 
 	return updateBranchName, nil
+}
+
+// ensureUpdateBranchAvailable returns an AbortError if updateBranchName is already taken, locally
+// or on the remote, and a plain error if either check itself fails.
+//
+// The local check runs first: a local ref by this name can be left over from a prior
+// checkout-mode run of the same code-content hash that got this far before failing (see
+// restoreOriginalCheckout — it puts the checkout's HEAD back, but never deletes local branches
+// drupdater created). Without it, the Create:true checkout that follows this call would fail on
+// go-git's raw "a branch named ... already exists" instead of the same clean AbortError a remote
+// collision gets.
+func (ws *WorkflowBaseService) ensureUpdateBranchAvailable(repository GitRepository, updateBranchName string) error {
+	if _, err := repository.Reference(plumbing.NewBranchReferenceName(updateBranchName), false); err == nil {
+		return AbortError{Msg: fmt.Sprintf("branch %s already exists locally, skipping", updateBranchName)}
+	} else if !errors.Is(err, plumbing.ErrReferenceNotFound) {
+		return fmt.Errorf("failed to check for a local %s branch: %w", updateBranchName, err)
+	}
+
+	exists, err := ws.repository.BranchExists(repository, updateBranchName, ws.config.Token)
+	if err != nil {
+		return fmt.Errorf("failed to check if branch exists: %w", err)
+	}
+	if exists {
+		return AbortError{Msg: fmt.Sprintf("branch %s already exists, skipping", updateBranchName)}
+	}
+	return nil
 }
 
 func (ws *WorkflowBaseService) updateSite(ctx context.Context, path string, worktree Worktree, site string) error {

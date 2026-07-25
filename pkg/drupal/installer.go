@@ -16,7 +16,9 @@ import (
 
 type Drush interface {
 	InstallSite(ctx context.Context, path string, site string) error
-	GetConfigSyncDir(ctx context.Context, path string, site string, create bool) (string, error)
+	// GetConfigSyncDir returns the site's config sync directory; relative controls whether the
+	// path is returned relative to path (true) or as the absolute path drush reports (false).
+	GetConfigSyncDir(ctx context.Context, path string, site string, relative bool) (string, error)
 }
 
 type Composer interface {

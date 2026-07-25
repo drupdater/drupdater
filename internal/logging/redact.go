@@ -61,6 +61,14 @@ func (r *Redactor) Register(values ...string) {
 	}
 }
 
+// Redact replaces every registered secret value in s with the placeholder. It is the exported
+// counterpart of redact, for output written outside the logger (e.g. a preflight check's report,
+// printed straight to a writer rather than logged) that must get the same redaction as any other
+// place a subprocess's output can surface a leaked credential.
+func (r *Redactor) Redact(s string) string {
+	return r.redact(s)
+}
+
 // redact replaces every registered secret value in s with the placeholder.
 func (r *Redactor) redact(s string) string {
 	replacer := r.currentReplacer()

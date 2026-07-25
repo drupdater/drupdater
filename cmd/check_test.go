@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/internal/logging"
 	"github.com/drupdater/drupdater/internal/services"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
@@ -108,12 +109,29 @@ func TestPrintCheckResults(t *testing.T) {
 		{Name: "a", OK: true},
 		{Name: "b", OK: false, Detail: "went wrong"},
 		{Name: "c", OK: false},
-	})
+	}, logging.NewRedactor())
 
 	out := buf.String()
 	assert.Contains(t, out, "✓ a\n")
 	assert.Contains(t, out, "✗ b: went wrong\n")
 	assert.Contains(t, out, "✗ c\n")
+}
+
+func TestPrintCheckResultsRedactsDetail(t *testing.T) {
+	// A failed check's Detail can carry raw subprocess output (e.g. a Composer error after a
+	// failed authenticated fetch), which is exactly where a leaked credential would otherwise
+	// reach stdout unredacted.
+	redactor := logging.NewRedactor()
+	redactor.Register("s3cr3t-token")
+
+	var buf bytes.Buffer
+	printCheckResults(&buf, []services.CheckResult{
+		{Name: "composer install", OK: false, Detail: "fetch failed: https://s3cr3t-token@example.com/repo.git: 403"},
+	}, redactor)
+
+	out := buf.String()
+	assert.NotContains(t, out, "s3cr3t-token")
+	assert.Contains(t, out, "***")
 }
 
 func TestAnyCheckFailed(t *testing.T) {
