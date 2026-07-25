@@ -481,6 +481,63 @@ func TestStartUpdateWithDryRun(t *testing.T) {
 	vcsProvider.AssertExpectations(t)
 }
 
+func TestStartUpdateCheckoutDryRunWithoutPlatform(t *testing.T) {
+	// Regression for issue #167: a checkout-mode --dry-run run needs no token and therefore
+	// cmd/root.go builds no VCS platform for it. StartUpdate must not dereference a nil platform
+	// to get the commit identity; it proceeds with whatever identity the checkout already has.
+	logger := zap.NewNop()
+	installer := NewMockInstaller(t)
+	repositoryService := NewMockRepository(t)
+	repository := NewMockGitRepository(t)
+	mockComposer := NewMockComposer(t)
+	drush := NewMockDrush(t)
+	ctx := context.Background()
+
+	config := internal.Config{
+		WorkingDir: "/checkout",
+		Branch:     "main",
+		Sites:      []string{"site1"},
+		DryRun:     true,
+	}
+
+	worktree := NewMockWorktree(t)
+	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
+	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Checkout(mock.Anything).Return(nil)
+
+	installer.EXPECT().Install(mock.Anything, "/tmp", "site1").Return(nil)
+	installer.EXPECT().ConfigureDatabase(mock.Anything, "/tmp", "site1").Return(nil)
+
+	drush.EXPECT().UpdateSite(mock.Anything, "/tmp", "site1").Return(nil)
+	drush.EXPECT().ExportConfiguration(mock.Anything, "/tmp", "site1").Return(nil)
+	drush.EXPECT().ConfigResave(mock.Anything, "/tmp", "site1").Return(nil)
+
+	repositoryService.EXPECT().OpenRepository(config.WorkingDir, "", "").Return(repository, worktree, "/tmp", nil)
+	mockComposer.EXPECT().CheckPlatformReqs(mock.Anything, "/tmp").Return("", nil)
+	repositoryService.EXPECT().BranchExists(repository, mock.Anything, mock.Anything).Return(false, nil)
+
+	mockComposer.EXPECT().Update(mock.Anything, "/tmp", mock.Anything, mock.Anything, false, false).Return([]composer.PackageChange{
+		{
+			Package: "drupal/core",
+			From:    "9.0.0",
+			To:      "9.1.0",
+		},
+	}, nil)
+	mockComposer.EXPECT().Install(mock.Anything, "/tmp").Return(nil)
+	mockComposer.EXPECT().GetLockHash("/tmp").Return("dummy-hash", nil)
+
+	// Execute: platform is nil, exactly as cmd/root.go leaves it for this configuration.
+	workflowService := NewWorkflowBaseService(logger, config, drush, nil, repositoryService, installer, mockComposer, event.NewManager(""))
+	err := workflowService.StartUpdate(ctx, nil)
+
+	require.NoError(t, err)
+	installer.AssertExpectations(t)
+	repositoryService.AssertExpectations(t)
+	repository.AssertExpectations(t)
+	drush.AssertExpectations(t)
+	mockComposer.AssertExpectations(t)
+}
+
 func TestPublishWorkDeletesBranchOnMRFailure(t *testing.T) {
 	// When CreateMergeRequest fails, publishWork must delete the remote branch it just
 	// pushed so the remote is left clean for the next run.

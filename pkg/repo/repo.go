@@ -133,8 +133,14 @@ func (rs *GitRepositoryService) prepareCheckout(checkout *git.Repository, userna
 	if err != nil {
 		return checkout, nil, "", fmt.Errorf("failed to read git config: %w", err)
 	}
-	config.User.Name = username
-	config.User.Email = email
+	// Empty values (no VCS platform to ask, e.g. a checkout-mode --dry-run run with no token)
+	// leave the checkout's existing commit identity in place instead of blanking it out.
+	if username != "" {
+		config.User.Name = username
+	}
+	if email != "" {
+		config.User.Email = email
+	}
 	if err := checkout.SetConfig(config); err != nil {
 		return checkout, nil, "", err
 	}
