@@ -145,11 +145,16 @@ func (ws *WorkflowBaseService) acquireWorkingCopy(username, email string) (GitRe
 	return ws.repository.OpenRepository(ws.config.WorkingDir, username, email)
 }
 
-// forEachSite runs fn for every configured site concurrently, bounded to the CPU count, and
-// cancels the rest on the first error.
+// forEachSite runs fn for every configured site concurrently, bounded by config.Concurrency
+// (or GOMAXPROCS(0), which reflects the container's CPU quota, when unset), and cancels the
+// rest on the first error.
 func (ws *WorkflowBaseService) forEachSite(ctx context.Context, fn func(context.Context, string) error) error {
 	g, groupCtx := errgroup.WithContext(ctx)
-	g.SetLimit(runtime.NumCPU())
+	limit := ws.config.Concurrency
+	if limit <= 0 {
+		limit = runtime.GOMAXPROCS(0)
+	}
+	g.SetLimit(limit)
 	for _, site := range ws.config.Sites {
 		g.Go(func() error {
 			return fn(groupCtx, site)

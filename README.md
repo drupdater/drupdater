@@ -186,6 +186,7 @@ All flags are optional; pass them after the required `<token>`.
 | `--clone` | `false` | Clone instead of using the checkout. Requires `--repository-url`. For local testing. |
 | `--repository-url` | _(from `origin`)_ | Repo URL. Required with `--clone`; otherwise read from the `origin` remote. |
 | `--security` | `false` | Update only packages with known vulnerabilities. Selects the `addons.security` list. |
+| `--concurrency` | `GOMAXPROCS(0)` | Maximum number of sites to install/update concurrently. Site installs are as much I/O-bound as CPU-bound, so raise or lower this from the CPU-derived default to match the runner (constrained runner, slow disk, or fast NVMe with many small sites). |
 | `--dry-run` | `false` | Run everything but skip branch and PR/MR creation. |
 | `--verbose` | `false` | Debug-level logging (also logs resolved config). |
 | `--config` | _(`<working-dir>/.drupdater.yaml`)_ | Path to the config file. |
