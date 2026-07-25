@@ -1,6 +1,7 @@
 package addon
 
 import (
+	"bytes"
 	"context"
 	"encoding/xml"
 	"fmt"
@@ -9,7 +10,6 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/services"
 
 	"github.com/go-git/go-git/v5"
@@ -21,16 +21,14 @@ import (
 type CodeBeautifier struct {
 	logger   *zap.Logger
 	phpcs    PHPCS
-	config   internal.Config
 	composer Composer
 }
 
 // NewCodeBeautifier creates a new code beautifier instance
-func NewCodeBeautifier(logger *zap.Logger, phpcs PHPCS, config internal.Config, composer Composer) *CodeBeautifier {
+func NewCodeBeautifier(logger *zap.Logger, phpcs PHPCS, composer Composer) *CodeBeautifier {
 	return &CodeBeautifier{
 		logger:   logger,
 		phpcs:    phpcs,
-		config:   config,
 		composer: composer,
 	}
 }
@@ -199,12 +197,6 @@ func (cb *CodeBeautifier) CreatePHPCSConfig(ctx context.Context, path string, wo
 		return false, fmt.Errorf("failed to parse phpcs template: %w", err)
 	}
 
-	outputFile, err := os.Create(filepath.Join(path, "phpcs.xml"))
-	if err != nil {
-		return false, fmt.Errorf("failed to create phpcs.xml: %w", err)
-	}
-	defer outputFile.Close()
-
 	drupalVersion, _ := cb.composer.GetInstalledPackageVersion(ctx, path, "drupal/core")
 	majorVersion := strings.Split(drupalVersion, ".")[0]
 
@@ -226,9 +218,25 @@ func (cb *CodeBeautifier) CreatePHPCSConfig(ctx context.Context, path string, wo
 		return false, nil
 	}
 
-	err = tmpl.Execute(outputFile, data)
-	if err != nil {
+	// Render before touching the filesystem. Creating the file up front would leave an empty
+	// phpcs.xml behind on any early return above, and the next run would then see that file,
+	// try to parse it for <file> definitions, and fail the whole run on the resulting XML
+	// syntax error.
+	var rendered bytes.Buffer
+	if err := tmpl.Execute(&rendered, data); err != nil {
 		return false, fmt.Errorf("failed to execute phpcs template: %w", err)
+	}
+
+	outputFile, err := os.Create(filepath.Join(path, "phpcs.xml"))
+	if err != nil {
+		return false, fmt.Errorf("failed to create phpcs.xml: %w", err)
+	}
+	if _, err := outputFile.Write(rendered.Bytes()); err != nil {
+		outputFile.Close() // ignore error; the write error takes precedence
+		return false, fmt.Errorf("failed to write phpcs.xml: %w", err)
+	}
+	if err := outputFile.Close(); err != nil {
+		return false, fmt.Errorf("failed to close phpcs.xml: %w", err)
 	}
 
 	if _, err := worktree.Add("phpcs.xml"); err != nil {

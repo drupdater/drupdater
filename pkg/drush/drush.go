@@ -68,7 +68,7 @@ func (e *CLI) InstallSite(ctx context.Context, dir string, site string) error {
 	if err != nil {
 		return fmt.Errorf("failed to install %s: %w, output: %s", site, err, out)
 	}
-	return err
+	return nil
 }
 
 func (e *CLI) GetConfigSyncDir(ctx context.Context, dir string, site string, relative bool) (string, error) {

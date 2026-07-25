@@ -2,7 +2,9 @@ package internal
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"time"
 
@@ -69,7 +71,10 @@ func LoadConfigFile(path string, c *Config) (found bool, err error) {
 
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	dec.KnownFields(true)
-	if err := dec.Decode(&fc); err != nil {
+	// A file that is empty or contains only comments has no YAML document, which Decode
+	// reports as io.EOF. That is the same intent as an absent file — no keys are set — so it
+	// resolves to the defaults rather than failing the run.
+	if err := dec.Decode(&fc); err != nil && !errors.Is(err, io.EOF) {
 		return true, fmt.Errorf("parsing %s: %w", path, err)
 	}
 
@@ -83,6 +88,13 @@ func applyFileConfig(fc fileConfig, c *Config) error {
 	timeout, err := time.ParseDuration(string(fc.Timeout))
 	if err != nil {
 		return fmt.Errorf("invalid timeout %q (use a Go duration like \"30m\" or \"2h\", or 0 to disable): %w", string(fc.Timeout), err)
+	}
+	// Reject an empty site list instead of running with it. Every per-site phase — installing
+	// the baseline database, running update hooks, exporting configuration — iterates this
+	// list, so an empty one would silently skip all of them and still open a merge request for
+	// an update that was never validated against a site.
+	if len(fc.Sites) == 0 {
+		return errors.New(`no sites configured: "sites" must list at least one Drupal site name`)
 	}
 	c.Sites = fc.Sites
 	c.Timeout = timeout

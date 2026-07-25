@@ -85,6 +85,14 @@ func providerFromHost(host string) string {
 	}
 }
 
+// ValidateRepositoryURL reports whether raw is a repository URL this tool can route to a
+// provider. It exists so callers validate against what Create actually accepts — including
+// SCP-style git URLs, which url.ParseRequestURI rejects because they carry no scheme.
+func ValidateRepositoryURL(raw string) error {
+	_, _, err := parseGitURL(raw)
+	return err
+}
+
 // parseGitURL extracts the host and "owner/repo" path from a repository URL, accepting both
 // HTTP(S) URLs (https://host/owner/repo.git) and SCP-style git URLs (git@host:owner/repo.git).
 // Any trailing ".git" and surrounding slashes are stripped.

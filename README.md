@@ -196,7 +196,7 @@ Optional file at the repo root. Missing file or omitted keys fall back to the
 defaults below; unknown keys are rejected so typos fail fast.
 
 ```yaml
-sites: [default]      # Drupal site directories to update
+sites: [default]      # Drupal site directories to update (must not be empty)
 timeout: 30m          # overall run timeout (Go duration; 0 disables)
 addons:               # configurable addons per mode (mandatory addons always run)
   normal:

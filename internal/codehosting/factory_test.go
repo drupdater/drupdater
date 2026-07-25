@@ -203,3 +203,27 @@ func TestParseGitURL(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateRepositoryURL(t *testing.T) {
+	t.Run("accepts HTTPS URLs", func(t *testing.T) {
+		require.NoError(t, ValidateRepositoryURL("https://github.com/drupdater/drupdater.git"))
+	})
+
+	t.Run("accepts SCP-style git URLs", func(t *testing.T) {
+		// url.ParseRequestURI rejects these because they have no scheme, but Create routes
+		// them fine, so the flag validation must accept them too.
+		require.NoError(t, ValidateRepositoryURL("git@github.com:drupdater/drupdater.git"))
+	})
+
+	t.Run("rejects an empty URL", func(t *testing.T) {
+		require.Error(t, ValidateRepositoryURL(""))
+	})
+
+	t.Run("rejects a URL with no host", func(t *testing.T) {
+		require.Error(t, ValidateRepositoryURL("https:///drupdater"))
+	})
+
+	t.Run("rejects a bare word", func(t *testing.T) {
+		require.Error(t, ValidateRepositoryURL("not-a-url"))
+	})
+}

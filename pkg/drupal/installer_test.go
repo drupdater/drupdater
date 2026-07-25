@@ -70,6 +70,7 @@ profile: thunder
 			t.Fatalf("Failed to read updated content from settings.php: %v", err)
 		}
 		updatedContent := `
+` + settingsMarker + `
 $databases['default']['default'] = [
 	'database' => '/site1.sqlite',
 	'prefix' => '',

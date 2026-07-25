@@ -1,7 +1,6 @@
 package addon
 
 import (
-	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/services"
 	"github.com/gookit/event"
 
@@ -13,16 +12,14 @@ import (
 type DeprecationsRemover struct {
 	logger   *zap.Logger
 	rector   Rector
-	config   internal.Config
 	composer Composer
 }
 
 // NewDeprecationsRemover creates a new deprecations remover instance
-func NewDeprecationsRemover(logger *zap.Logger, rector Rector, config internal.Config, composer Composer) *DeprecationsRemover {
+func NewDeprecationsRemover(logger *zap.Logger, rector Rector, composer Composer) *DeprecationsRemover {
 	return &DeprecationsRemover{
 		logger:   logger,
 		rector:   rector,
-		config:   config,
 		composer: composer,
 	}
 }

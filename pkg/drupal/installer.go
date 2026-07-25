@@ -58,6 +58,13 @@ func (is *Installer) Install(ctx context.Context, path string, site string) erro
 	return nil
 }
 
+// settingsMarker tags the block ConfigureDatabase appends to a site's settings.php. The run
+// configures each site twice — once to build the baseline database, once before the update
+// hooks — and both calls target the same file now that old and new code share one working
+// directory. The marker makes the append idempotent instead of stacking duplicate database,
+// hash_salt and private-path settings.
+const settingsMarker = "// Added by drupdater: test database settings."
+
 func (is *Installer) ConfigureDatabase(ctx context.Context, dir string, site string) error {
 
 	siteLogger := is.logger.With(zap.String("site", site))
@@ -69,11 +76,17 @@ func (is *Installer) ConfigureDatabase(ctx context.Context, dir string, site str
 	}
 	webroot = strings.TrimSuffix(webroot, "/")
 
+	settingsPath := dir + "/" + webroot + "/sites/" + site + "/settings.php"
+	if existing, err := afero.ReadFile(is.fs, settingsPath); err == nil && strings.Contains(string(existing), settingsMarker) {
+		siteLogger.Debug("database already configured, skipping", zap.String("path", settingsPath))
+		return nil
+	}
+
 	sqliteFile, _ := filepath.Abs(fmt.Sprintf("%s/../%s.sqlite", dir, site))
 	privatesDir, _ := filepath.Abs(fmt.Sprintf("%s/../private/%s", dir, site))
 
-	settingsPath := dir + "/" + webroot + "/sites/" + site + "/settings.php"
 	settings := `
+` + settingsMarker + `
 $databases['default']['default'] = [
 	'database' => '` + sqliteFile + `',
 	'prefix' => '',
