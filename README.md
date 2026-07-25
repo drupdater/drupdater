@@ -87,7 +87,10 @@ docker run ghcr.io/drupdater/drupdater-php8.3:latest \
 - `--clone --repository-url` — tells Drupdater to fetch the repo itself. In CI you
   omit these; it uses the checkout already on disk (see below).
 
-Add `--dry-run` to do everything except create the branch and PR/MR.
+Add `--dry-run` to do everything except create the branch and PR/MR. In
+checkout mode (no `--clone`), a `--dry-run` run touches the VCS platform for
+neither reading nor writing, so it needs no token at all — omit `<token>` and
+leave `DRUPDATER_TOKEN` unset.
 
 ## Prerequisites
 
@@ -163,7 +166,10 @@ the cron to `"0 4 * * *"`, and append `--security` to the run command.
 
 ## Tokens & Permissions
 
-Drupdater needs a token that can **push branches** and **open PRs/MRs**.
+Drupdater needs a token that can **push branches** and **open PRs/MRs** —
+except a checkout-mode `--dry-run` run, which does neither and needs no token
+at all. `--clone` always needs one, dry run or not, since cloning may itself
+require authentication.
 
 | Platform | Token | Notes |
 |----------|-------|-------|
@@ -177,7 +183,9 @@ Configuration is split in two: **CLI flags** (how a run is invoked) and
 
 ### CLI flags
 
-All flags are optional; pass them after the required `<token>`.
+All flags are optional; pass them after `<token>`, which is itself only
+required for a run that clones or pushes/opens a PR/MR (see
+[Tokens & Permissions](#tokens--permissions)).
 
 | Flag | Default | Description |
 |------|---------|-------------|
@@ -187,7 +195,7 @@ All flags are optional; pass them after the required `<token>`.
 | `--repository-url` | _(from `origin`)_ | Repo URL. Required with `--clone`; otherwise read from the `origin` remote. |
 | `--security` | `false` | Update only packages with known vulnerabilities. Selects the `addons.security` list. |
 | `--concurrency` | `GOMAXPROCS(0)` | Maximum number of sites to install/update concurrently. Site installs are as much I/O-bound as CPU-bound, so raise or lower this from the CPU-derived default to match the runner (constrained runner, slow disk, or fast NVMe with many small sites). |
-| `--dry-run` | `false` | Run everything but skip branch and PR/MR creation. |
+| `--dry-run` | `false` | Run everything but skip pushing the branch and creating the PR/MR (the branch and commits are still created locally). In checkout mode this also means no token is required. |
 | `--verbose` | `false` | Debug-level logging (also logs resolved config). |
 | `--config` | _(`<working-dir>/.drupdater.yaml`)_ | Path to the config file. |
 

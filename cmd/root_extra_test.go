@@ -22,10 +22,13 @@ import (
 )
 
 func TestResolveToken(t *testing.T) {
+	// The zero-value config (no --clone, no --dry-run) requires a token, matching a normal run.
+	normalRun := internal.Config{}
+
 	t.Run("the positional argument wins", func(t *testing.T) {
 		t.Setenv("DRUPDATER_TOKEN", "from-env")
 
-		token, err := resolveToken([]string{"from-arg"})
+		token, err := resolveToken([]string{"from-arg"}, normalRun)
 		require.NoError(t, err)
 		assert.Equal(t, "from-arg", token)
 	})
@@ -33,7 +36,7 @@ func TestResolveToken(t *testing.T) {
 	t.Run("falls back to DRUPDATER_TOKEN", func(t *testing.T) {
 		t.Setenv("DRUPDATER_TOKEN", "from-env")
 
-		token, err := resolveToken(nil)
+		token, err := resolveToken(nil, normalRun)
 		require.NoError(t, err)
 		assert.Equal(t, "from-env", token)
 	})
@@ -41,7 +44,7 @@ func TestResolveToken(t *testing.T) {
 	t.Run("an empty argument falls back to the environment", func(t *testing.T) {
 		t.Setenv("DRUPDATER_TOKEN", "from-env")
 
-		token, err := resolveToken([]string{""})
+		token, err := resolveToken([]string{""}, normalRun)
 		require.NoError(t, err)
 		assert.Equal(t, "from-env", token)
 	})
@@ -49,9 +52,47 @@ func TestResolveToken(t *testing.T) {
 	t.Run("errors when neither is set", func(t *testing.T) {
 		t.Setenv("DRUPDATER_TOKEN", "")
 
-		_, err := resolveToken(nil)
+		_, err := resolveToken(nil, normalRun)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "DRUPDATER_TOKEN")
+	})
+
+	t.Run("a checkout-mode dry-run needs no token", func(t *testing.T) {
+		t.Setenv("DRUPDATER_TOKEN", "")
+
+		token, err := resolveToken(nil, internal.Config{DryRun: true})
+		require.NoError(t, err)
+		assert.Empty(t, token)
+	})
+
+	t.Run("a checkout-mode dry-run still honors a given token", func(t *testing.T) {
+		t.Setenv("DRUPDATER_TOKEN", "from-env")
+
+		token, err := resolveToken(nil, internal.Config{DryRun: true})
+		require.NoError(t, err)
+		assert.Equal(t, "from-env", token)
+	})
+
+	t.Run("--clone still requires a token even with --dry-run", func(t *testing.T) {
+		t.Setenv("DRUPDATER_TOKEN", "")
+
+		_, err := resolveToken(nil, internal.Config{Clone: true, DryRun: true})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "DRUPDATER_TOKEN")
+	})
+}
+
+func TestTokenRequired(t *testing.T) {
+	t.Run("a normal checkout run requires a token", func(t *testing.T) {
+		assert.True(t, tokenRequired(internal.Config{}))
+	})
+
+	t.Run("--clone requires a token even with --dry-run", func(t *testing.T) {
+		assert.True(t, tokenRequired(internal.Config{Clone: true, DryRun: true}))
+	})
+
+	t.Run("checkout mode with --dry-run needs no token", func(t *testing.T) {
+		assert.False(t, tokenRequired(internal.Config{DryRun: true}))
 	})
 }
 

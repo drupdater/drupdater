@@ -90,7 +90,7 @@ names you can set there. See the README for the full file format.`,
 			return err
 		}
 
-		config.Token, err = resolveToken(args)
+		config.Token, err = resolveToken(args, config)
 		if err != nil {
 			logger.Error("missing token", zap.Error(err))
 			return err
@@ -133,11 +133,18 @@ names you can set there. See the README for the full file format.`,
 			ensureGitSafeDirectory(cmd.Context(), logger, config.WorkingDir)
 		}
 
-		vcsProviderFactory := codehosting.NewDefaultVcsProviderFactory()
-		platform, err := vcsProviderFactory.Create(config.RepositoryURL, config.Token, logger)
-		if err != nil {
-			logger.Error("failed to create VCS provider", zap.Error(err))
-			return err
+		// Only construct the VCS platform when a run will actually use it: cloning (may be
+		// authenticated) or publishing (pushing + creating the MR, i.e. anything without
+		// --dry-run). A checkout-mode --dry-run run does neither, so it needs no VCS client and
+		// no token — see tokenRequired.
+		var platform codehosting.Platform
+		if tokenRequired(config) {
+			vcsProviderFactory := codehosting.NewDefaultVcsProviderFactory()
+			platform, err = vcsProviderFactory.Create(config.RepositoryURL, config.Token, logger)
+			if err != nil {
+				logger.Error("failed to create VCS provider", zap.Error(err))
+				return err
+			}
 		}
 
 		// Create the event dispatcher and register addons as subscribers
@@ -165,14 +172,29 @@ names you can set there. See the README for the full file format.`,
 // resolveToken returns the access token: the positional argument when one is given, otherwise
 // DRUPDATER_TOKEN. The environment variable is the preferred form because it keeps the token
 // out of the process list and the shell history.
-func resolveToken(args []string) (string, error) {
+//
+// The token is only mandatory when the run will use it — see tokenRequired. A checkout-mode
+// --dry-run run pushes nothing and creates no MR, so it can proceed with no token and no
+// DRUPDATER_TOKEN set at all.
+func resolveToken(args []string, cfg internal.Config) (string, error) {
+	var token string
 	if len(args) == 1 && args[0] != "" {
-		return args[0], nil
+		token = args[0]
+	} else {
+		token = os.Getenv("DRUPDATER_TOKEN")
 	}
-	if token := os.Getenv("DRUPDATER_TOKEN"); token != "" {
-		return token, nil
+	if token == "" && tokenRequired(cfg) {
+		return "", errors.New("no token provided: pass it as the argument or set DRUPDATER_TOKEN")
 	}
-	return "", errors.New("no token provided: pass it as the argument or set DRUPDATER_TOKEN")
+	return token, nil
+}
+
+// tokenRequired reports whether this run performs an operation that needs VCS credentials:
+// cloning (--clone, which may be authenticated) or publishing (pushing the update branch and
+// creating the merge/pull request — i.e. any run without --dry-run). A checkout-mode --dry-run
+// run does neither.
+func tokenRequired(cfg internal.Config) bool {
+	return cfg.Clone || !cfg.DryRun
 }
 
 // registerComposerAuth registers the credentials carried by a COMPOSER_AUTH env value with the
@@ -458,7 +480,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&config.Clone, "clone", false, "Clone the repository instead of using the existing checkout. Requires --repository-url. Intended for local testing.")
 	rootCmd.PersistentFlags().StringVar(&config.RepositoryURL, "repository-url", "", "Repository URL. Required with --clone; otherwise derived from the checkout's origin remote.")
 	rootCmd.PersistentFlags().BoolVar(&config.Security, "security", false, "Only security updates. If true, only security updates will be applied.")
-	rootCmd.PersistentFlags().BoolVar(&config.DryRun, "dry-run", false, "Dry run. If true, no branch and merge request will be created.")
+	rootCmd.PersistentFlags().BoolVar(&config.DryRun, "dry-run", false, "Do not push the update branch or create a merge request. The branch and commits are still created locally.")
 	rootCmd.PersistentFlags().BoolVar(&config.Verbose, "verbose", false, "Verbose")
 	rootCmd.PersistentFlags().StringVar(&configFile, "config", "", "Path to the config file (default: <working-dir>/.drupdater.yaml).")
 	rootCmd.PersistentFlags().IntVar(&config.Concurrency, "concurrency", runtime.GOMAXPROCS(0), "Maximum number of sites to install/update concurrently. Defaults to GOMAXPROCS(0), which reflects the container's CPU quota, not just the host's core count.")

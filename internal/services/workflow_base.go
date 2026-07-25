@@ -80,7 +80,13 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []interna
 		defer cancel()
 	}
 
-	username, email := ws.platform.GetUser(ctx)
+	// platform is nil for a checkout-mode --dry-run run with no token (see cmd/root.go's
+	// tokenRequired): that run never pushes or creates an MR, so no VCS client was built and
+	// the checkout's own git identity (already configured locally, e.g. by CI) is used as-is.
+	var username, email string
+	if ws.platform != nil {
+		username, email = ws.platform.GetUser(ctx)
+	}
 
 	// Acquire a single working directory: the existing checkout (default, CI) or a fresh
 	// clone (--clone, for local testing). Old and new code live in this one directory

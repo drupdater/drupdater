@@ -308,4 +308,29 @@ func TestOpenRepository(t *testing.T) {
 		_, _, _, err := service.OpenRepository(t.TempDir(), "Bot", "bot@example.com")
 		require.Error(t, err)
 	})
+
+	t.Run("empty identity preserves the checkout's existing commit identity", func(t *testing.T) {
+		// A checkout-mode --dry-run run with no token has no VCS platform to ask for the user's
+		// name and email (see cmd/root.go's tokenRequired), so it calls OpenRepository with
+		// empty strings. That must not blank out an identity the checkout already has configured
+		// (e.g. set up by CI) — it should be left alone.
+		dir := t.TempDir()
+		checkout, err := git.PlainInit(dir, false)
+		require.NoError(t, err)
+		cfg, err := checkout.Config()
+		require.NoError(t, err)
+		cfg.User.Name = "Existing User"
+		cfg.User.Email = "existing@example.com"
+		require.NoError(t, checkout.SetConfig(cfg))
+
+		_, _, _, err = service.OpenRepository(dir, "", "")
+		require.NoError(t, err)
+
+		r, err := git.PlainOpen(dir)
+		require.NoError(t, err)
+		cfgAfter, err := r.Config()
+		require.NoError(t, err)
+		assert.Equal(t, "Existing User", cfgAfter.User.Name)
+		assert.Equal(t, "existing@example.com", cfgAfter.User.Email)
+	})
 }
