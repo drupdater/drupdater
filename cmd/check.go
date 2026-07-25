@@ -12,6 +12,7 @@ import (
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/codehosting"
 	"github.com/drupdater/drupdater/internal/logging"
+	"github.com/drupdater/drupdater/internal/report"
 	"github.com/drupdater/drupdater/internal/services"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/drupal"
@@ -76,6 +77,9 @@ Exits non-zero if any check fails, so it can gate a pipeline.`,
 		}
 
 		printCheckResults(cmd.OutOrStdout(), results, redactor)
+
+		writeCheckReport(logger, redactor, config.ReportPath, results)
+
 		if anyCheckFailed(results) {
 			return errors.New("preflight check failed")
 		}
@@ -116,6 +120,38 @@ func runCheapChecks(
 	}
 	results = append(results, checkVCS(ctx, logger, cfg.RepositoryURL, token, resolveErr)...)
 	return results
+}
+
+// writeCheckReport writes the preflight result to path, doing nothing when --report was not
+// given. --report is a persistent flag, so it applies to "check" as well as to a real run; a
+// preflight has no phases, packages or branch, so it gets its own document shape (report.Check)
+// rather than a run report with most of its fields left empty.
+//
+// As with a run's report, a write failure is logged and swallowed: the check's own verdict, and
+// the exit status carrying it, matter more than the file describing it.
+func writeCheckReport(logger *zap.Logger, redactor *logging.Redactor, path string, results []services.CheckResult) {
+	if path == "" {
+		return
+	}
+
+	check := report.NewCheck(internal.Version, toReportCheckResults(results))
+	if err := report.WriteCheck(afero.NewOsFs(), path, check, redactor.Redact); err != nil {
+		logger.Warn("failed to write check report", zap.String("path", path), zap.Error(err))
+		return
+	}
+	logger.Info("check report written", zap.String("path", path))
+}
+
+// toReportCheckResults converts the services results into the report's own schema type, for the
+// same reason report.PackageChange mirrors composer.PackageChange: the report is a published
+// contract and must not change shape because an internal type was refactored.
+func toReportCheckResults(results []services.CheckResult) []report.CheckResult {
+	out := make([]report.CheckResult, 0, len(results))
+	for _, r := range results {
+		out = append(out, report.CheckResult{Name: r.Name, OK: r.OK, Detail: r.Detail})
+	}
+
+	return out
 }
 
 // checkToken resolves the access token the same way the real run does (positional argument,

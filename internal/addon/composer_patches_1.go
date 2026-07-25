@@ -31,26 +31,29 @@ func (pu PatchUpdates) Changes() bool {
 	return len(pu.Removed) > 0 || len(pu.Updated) > 0 || len(pu.Conflicts) > 0
 }
 
+// The json tags on these three types are part of the --report schema (see report.go in this
+// package); rename a field only alongside a report.SchemaVersion bump.
+
 type RemovedPatch struct {
-	Package          string
-	PatchDescription string
-	PatchPath        string
-	Reason           string
+	Package          string `json:"package"`
+	PatchDescription string `json:"patch_description"`
+	PatchPath        string `json:"patch_path"`
+	Reason           string `json:"reason"`
 }
 
 type UpdatedPatch struct {
-	Package           string
-	PatchDescription  string
-	PreviousPatchPath string
-	NewPatchPath      string
+	Package           string `json:"package"`
+	PatchDescription  string `json:"patch_description"`
+	PreviousPatchPath string `json:"previous_patch_path"`
+	NewPatchPath      string `json:"new_patch_path"`
 }
 
 type ConflictPatch struct {
-	Package          string
-	FixedVersion     string
-	PatchPath        string
-	PatchDescription string
-	NewVersion       string
+	Package          string `json:"package"`
+	FixedVersion     string `json:"fixed_version"`
+	PatchPath        string `json:"patch_path"`
+	PatchDescription string `json:"patch_description"`
+	NewVersion       string `json:"new_version"`
 }
 
 type ComposerPatches1 struct {

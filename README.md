@@ -32,6 +32,7 @@ chore.
 - [CI/CD Integration](#cicd-integration)
 - [Tokens & Permissions](#tokens--permissions)
 - [Configuration](#configuration)
+- [Run report](#run-report)
 - [Troubleshooting](#troubleshooting)
 - [Architecture](#architecture)
 - [Development](#development)
@@ -211,6 +212,7 @@ required for a run that clones or pushes/opens a PR/MR (see
 | `--security` | `false` | Update only packages with known vulnerabilities. Selects the `addons.security` list. |
 | `--concurrency` | `GOMAXPROCS(0)` | Maximum number of sites to install/update concurrently. Site installs are as much I/O-bound as CPU-bound, so raise or lower this from the CPU-derived default to match the runner (constrained runner, slow disk, or fast NVMe with many small sites). |
 | `--dry-run` | `false` | Run everything but skip pushing the branch and creating the PR/MR (the branch and commits are still created locally). In checkout mode this also means no token is required. |
+| `--report` | _(disabled)_ | Write a machine-readable JSON report of the run to this path. Written on every outcome, including failures and `--dry-run`. See [Run report](#run-report). |
 | `--verbose` | `false` | Debug-level logging (also logs resolved config). |
 | `--config` | _(`<working-dir>/.drupdater.yaml`)_ | Path to the config file. |
 
@@ -241,6 +243,100 @@ addons:               # configurable addons per mode (mandatory addons always ru
 |----------|---------|
 | `DRUPALCODE_ACCESS_TOKEN` | Drupal.org GitLab PAT. Required for patch management (detecting upstream-committed patches and downloading updated patch files). |
 | `COMPOSER_AUTH` | Composer auth JSON for private Packagist/registries. See [Composer docs](https://getcomposer.org/doc/03-cli.md#composer-auth). |
+
+## Run report
+
+`--report <path>` writes a JSON document describing the run. It is written on
+**every** outcome — including a run that failed halfway and a `--dry-run` that
+never opened a PR/MR — so a failing repository leaves behind something better
+than a log to read.
+
+```bash
+drupdater --dry-run --report ./drupdater-report.json
+```
+
+```json
+{
+  "schema_version": 1,
+  "drupdater_version": "v0.12.0",
+  "started_at": "2026-07-25T02:00:00Z",
+  "finished_at": "2026-07-25T02:14:31Z",
+  "duration_seconds": 871.4,
+  "status": "success",
+  "mode": "security",
+  "dry_run": false,
+  "repository": "https://github.com/org/site.git",
+  "base_branch": "main",
+  "update_branch": "drupdater-3f81a2c",
+  "merge_request": { "url": "https://github.com/org/site/pull/42" },
+  "sites": ["default"],
+  "packages": [
+    { "action": "Upgrade", "package": "drupal/core", "from": "10.1.8", "to": "10.2.0" }
+  ],
+  "phases": [
+    { "name": "composer install", "started_at": "...", "duration_seconds": 63.2, "ok": true },
+    { "name": "baseline site install", "started_at": "...", "duration_seconds": 121.9, "ok": true }
+  ],
+  "addons": {
+    "composer_audit": { "fixed": [], "remaining": [] },
+    "update_hooks": { "default": {} }
+  }
+}
+```
+
+**`status`** is one of:
+
+| Value | Meaning |
+|---|---|
+| `success` | Every phase the run attempted completed. A `--dry-run` that stopped before pushing is a success. |
+| `no_changes` | The run worked and found nothing to update. Reported separately so an up-to-date site isn't mistaken for a broken one. |
+| `failed` | A phase returned an error. `failed_phase` and `error` say which and why. |
+
+**`phases`** records each step with its duration, which makes the cost of a run
+measurable without separate instrumentation — the phase distribution shows
+whether a run is dominated by `composer install`, by site installs, or by Rector.
+
+**`addons`** carries one structured section per addon that has something to
+report (`composer_audit`, `update_hooks`, `unsupported_modules`,
+`composer_patches`). Addons with nothing to say are omitted rather than present
+and empty.
+
+Credentials never appear in the report: the repository URL is stripped of any
+embedded userinfo, and the finished document passes through the same redactor
+that filters the logs.
+
+### With `drupdater check`
+
+`--report` applies to the preflight command too, where it writes the check
+results instead of a run — useful for gating a pipeline on a machine-readable
+verdict:
+
+```bash
+drupdater check --report ./preflight.json
+```
+
+```json
+{
+  "schema_version": 1,
+  "drupdater_version": "v0.12.0",
+  "checked_at": "2026-07-25T02:00:00Z",
+  "ok": false,
+  "results": [
+    { "name": "git history complete (not a shallow clone)", "ok": true },
+    { "name": "site \"default\": settings.php", "ok": false, "detail": "not found at web/sites/default/settings.php" }
+  ]
+}
+```
+
+### Schema stability
+
+`schema_version` is part of the contract. New fields may be added without
+bumping it — **consumers must ignore unknown fields** — while removing or
+renaming a field increments it.
+
+> [!NOTE]
+> While drupdater is pre-1.0, the schema may still gain fields between minor
+> versions. It will not silently rename or drop them.
 
 ## Troubleshooting
 

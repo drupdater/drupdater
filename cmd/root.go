@@ -20,6 +20,7 @@ import (
 	"github.com/drupdater/drupdater/internal/addon"
 	"github.com/drupdater/drupdater/internal/codehosting"
 	"github.com/drupdater/drupdater/internal/logging"
+	"github.com/drupdater/drupdater/internal/report"
 	"github.com/drupdater/drupdater/internal/services"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/drupal"
@@ -30,6 +31,7 @@ import (
 	"github.com/drupdater/drupdater/pkg/repo"
 	"github.com/gookit/event"
 	"github.com/maypok86/otter"
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -153,7 +155,11 @@ names you can set there. See the README for the full file format.`,
 		}
 		dispatcher := createDispatcher(addons)
 
-		workflow := services.NewWorkflowBaseService(logger, config, drush, platform, git, installer, composer, dispatcher)
+		var opts []services.Option
+		if config.ReportPath != "" {
+			opts = append(opts, services.WithReportSink(reportSink(logger, redactor, config.ReportPath)))
+		}
+		workflow := services.NewWorkflowBaseService(logger, config, drush, platform, git, installer, composer, dispatcher, opts...)
 
 		// Start the update workflow
 		err = workflow.StartUpdate(cmd.Context(), addons)
@@ -166,6 +172,22 @@ names you can set there. See the README for the full file format.`,
 		}
 		return nil
 	},
+}
+
+// reportSink returns the callback that writes the run report to path.
+//
+// A failure to write the report is logged and swallowed: the report describes the run, it is not
+// the run. Turning a full, successful update into a failed command because a path was not
+// writable would be a worse outcome than the missing file — and on the failure path, masking the
+// real error with a filesystem one would be worse still.
+func reportSink(logger *zap.Logger, redactor *logging.Redactor, path string) func(report.Report) {
+	return func(rep report.Report) {
+		if err := report.Write(afero.NewOsFs(), path, rep, redactor.Redact); err != nil {
+			logger.Warn("failed to write run report", zap.String("path", path), zap.Error(err))
+			return
+		}
+		logger.Info("run report written", zap.String("path", path))
+	}
 }
 
 // resolveToken returns the access token: the positional argument when one is given, otherwise
@@ -500,6 +522,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&config.Verbose, "verbose", false, "Verbose")
 	rootCmd.PersistentFlags().StringVar(&configFile, "config", "", "Path to the config file (default: <working-dir>/.drupdater.yaml).")
 	rootCmd.PersistentFlags().IntVar(&config.Concurrency, "concurrency", runtime.GOMAXPROCS(0), "Maximum number of sites to install/update concurrently. Defaults to GOMAXPROCS(0), which reflects the container's CPU quota, not just the host's core count.")
+	rootCmd.PersistentFlags().StringVar(&config.ReportPath, "report", "", "Write a machine-readable JSON report of the run to this path. Written on every outcome, including failures and --dry-run.")
 
 	rootCmd.AddCommand(addonsCmd)
 }

@@ -96,7 +96,8 @@ Config is split into two tiers, with no overlap:
 | `--repository-url` | _(from `origin`)_ | Repo URL; required with `--clone`, else read from `origin` |
 | `--security` | false | Only apply security updates; selects the `addons.security` list |
 | `--concurrency` | `GOMAXPROCS(0)` | Max concurrent per-site work in `forEachSite`; describes the machine, not the project, so it's a flag rather than a `.drupdater.yaml` key |
-| `--dry-run` | false | Skip branch creation and MR |
+| `--dry-run` | false | Skip pushing the branch and creating the MR (branch and commits are still made locally) |
+| `--report` | _(disabled)_ | Write the machine-readable JSON run report to this path (`internal/report`). Emitted on every exit path — success, failure and `--dry-run` — from `StartUpdate`'s defer. Also applies to `drupdater check`, which writes a `report.Check` instead |
 | `--verbose` | false | Debug-level structured logging |
 | `--config` | _(`<working-dir>/.drupdater.yaml`)_ | Path to the config file |
 

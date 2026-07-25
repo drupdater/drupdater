@@ -15,6 +15,8 @@ import (
 	"time"
 
 	"github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/internal/report"
+	"github.com/drupdater/drupdater/pkg/composer"
 
 	git "github.com/go-git/go-git/v5"
 	gitConfig "github.com/go-git/go-git/v5/config"
@@ -46,6 +48,24 @@ type WorkflowBaseService struct {
 	// concurrently, but they share one working tree and git index, and drush config:export
 	// commits via git itself, so the staging/commit steps must not overlap.
 	siteCommitMu sync.Mutex
+
+	// reportSink receives the run report when the run ends, on every exit path. nil when
+	// --report was not given, in which case no report is assembled beyond the in-memory
+	// bookkeeping the recorder does anyway.
+	reportSink func(report.Report)
+}
+
+// Option configures a WorkflowBaseService. Options are variadic so adding one does not disturb
+// existing call sites.
+type Option func(*WorkflowBaseService)
+
+// WithReportSink makes the run hand its finished report to sink. The sink is called exactly
+// once per run, after every other deferred cleanup has had its say, including when the run
+// fails.
+func WithReportSink(sink func(report.Report)) Option {
+	return func(ws *WorkflowBaseService) {
+		ws.reportSink = sink
+	}
 }
 
 func NewWorkflowBaseService(
@@ -57,8 +77,9 @@ func NewWorkflowBaseService(
 	installer Installer,
 	composerService Composer,
 	dispatcher EventDispatcher,
+	opts ...Option,
 ) *WorkflowBaseService {
-	return &WorkflowBaseService{
+	ws := &WorkflowBaseService{
 		logger:     logger,
 		config:     config,
 		drush:      drush,
@@ -69,10 +90,21 @@ func NewWorkflowBaseService(
 		dispatcher: dispatcher,
 		current:    time.Now(),
 	}
+	for _, opt := range opts {
+		opt(ws)
+	}
+
+	return ws
 }
 
 func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []internal.Addon) (err error) {
 	start := time.Now()
+
+	mode := report.ModeNormal
+	if ws.config.Security {
+		mode = report.ModeSecurity
+	}
+	rec := report.NewRecorder(internal.Version, mode, ws.config.DryRun, ws.config.RepositoryURL, ws.config.Branch, ws.config.Sites)
 
 	// Bound the whole run so a wedged subprocess or network call can't hang forever.
 	if ws.config.Timeout > 0 {
@@ -107,49 +139,96 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []interna
 			ws.restoreOriginalCheckout(worktree, originalRef)
 		}
 		ws.cleanup(path)
+
+		// Emit the report last, so it describes the run as a whole. An AbortError is not a
+		// failure — it is the workflow's way of saying there was nothing to do — so it is
+		// recorded as such rather than as an error the reader should act on.
+		if ws.reportSink != nil {
+			var abort AbortError
+			if errors.As(err, &abort) {
+				rec.SetNoChanges()
+			}
+			rec.AddAddons(addons)
+			ws.reportSink(rec.Finish())
+		}
 	}()
 
+	return ws.runPhases(ctx, rec, repository, worktree, path, addons)
+}
+
+// runPhases executes the update itself, one recorded phase at a time. It is separate from
+// StartUpdate so that the run's setup and teardown (timeout, working copy, checkout restore,
+// report emission) stay readable next to each other rather than being buried under the phases.
+func (ws *WorkflowBaseService) runPhases(
+	ctx context.Context,
+	rec *report.Recorder,
+	repository GitRepository,
+	worktree Worktree,
+	path string,
+	addons []internal.Addon,
+) error {
 	// Fail fast on cheap, structural prerequisites shared with "drupdater check" instead of
 	// discovering them mid-run: a shallow checkout only fails much later, with a cryptic
 	// "object not found" when the update branch is pushed. Extension requirements are
 	// deliberately not checked here (see CheckPlatformReqs).
-	if result := CheckGitHistoryComplete(ws.repository, path); !result.OK {
-		return fmt.Errorf("%s: %s", result.Name, result.Detail)
-	}
-	if result := CheckPlatformRequirements(ctx, ws.composer, path); !result.OK {
-		return fmt.Errorf("PHP platform requirements not satisfied:\n%s", result.Detail)
-	}
-
-	ws.logger.Info("running composer install")
-	if err := ws.composer.Install(ctx, path); err != nil {
-		return fmt.Errorf("failed to run composer install: %w", err)
-	}
-
-	// Install each site at the current (old) code to create the baseline database.
-	if err := ws.forEachSite(ctx, func(ctx context.Context, site string) error {
-		if err := ws.installer.Install(ctx, path, site); err != nil {
-			return fmt.Errorf("site %s installation failed: %w", site, err)
+	if err := rec.Run("preflight", func() error {
+		if result := CheckGitHistoryComplete(ws.repository, path); !result.OK {
+			return fmt.Errorf("%s: %s", result.Name, result.Detail)
+		}
+		if result := CheckPlatformRequirements(ctx, ws.composer, path); !result.OK {
+			return fmt.Errorf("PHP platform requirements not satisfied:\n%s", result.Detail)
 		}
 		return nil
 	}); err != nil {
 		return err
 	}
 
-	// Update the shared code: composer update, commit, and create the update branch.
-	updateBranchName, err := ws.updateSharedCode(ctx, repository, worktree, path)
-	if err != nil {
+	if err := rec.Run("composer install", func() error {
+		ws.logger.Info("running composer install")
+		if err := ws.composer.Install(ctx, path); err != nil {
+			return fmt.Errorf("failed to run composer install: %w", err)
+		}
+		return nil
+	}); err != nil {
 		return err
 	}
 
+	// Install each site at the current (old) code to create the baseline database.
+	if err := rec.Run("baseline site install", func() error {
+		return ws.forEachSite(ctx, func(ctx context.Context, site string) error {
+			if err := ws.installer.Install(ctx, path, site); err != nil {
+				return fmt.Errorf("site %s installation failed: %w", site, err)
+			}
+			return nil
+		})
+	}); err != nil {
+		return err
+	}
+
+	// Update the shared code: composer update, commit, and create the update branch.
+	var updateBranchName string
+	if err := rec.Run("update shared code", func() error {
+		var err error
+		updateBranchName, err = ws.updateSharedCode(ctx, repository, worktree, path, rec)
+		return err
+	}); err != nil {
+		return err
+	}
+	rec.SetUpdateBranch(updateBranchName)
+
 	// Run the update hooks and export config per site against the now-updated code.
-	if err := ws.forEachSite(ctx, func(ctx context.Context, site string) error {
-		return ws.updateSite(ctx, path, worktree, site)
+	if err := rec.Run("site update", func() error {
+		return ws.forEachSite(ctx, func(ctx context.Context, site string) error {
+			return ws.updateSite(ctx, path, worktree, site)
+		})
 	}); err != nil {
 		return err
 	}
 
 	if !ws.config.DryRun {
-		return ws.publishWork(ctx, repository, updateBranchName, addons)
+		return rec.Run("publish", func() error {
+			return ws.publishWork(ctx, repository, updateBranchName, addons, rec)
+		})
 	}
 	return nil
 }
@@ -245,7 +324,7 @@ func (ws *WorkflowBaseService) cleanup(path string) {
 	os.Remove(filepath.Join(parent, "private"))
 }
 
-func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context, repository GitRepository, worktree Worktree, path string) (string, error) {
+func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context, repository GitRepository, worktree Worktree, path string, rec *report.Recorder) (string, error) {
 	ws.logger.Info("updating dependencies")
 
 	// Do all of the update work on a dedicated branch. In checkout mode the run operates on the
@@ -273,6 +352,7 @@ func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context, repository 
 	if err != nil {
 		return "", fmt.Errorf("failed to update dependencies: %w", err)
 	}
+	rec.SetPackages(toReportPackages(changes))
 	if len(changes) == 0 {
 		return "", AbortError{Msg: "no changes detected"}
 	}
@@ -405,7 +485,26 @@ func (ws *WorkflowBaseService) commitSiteChanges(ctx context.Context, path strin
 	return nil
 }
 
-func (ws *WorkflowBaseService) publishWork(ctx context.Context, repository GitRepository, updateBranchName string, addons []internal.Addon) error {
+// toReportPackages converts composer's package changes into the report's own schema type. The
+// two are kept separate deliberately — see report.PackageChange.
+func toReportPackages(changes []composer.PackageChange) []report.PackageChange {
+	if len(changes) == 0 {
+		return nil
+	}
+	out := make([]report.PackageChange, 0, len(changes))
+	for _, c := range changes {
+		out = append(out, report.PackageChange{
+			Action:  c.Action,
+			Package: c.Package,
+			From:    c.From,
+			To:      c.To,
+		})
+	}
+
+	return out
+}
+
+func (ws *WorkflowBaseService) publishWork(ctx context.Context, repository GitRepository, updateBranchName string, addons []internal.Addon, rec *report.Recorder) error {
 	err := repository.Push(&git.PushOptions{
 		RemoteName: "origin",
 		RefSpecs: []gitConfig.RefSpec{
@@ -450,6 +549,7 @@ func (ws *WorkflowBaseService) publishWork(ctx context.Context, repository GitRe
 		return fmt.Errorf("failed to create merge request: %w", err)
 	}
 	ws.logger.Info("merge request created", zap.String("url", mr.URL))
+	rec.SetMergeRequest(mr.URL)
 
 	return nil
 }
