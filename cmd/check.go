@@ -68,14 +68,7 @@ Exits non-zero if any check fails, so it can gate a pipeline.`,
 		defer composerCLI.Cleanup()
 
 		ctx := cmd.Context()
-		var results []services.CheckResult
-		results = append(results, checkConfigAndAddons(configFilePath(configFile, cfg.WorkingDir), &cfg)...)
-		results = append(results, services.CheckGitHistoryComplete(gitSvc, cfg.WorkingDir))
-		results = append(results, services.CheckPlatformRequirements(ctx, composerCLI, cfg.WorkingDir))
-		for _, site := range cfg.Sites {
-			results = append(results, services.CheckSiteSettings(ctx, composerCLI, afero.NewOsFs(), cfg.WorkingDir, site))
-		}
-		results = append(results, checkVCS(ctx, logger, cfg.RepositoryURL, token, resolveErr)...)
+		results := runCheapChecks(ctx, logger, configFilePath(configFile, cfg.WorkingDir), &cfg, gitSvc, composerCLI, afero.NewOsFs(), token, resolveErr)
 
 		if checkFull {
 			results = append(results, runFullChecks(ctx, logger, cfg, token)...)
@@ -87,6 +80,41 @@ Exits non-zero if any check fails, so it can gate a pipeline.`,
 		}
 		return nil
 	},
+}
+
+// cheapChecksComposer is what runCheapChecks needs from Composer: the union of
+// services.PlatformReqsChecker and services.ComposerConfigGetter. Kept narrow (rather than
+// requiring the full services.Composer) so tests can supply a small fake instead of the whole
+// interface; the real *composer.CLI passed from RunE satisfies it as-is.
+type cheapChecksComposer interface {
+	services.PlatformReqsChecker
+	services.ComposerConfigGetter
+}
+
+// runCheapChecks runs every check that's free to compute: no composer install, no site install,
+// no network beyond one optional read-only VCS API call (see checkVCS). It's split out of RunE
+// so the orchestration and its branching can be unit tested against fakes, without needing the
+// real composer/drush/git binaries CI doesn't install.
+func runCheapChecks(
+	ctx context.Context,
+	logger *zap.Logger,
+	cfgFilePath string,
+	cfg *internal.Config,
+	repository services.ShallowCloneChecker,
+	composerSvc cheapChecksComposer,
+	fs afero.Fs,
+	token string,
+	resolveErr error,
+) []services.CheckResult {
+	var results []services.CheckResult
+	results = append(results, checkConfigAndAddons(cfgFilePath, cfg)...)
+	results = append(results, services.CheckGitHistoryComplete(repository, cfg.WorkingDir))
+	results = append(results, services.CheckPlatformRequirements(ctx, composerSvc, cfg.WorkingDir))
+	for _, site := range cfg.Sites {
+		results = append(results, services.CheckSiteSettings(ctx, composerSvc, fs, cfg.WorkingDir, site))
+	}
+	results = append(results, checkVCS(ctx, logger, cfg.RepositoryURL, token, resolveErr)...)
+	return results
 }
 
 // checkToken resolves the access token the same way the real run does (positional argument,
