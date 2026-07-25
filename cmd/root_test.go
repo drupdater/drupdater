@@ -26,9 +26,10 @@ func TestNewLogger(t *testing.T) {
 		}
 
 		// Create logger
-		logger := NewLogger(config)
+		logger, err := NewLogger(config)
 
 		// Assert logger is in debug mode
+		require.NoError(t, err)
 		assert.NotNil(t, logger)
 		assert.True(t, logger.Core().Enabled(zapcore.DebugLevel))
 	})
@@ -40,9 +41,10 @@ func TestNewLogger(t *testing.T) {
 		}
 
 		// Create logger
-		logger := NewLogger(config)
+		logger, err := NewLogger(config)
 
 		// Assert logger is not in debug mode but is in info mode
+		require.NoError(t, err)
 		assert.NotNil(t, logger)
 		assert.False(t, logger.Core().Enabled(zapcore.DebugLevel))
 		assert.True(t, logger.Core().Enabled(zapcore.InfoLevel))
@@ -51,9 +53,10 @@ func TestNewLogger(t *testing.T) {
 
 func TestNewCache(t *testing.T) {
 	// Create cache
-	cache := NewCache()
+	cache, err := NewCache()
 
 	// Verify cache is initialized
+	require.NoError(t, err)
 	assert.NotNil(t, cache)
 
 	// Test basic cache operations

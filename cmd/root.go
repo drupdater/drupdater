@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -57,10 +56,12 @@ names you can set there. See the README for the full file format.`,
 		if config.Clone && config.RepositoryURL == "" {
 			return errors.New("--repository-url is required with --clone")
 		}
-		// Validate the URL format when one is given.
+		// Validate the URL format when one is given, against what the provider factory accepts
+		// (HTTP(S) and SCP-style git URLs) rather than a stricter URL parser that would reject
+		// git@host:owner/repo.git even though cloning and provider detection handle it.
 		if config.RepositoryURL != "" {
-			if _, err := url.ParseRequestURI(config.RepositoryURL); err != nil {
-				return errors.New("invalid repository URL")
+			if err := codehosting.ValidateRepositoryURL(config.RepositoryURL); err != nil {
+				return fmt.Errorf("invalid repository URL: %w", err)
 			}
 		}
 		return nil
@@ -71,49 +72,37 @@ names you can set there. See the README for the full file format.`,
 		cmd.SilenceErrors = true
 
 		// Initialize the logger first so config errors are reported (errors are silenced by Cobra).
-		logger := NewLogger(config)
-
-		// The token comes from the positional argument, or DRUPDATER_TOKEN when it's omitted.
-		if len(args) == 1 {
-			config.Token = args[0]
-		} else {
-			config.Token = os.Getenv("DRUPDATER_TOKEN")
+		logger, err := NewLogger(config)
+		if err != nil {
+			// No logger yet, so this one report has to go straight to stderr.
+			fmt.Fprintln(cmd.ErrOrStderr(), "failed to initialize logger:", err)
+			return err
 		}
-		if config.Token == "" {
-			err := errors.New("no token provided: pass it as the argument or set DRUPDATER_TOKEN")
+
+		config.Token, err = resolveToken(args)
+		if err != nil {
 			logger.Error("missing token", zap.Error(err))
 			return err
 		}
 
 		// Load per-project config from .drupdater.yaml (sites, timeout, addons). A missing file
 		// falls back to built-in defaults.
-		cfgPath := configFile
-		if cfgPath == "" {
-			cfgPath = filepath.Join(config.WorkingDir, ".drupdater.yaml")
-		}
-		found, err := internal.LoadConfigFile(cfgPath, &config)
-		if err != nil {
-			logger.Error("invalid configuration", zap.Error(err))
+		if err := loadProjectConfig(logger, configFilePath(configFile, config.WorkingDir), &config); err != nil {
 			return err
 		}
-		if err := validateAddons(config); err != nil {
-			logger.Error("invalid configuration", zap.String("path", cfgPath), zap.Error(err))
-			return err
-		}
-		logger.Debug("configuration loaded",
-			zap.String("path", cfgPath),
-			zap.Bool("file_found", found),
-			zap.Strings("sites", config.Sites),
-			zap.Duration("timeout", config.Timeout),
-			zap.Strings("addons.normal", config.Addons.Normal),
-			zap.Strings("addons.security", config.Addons.Security),
-		)
 
-		cache := NewCache()
+		cache, err := NewCache()
+		if err != nil {
+			logger.Error("failed to create cache", zap.Error(err))
+			return err
+		}
 
 		// Create core service instances
 		drush := drush.NewCLI(logger, cache)
 		composer := composer.NewCLI(logger)
+		// Patch-apply checks build a scratch composer project in a temp directory; drop it
+		// when the run ends rather than leaving a vendor tree behind on every invocation.
+		defer composer.Cleanup()
 		drupalOrg := drupalorg.NewHTTPClient(logger)
 		installer := drupal.NewInstaller(logger, drush, composer)
 		git := repo.NewGitRepositoryService(logger)
@@ -121,19 +110,9 @@ names you can set there. See the README for the full file format.`,
 		// In checkout mode the repository URL and target branch come from the checkout, so
 		// they don't have to be passed in. --branch only applies to --clone.
 		if !config.Clone {
-			if config.RepositoryURL == "" {
-				remoteURL, err := git.GetRemoteURL(config.WorkingDir)
-				if err != nil {
-					return fmt.Errorf("failed to determine repository URL from checkout (pass --repository-url or run inside a checkout): %w", err)
-				}
-				config.RepositoryURL = remoteURL
-			}
-
-			branch, err := resolveCheckoutBranch(git, config.WorkingDir)
-			if err != nil {
+			if err := resolveCheckoutSettings(git, &config); err != nil {
 				return err
 			}
-			config.Branch = branch
 			logger.Info("using checkout", zap.String("url", config.RepositoryURL), zap.String("branch", config.Branch))
 
 			// CI mounts the checkout owned by a different user than the container runs as, so
@@ -169,6 +148,71 @@ names you can set there. See the README for the full file format.`,
 		}
 		return nil
 	},
+}
+
+// resolveToken returns the access token: the positional argument when one is given, otherwise
+// DRUPDATER_TOKEN. The environment variable is the preferred form because it keeps the token
+// out of the process list and the shell history.
+func resolveToken(args []string) (string, error) {
+	if len(args) == 1 && args[0] != "" {
+		return args[0], nil
+	}
+	if token := os.Getenv("DRUPDATER_TOKEN"); token != "" {
+		return token, nil
+	}
+	return "", errors.New("no token provided: pass it as the argument or set DRUPDATER_TOKEN")
+}
+
+// configFilePath returns the .drupdater.yaml to read: --config when set, otherwise the one in
+// the working directory.
+func configFilePath(explicit string, workingDir string) string {
+	if explicit != "" {
+		return explicit
+	}
+	return filepath.Join(workingDir, ".drupdater.yaml")
+}
+
+// loadProjectConfig layers the project's .drupdater.yaml onto cfg and validates the addon
+// names it lists. A missing file is not an error — the built-in defaults apply.
+func loadProjectConfig(logger *zap.Logger, path string, cfg *internal.Config) error {
+	found, err := internal.LoadConfigFile(path, cfg)
+	if err != nil {
+		logger.Error("invalid configuration", zap.String("path", path), zap.Error(err))
+		return err
+	}
+	if err := validateAddons(*cfg); err != nil {
+		logger.Error("invalid configuration", zap.String("path", path), zap.Error(err))
+		return err
+	}
+	logger.Debug("configuration loaded",
+		zap.String("path", path),
+		zap.Bool("file_found", found),
+		zap.Strings("sites", cfg.Sites),
+		zap.Duration("timeout", cfg.Timeout),
+		zap.Strings("addons.normal", cfg.Addons.Normal),
+		zap.Strings("addons.security", cfg.Addons.Security),
+	)
+	return nil
+}
+
+// resolveCheckoutSettings fills in the repository URL and target branch from the checkout,
+// which is where checkout mode takes them from instead of flags. --branch only applies to
+// --clone, so it is overwritten here.
+func resolveCheckoutSettings(git *repo.GitRepositoryService, cfg *internal.Config) error {
+	if cfg.RepositoryURL == "" {
+		remoteURL, err := git.GetRemoteURL(cfg.WorkingDir)
+		if err != nil {
+			return fmt.Errorf("failed to determine repository URL from checkout (pass --repository-url or run inside a checkout): %w", err)
+		}
+		cfg.RepositoryURL = remoteURL
+	}
+
+	branch, err := resolveCheckoutBranch(git, cfg.WorkingDir)
+	if err != nil {
+		return err
+	}
+	cfg.Branch = branch
+	return nil
 }
 
 // resolveCheckoutBranch determines the MR target branch for checkout mode: the checkout's
@@ -214,7 +258,6 @@ func ensureGitSafeDirectory(ctx context.Context, logger *zap.Logger, dir string)
 // addonDeps carries everything the addon constructors need.
 type addonDeps struct {
 	logger    *zap.Logger
-	config    internal.Config
 	drush     addon.Drush
 	composer  addon.Composer
 	drupalOrg addon.DrupalOrg
@@ -225,10 +268,10 @@ type addonDeps struct {
 var addonRegistry = map[string]func(addonDeps) internal.Addon{
 	"composer_audit": func(d addonDeps) internal.Addon { return addon.NewComposerAudit(d.logger, d.composer) },
 	"code_beautifier": func(d addonDeps) internal.Addon {
-		return addon.NewCodeBeautifier(d.logger, phpcs.NewCLI(d.logger), d.config, d.composer)
+		return addon.NewCodeBeautifier(d.logger, phpcs.NewCLI(d.logger), d.composer)
 	},
 	"deprecations_remover": func(d addonDeps) internal.Addon {
-		return addon.NewDeprecationsRemover(d.logger, rector.NewCLI(d.logger), d.config, d.composer)
+		return addon.NewDeprecationsRemover(d.logger, rector.NewCLI(d.logger), d.composer)
 	},
 	"translations_updater":   func(d addonDeps) internal.Addon { return addon.NewTranslationsUpdater(d.logger, d.drush, d.git) },
 	"composer_allow_plugins": func(d addonDeps) internal.Addon { return addon.NewComposerAllowPlugins(d.logger, d.composer) },
@@ -254,7 +297,7 @@ func createAddons(
 	drupalOrg addon.DrupalOrg,
 	git addon.Repository,
 ) ([]internal.Addon, error) {
-	deps := addonDeps{logger: logger, config: config, drush: drush, composer: composer, drupalOrg: drupalOrg, git: git}
+	deps := addonDeps{logger: logger, drush: drush, composer: composer, drupalOrg: drupalOrg, git: git}
 
 	names := config.Addons.Normal
 	if config.Security {
@@ -380,12 +423,11 @@ func Execute() {
 	}
 }
 
-func NewCache() otter.Cache[string, string] {
-	cache, _ := otter.MustBuilder[string, string](100).Build()
-	return cache
+func NewCache() (otter.Cache[string, string], error) {
+	return otter.MustBuilder[string, string](100).Build()
 }
 
-func NewLogger(config internal.Config) *zap.Logger {
+func NewLogger(config internal.Config) (*zap.Logger, error) {
 	loggerConfig := zap.NewDevelopmentConfig()
 	loggerConfig.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 
@@ -394,6 +436,5 @@ func NewLogger(config internal.Config) *zap.Logger {
 		loggerConfig.DisableCaller = true
 		loggerConfig.DisableStacktrace = true
 	}
-	log, _ := loggerConfig.Build(zap.AddStacktrace(zapcore.ErrorLevel))
-	return log
+	return loggerConfig.Build(zap.AddStacktrace(zapcore.ErrorLevel))
 }

@@ -71,7 +71,7 @@ func (rs *GitRepositoryService) CloneRepository(repository string, branch string
 		return nil, nil, "", fmt.Errorf("git clone: %w", err)
 	}
 
-	return prepareCheckout(checkout, username, email)
+	return rs.prepareCheckout(checkout, username, email)
 }
 
 // OpenRepository opens an existing checkout (e.g. the one CI already provides) instead of
@@ -82,7 +82,7 @@ func (rs *GitRepositoryService) OpenRepository(path string, username string, ema
 	if err != nil {
 		return nil, nil, "", fmt.Errorf("git open %q: %w", path, err)
 	}
-	return prepareCheckout(checkout, username, email)
+	return rs.prepareCheckout(checkout, username, email)
 }
 
 // GetRemoteURL returns the "origin" remote URL of the checkout at path. It is how checkout
@@ -128,8 +128,11 @@ func (rs *GitRepositoryService) GetCurrentBranch(path string) (string, error) {
 
 // prepareCheckout sets the commit identity and removes the prepare-commit-msg hook, then
 // returns the repository, worktree and working-tree root. Shared by clone and open.
-func prepareCheckout(checkout *git.Repository, username string, email string) (Repository, Worktree, string, error) {
-	config, _ := checkout.Config()
+func (rs *GitRepositoryService) prepareCheckout(checkout *git.Repository, username string, email string) (Repository, Worktree, string, error) {
+	config, err := checkout.Config()
+	if err != nil {
+		return checkout, nil, "", fmt.Errorf("failed to read git config: %w", err)
+	}
 	config.User.Name = username
 	config.User.Email = email
 	if err := checkout.SetConfig(config); err != nil {
@@ -140,16 +143,24 @@ func prepareCheckout(checkout *git.Repository, username string, email string) (R
 	if err != nil {
 		return checkout, nil, "", err
 	}
+	root := w.Filesystem.Root()
 
-	// @TODO: Verify if this is necessary
-	// Remove prepare-commit-msg hook because it does not work with the --no-verify option.
-	if _, err := w.Filesystem.Stat(".git/hooks/prepare-commit-msg"); err == nil {
-		if err := w.Filesystem.Remove(".git/hooks/prepare-commit-msg"); err != nil {
+	// Remove the project's prepare-commit-msg hook. go-git's own commits never run hooks, but
+	// `drush config:export --commit` shells out to the real git binary, which does — and a
+	// hook that prompts or rejects a machine-written message would wedge a non-interactive
+	// run that cannot pass --no-verify.
+	//
+	// This goes through the OS filesystem, not w.Filesystem: go-git's bound worktree
+	// filesystem rejects every path containing a ".git" component ("invalid path component"),
+	// so a Stat through it can never find the hook.
+	hookPath := filepath.Join(root, ".git", "hooks", "prepare-commit-msg")
+	if _, err := rs.fs.Stat(hookPath); err == nil {
+		if err := rs.fs.Remove(hookPath); err != nil {
 			return checkout, w, "", fmt.Errorf("failed to remove prepare-commit-msg hook: %w", err)
 		}
 	}
 
-	return checkout, w, w.Filesystem.Root(), nil
+	return checkout, w, root, nil
 }
 
 // BranchExists checks the actual remote for the branch, not the checkout's cached
@@ -189,10 +200,24 @@ func (rs *GitRepositoryService) IsSomethingStagedInPath(worktree Worktree, dir s
 	}
 
 	for filePath, s := range status {
-		if s.Staging != git.Unmodified && strings.Contains(filePath, dir) {
+		if s.Staging != git.Unmodified && pathWithin(filePath, dir) {
 			return true
 		}
 	}
 
 	return false
+}
+
+// pathWithin reports whether filePath is dir itself or lives underneath it. Git status paths
+// are slash-separated and relative to the worktree root. A plain substring test would also
+// match siblings that merely share a prefix — for dir "translations" it would match
+// "translations-backup/de.po" — and report changes that are not in the directory at all.
+// An empty dir matches everything, which is what "no path filter" means.
+func pathWithin(filePath string, dir string) bool {
+	dir = strings.Trim(filepath.ToSlash(dir), "/")
+	if dir == "" {
+		return true
+	}
+	filePath = strings.Trim(filepath.ToSlash(filePath), "/")
+	return filePath == dir || strings.HasPrefix(filePath, dir+"/")
 }

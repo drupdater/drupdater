@@ -174,8 +174,14 @@ func (ws *WorkflowBaseService) cleanup(path string) {
 	parent := filepath.Dir(path)
 	for _, site := range ws.config.Sites {
 		os.Remove(filepath.Join(parent, site+".sqlite"))
+		// Remove only the per-site directory the installer created, never the whole "private"
+		// tree: a private files directory next to the checkout is a standard Drupal layout, so
+		// that parent can hold real project data this run does not own.
+		os.RemoveAll(filepath.Join(parent, "private", site))
 	}
-	os.RemoveAll(filepath.Join(parent, "private"))
+	// Drop the parent too, but only if removing the per-site directories left it empty —
+	// os.Remove refuses a non-empty directory, which is exactly the guard we want here.
+	os.Remove(filepath.Join(parent, "private"))
 }
 
 func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context, repository GitRepository, worktree Worktree, path string) (string, error) {

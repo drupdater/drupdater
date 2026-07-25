@@ -68,4 +68,54 @@ func TestLoadConfigFile(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "timout")
 	})
+
+	t.Run("an empty file applies defaults", func(t *testing.T) {
+		// An empty document decodes to io.EOF. That means "no keys set", the same as an absent
+		// file — it must not fail the run.
+		var c Config
+		found, err := LoadConfigFile(writeConfig(t, ""), &c)
+		require.NoError(t, err)
+		assert.True(t, found)
+		assert.Equal(t, []string{"default"}, c.Sites)
+		assert.Equal(t, 30*time.Minute, c.Timeout)
+		assert.Equal(t, defaultNormalAddons, c.Addons.Normal)
+	})
+
+	t.Run("a comments-only file applies defaults", func(t *testing.T) {
+		var c Config
+		found, err := LoadConfigFile(writeConfig(t, "# everything is commented out\n# sites: [a]\n"), &c)
+		require.NoError(t, err)
+		assert.True(t, found)
+		assert.Equal(t, []string{"default"}, c.Sites)
+	})
+
+	t.Run("an unreadable path is an error", func(t *testing.T) {
+		var c Config
+		// A directory is not os.IsNotExist, so it must surface rather than fall back.
+		_, err := LoadConfigFile(t.TempDir(), &c)
+		require.Error(t, err)
+	})
+
+	t.Run("an explicitly empty site list is rejected", func(t *testing.T) {
+		// Every per-site phase iterates this list, so an empty one would skip installing,
+		// updating and exporting for all sites while still opening a merge request.
+		var c Config
+		_, err := LoadConfigFile(writeConfig(t, "sites: []\n"), &c)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "no sites configured")
+	})
+
+	t.Run("a null site list is rejected", func(t *testing.T) {
+		var c Config
+		_, err := LoadConfigFile(writeConfig(t, "sites:\n"), &c)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "no sites configured")
+	})
+
+	t.Run("sites are applied when set", func(t *testing.T) {
+		var c Config
+		_, err := LoadConfigFile(writeConfig(t, "sites: [default, subsite_a]\n"), &c)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"default", "subsite_a"}, c.Sites)
+	})
 }

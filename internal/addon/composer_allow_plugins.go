@@ -74,6 +74,12 @@ func (ap *ComposerAllowPlugins) postComposerUpdateHandler(e event.Event) error {
 		return err
 	}
 
+	// The map is written to below, so it must never be nil — a project with no allow-plugins
+	// entries yields an empty map, and assigning into a nil map panics.
+	if ap.allowPlugins == nil {
+		ap.allowPlugins = map[string]bool{}
+	}
+
 	// Add new plugins to allow-plugins
 	for key := range allPlugins {
 		if _, ok := ap.allowPlugins[key]; !ok {

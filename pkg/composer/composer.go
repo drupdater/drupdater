@@ -147,7 +147,7 @@ func (s *CLI) Install(ctx context.Context, dir string) error {
 	if err != nil {
 		return fmt.Errorf("failed to install dependencies: %w, output: %s", err, out)
 	}
-	return err
+	return nil
 }
 
 func (s *CLI) Require(ctx context.Context, dir string, args ...string) (string, error) {
@@ -362,15 +362,33 @@ func (s *CLI) GetInstalledPackageVersion(ctx context.Context, dir string, packag
 	return composerShow.Versions[0], nil
 }
 
+// GetAllowPlugins returns composer's allow-plugins config as a package -> allowed map.
+//
+// The setting is polymorphic: composer accepts an object of per-package entries, the boolean
+// `true` ("allow every plugin"), `false`, or nothing at all (reported as `[]`, `null`, or a
+// non-zero exit). Only the object form carries per-package entries, so every other shape
+// resolves to an empty map. The result is never nil — callers add newly discovered plugins to
+// it, and writing to a nil map panics.
 func (s *CLI) GetAllowPlugins(ctx context.Context, dir string) (map[string]bool, error) {
 	allowPluginsJSON, err := s.GetConfig(ctx, dir, "allow-plugins")
 	if err != nil {
-		return nil, fmt.Errorf("failed to get composer allow-plugins config: %w", err)
+		// `composer config allow-plugins` exits non-zero when the key is not set at all. That
+		// is a legitimate project state, not a failure: there are simply no entries yet.
+		s.logger.Debug("no composer allow-plugins config found", zap.Error(err))
+		return map[string]bool{}, nil
 	}
 
-	var allowPlugins map[string]bool
+	allowPlugins := map[string]bool{}
 	if err := json.Unmarshal([]byte(allowPluginsJSON), &allowPlugins); err != nil {
-		return nil, err
+		switch strings.TrimSpace(allowPluginsJSON) {
+		case "true", "false", "[]", "":
+			return map[string]bool{}, nil
+		}
+		return nil, fmt.Errorf("failed to parse composer allow-plugins config %q: %w", allowPluginsJSON, err)
+	}
+	if allowPlugins == nil {
+		// JSON null decodes successfully but sets the map to nil.
+		return map[string]bool{}, nil
 	}
 
 	return allowPlugins, nil
@@ -470,6 +488,20 @@ func (s *CLI) initTempDir() {
 
 	// Write the composer.json file to the temporary directory
 	s.initErr = afero.WriteFile(s.fs, s.tempDir+"/composer.json", []byte(composerJSON), 0644)
+}
+
+// Cleanup removes the scratch composer project used for patch-apply checks. It is a no-op
+// when no check ever ran, and safe to call more than once. Callers should defer it for the
+// lifetime of the CLI: without it every run leaves a scratch project (with a full vendor
+// tree) behind in the temp directory.
+func (s *CLI) Cleanup() {
+	if s.tempDir == "" {
+		return
+	}
+	if err := s.fs.RemoveAll(s.tempDir); err != nil {
+		s.logger.Warn("failed to remove composer scratch directory", zap.String("dir", s.tempDir), zap.Error(err))
+	}
+	s.tempDir = ""
 }
 
 type patchTestConfig struct {

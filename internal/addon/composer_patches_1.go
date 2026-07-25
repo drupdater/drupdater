@@ -214,6 +214,18 @@ func isRemotePatch(patchPath string) bool {
 	return err == nil && (u.Scheme == "http" || u.Scheme == "https")
 }
 
+// dropPatchFile removes a patch's file from the worktree. A remote patch has no file in the
+// repository — its "path" is a URL — so there is nothing to remove and that is not an error.
+// Every removal path goes through here so a URL is never handed to worktree.Remove, which
+// would fail and leave the caller thinking the patch could not be dropped.
+func (h *ComposerPatches1) dropPatchFile(worktree Worktree, patchPath string) error {
+	if isRemotePatch(patchPath) {
+		return nil
+	}
+	_, err := worktree.Remove(patchPath)
+	return err
+}
+
 // removeDependencyProvidedPatches drops root patches whose patch file is already applied
 // by an installed dependency for the same package. composer-patches collects patches from
 // every package, so keeping the root copy makes it apply the same file twice (the second
@@ -257,10 +269,8 @@ func (h *ComposerPatches1) removeUninstalledPackagePatches(ctx context.Context, 
 			continue
 		}
 		for description, patchPath := range patches[packageName] {
-			if !isRemotePatch(patchPath) {
-				if _, err := worktree.Remove(patchPath); err != nil {
-					h.logger.Error("failed to remove patch", zap.String("patch", patchPath), zap.Error(err))
-				}
+			if err := h.dropPatchFile(worktree, patchPath); err != nil {
+				h.logger.Error("failed to remove patch", zap.String("patch", patchPath), zap.Error(err))
 			}
 			h.logger.Info("removing patch: package no longer installed", zap.String("package", packageName), zap.String("patch", patchPath))
 			removed = append(removed, RemovedPatch{Package: packageName, PatchPath: patchPath, PatchDescription: description, Reason: fmt.Sprintf("%s is not installed in the project", packageName)})
@@ -275,10 +285,8 @@ func (h *ComposerPatches1) removePackagePatches(worktree Worktree, op composer.P
 	for description, patchPath := range patches[op.Package] {
 		h.logger.Debug("removing patch", zap.String("package", op.Package), zap.String("patch", patchPath))
 		removed = append(removed, RemovedPatch{Package: op.Package, PatchPath: patchPath, PatchDescription: description, Reason: fmt.Sprintf("%s is no longer installed", op.Package)})
-		if !isRemotePatch(patchPath) {
-			if _, err := worktree.Remove(patchPath); err != nil {
-				h.logger.Error("failed to remove patch", zap.String("patch", patchPath), zap.Error(err))
-			}
+		if err := h.dropPatchFile(worktree, patchPath); err != nil {
+			h.logger.Error("failed to remove patch", zap.String("patch", patchPath), zap.Error(err))
 		}
 	}
 	delete(patches, op.Package)
@@ -311,15 +319,19 @@ func (h *ComposerPatches1) processSinglePatch(ctx context.Context, path string, 
 				h.logger.Error("failed to search commit history", zap.Error(err))
 			} else if len(commits) != 0 {
 				h.logger.Debug("issue is fixed", zap.String("issue", issue.ID))
-				if _, err := worktree.Remove(patchPath); err != nil {
+				if err := h.dropPatchFile(worktree, patchPath); err != nil {
+					// The entry was deleted from the map above. Put it back: a patch whose file
+					// could not be removed must stay declared rather than disappear from
+					// composer.json without ever being reported in the merge request.
 					h.logger.Error("failed to remove patch", zap.String("patch", patchPath), zap.Error(err))
-				} else {
-					if len(patches[op.Package]) == 0 {
-						delete(patches, op.Package)
-					}
-					h.logger.Info("removing patch: issue fixed in new version", zap.String("package", op.Package), zap.String("patch", patchPath))
-					updates.Removed = append(updates.Removed, RemovedPatch{Package: op.Package, PatchPath: patchPath, Reason: fmt.Sprintf("Issue [#%s](%s) is fixed in %s %s", issue.ID, issue.URL, op.Package, op.To), PatchDescription: description})
+					patches[op.Package][description] = patchPath
+					return
 				}
+				if len(patches[op.Package]) == 0 {
+					delete(patches, op.Package)
+				}
+				h.logger.Info("removing patch: issue fixed in new version", zap.String("package", op.Package), zap.String("patch", patchPath))
+				updates.Removed = append(updates.Removed, RemovedPatch{Package: op.Package, PatchPath: patchPath, Reason: fmt.Sprintf("Issue [#%s](%s) is fixed in %s %s", issue.ID, issue.URL, op.Package, op.To), PatchDescription: description})
 				return
 			}
 		}
@@ -392,11 +404,9 @@ func (h *ComposerPatches1) processSinglePatch(ctx context.Context, path string, 
 		h.logger.Debug("failed to check if patch applies", zap.String("patch", fullNewPath), zap.Error(err))
 		return
 	} else if ok {
-		if !externalPatch {
-			if _, err := worktree.Remove(patchPath); err != nil {
-				h.logger.Debug("failed to remove old patch file", zap.String("patch", patchPath), zap.Error(err))
-				return
-			}
+		if err := h.dropPatchFile(worktree, patchPath); err != nil {
+			h.logger.Debug("failed to remove old patch file", zap.String("patch", patchPath), zap.Error(err))
+			return
 		}
 		patches[op.Package][description] = fullNewPath
 		if _, err := worktree.Add(fullNewPath); err != nil {
@@ -414,8 +424,12 @@ func (h *ComposerPatches1) processSinglePatch(ctx context.Context, path string, 
 func (h *ComposerPatches1) validateCombinedPatches(ctx context.Context, path string, op composer.PackageChange, patches map[string]map[string]string, updates *PatchUpdates) {
 	patchPaths := make([]string, 0, len(patches[op.Package]))
 	for _, patchPath := range patches[op.Package] {
+		// Resolve local paths against the project, exactly as processSinglePatch does. This
+		// must use isRemotePatch, not url.ParseRequestURI: the latter accepts a bare absolute
+		// path like "/patches/x.diff", which would then be passed through unprefixed, fail to
+		// resolve, and report a false patch conflict that needlessly pins the package.
 		absolutePath := patchPath
-		if _, err := url.ParseRequestURI(patchPath); err != nil {
+		if !isRemotePatch(patchPath) {
 			absolutePath = path + "/" + patchPath
 		}
 		patchPaths = append(patchPaths, absolutePath)

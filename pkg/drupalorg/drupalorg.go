@@ -46,6 +46,13 @@ func (s *HTTPClient) GetIssue(ctx context.Context, issueID string) (*Issue, erro
 	}
 	defer resp.Body.Close()
 
+	// Check the status before decoding: drupal.org answers an unknown node or an outage with
+	// an HTML error page, which would otherwise surface as an opaque "failed to decode
+	// response" instead of naming the real problem.
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to fetch issue %s: unexpected status %s", issueID, resp.Status)
+	}
+
 	var apiResp Issue
 	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)

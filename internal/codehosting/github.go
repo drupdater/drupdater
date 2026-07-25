@@ -33,7 +33,7 @@ func newGithub(path string, token string, logger *zap.Logger) (*Github, error) {
 	}, nil
 }
 
-func (g Github) CreateMergeRequest(ctx context.Context, title string, description string, sourceBranch string, targetBranch string) (MergeRequest, error) {
+func (g *Github) CreateMergeRequest(ctx context.Context, title string, description string, sourceBranch string, targetBranch string) (MergeRequest, error) {
 	mr, _, err := g.client.PullRequests.Create(ctx, g.owner, g.repo, &github.NewPullRequest{
 		Head:  &sourceBranch,
 		Base:  &targetBranch,

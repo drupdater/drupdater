@@ -50,8 +50,15 @@ func (cd *ComposerDiff) postComposerUpdateHandler(e event.Event) error {
 	}
 	cd.table = table
 
-	table, _ = cd.composer.Diff(evt.Context(), evt.Path(), false)
-	cd.logger.Info("dependency diff\n" + table)
+	// The run log gets the link-free table: the linked variant is what goes in the merge
+	// request, but its markdown URLs make the same content unreadable in a terminal. A failure
+	// here only costs a log line, so it must not fail the run — but it is worth reporting.
+	plain, err := cd.composer.Diff(evt.Context(), evt.Path(), false)
+	if err != nil {
+		cd.logger.Warn("failed to render the dependency diff for the log", zap.Error(err))
+		return nil
+	}
+	cd.logger.Info("dependency diff\n" + plain)
 
 	return nil
 }
