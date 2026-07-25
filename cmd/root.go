@@ -3,6 +3,7 @@ package cmd
 import (
 	"cmp"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -18,6 +19,7 @@ import (
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/addon"
 	"github.com/drupdater/drupdater/internal/codehosting"
+	"github.com/drupdater/drupdater/internal/logging"
 	"github.com/drupdater/drupdater/internal/services"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/drupal"
@@ -72,8 +74,16 @@ names you can set there. See the README for the full file format.`,
 		cmd.SilenceUsage = true
 		cmd.SilenceErrors = true
 
+		// Values subprocesses (Composer, Drush, git) can echo back in their own output — most
+		// often a credential embedded in a URL after a failed authenticated fetch. Registered
+		// as soon as each becomes known so nothing is logged unredacted in between; never
+		// logged itself, including at debug level with --verbose.
+		redactor := logging.NewRedactor()
+		redactor.Register(os.Getenv("DRUPALCODE_ACCESS_TOKEN"))
+		registerComposerAuth(redactor, os.Getenv("COMPOSER_AUTH"))
+
 		// Initialize the logger first so config errors are reported (errors are silenced by Cobra).
-		logger, err := NewLogger(config)
+		logger, err := NewLogger(config, redactor)
 		if err != nil {
 			// No logger yet, so this one report has to go straight to stderr.
 			fmt.Fprintln(cmd.ErrOrStderr(), "failed to initialize logger:", err)
@@ -85,6 +95,7 @@ names you can set there. See the README for the full file format.`,
 			logger.Error("missing token", zap.Error(err))
 			return err
 		}
+		redactor.Register(config.Token)
 
 		// Load per-project config from .drupdater.yaml (sites, timeout, addons). A missing file
 		// falls back to built-in defaults.
@@ -162,6 +173,46 @@ func resolveToken(args []string) (string, error) {
 		return token, nil
 	}
 	return "", errors.New("no token provided: pass it as the argument or set DRUPDATER_TOKEN")
+}
+
+// registerComposerAuth registers the credentials carried by a COMPOSER_AUTH env value with the
+// redactor. COMPOSER_AUTH is a JSON object (http-basic/bearer/gitlab-token/github-oauth/... per
+// host, see the Composer docs) and Composer echoes the individual username, password, or token
+// value it contains — typically embedded in a URL after a failed authenticated fetch — not the
+// blob itself, so registering only the raw string would never match that output. Every string
+// leaf of the parsed JSON is registered individually; the raw value is registered too, as a
+// fallback for a value that fails to parse as JSON.
+func registerComposerAuth(redactor *logging.Redactor, composerAuth string) {
+	redactor.Register(composerAuth)
+
+	var parsed any
+	if err := json.Unmarshal([]byte(composerAuth), &parsed); err != nil {
+		return
+	}
+	redactor.Register(jsonStringLeaves(parsed)...)
+}
+
+// jsonStringLeaves returns every string value found anywhere in a decoded JSON structure
+// (as produced by json.Unmarshal into `any`), recursing through nested objects and arrays.
+func jsonStringLeaves(v any) []string {
+	switch t := v.(type) {
+	case string:
+		return []string{t}
+	case map[string]any:
+		leaves := make([]string, 0, len(t))
+		for _, val := range t {
+			leaves = append(leaves, jsonStringLeaves(val)...)
+		}
+		return leaves
+	case []any:
+		leaves := make([]string, 0, len(t))
+		for _, val := range t {
+			leaves = append(leaves, jsonStringLeaves(val)...)
+		}
+		return leaves
+	default:
+		return nil
+	}
 }
 
 // configFilePath returns the .drupdater.yaml to read: --config when set, otherwise the one in
@@ -429,7 +480,7 @@ func NewCache() (otter.Cache[string, string], error) {
 	return otter.MustBuilder[string, string](100).Build()
 }
 
-func NewLogger(config internal.Config) (*zap.Logger, error) {
+func NewLogger(config internal.Config, redactor *logging.Redactor) (*zap.Logger, error) {
 	loggerConfig := zap.NewDevelopmentConfig()
 	loggerConfig.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 
@@ -438,5 +489,5 @@ func NewLogger(config internal.Config) (*zap.Logger, error) {
 		loggerConfig.DisableCaller = true
 		loggerConfig.DisableStacktrace = true
 	}
-	return loggerConfig.Build(zap.AddStacktrace(zapcore.ErrorLevel))
+	return loggerConfig.Build(zap.AddStacktrace(zapcore.ErrorLevel), zap.WrapCore(logging.WrapCore(redactor)))
 }

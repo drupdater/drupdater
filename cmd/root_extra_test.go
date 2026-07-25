@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/internal/logging"
 	"github.com/drupdater/drupdater/pkg/repo"
 	git "github.com/go-git/go-git/v5"
 	gitConfig "github.com/go-git/go-git/v5/config"
@@ -52,6 +53,52 @@ func TestResolveToken(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "DRUPDATER_TOKEN")
 	})
+}
+
+func TestRegisterComposerAuth(t *testing.T) {
+	// registerComposerAuth must register the individual credentials inside COMPOSER_AUTH, not
+	// just the raw JSON blob: Composer echoes the username/password/token itself (typically
+	// embedded in a URL after a failed authenticated fetch), never the blob verbatim.
+	redact := func(t *testing.T, redactor *logging.Redactor, msg string) string {
+		t.Helper()
+		core, logs := observer.New(zap.DebugLevel)
+		logger := zap.New(logging.WrapCore(redactor)(core))
+		logger.Info(msg)
+		return logs.All()[0].Message
+	}
+
+	t.Run("registers individual leaf values from valid JSON", func(t *testing.T) {
+		redactor := logging.NewRedactor()
+		registerComposerAuth(redactor, `{"http-basic":{"repo.packagist.com":{"username":"du","password":"s3cr3t-pass"}}}`)
+
+		got := redact(t, redactor, "fetch failed: https://du:s3cr3t-pass@repo.packagist.com/p2/foo.json: 403")
+		assert.NotContains(t, got, "s3cr3t-pass")
+	})
+
+	t.Run("falls back to redacting the raw value when it is not valid JSON", func(t *testing.T) {
+		redactor := logging.NewRedactor()
+		registerComposerAuth(redactor, "not-json-token")
+
+		got := redact(t, redactor, "leaked not-json-token here")
+		assert.NotContains(t, got, "not-json-token")
+	})
+
+	t.Run("empty value is a no-op", func(t *testing.T) {
+		redactor := logging.NewRedactor()
+		registerComposerAuth(redactor, "")
+
+		got := redact(t, redactor, "hello world")
+		assert.Equal(t, "hello world", got)
+	})
+}
+
+func TestJSONStringLeaves(t *testing.T) {
+	leaves := jsonStringLeaves(map[string]any{
+		"a": "1",
+		"b": map[string]any{"c": "2", "d": []any{"3", "4"}},
+		"e": 5.0,
+	})
+	assert.ElementsMatch(t, []string{"1", "2", "3", "4"}, leaves)
 }
 
 func TestConfigFilePath(t *testing.T) {
