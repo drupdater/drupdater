@@ -50,7 +50,6 @@ func TestNewLogger(t *testing.T) {
 		assert.False(t, logger.Core().Enabled(zapcore.DebugLevel))
 		assert.True(t, logger.Core().Enabled(zapcore.InfoLevel))
 	})
-
 }
 
 func TestNewCache(t *testing.T) {
