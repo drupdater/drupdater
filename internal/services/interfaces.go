@@ -14,6 +14,7 @@ type Composer interface {
 	Update(ctx context.Context, dir string, packagesToUpdate []string, packagesToKeep []string, minimalChanges bool, dryRun bool) ([]composer.PackageChange, error)
 	GetLockHash(dir string) (string, error)
 	CheckPlatformReqs(ctx context.Context, dir string) (string, error)
+	GetConfig(ctx context.Context, dir string, key string) (string, error)
 }
 
 type Drush interface {
@@ -28,6 +29,7 @@ type Repository interface {
 	OpenRepository(path string, username string, email string) (repo.Repository, repo.Worktree, string, error)
 	GetRemoteURL(path string) (string, error)
 	GetCurrentBranch(path string) (string, error)
+	IsShallowClone(path string) (bool, error)
 }
 
 // GitRepository is an alias for repo.Repository to avoid duplication.

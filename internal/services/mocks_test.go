@@ -109,6 +109,78 @@ func (_c *MockComposer_CheckPlatformReqs_Call) RunAndReturn(run func(ctx context
 	return _c
 }
 
+// GetConfig provides a mock function for the type MockComposer
+func (_mock *MockComposer) GetConfig(ctx context.Context, dir string, key string) (string, error) {
+	ret := _mock.Called(ctx, dir, key)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetConfig")
+	}
+
+	var r0 string
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) (string, error)); ok {
+		return returnFunc(ctx, dir, key)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) string); ok {
+		r0 = returnFunc(ctx, dir, key)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = returnFunc(ctx, dir, key)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockComposer_GetConfig_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetConfig'
+type MockComposer_GetConfig_Call struct {
+	*mock.Call
+}
+
+// GetConfig is a helper method to define mock.On call
+//   - ctx context.Context
+//   - dir string
+//   - key string
+func (_e *MockComposer_Expecter) GetConfig(ctx any, dir any, key any) *MockComposer_GetConfig_Call {
+	return &MockComposer_GetConfig_Call{Call: _e.mock.On("GetConfig", ctx, dir, key)}
+}
+
+func (_c *MockComposer_GetConfig_Call) Run(run func(ctx context.Context, dir string, key string)) *MockComposer_GetConfig_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockComposer_GetConfig_Call) Return(s string, err error) *MockComposer_GetConfig_Call {
+	_c.Call.Return(s, err)
+	return _c
+}
+
+func (_c *MockComposer_GetConfig_Call) RunAndReturn(run func(ctx context.Context, dir string, key string) (string, error)) *MockComposer_GetConfig_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetLockHash provides a mock function for the type MockComposer
 func (_mock *MockComposer) GetLockHash(dir string) (string, error) {
 	ret := _mock.Called(dir)
@@ -849,6 +921,66 @@ func (_c *MockRepository_GetRemoteURL_Call) Return(s string, err error) *MockRep
 }
 
 func (_c *MockRepository_GetRemoteURL_Call) RunAndReturn(run func(path string) (string, error)) *MockRepository_GetRemoteURL_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// IsShallowClone provides a mock function for the type MockRepository
+func (_mock *MockRepository) IsShallowClone(path string) (bool, error) {
+	ret := _mock.Called(path)
+
+	if len(ret) == 0 {
+		panic("no return value specified for IsShallowClone")
+	}
+
+	var r0 bool
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(string) (bool, error)); ok {
+		return returnFunc(path)
+	}
+	if returnFunc, ok := ret.Get(0).(func(string) bool); ok {
+		r0 = returnFunc(path)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+	if returnFunc, ok := ret.Get(1).(func(string) error); ok {
+		r1 = returnFunc(path)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRepository_IsShallowClone_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IsShallowClone'
+type MockRepository_IsShallowClone_Call struct {
+	*mock.Call
+}
+
+// IsShallowClone is a helper method to define mock.On call
+//   - path string
+func (_e *MockRepository_Expecter) IsShallowClone(path any) *MockRepository_IsShallowClone_Call {
+	return &MockRepository_IsShallowClone_Call{Call: _e.mock.On("IsShallowClone", path)}
+}
+
+func (_c *MockRepository_IsShallowClone_Call) Run(run func(path string)) *MockRepository_IsShallowClone_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_IsShallowClone_Call) Return(b bool, err error) *MockRepository_IsShallowClone_Call {
+	_c.Call.Return(b, err)
+	return _c
+}
+
+func (_c *MockRepository_IsShallowClone_Call) RunAndReturn(run func(path string) (bool, error)) *MockRepository_IsShallowClone_Call {
 	_c.Call.Return(run)
 	return _c
 }

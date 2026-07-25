@@ -126,6 +126,22 @@ func (rs *GitRepositoryService) GetCurrentBranch(path string) (string, error) {
 	return "", nil
 }
 
+// IsShallowClone reports whether the checkout at path has a truncated commit history (e.g. a
+// CI default of fetch-depth: 1). A shallow checkout can still create commits, but pushing the
+// resulting branch fails downstream with "object not found": the remote needs the ancestry of
+// the pushed commits to describe them, and a shallow clone doesn't have it.
+func (rs *GitRepositoryService) IsShallowClone(path string) (bool, error) {
+	checkout, err := git.PlainOpen(path)
+	if err != nil {
+		return false, fmt.Errorf("git open %q: %w", path, err)
+	}
+	shallow, err := checkout.Storer.Shallow()
+	if err != nil {
+		return false, fmt.Errorf("failed to read shallow commit info: %w", err)
+	}
+	return len(shallow) > 0, nil
+}
+
 // prepareCheckout sets the commit identity and removes the prepare-commit-msg hook, then
 // returns the repository, worktree and working-tree root. Shared by clone and open.
 func (rs *GitRepositoryService) prepareCheckout(checkout *git.Repository, username string, email string) (Repository, Worktree, string, error) {
