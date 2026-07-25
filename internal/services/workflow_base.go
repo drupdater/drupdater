@@ -100,11 +100,15 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []interna
 		ws.cleanup(path)
 	}()
 
-	// Fail fast if the runtime PHP version doesn't satisfy the project's platform
-	// requirements; composer update would otherwise fail mid-run with confusing output.
-	// Extension requirements are deliberately not checked here (see CheckPlatformReqs).
-	if out, err := ws.composer.CheckPlatformReqs(ctx, path); err != nil {
-		return fmt.Errorf("PHP platform requirements not satisfied:\n%s", out)
+	// Fail fast on cheap, structural prerequisites shared with "drupdater check" instead of
+	// discovering them mid-run: a shallow checkout only fails much later, with a cryptic
+	// "object not found" when the update branch is pushed. Extension requirements are
+	// deliberately not checked here (see CheckPlatformReqs).
+	if result := CheckGitHistoryComplete(ws.repository, path); !result.OK {
+		return fmt.Errorf("%s: %s", result.Name, result.Detail)
+	}
+	if result := CheckPlatformRequirements(ctx, ws.composer, path); !result.OK {
+		return fmt.Errorf("PHP platform requirements not satisfied:\n%s", result.Detail)
 	}
 
 	ws.logger.Info("running composer install")

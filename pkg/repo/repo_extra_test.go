@@ -153,3 +153,42 @@ func TestCloneRepository(t *testing.T) {
 		require.Error(t, err)
 	})
 }
+
+func TestIsShallowClone(t *testing.T) {
+	service := NewGitRepositoryService(zap.NewNop())
+
+	t.Run("a full checkout is not shallow", func(t *testing.T) {
+		dir, _ := initRepoWithCommit(t)
+
+		shallow, err := service.IsShallowClone(dir)
+		require.NoError(t, err)
+		assert.False(t, shallow)
+	})
+
+	t.Run("a depth-limited clone is shallow", func(t *testing.T) {
+		source, r := initRepoWithCommit(t)
+		wt, err := r.Worktree()
+		require.NoError(t, err)
+		// A second commit gives the depth-1 clone below ancestry to actually truncate.
+		_, err = wt.Commit("second", &git.CommitOptions{
+			AllowEmptyCommits: true,
+			Author:            &object.Signature{Name: "t", Email: "t@example.com"},
+		})
+		require.NoError(t, err)
+		head, err := r.Head()
+		require.NoError(t, err)
+
+		_, _, path, err := service.CloneRepository(source, head.Name().Short(), "", "Bot", "bot@example.com")
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = os.RemoveAll(path) })
+
+		shallow, err := service.IsShallowClone(path)
+		require.NoError(t, err)
+		assert.True(t, shallow)
+	})
+
+	t.Run("errors on a non-repository path", func(t *testing.T) {
+		_, err := service.IsShallowClone(t.TempDir())
+		require.Error(t, err)
+	})
+}

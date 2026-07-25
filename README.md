@@ -102,6 +102,21 @@ leave `DRUPDATER_TOKEN` unset.
 - *(Optional)* A [Drupal.org GitLab access token](https://git.drupalcode.org)
   (`DRUPALCODE_ACCESS_TOKEN`) to enable patch management.
 
+Run `drupdater check` to validate these against a checkout before scheduling a
+real run — it fails fast on the first four instead of burning several minutes
+on `composer install` and a site install first:
+
+```bash
+docker run -v "$(pwd)":/app -w /app ghcr.io/drupdater/drupdater-php8.3:latest check
+```
+
+By default it only runs cheap, near-instant checks (config, git history,
+platform requirements, each site's `settings.php`). Add `--full` to also
+clone the repo and actually run `drush site-install --existing-config` per
+site — the definitive answer, at close to the cost of a real run. `check`
+never modifies your checkout and exits non-zero on any failure, so it can
+gate a pipeline too.
+
 ## CI/CD Integration
 
 In CI, Drupdater runs against the checkout — no `--clone` needed. The recommended
@@ -231,7 +246,8 @@ addons:               # configurable addons per mode (mandatory addons always ru
 
 | Symptom | Cause / Fix |
 |---------|-------------|
-| Push fails with `object not found` | Shallow checkout. Set `fetch-depth: 0` / `GIT_DEPTH: "0"`. |
+| Not sure why a run would fail | Run `drupdater check` (add `--full` for the definitive site-install check) before scheduling a real run. |
+| Push fails with `object not found` | Shallow checkout. Set `fetch-depth: 0` / `GIT_DEPTH: "0"`. `drupdater check` catches this upfront. |
 | PR is created but CI doesn't run on it (GitHub) | Expected with `GITHUB_TOKEN` — use a PAT or App token. See [Tokens & Permissions](#tokens--permissions). |
 | `composer install` fails on private packages | Provide `COMPOSER_AUTH` (see below). |
 | Site install fails | Confirm `drush site-install --existing-config` works locally first. |

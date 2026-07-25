@@ -54,6 +54,7 @@ func TestStartUpdate(t *testing.T) {
 	drush.EXPECT().ConfigResave(mock.Anything, "/tmp", "site1").Return(nil)
 
 	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil)
+	repositoryService.EXPECT().IsShallowClone("/tmp").Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(mock.Anything, "/tmp").Return("", nil)
 	repositoryService.EXPECT().BranchExists(repository, mock.Anything, mock.Anything).Return(false, nil)
 
@@ -125,6 +126,7 @@ func TestStartUpdatePublishUsesLiveContext(t *testing.T) {
 	drush.EXPECT().ConfigResave(mock.Anything, "/tmp", "site1").Return(nil)
 
 	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil)
+	repositoryService.EXPECT().IsShallowClone("/tmp").Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(mock.Anything, "/tmp").Return("", nil)
 	repositoryService.EXPECT().BranchExists(repository, mock.Anything, mock.Anything).Return(false, nil)
 
@@ -183,6 +185,7 @@ func TestStartUpdateSiteFailureDoesNotPublish(t *testing.T) {
 	worktree.EXPECT().Checkout(mock.Anything).Return(nil)
 
 	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil)
+	repositoryService.EXPECT().IsShallowClone("/tmp").Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(mock.Anything, "/tmp").Return("", nil)
 	repositoryService.EXPECT().BranchExists(repository, mock.Anything, mock.Anything).Return(false, nil)
 
@@ -236,6 +239,7 @@ func TestStartUpdateTimeout(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
 	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil)
+	repositoryService.EXPECT().IsShallowClone("/tmp").Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(mock.Anything, "/tmp").Return("", nil)
 
 	// Both phases block on the context, simulating a wedged subprocess; the run
@@ -284,6 +288,7 @@ func TestStartUpdatePlatformReqsFail(t *testing.T) {
 	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil)
 
 	// The platform check fails → updateSharedCode aborts.
+	repositoryService.EXPECT().IsShallowClone("/tmp").Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(mock.Anything, "/tmp").Return("php 8.1.0 failed", errors.New("unmet platform requirements"))
 
 	// installCode (and a site install) may run concurrently before the cancel propagates.
@@ -332,6 +337,7 @@ func TestStartUpdateNoChanges(t *testing.T) {
 	// installCode: one CloneRepository + Install
 	// updateSharedCode: one CloneRepository + Update (returns empty → AbortError)
 	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil)
+	repositoryService.EXPECT().IsShallowClone("/tmp").Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(mock.Anything, "/tmp").Return("", nil)
 
 	mockComposer.EXPECT().Install(mock.Anything, "/tmp").Return(nil)
@@ -388,6 +394,7 @@ func TestStartUpdateBranchAlreadyExists(t *testing.T) {
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
 
 	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil)
+	repositoryService.EXPECT().IsShallowClone("/tmp").Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(mock.Anything, "/tmp").Return("", nil)
 	repositoryService.EXPECT().BranchExists(repository, mock.Anything, mock.Anything).Return(true, nil)
 
@@ -452,6 +459,7 @@ func TestStartUpdateWithDryRun(t *testing.T) {
 	drush.EXPECT().ConfigResave(mock.Anything, "/tmp", "site1").Return(nil)
 
 	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil)
+	repositoryService.EXPECT().IsShallowClone("/tmp").Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(mock.Anything, "/tmp").Return("", nil)
 	repositoryService.EXPECT().BranchExists(repository, mock.Anything, mock.Anything).Return(false, nil)
 
@@ -513,6 +521,7 @@ func TestStartUpdateCheckoutDryRunWithoutPlatform(t *testing.T) {
 	drush.EXPECT().ConfigResave(mock.Anything, "/tmp", "site1").Return(nil)
 
 	repositoryService.EXPECT().OpenRepository(config.WorkingDir, "", "").Return(repository, worktree, "/tmp", nil)
+	repositoryService.EXPECT().IsShallowClone("/tmp").Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(mock.Anything, "/tmp").Return("", nil)
 	repositoryService.EXPECT().BranchExists(repository, mock.Anything, mock.Anything).Return(false, nil)
 
@@ -572,6 +581,7 @@ func TestPublishWorkDeletesBranchOnMRFailure(t *testing.T) {
 	drush.EXPECT().ConfigResave(mock.Anything, "/tmp", "site1").Return(nil)
 
 	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil)
+	repositoryService.EXPECT().IsShallowClone("/tmp").Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(mock.Anything, "/tmp").Return("", nil)
 	repositoryService.EXPECT().BranchExists(repository, mock.Anything, mock.Anything).Return(false, nil)
 
@@ -630,6 +640,7 @@ func TestPublishWorkLogsWarningWhenDeleteBranchFails(t *testing.T) {
 	drush.EXPECT().ConfigResave(mock.Anything, "/tmp", "site1").Return(nil)
 
 	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil)
+	repositoryService.EXPECT().IsShallowClone("/tmp").Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(mock.Anything, "/tmp").Return("", nil)
 	repositoryService.EXPECT().BranchExists(repository, mock.Anything, mock.Anything).Return(false, nil)
 
@@ -690,6 +701,7 @@ func TestPublishWorkPushFails(t *testing.T) {
 	drush.EXPECT().ConfigResave(mock.Anything, "/tmp", "site1").Return(nil)
 
 	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil)
+	repositoryService.EXPECT().IsShallowClone("/tmp").Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(mock.Anything, "/tmp").Return("", nil)
 	repositoryService.EXPECT().BranchExists(repository, mock.Anything, mock.Anything).Return(false, nil)
 
@@ -739,6 +751,7 @@ func TestStartUpdateGetLockHashError(t *testing.T) {
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
 	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil)
+	repositoryService.EXPECT().IsShallowClone("/tmp").Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(mock.Anything, "/tmp").Return("", nil)
 	mockComposer.EXPECT().Install(mock.Anything, "/tmp").Return(nil)
 	mockComposer.EXPECT().Update(mock.Anything, "/tmp", mock.Anything, mock.Anything, false, false).Return([]composer.PackageChange{
@@ -785,6 +798,7 @@ func TestStartUpdateBranchExistsError(t *testing.T) {
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
 	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil)
+	repositoryService.EXPECT().IsShallowClone("/tmp").Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(mock.Anything, "/tmp").Return("", nil)
 	mockComposer.EXPECT().Install(mock.Anything, "/tmp").Return(nil)
 	mockComposer.EXPECT().Update(mock.Anything, "/tmp", mock.Anything, mock.Anything, false, false).Return([]composer.PackageChange{
@@ -838,6 +852,7 @@ func TestStartUpdateConfigResaveError(t *testing.T) {
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
 	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil)
+	repositoryService.EXPECT().IsShallowClone("/tmp").Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(mock.Anything, "/tmp").Return("", nil)
 	repositoryService.EXPECT().BranchExists(repository, mock.Anything, mock.Anything).Return(false, nil)
 	mockComposer.EXPECT().Install(mock.Anything, "/tmp").Return(nil)
@@ -888,6 +903,7 @@ func TestStartUpdateExportConfigurationError(t *testing.T) {
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
 	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil)
+	repositoryService.EXPECT().IsShallowClone("/tmp").Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(mock.Anything, "/tmp").Return("", nil)
 	repositoryService.EXPECT().BranchExists(repository, mock.Anything, mock.Anything).Return(false, nil)
 	mockComposer.EXPECT().Install(mock.Anything, "/tmp").Return(nil)
@@ -944,6 +960,7 @@ func TestStartUpdateFireEventError(t *testing.T) {
 		Return(repository, worktree, "/tmp", nil)
 
 	mockComposer.EXPECT().Install(mock.Anything, "/tmp").Return(nil)
+	repositoryService.EXPECT().IsShallowClone("/tmp").Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(mock.Anything, "/tmp").Return("", nil)
 
 	// The dispatcher returns an error on the first FireEvent call (PreComposerUpdateEvent).
@@ -999,6 +1016,7 @@ func TestStartUpdateUsesExistingCheckout(t *testing.T) {
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
 	repositoryService.EXPECT().OpenRepository(checkout, "user", "mail").Return(repository, worktree, checkout, nil)
+	repositoryService.EXPECT().IsShallowClone(checkout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(mock.Anything, checkout).Return("", nil)
 	repositoryService.EXPECT().BranchExists(repository, mock.Anything, mock.Anything).Return(false, nil)
 	repository.EXPECT().Push(mock.Anything).Return(nil)
@@ -1047,6 +1065,7 @@ func TestStartUpdateWorkBranchCheckoutError(t *testing.T) {
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
 	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil)
+	repositoryService.EXPECT().IsShallowClone("/tmp").Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(mock.Anything, "/tmp").Return("", nil)
 	mockComposer.EXPECT().Install(mock.Anything, "/tmp").Return(nil)
 	installer.EXPECT().Install(mock.Anything, "/tmp", "site1").Return(nil)

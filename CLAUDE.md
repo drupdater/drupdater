@@ -49,6 +49,10 @@ The workflow in `workflow_base.go` operates on a **single working directory** (t
 
 The site databases are SQLite files written beside the working directory (`{dir}/../{site}.sqlite`); checkout-mode runs clean these up afterward. At the end (unless `--dry-run`), a merge/pull request is created with a generated description.
 
+### Preflight Checks (`cmd/check.go`, `internal/services/preflight.go`)
+
+`drupdater check` validates a project's prerequisites without running an update — no `composer update`, no branch, no MR. The cheap checks (`.drupdater.yaml`/addon names, git history depth, PHP platform requirements, each site's `settings.php`, VCS host/token) run by default; `--full` additionally clones the repo to a scratch directory (never the live working copy) and runs a real `composer install` + `drush site-install --existing-config` per site. `CheckGitHistoryComplete` and `CheckPlatformRequirements` in `preflight.go` are shared with `workflow_base.go`'s own fail-fast startup checks, so a shallow checkout is caught the same way in both a real run and `check`.
+
 ### Addon System (`internal/addon/`)
 
 Addons implement the `Addon` interface and subscribe to workflow events via `gookit/event`. They hook into pre/post composer update and pre/post site update events.
