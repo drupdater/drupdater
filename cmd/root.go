@@ -18,6 +18,7 @@ import (
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/addon"
 	"github.com/drupdater/drupdater/internal/codehosting"
+	"github.com/drupdater/drupdater/internal/logging"
 	"github.com/drupdater/drupdater/internal/services"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/drupal"
@@ -72,8 +73,15 @@ names you can set there. See the README for the full file format.`,
 		cmd.SilenceUsage = true
 		cmd.SilenceErrors = true
 
+		// Values subprocesses (Composer, Drush, git) can echo back in their own output — most
+		// often a credential embedded in a URL after a failed authenticated fetch. Registered
+		// as soon as each becomes known so nothing is logged unredacted in between; never
+		// logged itself, including at debug level with --verbose.
+		redactor := logging.NewRedactor()
+		redactor.Register(os.Getenv("DRUPALCODE_ACCESS_TOKEN"), os.Getenv("COMPOSER_AUTH"))
+
 		// Initialize the logger first so config errors are reported (errors are silenced by Cobra).
-		logger, err := NewLogger(config)
+		logger, err := NewLogger(config, redactor)
 		if err != nil {
 			// No logger yet, so this one report has to go straight to stderr.
 			fmt.Fprintln(cmd.ErrOrStderr(), "failed to initialize logger:", err)
@@ -85,6 +93,7 @@ names you can set there. See the README for the full file format.`,
 			logger.Error("missing token", zap.Error(err))
 			return err
 		}
+		redactor.Register(config.Token)
 
 		// Load per-project config from .drupdater.yaml (sites, timeout, addons). A missing file
 		// falls back to built-in defaults.
@@ -429,7 +438,7 @@ func NewCache() (otter.Cache[string, string], error) {
 	return otter.MustBuilder[string, string](100).Build()
 }
 
-func NewLogger(config internal.Config) (*zap.Logger, error) {
+func NewLogger(config internal.Config, redactor *logging.Redactor) (*zap.Logger, error) {
 	loggerConfig := zap.NewDevelopmentConfig()
 	loggerConfig.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 
@@ -438,5 +447,5 @@ func NewLogger(config internal.Config) (*zap.Logger, error) {
 		loggerConfig.DisableCaller = true
 		loggerConfig.DisableStacktrace = true
 	}
-	return loggerConfig.Build(zap.AddStacktrace(zapcore.ErrorLevel))
+	return loggerConfig.Build(zap.AddStacktrace(zapcore.ErrorLevel), zap.WrapCore(logging.WrapCore(redactor)))
 }

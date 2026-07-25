@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/internal/logging"
 	"github.com/drupdater/drupdater/internal/services"
 	"github.com/drupdater/drupdater/pkg/repo"
 	git "github.com/go-git/go-git/v5"
@@ -26,7 +27,7 @@ func TestNewLogger(t *testing.T) {
 		}
 
 		// Create logger
-		logger, err := NewLogger(config)
+		logger, err := NewLogger(config, logging.NewRedactor())
 
 		// Assert logger is in debug mode
 		require.NoError(t, err)
@@ -41,7 +42,7 @@ func TestNewLogger(t *testing.T) {
 		}
 
 		// Create logger
-		logger, err := NewLogger(config)
+		logger, err := NewLogger(config, logging.NewRedactor())
 
 		// Assert logger is not in debug mode but is in info mode
 		require.NoError(t, err)
@@ -49,6 +50,7 @@ func TestNewLogger(t *testing.T) {
 		assert.False(t, logger.Core().Enabled(zapcore.DebugLevel))
 		assert.True(t, logger.Core().Enabled(zapcore.InfoLevel))
 	})
+
 }
 
 func TestNewCache(t *testing.T) {
