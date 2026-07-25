@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -999,6 +1000,59 @@ func TestStartUpdateWorkBranchCheckoutError(t *testing.T) {
 	require.ErrorIs(t, err, checkoutErr)
 	require.ErrorContains(t, err, "failed to create work branch")
 	repository.AssertNotCalled(t, "Push", mock.Anything)
+}
+
+func TestForEachSite(t *testing.T) {
+	logger := zap.NewNop()
+	sites := []string{"site1", "site2", "site3", "site4"}
+
+	t.Run("bounds concurrency to config.Concurrency", func(t *testing.T) {
+		ws := &WorkflowBaseService{logger: logger, config: internal.Config{Sites: sites, Concurrency: 1}}
+
+		var current, peak atomic.Int32
+		err := ws.forEachSite(context.Background(), func(_ context.Context, _ string) error {
+			n := current.Add(1)
+			defer current.Add(-1)
+			for {
+				m := peak.Load()
+				if n <= m || peak.CompareAndSwap(m, n) {
+					break
+				}
+			}
+			time.Sleep(time.Millisecond)
+			return nil
+		})
+
+		require.NoError(t, err)
+		assert.EqualValues(t, 1, peak.Load())
+	})
+
+	t.Run("falls back to GOMAXPROCS(0) when Concurrency is unset", func(t *testing.T) {
+		ws := &WorkflowBaseService{logger: logger, config: internal.Config{Sites: sites}}
+
+		var calls atomic.Int32
+		err := ws.forEachSite(context.Background(), func(_ context.Context, _ string) error {
+			calls.Add(1)
+			return nil
+		})
+
+		require.NoError(t, err)
+		assert.EqualValues(t, len(sites), calls.Load())
+	})
+
+	t.Run("propagates the first error and cancels the rest", func(t *testing.T) {
+		ws := &WorkflowBaseService{logger: logger, config: internal.Config{Sites: sites, Concurrency: 2}}
+		boom := errors.New("boom")
+
+		err := ws.forEachSite(context.Background(), func(_ context.Context, site string) error {
+			if site == "site1" {
+				return boom
+			}
+			return nil
+		})
+
+		require.ErrorIs(t, err, boom)
+	})
 }
 
 func TestCleanup(t *testing.T) {

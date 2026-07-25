@@ -91,6 +91,7 @@ Config is split into two tiers, with no overlap:
 | `--clone` | false | Clone instead of using the checkout (needs `--repository-url`); for testing |
 | `--repository-url` | _(from `origin`)_ | Repo URL; required with `--clone`, else read from `origin` |
 | `--security` | false | Only apply security updates; selects the `addons.security` list |
+| `--concurrency` | `GOMAXPROCS(0)` | Max concurrent per-site work in `forEachSite`; describes the machine, not the project, so it's a flag rather than a `.drupdater.yaml` key |
 | `--dry-run` | false | Skip branch creation and MR |
 | `--verbose` | false | Debug-level structured logging |
 | `--config` | _(`<working-dir>/.drupdater.yaml`)_ | Path to the config file |

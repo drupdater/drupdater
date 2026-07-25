@@ -14,6 +14,10 @@ type Config struct {
 	Verbose       bool
 	Timeout       time.Duration
 	Addons        AddonsConfig
+	// Concurrency bounds how many sites are installed/updated at once. It describes the
+	// machine the run happens on, not the project, so it's a CLI flag rather than a
+	// .drupdater.yaml key. A value <= 0 means "use GOMAXPROCS(0)".
+	Concurrency int
 }
 
 // AddonsConfig lists which configurable addons run in each mode. Mandatory addons

@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"syscall"
@@ -409,6 +410,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&config.DryRun, "dry-run", false, "Dry run. If true, no branch and merge request will be created.")
 	rootCmd.PersistentFlags().BoolVar(&config.Verbose, "verbose", false, "Verbose")
 	rootCmd.PersistentFlags().StringVar(&configFile, "config", "", "Path to the config file (default: <working-dir>/.drupdater.yaml).")
+	rootCmd.PersistentFlags().IntVar(&config.Concurrency, "concurrency", runtime.GOMAXPROCS(0), "Maximum number of sites to install/update concurrently. Defaults to GOMAXPROCS(0), which reflects the container's CPU quota, not just the host's core count.")
 
 	rootCmd.AddCommand(addonsCmd)
 }
