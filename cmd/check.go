@@ -46,6 +46,7 @@ Exits non-zero if any check fails, so it can gate a pipeline.`,
 		cmd.SilenceErrors = true
 
 		redactor := logging.NewRedactor()
+		registerEnvSecrets(redactor)
 		logger, err := NewLogger(config, redactor)
 		if err != nil {
 			fmt.Fprintln(cmd.ErrOrStderr(), "failed to initialize logger:", err)
@@ -74,7 +75,7 @@ Exits non-zero if any check fails, so it can gate a pipeline.`,
 			results = append(results, runFullChecks(ctx, logger, cfg, token)...)
 		}
 
-		printCheckResults(cmd.OutOrStdout(), results)
+		printCheckResults(cmd.OutOrStdout(), results, redactor)
 		if anyCheckFailed(results) {
 			return errors.New("preflight check failed")
 		}
@@ -242,14 +243,18 @@ func cleanupFullCheckArtifacts(path string, sites []string) {
 	os.Remove(filepath.Join(parent, "private"))
 }
 
-func printCheckResults(w io.Writer, results []services.CheckResult) {
+// printCheckResults writes results to w, redacting each detail message through redactor first: a
+// failed check's Detail can carry a subprocess's raw output (e.g. Composer's error after a failed
+// authenticated fetch), which is exactly where a credential embedded in a URL would otherwise
+// leak straight to stdout, bypassing the logger's own redaction entirely.
+func printCheckResults(w io.Writer, results []services.CheckResult, redactor *logging.Redactor) {
 	for _, r := range results {
 		mark := "✓"
 		if !r.OK {
 			mark = "✗"
 		}
 		if !r.OK && r.Detail != "" {
-			fmt.Fprintf(w, "%s %s: %s\n", mark, r.Name, r.Detail)
+			fmt.Fprintf(w, "%s %s: %s\n", mark, r.Name, redactor.Redact(r.Detail))
 			continue
 		}
 		fmt.Fprintf(w, "%s %s\n", mark, r.Name)

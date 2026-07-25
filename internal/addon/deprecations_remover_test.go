@@ -7,6 +7,7 @@ import (
 	"github.com/drupdater/drupdater/internal/services"
 	"github.com/drupdater/drupdater/pkg/rector"
 
+	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/gookit/event"
 	"github.com/stretchr/testify/assert"
@@ -21,7 +22,7 @@ func TestDeprecationsRemover_SubscribedEvents(t *testing.T) {
 
 	assert.Contains(t, events, "post-code-update")
 	item := events["post-code-update"].(event.ListenerItem)
-	assert.Equal(t, event.Normal, item.Priority)
+	assert.Equal(t, event.AboveNormal, item.Priority)
 }
 
 func TestDeprecationsRemover_RenderTemplate(t *testing.T) {
@@ -54,6 +55,11 @@ func TestRemoveDeprecations(t *testing.T) {
 		}, nil)
 		composer.EXPECT().Remove(mock.Anything, "/path/to/repo", []string{"palantirnet/drupal-rector"}).Return("", nil)
 
+		// Removing the temporarily-required rector left composer.json/composer.lock unchanged
+		// from HEAD, so nothing is staged and no cleanup commit happens.
+		worktree.EXPECT().AddGlob("composer.*").Return(nil).Once()
+		worktree.EXPECT().Status().Return(git.Status{}, nil).Once()
+
 		// Execute
 		updateRemoveDeprecations := NewDeprecationsRemover(logger, runner, composer)
 		postCodeUpdate := services.NewPostCodeUpdateEvent(context.Background(), "/path/to/repo", worktree)
@@ -64,6 +70,35 @@ func TestRemoveDeprecations(t *testing.T) {
 		composer.AssertExpectations(t)
 		runner.AssertExpectations(t)
 		worktree.AssertExpectations(t)
+	})
+
+	t.Run("Rector is not installed and removing it leaves a composer.lock diff", func(t *testing.T) {
+		composer := NewMockComposer(t)
+		composer.EXPECT().IsPackageInstalled(mock.Anything, "/path/to/repo", "palantirnet/drupal-rector").Return(false, nil)
+		composer.EXPECT().Require(mock.Anything, "/path/to/repo", []string{"palantirnet/drupal-rector"}).Return("", nil)
+		composer.EXPECT().GetCustomCodeDirectories(mock.Anything, "/path/to/repo").Return([]string{"web/modules/custom"}, nil)
+
+		runner := NewMockRector(t)
+		runner.EXPECT().Run(mock.Anything, "/path/to/repo", []string{"web/modules/custom"}).Return(rector.ReturnOutput{
+			ChangedFiles: []string{},
+			FileDiffs:    []rector.ReturnOutputFillDiff{},
+			Totals:       rector.ReturnOutputTotals{ChangedFiles: 0, Errors: 0},
+		}, nil)
+		composer.EXPECT().Remove(mock.Anything, "/path/to/repo", []string{"palantirnet/drupal-rector"}).Return("", nil)
+
+		wt := NewMockWorktree(t)
+		wt.EXPECT().AddGlob("composer.*").Return(nil).Once()
+		wt.EXPECT().Status().Return(git.Status{"composer.lock": &git.FileStatus{Staging: git.Modified}}, nil).Once()
+		wt.EXPECT().Commit("Remove temporary drupal-rector installation", mock.Anything).Return(plumbing.NewHash(""), nil).Once()
+
+		updateRemoveDeprecations := NewDeprecationsRemover(logger, runner, composer)
+		postCodeUpdate := services.NewPostCodeUpdateEvent(context.Background(), "/path/to/repo", wt)
+		err := updateRemoveDeprecations.postCodeUpdateHandler(postCodeUpdate)
+
+		require.NoError(t, err)
+		composer.AssertExpectations(t)
+		runner.AssertExpectations(t)
+		wt.AssertExpectations(t)
 	})
 
 	t.Run("Rector is installed and command executed successfully with one fix", func(t *testing.T) {

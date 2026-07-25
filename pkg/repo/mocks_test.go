@@ -37,6 +37,61 @@ func (_m *MockRepository) EXPECT() *MockRepository_Expecter {
 	return &MockRepository_Expecter{mock: &_m.Mock}
 }
 
+// Head provides a mock function for the type MockRepository
+func (_mock *MockRepository) Head() (*plumbing.Reference, error) {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for Head")
+	}
+
+	var r0 *plumbing.Reference
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func() (*plumbing.Reference, error)); ok {
+		return returnFunc()
+	}
+	if returnFunc, ok := ret.Get(0).(func() *plumbing.Reference); ok {
+		r0 = returnFunc()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*plumbing.Reference)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func() error); ok {
+		r1 = returnFunc()
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRepository_Head_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Head'
+type MockRepository_Head_Call struct {
+	*mock.Call
+}
+
+// Head is a helper method to define mock.On call
+func (_e *MockRepository_Expecter) Head() *MockRepository_Head_Call {
+	return &MockRepository_Head_Call{Call: _e.mock.On("Head")}
+}
+
+func (_c *MockRepository_Head_Call) Run(run func()) *MockRepository_Head_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockRepository_Head_Call) Return(reference *plumbing.Reference, err error) *MockRepository_Head_Call {
+	_c.Call.Return(reference, err)
+	return _c
+}
+
+func (_c *MockRepository_Head_Call) RunAndReturn(run func() (*plumbing.Reference, error)) *MockRepository_Head_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Push provides a mock function for the type MockRepository
 func (_mock *MockRepository) Push(o *git.PushOptions) error {
 	ret := _mock.Called(o)
@@ -84,6 +139,74 @@ func (_c *MockRepository_Push_Call) Return(err error) *MockRepository_Push_Call 
 }
 
 func (_c *MockRepository_Push_Call) RunAndReturn(run func(o *git.PushOptions) error) *MockRepository_Push_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Reference provides a mock function for the type MockRepository
+func (_mock *MockRepository) Reference(name plumbing.ReferenceName, resolved bool) (*plumbing.Reference, error) {
+	ret := _mock.Called(name, resolved)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Reference")
+	}
+
+	var r0 *plumbing.Reference
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(plumbing.ReferenceName, bool) (*plumbing.Reference, error)); ok {
+		return returnFunc(name, resolved)
+	}
+	if returnFunc, ok := ret.Get(0).(func(plumbing.ReferenceName, bool) *plumbing.Reference); ok {
+		r0 = returnFunc(name, resolved)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*plumbing.Reference)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(plumbing.ReferenceName, bool) error); ok {
+		r1 = returnFunc(name, resolved)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRepository_Reference_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Reference'
+type MockRepository_Reference_Call struct {
+	*mock.Call
+}
+
+// Reference is a helper method to define mock.On call
+//   - name plumbing.ReferenceName
+//   - resolved bool
+func (_e *MockRepository_Expecter) Reference(name any, resolved any) *MockRepository_Reference_Call {
+	return &MockRepository_Reference_Call{Call: _e.mock.On("Reference", name, resolved)}
+}
+
+func (_c *MockRepository_Reference_Call) Run(run func(name plumbing.ReferenceName, resolved bool)) *MockRepository_Reference_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 plumbing.ReferenceName
+		if args[0] != nil {
+			arg0 = args[0].(plumbing.ReferenceName)
+		}
+		var arg1 bool
+		if args[1] != nil {
+			arg1 = args[1].(bool)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_Reference_Call) Return(reference *plumbing.Reference, err error) *MockRepository_Reference_Call {
+	_c.Call.Return(reference, err)
+	return _c
+}
+
+func (_c *MockRepository_Reference_Call) RunAndReturn(run func(name plumbing.ReferenceName, resolved bool) (*plumbing.Reference, error)) *MockRepository_Reference_Call {
 	_c.Call.Return(run)
 	return _c
 }

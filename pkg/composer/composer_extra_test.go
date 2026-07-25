@@ -4,6 +4,8 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/spf13/afero"
@@ -131,6 +133,58 @@ func TestCleanup(t *testing.T) {
 	})
 }
 
+func TestResetScratchProject(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	service := &CLI{logger: zap.NewNop(), fs: fs}
+	service.initOnce.Do(service.initTempDir)
+	require.NoError(t, service.initErr)
+
+	// Simulate what a prior CheckIfPatchApplies/CheckIfPatchesApply call left behind: a
+	// composer.json with a pinned require added by `composer require` for an earlier, unrelated
+	// check, plus the composer.lock and vendor tree that call produced.
+	require.NoError(t, afero.WriteFile(fs, service.tempDir+"/composer.json", []byte(`{"require":{"some/leftover-package":"1.2.3"}}`), 0644))
+	require.NoError(t, afero.WriteFile(fs, service.tempDir+"/composer.lock", []byte("{}"), 0644))
+	require.NoError(t, afero.WriteFile(fs, service.tempDir+"/vendor/autoload.php", []byte("<?php"), 0644))
+
+	require.NoError(t, service.resetScratchProject())
+
+	content, err := afero.ReadFile(fs, service.tempDir+"/composer.json")
+	require.NoError(t, err)
+	assert.JSONEq(t, scratchComposerJSON, string(content))
+
+	lockExists, err := afero.Exists(fs, service.tempDir+"/composer.lock")
+	require.NoError(t, err)
+	assert.False(t, lockExists)
+
+	vendorExists, err := afero.DirExists(fs, service.tempDir+"/vendor")
+	require.NoError(t, err)
+	assert.False(t, vendorExists)
+}
+
+func TestCleanupResetsInitOnceForReinitialization(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	service := &CLI{logger: zap.NewNop(), fs: fs}
+
+	service.initOnce.Do(service.initTempDir)
+	require.NoError(t, service.initErr)
+	firstDir := service.tempDir
+	require.NotEmpty(t, firstDir)
+
+	service.Cleanup()
+	assert.Empty(t, service.tempDir)
+
+	// A later check must reinitialize a fresh scratch project, not silently skip past
+	// initTempDir with initOnce already spent and an empty tempDir left over from Cleanup.
+	service.initOnce.Do(service.initTempDir)
+	require.NoError(t, service.initErr)
+	assert.NotEmpty(t, service.tempDir)
+	assert.NotEqual(t, firstDir, service.tempDir)
+
+	exists, err := afero.DirExists(fs, service.tempDir)
+	require.NoError(t, err)
+	assert.True(t, exists)
+}
+
 func TestInstallReturnsNilOnSuccess(t *testing.T) {
 	stubComposerOutput(t, "Nothing to install")
 
@@ -218,6 +272,36 @@ func TestGetInstalledPackageVersionErrors(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no versions found")
 	})
+}
+
+func TestDiffFallsBackWhenTooLargeInBytes(t *testing.T) {
+	// GitHub/GitLab's merge/pull request body limit is a byte limit, not a rune count. A diff
+	// table full of multi-byte characters (accented package or issue titles, say) can be under
+	// the threshold in runes yet already over it in bytes, so the fallback must measure bytes.
+	// "é" is a single rune but 2 bytes in UTF-8: 40000 of them is 40000 runes (under the 63000
+	// rune threshold) but 80000 bytes (over it).
+	hugeMultiByte := strings.Repeat("é", 40000)
+
+	var calls int
+	execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+		calls++
+		out := hugeMultiByte
+		if !slices.Contains(arg, "--with-links") {
+			out = "short plain diff"
+		}
+		cs := []string{"-test.run=TestHelperProcess", "--", out}
+		cs = append(cs, arg...)
+		cmd := exec.CommandContext(ctx, os.Args[0], cs...)
+		cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
+		return cmd
+	}
+	t.Cleanup(func() { execCommand = exec.CommandContext })
+
+	service := &CLI{logger: zap.NewNop()}
+	out, err := service.Diff(t.Context(), "/tmp", true)
+	require.NoError(t, err)
+	assert.Equal(t, "short plain diff", out)
+	assert.Equal(t, 2, calls, "expected a fallback call without --with-links")
 }
 
 func TestDiffFailure(t *testing.T) {

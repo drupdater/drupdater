@@ -9,6 +9,7 @@ import (
 	gitConfig "github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing/object"
 
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -151,6 +152,48 @@ func TestCloneRepository(t *testing.T) {
 
 		_, _, _, err := service.CloneRepository(source, "no-such-branch", "", "Bot", "bot@example.com")
 		require.Error(t, err)
+	})
+
+	t.Run("returns the error when the project directory cannot be created", func(t *testing.T) {
+		roService := &GitRepositoryService{logger: zap.NewNop(), fs: afero.NewReadOnlyFs(afero.NewMemMapFs())}
+
+		_, _, _, err := roService.CloneRepository("https://example.com/repo.git", "main", "", "Bot", "bot@example.com")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to create project directory")
+	})
+}
+
+func TestHead(t *testing.T) {
+	// Head() is what StartUpdate uses to capture a checkout-mode run's original state before
+	// creating drupdater's own throwaway work branch, so it can restore it if the run fails.
+	service := NewGitRepositoryService(zap.NewNop())
+
+	t.Run("resolves to the checked-out branch", func(t *testing.T) {
+		dir, _ := initRepoWithCommit(t)
+
+		repository, _, _, err := service.OpenRepository(dir, "Bot", "bot@example.com")
+		require.NoError(t, err)
+
+		ref, err := repository.Head()
+		require.NoError(t, err)
+		assert.True(t, ref.Name().IsBranch())
+	})
+
+	t.Run("resolves directly to a commit hash when detached", func(t *testing.T) {
+		dir, r := initRepoWithCommit(t)
+		head, err := r.Head()
+		require.NoError(t, err)
+		wt, err := r.Worktree()
+		require.NoError(t, err)
+		require.NoError(t, wt.Checkout(&git.CheckoutOptions{Hash: head.Hash()}))
+
+		repository, _, _, err := service.OpenRepository(dir, "Bot", "bot@example.com")
+		require.NoError(t, err)
+
+		ref, err := repository.Head()
+		require.NoError(t, err)
+		assert.False(t, ref.Name().IsBranch())
+		assert.Equal(t, head.Hash(), ref.Hash())
 	})
 }
 

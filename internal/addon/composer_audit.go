@@ -46,8 +46,11 @@ func (ca *ComposerAudit) SubscribedEvents() map[string]any {
 			Priority: event.Max,
 			Listener: event.ListenerFunc(ca.preComposerUpdateHandler),
 		},
+		// Below Normal: this reports the security posture of the final code, so it must run
+		// after code_beautifier and deprecations_remover — both Normal/AboveNormal — rather than
+		// possibly interleaving with them at an arbitrary point.
 		"post-code-update": event.ListenerItem{
-			Priority: event.Normal,
+			Priority: event.BelowNormal,
 			Listener: event.ListenerFunc(ca.postCodeUpdateHandler),
 		},
 		"pre-merge-request-create": event.ListenerItem{

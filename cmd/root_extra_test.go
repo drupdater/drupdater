@@ -96,6 +96,22 @@ func TestTokenRequired(t *testing.T) {
 	})
 }
 
+func TestRegisterEnvSecrets(t *testing.T) {
+	// registerEnvSecrets is what wires DRUPALCODE_ACCESS_TOKEN and COMPOSER_AUTH into the
+	// redactor for both a real run (cmd/root.go) and "drupdater check" (cmd/check.go), which
+	// shells out to the same subprocesses and must redact the same secrets from anything it
+	// prints.
+	t.Setenv("DRUPALCODE_ACCESS_TOKEN", "drupalcode-secret")
+	t.Setenv("COMPOSER_AUTH", `{"bearer":{"example.com":"bearer-secret"}}`)
+
+	redactor := logging.NewRedactor()
+	registerEnvSecrets(redactor)
+
+	got := redactor.Redact("leaked drupalcode-secret and bearer-secret")
+	assert.NotContains(t, got, "drupalcode-secret")
+	assert.NotContains(t, got, "bearer-secret")
+}
+
 func TestRegisterComposerAuth(t *testing.T) {
 	// registerComposerAuth must register the individual credentials inside COMPOSER_AUTH, not
 	// just the raw JSON blob: Composer echoes the username/password/token itself (typically
@@ -133,13 +149,28 @@ func TestRegisterComposerAuth(t *testing.T) {
 	})
 }
 
-func TestJSONStringLeaves(t *testing.T) {
-	leaves := jsonStringLeaves(map[string]any{
+func TestComposerAuthSecretLeaves(t *testing.T) {
+	leaves := composerAuthSecretLeaves(map[string]any{
 		"a": "1",
 		"b": map[string]any{"c": "2", "d": []any{"3", "4"}},
 		"e": 5.0,
-	})
+	}, "")
 	assert.ElementsMatch(t, []string{"1", "2", "3", "4"}, leaves)
+}
+
+func TestComposerAuthSecretLeavesSkipsUsername(t *testing.T) {
+	// Packagist.com's documented http-basic form sets username to the literal word "token" and
+	// the real secret in password; the username leaf must not be registered as a secret, or every
+	// occurrence of the word "token" in unrelated log output gets redacted too.
+	leaves := composerAuthSecretLeaves(map[string]any{
+		"http-basic": map[string]any{
+			"repo.packagist.com": map[string]any{
+				"username": "token",
+				"password": "s3cr3t-pass",
+			},
+		},
+	}, "")
+	assert.Equal(t, []string{"s3cr3t-pass"}, leaves)
 }
 
 func TestConfigFilePath(t *testing.T) {

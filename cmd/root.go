@@ -79,8 +79,7 @@ names you can set there. See the README for the full file format.`,
 		// as soon as each becomes known so nothing is logged unredacted in between; never
 		// logged itself, including at debug level with --verbose.
 		redactor := logging.NewRedactor()
-		redactor.Register(os.Getenv("DRUPALCODE_ACCESS_TOKEN"))
-		registerComposerAuth(redactor, os.Getenv("COMPOSER_AUTH"))
+		registerEnvSecrets(redactor)
 
 		// Initialize the logger first so config errors are reported (errors are silenced by Cobra).
 		logger, err := NewLogger(config, redactor)
@@ -197,13 +196,26 @@ func tokenRequired(cfg internal.Config) bool {
 	return cfg.Clone || !cfg.DryRun
 }
 
+// registerEnvSecrets registers every credential-bearing environment value a subprocess
+// (Composer, Drush, git) might echo back in its own output, so nothing leaks unredacted between
+// the moment a value becomes known and the moment it might appear in a log line. Shared by the
+// real run and "drupdater check", which shells out to the same subprocesses and must redact the
+// same secrets from anything it prints.
+func registerEnvSecrets(redactor *logging.Redactor) {
+	redactor.Register(os.Getenv("DRUPALCODE_ACCESS_TOKEN"))
+	registerComposerAuth(redactor, os.Getenv("COMPOSER_AUTH"))
+}
+
 // registerComposerAuth registers the credentials carried by a COMPOSER_AUTH env value with the
 // redactor. COMPOSER_AUTH is a JSON object (http-basic/bearer/gitlab-token/github-oauth/... per
-// host, see the Composer docs) and Composer echoes the individual username, password, or token
-// value it contains — typically embedded in a URL after a failed authenticated fetch — not the
-// blob itself, so registering only the raw string would never match that output. Every string
-// leaf of the parsed JSON is registered individually; the raw value is registered too, as a
-// fallback for a value that fails to parse as JSON.
+// host, see the Composer docs) and Composer echoes the individual password or token value it
+// contains — typically embedded in a URL after a failed authenticated fetch — not the blob
+// itself, so registering only the raw string would never match that output. Every string leaf of
+// the parsed JSON is registered individually, except values keyed "username": Composer's
+// documented http-basic form for package registries (e.g. Packagist.com) commonly sets username
+// to the literal word "token", which is not a secret and must not be redacted from unrelated log
+// output that happens to contain that word. The raw value is registered too, as a fallback for a
+// value that fails to parse as JSON.
 func registerComposerAuth(redactor *logging.Redactor, composerAuth string) {
 	redactor.Register(composerAuth)
 
@@ -211,25 +223,29 @@ func registerComposerAuth(redactor *logging.Redactor, composerAuth string) {
 	if err := json.Unmarshal([]byte(composerAuth), &parsed); err != nil {
 		return
 	}
-	redactor.Register(jsonStringLeaves(parsed)...)
+	redactor.Register(composerAuthSecretLeaves(parsed, "")...)
 }
 
-// jsonStringLeaves returns every string value found anywhere in a decoded JSON structure
-// (as produced by json.Unmarshal into `any`), recursing through nested objects and arrays.
-func jsonStringLeaves(v any) []string {
+// composerAuthSecretLeaves returns every string value found anywhere in a decoded COMPOSER_AUTH
+// JSON structure (as produced by json.Unmarshal into `any`), recursing through nested objects and
+// arrays, except values reached through a "username" key (see registerComposerAuth).
+func composerAuthSecretLeaves(v any, key string) []string {
 	switch t := v.(type) {
 	case string:
+		if key == "username" {
+			return nil
+		}
 		return []string{t}
 	case map[string]any:
 		leaves := make([]string, 0, len(t))
-		for _, val := range t {
-			leaves = append(leaves, jsonStringLeaves(val)...)
+		for k, val := range t {
+			leaves = append(leaves, composerAuthSecretLeaves(val, k)...)
 		}
 		return leaves
 	case []any:
 		leaves := make([]string, 0, len(t))
 		for _, val := range t {
-			leaves = append(leaves, jsonStringLeaves(val)...)
+			leaves = append(leaves, composerAuthSecretLeaves(val, key)...)
 		}
 		return leaves
 	default:

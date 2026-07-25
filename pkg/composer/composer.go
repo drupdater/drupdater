@@ -10,7 +10,6 @@ import (
 	"regexp"
 	"strings"
 	"sync"
-	"unicode/utf8"
 
 	"github.com/spf13/afero"
 	"go.uber.org/zap"
@@ -332,9 +331,13 @@ func (s *CLI) Diff(ctx context.Context, dir string, withLinks bool) (string, err
 	}
 
 	if withLinks {
-		// If table is too long, Github/Gitlab will not accept it. So we use the version without the links.
-		tableCharCount := utf8.RuneCountInString(out)
-		if tableCharCount > 63000 {
+		// If the table is too long, GitHub/GitLab will not accept it. GitHub's and GitLab's MR
+		// body limits (65536 and 1MB respectively) are byte limits, not rune counts, so measure
+		// this the same way: a table full of multi-byte package/issue titles could pass a rune
+		// count under the cap yet still exceed it in bytes. This is only the dependency-diff
+		// section of the body, not the whole thing, so the threshold stays comfortably under
+		// the smaller (GitHub) limit to leave room for the other addons' sections.
+		if len(out) > 63000 {
 			return s.Diff(ctx, dir, false)
 		}
 	}
@@ -458,36 +461,57 @@ type lockPackage struct {
 	Extra json.RawMessage `json:"extra"`
 }
 
+// scratchComposerJSON is the base composer.json for the scratch project used to test whether a
+// patch applies. It is written fresh before every check (see resetScratchProject) rather than
+// once, so one check's `composer require` can never leave state a later, unrelated check reads.
+const scratchComposerJSON = `{
+	"name": "drupdater/patch-test",
+	"type": "project",
+	"repositories": [
+		{
+			"type": "composer",
+			"url": "https://packages.drupal.org/8"
+		}
+	],
+	"require": {
+		"cweagans/composer-patches": "~1.0"
+	},
+	"config": {
+		"allow-plugins": true
+	},
+	"extra": {
+		"composer-exit-on-patch-failure": true,
+		"patches-file": "composer.patches.json"
+	}
+}`
+
 func (s *CLI) initTempDir() {
 	s.tempDir, s.initErr = afero.TempDir(s.fs, "", "composer-service")
 	if s.initErr != nil {
 		return
 	}
+	s.initErr = afero.WriteFile(s.fs, s.tempDir+"/composer.json", []byte(scratchComposerJSON), 0644)
+}
 
-	// Create a composer.json file
-	composerJSON := `{
-		"name": "drupdater/patch-test",
-		"type": "project",
-		"repositories": [
-			{
-				"type": "composer",
-				"url": "https://packages.drupal.org/8"
-			}
-		],
-		"require": {
-			"cweagans/composer-patches": "~1.0"
-		},
-		"config": {
-			"allow-plugins": true
-		},
-		"extra": {
-			"composer-exit-on-patch-failure": true,
-			"patches-file": "composer.patches.json"
-		}
-	}`
-
-	// Write the composer.json file to the temporary directory
-	s.initErr = afero.WriteFile(s.fs, s.tempDir+"/composer.json", []byte(composerJSON), 0644)
+// resetScratchProject restores the scratch project to its pristine state before a new check
+// runs. CheckIfPatchApplies and CheckIfPatchesApply both run `composer require <pkg>:<version>`
+// in this directory, which permanently adds that package (at that exact version) to
+// composer.json and composer.lock. Without resetting first, every later check inherits every
+// earlier check's requirement: a version conflict between two unrelated packages checked earlier
+// in the same run would make `composer require` fail for a reason that has nothing to do with
+// whether the patch under test actually applies, and — because that failure is deliberately read
+// as "the patch does not apply" — silently pins the wrong package version in the merge request.
+func (s *CLI) resetScratchProject() error {
+	if err := afero.WriteFile(s.fs, s.tempDir+"/composer.json", []byte(scratchComposerJSON), 0644); err != nil {
+		return fmt.Errorf("failed to reset scratch composer.json: %w", err)
+	}
+	if err := s.fs.RemoveAll(s.tempDir + "/composer.lock"); err != nil {
+		return fmt.Errorf("failed to remove scratch composer.lock: %w", err)
+	}
+	if err := s.fs.RemoveAll(s.tempDir + "/vendor"); err != nil {
+		return fmt.Errorf("failed to remove scratch vendor directory: %w", err)
+	}
+	return nil
 }
 
 // Cleanup removes the scratch composer project used for patch-apply checks. It is a no-op
@@ -502,6 +526,11 @@ func (s *CLI) Cleanup() {
 		s.logger.Warn("failed to remove composer scratch directory", zap.String("dir", s.tempDir), zap.Error(err))
 	}
 	s.tempDir = ""
+	// Reset initOnce too: without this, a patch check running after Cleanup would see initOnce
+	// already spent and skip straight past initTempDir with a stale, empty tempDir — writing
+	// composer.patches.json and running `composer require` in the process's own working
+	// directory (Dir: "" resolves to cwd) instead of a scratch project.
+	s.initOnce = sync.Once{}
 }
 
 type patchTestConfig struct {
@@ -513,6 +542,9 @@ func (s *CLI) CheckIfPatchApplies(ctx context.Context, packageName string, packa
 	s.initOnce.Do(s.initTempDir)
 	if s.initErr != nil {
 		return false, s.initErr
+	}
+	if err := s.resetScratchProject(); err != nil {
+		return false, err
 	}
 
 	// Create a composer.patches.json file using json.Marshal to safely handle
@@ -547,6 +579,9 @@ func (s *CLI) CheckIfPatchesApply(ctx context.Context, packageName string, packa
 	s.initOnce.Do(s.initTempDir)
 	if s.initErr != nil {
 		return false, s.initErr
+	}
+	if err := s.resetScratchProject(); err != nil {
+		return false, err
 	}
 
 	patchMap := make(map[string]string, len(patchPaths))

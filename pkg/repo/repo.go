@@ -19,6 +19,13 @@ import (
 type Repository interface {
 	Push(o *git.PushOptions) error
 	Remote(name string) (*git.Remote, error)
+	// Head returns the resolved HEAD reference: pointing at a branch (Name().IsBranch() is true)
+	// when the checkout is on one, or directly at a commit hash (Name() == plumbing.HEAD) when
+	// detached — the state a CI checkout is normally left in.
+	Head() (*plumbing.Reference, error)
+	// Reference looks up a single local reference by name, returning plumbing.ErrReferenceNotFound
+	// if it doesn't exist.
+	Reference(name plumbing.ReferenceName, resolved bool) (*plumbing.Reference, error)
 }
 
 type Worktree interface {

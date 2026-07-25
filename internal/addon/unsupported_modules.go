@@ -44,8 +44,14 @@ func (um *UnsupportedModules) SubscribedEvents() map[string]any {
 	}
 }
 
-// RenderTemplate returns the rendered template for this addon.
+// RenderTemplate returns the rendered template for this addon. Locking here is not required for
+// correctness today — the workflow only calls it after every site's forEachSite goroutine has
+// returned, and errgroup.Wait establishes a happens-before edge for that — but that ordering is
+// an invariant of the caller, not of this type, so mu still guards the read.
 func (um *UnsupportedModules) RenderTemplate() (string, error) {
+	um.mu.Lock()
+	defer um.mu.Unlock()
+
 	if len(um.modules) == 0 {
 		return "", nil
 	}
