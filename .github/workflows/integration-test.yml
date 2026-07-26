@@ -4,10 +4,17 @@ name: Integration Test
 # drupdater/test-drupal-cms: a Drupal CMS checkout whose composer.lock is
 # deliberately frozen at an old resolution, so every run has something to update.
 #
-# Manual only, on purpose. Dispatch it from the branch of a PR whose change
-# warrants an end-to-end check; the unit suite in go.yml covers everything else.
+# Manual on purpose -- a run is a Docker build plus a real Drupal install, far
+# too slow to want on every push, and the unit suite in go.yml covers the rest.
+# Two ways in:
+#   * add the "integration-test" label to a pull request (remove and re-add to
+#     re-run) -- the result shows up as a check on that PR;
+#   * dispatch it from the Actions tab when you want to pick the target,
+#     security mode, or a real non-dry run.
 
 on:
+  pull_request:
+    types: [labeled]
   workflow_dispatch:
     inputs:
       repository_url:
@@ -36,12 +43,31 @@ on:
         default: false
         type: boolean
 
+# Per pull request rather than global, so labelling one PR does not cancel a run
+# already going on another.
 concurrency:
-  group: ${{ github.workflow }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
+
+env:
+  # A label event carries none of the workflow_dispatch inputs, so every one of
+  # them needs a fallback. dry_run is the one that matters: unset would read as
+  # "not a dry run", and a label would quietly start pushing branches and
+  # opening merge requests against the target. Only an explicit dispatch can
+  # ever turn it off.
+  TARGET_URL: ${{ inputs.repository_url || 'https://github.com/drupdater/test-drupal-cms.git' }}
+  TARGET_BRANCH: ${{ inputs.branch || 'main' }}
+  IS_DISPATCH: ${{ github.event_name == 'workflow_dispatch' }}
+  IN_DRY_RUN: ${{ inputs.dry_run }}
+  IN_SECURITY: ${{ inputs.security }}
+  IN_VERBOSE: ${{ inputs.verbose }}
 
 jobs:
   integration-test:
+    # Any label would otherwise start a run.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.label.name == 'integration-test'
     runs-on: ubuntu-latest
     timeout-minutes: 75
     permissions:
@@ -49,6 +75,23 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
+
+      - name: Resolve run mode
+        id: mode
+        run: |
+          # A label-triggered run is always a dry run; see the env block above.
+          if [ "$IS_DISPATCH" = "true" ]; then
+            dry_run=$IN_DRY_RUN; security=$IN_SECURITY; verbose=$IN_VERBOSE
+          else
+            dry_run=true; security=false; verbose=false
+          fi
+          {
+            echo "dry_run=$dry_run"
+            echo "security=$security"
+            echo "verbose=$verbose"
+          } >> "$GITHUB_OUTPUT"
+          echo "target=$TARGET_URL@$TARGET_BRANCH dry_run=$dry_run security=$security" \
+            >> "$GITHUB_STEP_SUMMARY"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -69,29 +112,25 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Delete stale update branches
-        if: ${{ !inputs.dry_run }}
+        if: steps.mode.outputs.dry_run != 'true'
         env:
           REPO_TOKEN: ${{ secrets.DRUPDATER_TEST_TOKEN }}
-          REPOSITORY_URL: ${{ inputs.repository_url }}
         run: |
           # The target's composer.lock is frozen, so the update branch name
           # (update-<lock content-hash>) is stable across runs. Left behind, it
           # makes the next real run abort with "branch already exists", which
           # reports as no_changes and exit 0 -- a green run that tested nothing.
-          git ls-remote --heads \
-            "$(echo "$REPOSITORY_URL" | sed "s#https://#https://oauth2:$REPO_TOKEN@#")" \
-            'refs/heads/update-*' | awk '{print $2}' | sed 's#refs/heads/##' \
+          authed="$(echo "$TARGET_URL" | sed "s#https://#https://oauth2:$REPO_TOKEN@#")"
+          git ls-remote --heads "$authed" 'refs/heads/update-*' \
+            | awk '{print $2}' | sed 's#refs/heads/##' \
             | while read -r ref; do
                 echo "deleting stale branch $ref"
-                git push "$(echo "$REPOSITORY_URL" | sed "s#https://#https://oauth2:$REPO_TOKEN@#")" \
-                  --delete "$ref"
+                git push "$authed" --delete "$ref"
               done
 
       - name: Clone project
         env:
           REPO_TOKEN: ${{ secrets.DRUPDATER_TEST_TOKEN }}
-          REPOSITORY_URL: ${{ inputs.repository_url }}
-          BRANCH: ${{ inputs.branch }}
         run: |
           # ./run is the mount root, the project a level below it. drupdater
           # writes <site>.sqlite and private/ into the checkout's PARENT
@@ -102,7 +141,7 @@ jobs:
           # No --depth: drupdater's preflight rejects a shallow checkout
           # ("git history complete"), and a shallow clone cannot be pushed.
           git -c credential.helper='!f(){ echo username=oauth2; echo "password=$REPO_TOKEN"; };f' \
-            clone --branch "$BRANCH" "$REPOSITORY_URL" ./run/project
+            clone --branch "$TARGET_BRANCH" "$TARGET_URL" ./run/project
           # Deliberately NO git identity configured here. A fresh clone has none,
           # which is exactly the case drupdater has to handle on its own -- leaving
           # it unset is what makes this job a regression test for that fallback.
@@ -113,9 +152,9 @@ jobs:
           # needing none, so running it with an empty one keeps that promise tested.
           REPO_TOKEN: ${{ secrets.DRUPDATER_TEST_TOKEN }}
           DRUPALCODE_ACCESS_TOKEN: ${{ secrets.DRUPALCODE_ACCESS_TOKEN }}
-          DRY_RUN: ${{ inputs.dry_run }}
-          SECURITY: ${{ inputs.security }}
-          VERBOSE: ${{ inputs.verbose }}
+          DRY_RUN: ${{ steps.mode.outputs.dry_run }}
+          SECURITY: ${{ steps.mode.outputs.security }}
+          VERBOSE: ${{ steps.mode.outputs.verbose }}
         run: |
           args=(--working-dir /workspace/project --report /workspace/report.json)
           [ "$DRY_RUN" = "true" ]  && args+=(--dry-run)
