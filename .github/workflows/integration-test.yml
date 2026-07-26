@@ -266,7 +266,9 @@ jobs:
             "failed_phase=\(.failed_phase // "-")  error=\(.error // "-")",
             "packages=\(.packages | length)",
             "phases:", (.phases[] | "  \(.name): ok=\(.ok) \(.duration_seconds)s \(.error // "")"),
-            "addons: \(.addons // {} | keys | join(", "))"
+            "addons:",
+            ((.addons // {}) | to_entries[]
+             | "  \(.key): \(.value | tojson | if length > 400 then .[0:400] + " ..." else . end)")
           ' ./run/report.json | tee -a "$GITHUB_STEP_SUMMARY"
           # The container exits 0 on an AbortError ("no changes", "branch already
           # exists") and a run reports success even when an addon logged and
