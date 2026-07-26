@@ -10,13 +10,6 @@ canonical formatting.
 | Report key | *(none — deliberately)* |
 | Pull request section | *(none)* |
 
-## Why it exists
-
-`composer update` and `composer require` write `composer.json` in whatever order they
-happen to produce. On a project that normalises its `composer.json`, that means every
-Drupdater pull request carries an unrelated reformatting diff — or worse, gets reverted
-by the next developer who runs the normaliser locally.
-
 ## What it does
 
 Checks whether
@@ -30,6 +23,13 @@ doing so unprompted would produce a large, unreviewable diff.
 
 It runs at the **lowest** priority on `post-composer-update`, so it normalises the final
 state after every other addon on that event has finished.
+
+## Why it exists
+
+`composer update` and `composer require` write `composer.json` in whatever order they
+happen to produce. On a project that normalises its `composer.json`, that means every
+Drupdater pull request carries an unrelated reformatting diff — or worse, gets reverted
+by the next developer who runs the normaliser locally.
 
 ## Requirements
 

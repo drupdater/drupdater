@@ -12,6 +12,7 @@ copyright: Licensed under the Apache License 2.0
 
 theme:
   name: material
+  custom_dir: overrides
   language: en
   icon:
     repo: fontawesome/brands/github
@@ -47,6 +48,9 @@ extra_css:
   - stylesheets/extra.css
 
 extra:
+  # Analytics is opt-in per build: the publish workflow sets DRUPDATER_GOATCOUNTER,
+  # so `mkdocs serve` and local builds emit no tracking script at all.
+  goatcounter: !ENV [DRUPDATER_GOATCOUNTER, false]
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/drupdater/drupdater

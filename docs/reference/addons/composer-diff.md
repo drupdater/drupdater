@@ -10,12 +10,6 @@ upgraded, downgraded or removed, with links to the upstream changelogs.
 | Report key | *(none — deliberately)* |
 | Pull request section | "🛠️ Dependency updates" |
 
-## Why it exists
-
-It is the reviewer's primary artefact. Everything else in the pull request describes work
-Drupdater did; this describes what actually changed in the dependency tree, which is what
-you are being asked to approve.
-
 ## What it does
 
 Runs `composer diff` twice against the pre-update and post-update lock files:
@@ -27,6 +21,11 @@ Runs `composer diff` twice against the pre-update and post-update lock files:
 
 It runs at the **lowest** priority on `post-composer-update`, so any other addon on that
 event has already finished mutating the lock file before the diff is taken.
+
+## Why it exists
+
+Everything else in the pull request describes work Drupdater did. This describes what
+changed in the dependency tree, which is what the reviewer is approving.
 
 ## Pull request section
 

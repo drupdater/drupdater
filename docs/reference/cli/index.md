@@ -77,8 +77,8 @@ is only reported in the `drupdater_version` field of the [run report](../run-rep
 
 - All flags on the root command are **persistent**, so `check` accepts every one of them
   too.
-- `--verbose` raises logging to debug level and additionally logs the resolved
-  configuration.
+- `--verbose` raises logging to debug level. On an update it also logs the resolved
+  configuration; `check` reports the configuration through its own results instead.
 - Log output is structured and passes through a redactor, so registered secrets never
   appear — see [Credentials and
   redaction](../../explanation/credentials-and-redaction.md).

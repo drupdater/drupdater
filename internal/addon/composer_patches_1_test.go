@@ -922,7 +922,7 @@ func TestComposer_Patches_1_RenderTemplate(t *testing.T) {
 				Reason:           "reason1",
 			},
 			{
-				PatchDescription: "Issue #issue1: [title1](link1) was fixed in version 2.0",
+				PatchDescription: "Issue #3123456: [Fix the thing](https://www.drupal.org/i/3123456) was fixed in version 2.0",
 				Package:          "package1",
 				PatchPath:        "patch1",
 				Reason:           "Fixed",

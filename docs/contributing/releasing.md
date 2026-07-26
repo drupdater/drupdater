@@ -8,9 +8,9 @@ Add one of these labels to a pull request before merging it to `main`:
 
 | Label | Effect |
 |---|---|
-| `bump:major` | `v0.12.0` → `v1.0.0` |
-| `bump:minor` | `v0.12.0` → `v0.13.0` |
-| `bump:patch` | `v0.12.0` → `v0.12.1` |
+| `bump:major` | `v0.3.6` → `v1.0.0` |
+| `bump:minor` | `v0.3.6` → `v0.4.0` |
+| `bump:patch` | `v0.3.6` → `v0.3.7` |
 
 On merge, the release workflow creates the new tag and updates the corresponding major and
 minor tags — releasing `v1.2.3` also moves `v1` and `v1.2`.

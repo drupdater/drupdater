@@ -41,7 +41,7 @@ Drupal.org's code hosting runs on GitLab at
 
     ```bash
     docker run -e DRUPALCODE_ACCESS_TOKEN \
-      ghcr.io/drupdater/drupdater-php8.3:v0.12.0 \
+      ghcr.io/drupdater/drupdater-php8.3:latest \
       <token> --clone --repository-url <repository-url>
     ```
 

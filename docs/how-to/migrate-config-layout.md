@@ -84,12 +84,10 @@ drupdater check
 ✓ addon names resolve
 ```
 
-Or, if you only want to confirm the file parses without running anything else, `--verbose`
-logs the resolved configuration:
-
-```bash
-drupdater --dry-run --verbose
-```
+That is the whole verification: `check` loads the file exactly as a run does, in about a
+second, and names the sites it resolved. To see every resolved value — timeout, both
+addon lists, both `auto_merge` flags — run the update itself with `--verbose`, which logs
+them at debug level.
 
 ## Why the layout changed
 

@@ -10,12 +10,6 @@ new plugins for you to review.
 | Report key | *(none)* |
 | Pull request section | "🔌 New Composer plugins", when new plugins were found |
 
-## Why it exists
-
-Composer refuses to execute a plugin that is not in `config.allow-plugins`, and prompts
-interactively when it meets one. An unattended run has nobody to answer that prompt, so
-an update that pulls in a new plugin would hang or fail.
-
 ## What it does
 
 **Before the update**, it saves the project's current `allow-plugins` configuration and
@@ -28,6 +22,12 @@ project ends up back where it started, plus explicit `false` entries for anythin
 
 The result is that new plugins are **not** silently trusted. They are recorded, disabled,
 and surfaced in the pull request for a human to decide on.
+
+## Why it exists
+
+Composer refuses to execute a plugin that is not in `config.allow-plugins`, and prompts
+interactively when it meets one. An unattended run has nobody to answer that prompt, so
+an update that pulls in a new plugin would hang or fail.
 
 ## Pull request section
 

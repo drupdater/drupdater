@@ -12,13 +12,6 @@ whose patch cannot be made to apply.
 | Pull request section | "🩹 Patch updates" |
 | Requires | [`DRUPALCODE_ACCESS_TOKEN`](../environment-variables.md#drupalcode_access_token) for the Drupal.org half |
 
-## Why it exists
-
-Patches are the most fragile part of a Drupal dependency update. A patch written against
-version 1.2 frequently will not apply to 1.3 — sometimes because the upstream issue was
-fixed and the patch is now redundant, sometimes because it needs rerolling. Without
-handling, `composer update` simply fails and the whole run is lost.
-
 ## What it does
 
 It runs before the real update, using a dry-run `composer update` to see which packages
@@ -56,6 +49,13 @@ version** rather than updated. The rest of the update proceeds. The pin is repor
 conflict so you know a package was deliberately held back and why.
 
 Changes to `composer.json` and the `patches/` directory are committed as `Update patches`.
+
+## Why it exists
+
+Patches are the most fragile part of a Drupal dependency update. A patch written against
+version 1.2 frequently will not apply to 1.3 — sometimes because the upstream issue was
+fixed and the patch is now redundant, sometimes because it needs rerolling. Without
+handling, `composer update` simply fails and the whole run is lost.
 
 ## Report section
 
@@ -98,9 +98,8 @@ held at, `new_version` the one it would otherwise have moved to.
 
 Omitted entirely when the run changed no patches.
 
-**Conflicts are the actionable half.** They are the packages this run could not update,
-and they will stay un-updated on every subsequent run until someone rerolls the patch or
-the issue is fixed upstream.
+`conflicts` needs a human. Those packages could not be updated, and will stay behind on
+every subsequent run until someone rerolls the patch or the issue is fixed upstream.
 
 ## Pull request section
 

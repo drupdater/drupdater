@@ -14,9 +14,8 @@ Because a run reports `success` even when an addon failed. Most addons log and s
 their own errors, so that the loss of, say, translation updates does not throw away an
 otherwise complete dependency update.
 
-That is a deliberate trade, and it has a cost:
-[`unsupported_modules`](../reference/addons/unsupported-modules.md) was once silently
-broken on Drupal 11 for months. Every run was green. The addon never reported a thing.
+That trade has a cost — an addon that broke would look exactly like one with nothing to
+do, and [one once did, for months](../explanation/why-a-run-report.md).
 
 Asserting that the addons you expect to run **actually appear in the report** is what
 turns a check from "it did not crash" into "it did what it is for".

@@ -11,13 +11,6 @@ custom code to rewrite APIs deprecated by the new Drupal version.
 | Pull request section | *(none)* |
 | Commits | `Remove temporary drupal-rector installation`, `Remove deprecations` |
 
-## Why it exists
-
-Each Drupal minor release deprecates APIs that the *next* major removes. Fixing them at
-the moment the deprecation lands — in the same pull request as the version bump that
-introduced it — is far cheaper than discovering a few hundred of them when the major
-upgrade finally comes around.
-
 ## What it does
 
 1. If `palantirnet/drupal-rector` is not already a project dependency, it is required
@@ -32,6 +25,13 @@ upgrade finally comes around.
 The temporary install-then-remove is what forces this addon to run **above normal**
 priority on `post-code-update`: its `composer.json` churn must be fully committed before
 [`code_beautifier`](code-beautifier.md) stages anything at normal priority.
+
+## Why it exists
+
+Each Drupal minor release deprecates APIs that the *next* major removes. Fixing them at
+the moment the deprecation lands — in the same pull request as the version bump that
+introduced it — is far cheaper than discovering a few hundred of them when the major
+upgrade finally comes around.
 
 ## Report section
 

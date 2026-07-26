@@ -168,8 +168,8 @@ the command:
 ```
 
 Trigger it manually — **Run workflow** on GitHub, or **Play** on the pipeline schedule in
-GitLab — and watch the log. You should see the phases from the previous tutorial, ending
-without a `publish` phase.
+GitLab — and watch the log. It should end with `update finished` and no merge request
+URL: publishing is what `--dry-run` skips.
 
 This also proves the checkout is deep enough and the image PHP version is right, which are
 the two things that differ between your machine and CI.
@@ -185,30 +185,24 @@ Trigger the workflow manually once more. This time it will:
 3. Fill the description with the dependency table, pending update hooks, and any patch or
    unsupported-module findings.
 
-Open it. That description is the whole point of the tool — it is a review, not a diff.
+Open it and read the description. It is what you review, rather than the diff.
 
 !!! note "If nothing happened"
 
     Check the log for `update aborted`. `no changes detected` means the project is already
-    current; `branch update-… already exists` means an identical update is already open.
-    Both exit `0` deliberately.
+    current; `branch update-… already exists, skipping` means an identical update is
+    already open. Both exit `0` deliberately.
 
 ## Step 6: add the daily security job
 
-Security fixes should not wait for Monday.
+Security fixes should not wait for Monday. Add a second job that differs from the first in
+exactly two ways: it runs daily, and it passes `--security`.
 
 === "GitHub Actions"
 
     Copy `.github/workflows/drupdater.yml` to
-    `.github/workflows/drupdater-security.yml` and change two things — the cron, and add
-    `--security`:
-
-    ```yaml
-    on:
-      schedule:
-        - cron: "0 4 * * *"   # every day 04:00 UTC
-      workflow_dispatch:
-    ```
+    `.github/workflows/drupdater-security.yml`, change the cron to `"0 4 * * *"`, and add
+    the flag:
 
     ```yaml
           - run: /opt/drupdater/bin --security
@@ -218,7 +212,8 @@ Security fixes should not wait for Monday.
 
 === "GitLab CI"
 
-    Add a second job alongside the first:
+    Add a second job reusing the same base, and a second pipeline schedule with pattern
+    `0 4 * * *` and `DRUPDATER_SCHEDULE` set to `daily`:
 
     ```yaml
     drupdater:security:
@@ -228,9 +223,6 @@ Security fixes should not wait for Monday.
       rules:
         - if: $CI_PIPELINE_SOURCE == "schedule" && $DRUPDATER_SCHEDULE == "daily"
     ```
-
-    Then create a second pipeline schedule with pattern `0 4 * * *` and
-    `DRUPDATER_SCHEDULE` set to `daily`.
 
 A security run differs from a normal one in three ways:
 
@@ -245,50 +237,29 @@ behaviour, not a misconfiguration.
 
 ## Step 7: keep the report
 
-Have CI archive the machine-readable report so a failed run leaves something better than a
-log:
+Add `--report ./report.json` to the run command and have CI archive the file, so a failed
+run leaves something better than a log behind. The exact snippet for your platform is in
+[Run in GitHub Actions](../how-to/github-actions.md#a-run-report-artifact) and [Run in
+GitLab CI](../how-to/gitlab-ci.md#a-run-report-artifact).
 
-=== "GitHub Actions"
-
-    ```yaml
-          - run: /opt/drupdater/bin --report ./report.json
-            env:
-              DRUPDATER_TOKEN: ${{ secrets.DRUPDATER_TOKEN }}
-
-          - uses: actions/upload-artifact@v4
-            if: always()
-            with:
-              name: drupdater-report
-              path: ./report.json
-    ```
-
-=== "GitLab CI"
-
-    ```yaml
-      script:
-        - /opt/drupdater/bin --report ./drupdater-report.json
-      artifacts:
-        when: always
-        paths:
-          - drupdater-report.json
-    ```
-
-`if: always()` / `when: always` matters — the report is written on failures too, and that
-is when you want it most.
+Archive it **on failure too** — `if: always()` on GitHub, `when: always` on GitLab. The
+report is written on every outcome, and a failed run is when you most want it. See
+[Consume the run report](../how-to/consume-the-run-report.md).
 
 ## Step 8: pin the image
 
 You have been using `:latest`. Drupdater is pre-1.0, so its CLI and config format can
 change between minor versions — and `latest` will pick that up without warning.
 
-Replace it with a full version everywhere:
+Take the current tag from the [latest
+release](https://github.com/drupdater/drupdater/releases) and use it everywhere in place
+of `latest`:
 
 ```yaml
-image: ghcr.io/drupdater/drupdater-php8.3:v0.12.0
+image: ghcr.io/drupdater/drupdater-php8.3:v0.3.6
 ```
 
-Check the [latest release](https://github.com/drupdater/drupdater/releases) for the
-current tag, and bump it deliberately.
+Bump it deliberately when you want the new version.
 
 ## What you built
 

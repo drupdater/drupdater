@@ -19,7 +19,7 @@ Add to `.gitlab-ci.yml`:
 ```yaml
 .drupdater_base:
   image:
-    name: ghcr.io/drupdater/drupdater-php8.3:v0.12.0
+    name: ghcr.io/drupdater/drupdater-php8.3:latest
     entrypoint: [""]
   variables:
     GIT_DEPTH: "0"  # full history required to push the update branch

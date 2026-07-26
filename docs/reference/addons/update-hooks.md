@@ -10,14 +10,6 @@ reviewer knows what will run on deploy.
 | Report key | `update_hooks` |
 | Pull request section | "📄 Job Logs" → "⚙️ Update Hooks" |
 
-## Why it exists
-
-A dependency bump that carries database update hooks is a different kind of change from
-one that does not. Hooks run on deploy, may take a long time on a large site, and may not
-be reversible. Listing them turns "this updates Drupal core" into "this updates Drupal
-core and will run these four schema changes", which is the information a reviewer
-actually needs to schedule the deploy.
-
 ## What it does
 
 Runs immediately before each site's update hooks are executed, and asks Drush for the
@@ -26,6 +18,14 @@ the state after any other addon on that event has finished.
 
 Sites are processed concurrently, so the collected map is mutex-guarded and keyed by
 site: the same module can have different pending hooks on different sites.
+
+## Why it exists
+
+A dependency bump that carries database update hooks is a different kind of change from
+one that does not. Hooks run on deploy, may take a long time on a large site, and may not
+be reversible. Listing them turns "this updates Drupal core" into "this updates Drupal
+core and will run these four schema changes", which is the information a reviewer
+actually needs to schedule the deploy.
 
 ## Report section
 

@@ -43,7 +43,13 @@ jobs:
 
       # --strict fails the build on a broken internal link or a nav entry pointing at a
       # file that does not exist, so a bad link is caught here rather than published.
+      #
+      # DRUPDATER_GOATCOUNTER is what puts the analytics script into the pages. It is set
+      # here and nowhere else, so only the published site is counted — a contributor
+      # running mkdocs serve or make docs-build gets no tracking script.
       - run: mkdocs build --strict
+        env:
+          DRUPDATER_GOATCOUNTER: "true"
 
       - uses: peaceiris/actions-gh-pages@v4
         with:

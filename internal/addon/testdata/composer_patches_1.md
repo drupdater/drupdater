@@ -10,7 +10,7 @@ The following patches were removed as they are no longer needed:
   - Patch: `patch1`
   - Reason: reason1
 
-- Issue #issue1: [title1](link1) was fixed in version 2.0:
+- Issue #3123456: [Fix the thing](https://www.drupal.org/i/3123456) was fixed in version 2.0:
 
   - Package: package1
   - Patch: `patch1`

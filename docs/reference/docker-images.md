@@ -26,18 +26,20 @@ Each variant is tagged on release:
 
 | Tag form | Example | Moves? |
 |---|---|---|
-| `<major>.<minor>.<patch>` | `0.12.0` | No |
-| `v<major>.<minor>.<patch>` | `v0.12.0` | No |
-| `<major>.<minor>` | `0.12` | Yes, within the minor |
+| `<major>.<minor>.<patch>` | `0.3.6` | No |
+| `v<major>.<minor>.<patch>` | `v0.3.6` | No |
+| `<major>.<minor>` | `0.3` | Yes, within the minor |
 | `<major>` | `0` | Yes, within the major |
 | `latest` | | Yes, always |
 
 !!! warning "Pin in production"
 
     Drupdater is pre-1.0. The CLI surface and config format may change between minor
-    versions, so `latest` and the floating `0` tag can change behaviour under you. Pin to
-    a full version — `ghcr.io/drupdater/drupdater-php8.3:v0.12.0` — for a scheduled
-    pipeline, and bump it deliberately.
+    versions, so `latest` and the floating `0` tag can change behaviour under you.
+
+    The examples throughout this documentation use `latest` for brevity. In a scheduled
+    pipeline, replace it with the full version from the [latest
+    release](https://github.com/drupdater/drupdater/releases) and bump it deliberately.
 
 ## Entrypoint
 
@@ -48,7 +50,7 @@ must be cleared before `script:` can run:
 
 ```yaml
 image:
-  name: ghcr.io/drupdater/drupdater-php8.3:v0.12.0
+  name: ghcr.io/drupdater/drupdater-php8.3:latest
   entrypoint: [""]
 script:
   - /opt/drupdater/bin "$DRUPDATER_TOKEN"
@@ -59,7 +61,7 @@ too:
 
 ```yaml
 container:
-  image: ghcr.io/drupdater/drupdater-php8.3:v0.12.0
+  image: ghcr.io/drupdater/drupdater-php8.3:latest
 steps:
   - run: /opt/drupdater/bin "${{ secrets.DRUPDATER_TOKEN }}"
 ```
@@ -67,7 +69,7 @@ steps:
 Run directly with `docker run`, the entrypoint applies and you pass only arguments:
 
 ```bash
-docker run ghcr.io/drupdater/drupdater-php8.3:v0.12.0 <token> --dry-run
+docker run ghcr.io/drupdater/drupdater-php8.3:latest <token> --dry-run
 ```
 
 ## What is in the image
@@ -109,7 +111,7 @@ a parent directory and point `--working-dir` at the checkout within it:
 
 ```bash
 docker run -v "$(pwd)":/workspace/project -w /workspace \
-  ghcr.io/drupdater/drupdater-php8.3:v0.12.0 \
+  ghcr.io/drupdater/drupdater-php8.3:latest \
   "$DRUPDATER_TOKEN" --working-dir /workspace/project
 ```
 

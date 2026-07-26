@@ -12,12 +12,6 @@ result.
 | Commits | `Update translations` |
 | Requires | The `locale_deploy` module enabled on the site |
 
-## Why it exists
-
-Updating a module frequently changes its translatable strings. On a project that commits
-its `.po` files, those translations go stale at exactly the moment the module is updated —
-so the natural time to refresh them is in the same pull request.
-
 ## What it does
 
 For each site, after that site's update hooks and configuration export have run:
@@ -29,6 +23,12 @@ For each site, after that site's update hooks and configuration export have run:
    actually staged.
 
 Sites run concurrently, so the results map is mutex-guarded and keyed by site.
+
+## Why it exists
+
+Updating a module frequently changes its translatable strings. On a project that commits
+its `.po` files, those translations go stale at exactly the moment the module is updated —
+so the natural time to refresh them is in the same pull request.
 
 ## Report section
 
@@ -55,10 +55,9 @@ Sites run concurrently, so the results map is mutex-guarded and keyed by site.
 | `updated` | Whether anything was actually committed |
 | `skipped` | Present with a reason when the addon bailed out early |
 
-The `skipped` field is the point of this section. Both skip conditions — `locale_deploy`
-not enabled, and an unresolvable translation path — were previously visible only in the
-log, and a report that simply omitted the site would make "deliberately skipped"
-indistinguishable from "ran and found nothing".
+`skipped` distinguishes a site the addon deliberately passed over from one it ran against
+and found nothing to commit. Both skip conditions — `locale_deploy` not enabled, and an
+unresolvable translation path — are recorded with their reason.
 
 Omitted when no site produced a result at all.
 
