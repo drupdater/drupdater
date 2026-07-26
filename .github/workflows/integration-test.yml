@@ -87,12 +87,19 @@ jobs:
             # One leg, exactly as asked.
             mode=normal; [ "$IN_SECURITY" = "true" ] && mode=security
             url=${IN_URL:-https://github.com/drupdater/test-drupal-cms.git}
-            include=$(jq -nc \
+            # If the target happens to be a known fixture, take its
+            # expectations too, so a dispatch at the default gets the same
+            # verification a label does. Otherwise assert only the status --
+            # a dispatch can be aimed at any repository.
+            include=$(jq -c \
               --arg n "$(basename "$url" .git)" \
               --arg u "$url" \
               --arg b "${IN_BRANCH:-main}" \
               --arg m "$mode" \
-              '[{fixture:$n, repository_url:$u, branch:$b, mode:$m}]')
+              '(map(select(.repository_url == $u)) | first) as $f
+               | [{fixture: ($f.name // $n), repository_url: $u, branch: $b, mode: $m,
+                   expect: (($f.expect[$m] // {status:["success","no_changes"]}) | tojson)}]' \
+              .github/integration-fixtures.json)
             dry_run=$IN_DRY_RUN
             verbose=$IN_VERBOSE
           else
@@ -101,7 +108,8 @@ jobs:
             # and updates only what has an advisory -- so one passing says
             # nothing about the other.
             include=$(jq -c '[ .[] as $f | ("normal","security") as $m |
-              {fixture:$f.name, repository_url:$f.repository_url, branch:$f.branch, mode:$m} ]' \
+              {fixture:$f.name, repository_url:$f.repository_url, branch:$f.branch, mode:$m,
+               expect: (($f.expect[$m] // {status:["success","no_changes"]}) | tojson)} ]' \
               .github/integration-fixtures.json)
             # A label event carries none of the inputs above, and an unset
             # dry_run would read as "not a dry run" -- a label would then quietly
@@ -171,6 +179,13 @@ jobs:
       TARGET_URL: ${{ matrix.repository_url }}
       TARGET_BRANCH: ${{ matrix.branch }}
     steps:
+      # Just the assertion script -- the job otherwise has no use for the source.
+      - name: Checkout assertion script
+        uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github/assert-report.jq
+          sparse-checkout-cone-mode: false
+
       - name: Download image
         uses: actions/download-artifact@v4
         with:
@@ -236,8 +251,10 @@ jobs:
 
       # The report is written on every exit path, so this runs even when the
       # container failed -- a failed run's report is the one worth reading.
-      - name: Summarise run report
+      - name: Summarise and verify run report
         if: always()
+        env:
+          EXPECT: ${{ matrix.expect }}
         run: |
           # The container runs as root and the report is written 0600, so both jq
           # and upload-artifact get EACCES until the runner owns it back.
@@ -252,9 +269,11 @@ jobs:
             "addons: \(.addons // {} | keys | join(", "))"
           ' ./run/report.json | tee -a "$GITHUB_STEP_SUMMARY"
           # The container exits 0 on an AbortError ("no changes", "branch already
-          # exists"), so exit status alone is not a verdict -- gate on the report.
-          # no_changes is legitimate in security mode when nothing has an advisory.
-          jq -e '.status == "success" or .status == "no_changes"' ./run/report.json > /dev/null
+          # exists") and a run reports success even when an addon logged and
+          # swallowed its own failure, so neither exit status nor .status alone is
+          # a verdict. Assert what this fixture is actually meant to produce.
+          jq -e -r --argjson expect "$EXPECT" -f .github/assert-report.jq \
+            ./run/report.json | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Upload run report
         if: always()

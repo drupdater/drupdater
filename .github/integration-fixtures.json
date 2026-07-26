@@ -3,6 +3,34 @@
     "name": "drupal-cms",
     "description": "Drupal CMS, core held a minor behind so every run has updates",
     "repository_url": "https://github.com/drupdater/test-drupal-cms.git",
-    "branch": "main"
+    "branch": "main",
+    "expect": {
+      "normal": {
+        "status": ["success"],
+        "min_packages": 1,
+        "phases": [
+          "acquire working copy",
+          "preflight",
+          "composer install",
+          "baseline site install",
+          "update shared code",
+          "site update"
+        ],
+        "addons": ["update_hooks", "unsupported_modules"]
+      },
+      "security": {
+        "status": ["success"],
+        "min_packages": 1,
+        "phases": [
+          "acquire working copy",
+          "preflight",
+          "composer install",
+          "baseline site install",
+          "update shared code",
+          "site update"
+        ],
+        "addons": ["composer_audit", "update_hooks"]
+      }
+    }
   }
 ]
