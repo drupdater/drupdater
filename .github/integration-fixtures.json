@@ -6,7 +6,9 @@
     "branch": "main",
     "expect": {
       "normal": {
-        "status": ["success"],
+        "status": [
+          "success"
+        ],
         "min_packages": 1,
         "phases": [
           "acquire working copy",
@@ -16,10 +18,18 @@
           "update shared code",
           "site update"
         ],
-        "addons": ["update_hooks", "unsupported_modules"]
+        "addons": [
+          "update_hooks",
+          "unsupported_modules",
+          "code_beautifier",
+          "deprecations_remover",
+          "translations_updater"
+        ]
       },
       "security": {
-        "status": ["success"],
+        "status": [
+          "success"
+        ],
         "min_packages": 1,
         "phases": [
           "acquire working copy",
@@ -29,7 +39,10 @@
           "update shared code",
           "site update"
         ],
-        "addons": ["composer_audit", "update_hooks"]
+        "addons": [
+          "composer_audit",
+          "update_hooks"
+        ]
       }
     }
   }
