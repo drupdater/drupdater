@@ -1,6 +1,7 @@
 package addon
 
 import (
+	"github.com/drupdater/drupdater/pkg/rector"
 	"testing"
 
 	"github.com/drupdater/drupdater/internal/report"
@@ -128,4 +129,91 @@ func TestComposerDiffDoesNotReport(t *testing.T) {
 	var addon any = &ComposerDiff{}
 	_, isReporter := addon.(report.Reporter)
 	assert.False(t, isReporter)
+}
+
+func TestCodeBeautifierReportData(t *testing.T) {
+	cb := &CodeBeautifier{}
+
+	t.Run("nothing fixed reports nothing", func(t *testing.T) {
+		assert.Equal(t, "code_beautifier", cb.ReportKey())
+		assert.Nil(t, cb.ReportData())
+	})
+
+	t.Run("reports the files it committed and what was fixable", func(t *testing.T) {
+		cb := &CodeBeautifier{
+			fixedFiles: []string{"web/modules/custom/a/a.module", "web/modules/custom/b/b.module"},
+			fixable:    7,
+		}
+		assert.Equal(t, CodingStyleFixes{
+			Files:   []string{"web/modules/custom/a/a.module", "web/modules/custom/b/b.module"},
+			Fixable: 7,
+		}, cb.ReportData())
+	})
+}
+
+func TestDeprecationsRemoverReportData(t *testing.T) {
+	t.Run("nothing rewritten reports nothing", func(t *testing.T) {
+		dr := &DeprecationsRemover{}
+		assert.Equal(t, "deprecations_remover", dr.ReportKey())
+		assert.Nil(t, dr.ReportData())
+	})
+
+	t.Run("records which rules fired on which file, sorted", func(t *testing.T) {
+		dr := &DeprecationsRemover{}
+		dr.recordFixes(rector.ReturnOutput{
+			Totals:       rector.ReturnOutputTotals{ChangedFiles: 2},
+			ChangedFiles: []string{"web/modules/custom/z/z.php", "web/modules/custom/a/a.php"},
+			FileDiffs: []rector.ReturnOutputFillDiff{
+				{File: "web/modules/custom/a/a.php", AppliedRectors: []string{"SecondRector", "FirstRector"}},
+				{File: "web/modules/custom/z/z.php", AppliedRectors: []string{"OtherRector"}},
+			},
+		})
+
+		// Files and rule names are both sorted, so two runs over unchanged code produce
+		// byte-identical sections and a consumer can diff reports directly.
+		assert.Equal(t, []DeprecationFix{
+			{File: "web/modules/custom/a/a.php", AppliedRectors: []string{"FirstRector", "SecondRector"}},
+			{File: "web/modules/custom/z/z.php", AppliedRectors: []string{"OtherRector"}},
+		}, dr.ReportData())
+	})
+
+	t.Run("a changed file with no recorded rules still reports", func(t *testing.T) {
+		dr := &DeprecationsRemover{}
+		dr.recordFixes(rector.ReturnOutput{
+			Totals:       rector.ReturnOutputTotals{ChangedFiles: 1},
+			ChangedFiles: []string{"a.php"},
+		})
+		assert.Equal(t, []DeprecationFix{{File: "a.php"}}, dr.ReportData())
+	})
+}
+
+func TestTranslationsUpdaterReportData(t *testing.T) {
+	t.Run("never ran reports nothing", func(t *testing.T) {
+		tu := &TranslationsUpdater{}
+		assert.Equal(t, "translations_updater", tu.ReportKey())
+		assert.Nil(t, tu.ReportData())
+	})
+
+	t.Run("distinguishes updated, unchanged and skipped, per site", func(t *testing.T) {
+		// The skipped case is the one that matters: it used to be visible only in the log,
+		// so a report that omitted the site could not tell it apart from "nothing to do".
+		tu := &TranslationsUpdater{}
+		tu.record("one", TranslationResult{Path: "translations", Updated: true})
+		tu.record("two", TranslationResult{Path: "translations"})
+		tu.record("three", TranslationResult{Skipped: "locale_deploy not enabled"})
+
+		assert.Equal(t, map[string]TranslationResult{
+			"one":   {Path: "translations", Updated: true},
+			"two":   {Path: "translations"},
+			"three": {Skipped: "locale_deploy not enabled"},
+		}, tu.ReportData())
+	})
+
+	t.Run("the returned map is a copy of guarded state", func(t *testing.T) {
+		tu := &TranslationsUpdater{}
+		tu.record("default", TranslationResult{Updated: true})
+		out := tu.ReportData().(map[string]TranslationResult)
+		out["default"] = TranslationResult{}
+		assert.True(t, tu.ReportData().(map[string]TranslationResult)["default"].Updated)
+	})
 }

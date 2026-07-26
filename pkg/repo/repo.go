@@ -11,9 +11,17 @@ import (
 	"github.com/spf13/afero"
 
 	git "github.com/go-git/go-git/v5"
+	gitconfig "github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"go.uber.org/zap"
+)
+
+// Identity used for commits when neither the VCS platform nor the checkout supplies one.
+// Both are only reached in that last-resort case; see prepareCheckout.
+const (
+	defaultCommitName  = "drupdater"
+	defaultCommitEmail = "drupdater@localhost"
 )
 
 type Repository interface {
@@ -164,6 +172,26 @@ func (rs *GitRepositoryService) prepareCheckout(checkout *git.Repository, userna
 	if email != "" {
 		config.User.Email = email
 	}
+
+	// ...but "leave it in place" only works when there is one. A fresh clone and a CI
+	// checkout (actions/checkout included) both have no identity of their own, and go-git
+	// fails the very first commit with "author field is required". Fall back to a generic
+	// one so a run with nothing to ask still commits.
+	//
+	// The check reads the scoped config — system and global merged over local, which is what
+	// go-git itself resolves the author from — so a developer's global user.name still wins
+	// and we only write a default when there genuinely is none anywhere.
+	scoped, err := checkout.ConfigScoped(gitconfig.SystemScope)
+	if err != nil {
+		return checkout, nil, "", fmt.Errorf("failed to read scoped git config: %w", err)
+	}
+	if config.User.Name == "" && scoped.User.Name == "" {
+		config.User.Name = defaultCommitName
+	}
+	if config.User.Email == "" && scoped.User.Email == "" {
+		config.User.Email = defaultCommitEmail
+	}
+
 	if err := checkout.SetConfig(config); err != nil {
 		return checkout, nil, "", err
 	}

@@ -235,3 +235,102 @@ func TestIsShallowClone(t *testing.T) {
 		require.Error(t, err)
 	})
 }
+
+// isolateGitConfig points go-git's global-config lookup at an empty directory, so these tests
+// see the same identity-less environment a CI runner has rather than the developer's own
+// ~/.gitconfig.
+func isolateGitConfig(t *testing.T) string {
+	t.Helper()
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	return home
+}
+
+func TestPrepareCheckoutCommitIdentityFallback(t *testing.T) {
+	service := NewGitRepositoryService(zap.NewNop())
+
+	t.Run("falls back when nothing supplies an identity", func(t *testing.T) {
+		// A tokenless checkout-mode dry run has no VCS platform to ask, and a fresh clone or a
+		// CI checkout has no identity of its own, so without a fallback the first commit dies
+		// with go-git's "author field is required".
+		isolateGitConfig(t)
+		dir := t.TempDir()
+		_, err := git.PlainInit(dir, false)
+		require.NoError(t, err)
+
+		_, _, _, err = service.OpenRepository(dir, "", "")
+		require.NoError(t, err)
+
+		r, err := git.PlainOpen(dir)
+		require.NoError(t, err)
+		cfg, err := r.Config()
+		require.NoError(t, err)
+		assert.Equal(t, defaultCommitName, cfg.User.Name)
+		assert.Equal(t, defaultCommitEmail, cfg.User.Email)
+	})
+
+	t.Run("a commit actually succeeds with only the fallback", func(t *testing.T) {
+		// The regression this guards is not the config value but the commit itself.
+		isolateGitConfig(t)
+		dir := t.TempDir()
+		_, err := git.PlainInit(dir, false)
+		require.NoError(t, err)
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "file.txt"), []byte("hi"), 0o600))
+
+		_, worktree, _, err := service.OpenRepository(dir, "", "")
+		require.NoError(t, err)
+		_, err = worktree.Add("file.txt")
+		require.NoError(t, err)
+
+		hash, err := worktree.Commit("initial", &git.CommitOptions{})
+		require.NoError(t, err)
+		assert.False(t, hash.IsZero())
+	})
+
+	t.Run("a global identity wins over the fallback", func(t *testing.T) {
+		// go-git resolves the author from the scoped config, so a developer's global
+		// user.name is a perfectly good identity and must not be shadowed by a local default.
+		home := isolateGitConfig(t)
+		require.NoError(t, os.WriteFile(filepath.Join(home, ".gitconfig"),
+			[]byte("[user]\n\tname = Global User\n\temail = global@example.com\n"), 0o600))
+
+		dir := t.TempDir()
+		_, err := git.PlainInit(dir, false)
+		require.NoError(t, err)
+
+		_, _, _, err = service.OpenRepository(dir, "", "")
+		require.NoError(t, err)
+
+		r, err := git.PlainOpen(dir)
+		require.NoError(t, err)
+		cfg, err := r.Config()
+		require.NoError(t, err)
+		assert.Empty(t, cfg.User.Name, "no local override should have been written")
+		assert.Empty(t, cfg.User.Email)
+
+		scoped, err := r.ConfigScoped(gitConfig.SystemScope)
+		require.NoError(t, err)
+		assert.Equal(t, "Global User", scoped.User.Name)
+	})
+
+	t.Run("an explicit identity wins over both", func(t *testing.T) {
+		home := isolateGitConfig(t)
+		require.NoError(t, os.WriteFile(filepath.Join(home, ".gitconfig"),
+			[]byte("[user]\n\tname = Global User\n\temail = global@example.com\n"), 0o600))
+
+		dir := t.TempDir()
+		_, err := git.PlainInit(dir, false)
+		require.NoError(t, err)
+
+		_, _, _, err = service.OpenRepository(dir, "Bot", "bot@example.com")
+		require.NoError(t, err)
+
+		r, err := git.PlainOpen(dir)
+		require.NoError(t, err)
+		cfg, err := r.Config()
+		require.NoError(t, err)
+		assert.Equal(t, "Bot", cfg.User.Name)
+		assert.Equal(t, "bot@example.com", cfg.User.Email)
+	})
+}

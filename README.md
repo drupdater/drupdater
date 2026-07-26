@@ -345,9 +345,21 @@ measurable without separate instrumentation — the phase distribution shows
 whether a run is dominated by `composer install`, by site installs, or by Rector.
 
 **`addons`** carries one structured section per addon that has something to
-report (`composer_audit`, `update_hooks`, `unsupported_modules`,
-`composer_patches`). Addons with nothing to say are omitted rather than present
-and empty.
+report: `composer_audit`, `update_hooks`, `unsupported_modules`,
+`composer_patches`, `code_beautifier`, `deprecations_remover` and
+`translations_updater`. Addons with nothing to say are omitted rather than
+present and empty.
+
+`composer_diff` and `composer_normalizer` deliberately contribute nothing — the
+first duplicates the top-level `packages` field, the second only reorders
+`composer.json`. Everything else reports even when its work is "only" a code
+change: the diff tells you what changed but not whether an addon ran at all, and
+most addons log and swallow their own failures, so one that silently did nothing
+looks exactly like one with nothing to do.
+
+`translations_updater` is keyed by site and records `skipped` with a reason when
+it bails out early — `locale_deploy` not enabled, or a translation path that
+does not resolve. Both were previously visible only in the log.
 
 **`merge_request.auto_merge`** is present only when the active run type asked
 for auto-merge, so "never requested" is distinguishable from "requested and

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"text/template"
 
@@ -22,6 +23,11 @@ type CodeBeautifier struct {
 	logger   *zap.Logger
 	phpcs    PHPCS
 	composer Composer
+
+	// What the run actually fixed, for the report. Written once from the single
+	// post-code-update event, read after the run.
+	fixedFiles []string
+	fixable    int
 }
 
 // NewCodeBeautifier creates a new code beautifier instance
@@ -162,8 +168,14 @@ func (cb *CodeBeautifier) postCodeUpdateHandler(e event.Event) error { //nolint:
 		return nil
 	}
 
-	_, err = event.Worktree().Commit("Update coding styles", &git.CommitOptions{})
-	return err
+	if _, err := event.Worktree().Commit("Update coding styles", &git.CommitOptions{}); err != nil {
+		return err
+	}
+
+	sort.Strings(addedFiles)
+	cb.fixedFiles = addedFiles
+	cb.fixable = codingStyleUpdateResult.Totals.Fixable
+	return nil
 }
 
 // stagedAnyOf reports whether any of paths has a staged (non-Unmodified) change in worktree. An

@@ -1,27 +1,37 @@
 name: Integration Test
 
+# Runs drupdater end to end against real Drupal sites -- fixture repositories
+# whose composer.lock is deliberately frozen at an old resolution, so every run
+# has something to update.
+#
+# Manual on purpose: every leg installs Drupal for real, far too slow to want on
+# every push, and the unit suite in go.yml covers the rest. The image is built
+# once and shared, so adding fixtures costs runs but not rebuilds. Two ways in:
+#
+#   * add the "integration-test" label to a pull request. Every fixture runs in
+#     both normal and security mode, always as a dry run, and each leg shows up
+#     as its own check on that PR. Remove and re-add the label to re-run.
+#   * dispatch from the Actions tab to aim at one target, pick the mode, or do a
+#     real non-dry run.
+#
+# ADDING A FIXTURE: append an entry to .github/integration-fixtures.json. The
+# label path picks it up automatically -- nothing here needs editing.
+
 on:
+  pull_request:
+    types: [labeled]
   workflow_dispatch:
     inputs:
       repository_url:
         description: 'Drupal project repository URL'
-        required: true
+        required: false
+        default: 'https://github.com/drupdater/test-drupal-cms.git'
         type: string
       branch:
         description: 'Target branch in the project repository'
         required: false
         default: 'main'
         type: string
-      php_version:
-        description: 'PHP version'
-        required: false
-        default: '8.3'
-        type: choice
-        options:
-          - '8.2'
-          - '8.3'
-          - '8.4'
-          - '8.5'
       dry_run:
         description: 'Skip branch and MR creation'
         required: false
@@ -38,15 +48,99 @@ on:
         default: false
         type: boolean
 
+# Per pull request rather than global, so labelling one PR does not cancel a run
+# already going on another.
 concurrency:
-  group: ${{ github.workflow }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+# Every job here only ever reads this repository: it clones the fixture over
+# plain HTTPS and talks to the fixture's remote with DRUPDATER_TEST_TOKEN, never
+# with GITHUB_TOKEN. Declared once at the top rather than per job so a job added
+# later inherits the restriction instead of silently getting the repository
+# default.
+permissions:
+  contents: read
+
 jobs:
-  integration-test:
+  # Decides what to run. A label means "everything", a dispatch means "exactly
+  # what I asked for", and keeping that decision in one place stops the matrix
+  # and the run flags from drifting apart.
+  plan:
+    # Without this any label at all would start a run.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.label.name == 'integration-test'
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
+    outputs:
+      include: ${{ steps.set.outputs.include }}
+      dry_run: ${{ steps.set.outputs.dry_run }}
+      verbose: ${{ steps.set.outputs.verbose }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Resolve fixtures and run flags
+        id: set
+        env:
+          IS_DISPATCH: ${{ github.event_name == 'workflow_dispatch' }}
+          IN_URL: ${{ inputs.repository_url }}
+          IN_BRANCH: ${{ inputs.branch }}
+          IN_SECURITY: ${{ inputs.security }}
+          IN_DRY_RUN: ${{ inputs.dry_run }}
+          IN_VERBOSE: ${{ inputs.verbose }}
+        run: |
+          set -euo pipefail
+          if [ "$IS_DISPATCH" = "true" ]; then
+            # One leg, exactly as asked.
+            mode=normal; [ "$IN_SECURITY" = "true" ] && mode=security
+            url=${IN_URL:-https://github.com/drupdater/test-drupal-cms.git}
+            # If the target happens to be a known fixture, take its
+            # expectations too, so a dispatch at the default gets the same
+            # verification a label does. Otherwise assert only the status --
+            # a dispatch can be aimed at any repository.
+            include=$(jq -c \
+              --arg n "$(basename "$url" .git)" \
+              --arg u "$url" \
+              --arg b "${IN_BRANCH:-main}" \
+              --arg m "$mode" \
+              '(map(select(.repository_url == $u)) | first) as $f
+               | [{fixture: ($f.name // $n), repository_url: $u, branch: $b, mode: $m,
+                   expect: (($f.expect[$m] // {status:["success","no_changes"]}) | tojson)}]' \
+              .github/integration-fixtures.json)
+            dry_run=$IN_DRY_RUN
+            verbose=$IN_VERBOSE
+          else
+            # A label means every fixture in both modes. The two exercise
+            # different code paths -- security mode is driven by composer_audit
+            # and updates only what has an advisory -- so one passing says
+            # nothing about the other.
+            include=$(jq -c '[ .[] as $f | ("normal","security") as $m |
+              {fixture:$f.name, repository_url:$f.repository_url, branch:$f.branch, mode:$m,
+               expect: (($f.expect[$m] // {status:["success","no_changes"]}) | tojson)} ]' \
+              .github/integration-fixtures.json)
+            # A label event carries none of the inputs above, and an unset
+            # dry_run would read as "not a dry run" -- a label would then quietly
+            # push branches and open merge requests against the fixtures. Only an
+            # explicit dispatch can turn it off.
+            dry_run=true
+            verbose=false
+          fi
+          {
+            echo "include=$include"
+            echo "dry_run=$dry_run"
+            echo "verbose=$verbose"
+          } >> "$GITHUB_OUTPUT"
+          echo "### Integration test plan" >> "$GITHUB_STEP_SUMMARY"
+          echo "dry_run=\`$dry_run\`" >> "$GITHUB_STEP_SUMMARY"
+          jq -r '.[] | "- \(.fixture) / \(.mode) -- \(.repository_url)@\(.branch)"' \
+            <<<"$include" >> "$GITHUB_STEP_SUMMARY"
+
+  # The image is identical for every leg, so build it once and pass it along as
+  # an artifact. Building per leg meant 2 builds for one fixture and 2N for N.
+  build:
+    needs: plan
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -54,37 +148,146 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
+      # One version, no matrix over PHP: this job proves drupdater works against
+      # a real site, not that Drupal runs on every PHP release. 8.4 has to match
+      # the target's config.platform.php -- its lock is resolved for 8.4.1 and
+      # pulls in Symfony 8, which will not install on anything earlier.
       - name: Build Docker image
         uses: docker/build-push-action@v7
         with:
           context: .
-          load: true
           tags: drupdater:test
           build-args: |
-            PHP_VERSION=${{ inputs.php_version }}
+            PHP_VERSION=8.4
+          outputs: type=docker,dest=/tmp/drupdater-image.tar
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Upload image
+        uses: actions/upload-artifact@v4
+        with:
+          name: drupdater-image
+          path: /tmp/drupdater-image.tar
+          retention-days: 1
+          if-no-files-found: error
+
+  integration-test:
+    needs: [plan, build]
+    name: ${{ matrix.fixture }} / ${{ matrix.mode }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    strategy:
+      # One fixture or mode failing must not hide the state of the others.
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.include) }}
+    env:
+      TARGET_URL: ${{ matrix.repository_url }}
+      TARGET_BRANCH: ${{ matrix.branch }}
+    steps:
+      # Just the assertion script -- the job otherwise has no use for the source.
+      - name: Checkout assertion script
+        uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github/assert-report.jq
+          sparse-checkout-cone-mode: false
+
+      - name: Download image
+        uses: actions/download-artifact@v4
+        with:
+          name: drupdater-image
+          path: /tmp
+
+      - name: Load image
+        run: docker load --input /tmp/drupdater-image.tar
+
+      - name: Delete stale update branches
+        if: needs.plan.outputs.dry_run != 'true'
+        env:
+          REPO_TOKEN: ${{ secrets.DRUPDATER_TEST_TOKEN }}
+        run: |
+          # A fixture's composer.lock is frozen, so the update branch name
+          # (update-<lock content-hash>) is stable across runs. Left behind, it
+          # makes the next real run abort with "branch already exists", which
+          # reports as no_changes and exit 0 -- a green run that tested nothing.
+          authed="$(echo "$TARGET_URL" | sed "s#https://#https://oauth2:$REPO_TOKEN@#")"
+          git ls-remote --heads "$authed" 'refs/heads/update-*' \
+            | awk '{print $2}' | sed 's#refs/heads/##' \
+            | while read -r ref; do
+                echo "deleting stale branch $ref"
+                git push "$authed" --delete "$ref"
+              done
 
       - name: Clone project
         env:
           REPO_TOKEN: ${{ secrets.DRUPDATER_TEST_TOKEN }}
-          REPOSITORY_URL: ${{ inputs.repository_url }}
-          BRANCH: ${{ inputs.branch }}
         run: |
+          # ./run is the mount root, the project a level below it. drupdater
+          # writes <site>.sqlite and private/ into the checkout's PARENT
+          # (pkg/drupal/installer.go), so the parent has to be a real directory
+          # we control -- mounting the checkout itself at /workspace puts them
+          # in the container's /.
+          mkdir -p ./run
+          # No --depth: drupdater's preflight rejects a shallow checkout
+          # ("git history complete"), and a shallow clone cannot be pushed.
           git -c credential.helper='!f(){ echo username=oauth2; echo "password=$REPO_TOKEN"; };f' \
-            clone --branch "$BRANCH" --depth 1 "$REPOSITORY_URL" ./drupal-project
+            clone --branch "$TARGET_BRANCH" "$TARGET_URL" ./run/project
+          # Deliberately NO git identity configured here. A fresh clone has none,
+          # which is exactly the case drupdater has to handle on its own -- leaving
+          # it unset is what makes this job a regression test for that fallback.
 
       - name: Run drupdater
         env:
+          # No fallback token on purpose: a checkout-mode --dry-run is documented as
+          # needing none, so running it with an empty one keeps that promise tested.
           REPO_TOKEN: ${{ secrets.DRUPDATER_TEST_TOKEN }}
-          DRY_RUN: ${{ inputs.dry_run }}
-          SECURITY: ${{ inputs.security }}
-          VERBOSE: ${{ inputs.verbose }}
+          DRUPALCODE_ACCESS_TOKEN: ${{ secrets.DRUPALCODE_ACCESS_TOKEN }}
+          DRY_RUN: ${{ needs.plan.outputs.dry_run }}
+          VERBOSE: ${{ needs.plan.outputs.verbose }}
+          MODE: ${{ matrix.mode }}
         run: |
-          args=(--working-dir /workspace)
-          [ "$DRY_RUN" = "true" ] && args+=(--dry-run)
-          [ "$SECURITY" = "true" ] && args+=(--security)
-          [ "$VERBOSE" = "true" ] && args+=(--verbose)
+          args=(--working-dir /workspace/project --report /workspace/report.json)
+          [ "$DRY_RUN" = "true" ]    && args+=(--dry-run)
+          [ "$MODE" = "security" ]   && args+=(--security)
+          [ "$VERBOSE" = "true" ]    && args+=(--verbose)
           docker run --rm \
-            -v "$(pwd)/drupal-project:/workspace" \
+            -e DRUPALCODE_ACCESS_TOKEN \
+            -v "$(pwd)/run:/workspace" \
             drupdater:test "$REPO_TOKEN" "${args[@]}"
+
+      # The report is written on every exit path, so this runs even when the
+      # container failed -- a failed run's report is the one worth reading.
+      - name: Summarise and verify run report
+        if: always()
+        env:
+          EXPECT: ${{ matrix.expect }}
+        run: |
+          # The container runs as root and the report is written 0600, so both jq
+          # and upload-artifact get EACCES until the runner owns it back.
+          sudo chown -R "$(id -u):$(id -g)" ./run || true
+          test -f ./run/report.json || { echo "::error::no run report was written"; exit 1; }
+          echo "### ${{ matrix.fixture }} / ${{ matrix.mode }}" >> "$GITHUB_STEP_SUMMARY"
+          jq -r '
+            "status=\(.status)  mode=\(.mode)  dry_run=\(.dry_run)",
+            "failed_phase=\(.failed_phase // "-")  error=\(.error // "-")",
+            "packages=\(.packages | length)",
+            "phases:", (.phases[] | "  \(.name): ok=\(.ok) \(.duration_seconds)s \(.error // "")"),
+            "addons:",
+            ((.addons // {}) | to_entries[]
+             | "  \(.key): \(.value | tojson | if length > 400 then .[0:400] + " ..." else . end)")
+          ' ./run/report.json | tee -a "$GITHUB_STEP_SUMMARY"
+          # The container exits 0 on an AbortError ("no changes", "branch already
+          # exists") and a run reports success even when an addon logged and
+          # swallowed its own failure, so neither exit status nor .status alone is
+          # a verdict. Assert what this fixture is actually meant to produce.
+          jq -e -r --argjson expect "$EXPECT" -f .github/assert-report.jq \
+            ./run/report.json | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload run report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: drupdater-report-${{ matrix.fixture }}-${{ matrix.mode }}
+          path: ./run/report.json
+          if-no-files-found: error
+          retention-days: 30
