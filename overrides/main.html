@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{#
+  GoatCounter, on the published site only.
+
+  config.extra.goatcounter comes from the DRUPDATER_GOATCOUNTER environment
+  variable, which only .github/workflows/docs.yml sets — so a local build or
+  `mkdocs serve` produces pages with no tracking script in them.
+
+  The theme does not enable navigation.instant, so each page is a full document
+  load and count.js registers the hit by itself. Add a hook here if instant
+  navigation is ever turned on.
+#}
+{% block extrahead %}
+  {% if config.extra.goatcounter %}
+    <script data-goatcounter="https://drupdater.goatcounter.com/count"
+            async src="//gc.zgo.at/count.js"></script>
+  {% endif %}
+{% endblock %}

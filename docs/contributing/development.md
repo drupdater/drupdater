@@ -29,6 +29,12 @@ make docs-build     # build the documentation with --strict
 make help           # list every target
 ```
 
+!!! note "Analytics only exists on the published site"
+
+    The GoatCounter script in `overrides/main.html` is emitted only when
+    `DRUPDATER_GOATCOUNTER` is set, which happens in `.github/workflows/docs.yml` and
+    nowhere else. A local preview or build produces pages with no tracking script.
+
 Run a single test:
 
 ```bash
