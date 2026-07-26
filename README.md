@@ -209,7 +209,7 @@ required for a run that clones or pushes/opens a PR/MR (see
 | `--working-dir` | `.` | Path to the existing checkout to update in place. |
 | `--clone` | `false` | Clone instead of using the checkout. Requires `--repository-url`. For local testing. |
 | `--repository-url` | _(from `origin`)_ | Repo URL. Required with `--clone`; otherwise read from the `origin` remote. |
-| `--security` | `false` | Update only packages with known vulnerabilities. Selects the `addons.security` list. |
+| `--security` | `false` | Update only packages with known vulnerabilities. Selects the `run_types.security` block. |
 | `--concurrency` | `GOMAXPROCS(0)` | Maximum number of sites to install/update concurrently. Site installs are as much I/O-bound as CPU-bound, so raise or lower this from the CPU-derived default to match the runner (constrained runner, slow disk, or fast NVMe with many small sites). |
 | `--dry-run` | `false` | Run everything but skip pushing the branch and creating the PR/MR (the branch and commits are still created locally). In checkout mode this also means no token is required. |
 | `--report` | _(disabled)_ | Write a machine-readable JSON report of the run to this path. Written on every outcome, including failures and `--dry-run`. See [Run report](#run-report). |
@@ -221,21 +221,66 @@ required for a run that clones or pushes/opens a PR/MR (see
 Optional file at the repo root. Missing file or omitted keys fall back to the
 defaults below; unknown keys are rejected so typos fail fast.
 
+Global keys describe the whole run; everything that differs between a normal
+and a security update lives under `run_types`:
+
 ```yaml
 sites: [default]      # Drupal site directories to update (must not be empty)
 timeout: 30m          # overall run timeout (Go duration; 0 disables)
-addons:               # configurable addons per mode (mandatory addons always run)
+
+run_types:            # per-run-type settings; --security picks which block applies
   normal:
-    - code_beautifier        # phpcbf code-style fixes
-    - deprecations_remover   # drupal-rector deprecation removal
-    - translations_updater   # interface translations
-    - composer_normalizer    # normalize composer.json
-    - unsupported_modules    # report modules with no supported release
-  security: []               # minimal by default — don't interfere with the fix
+    addons:                      # configurable addons (mandatory ones always run)
+      - code_beautifier          # phpcbf code-style fixes
+      - deprecations_remover     # drupal-rector deprecation removal
+      - translations_updater     # interface translations
+      - composer_normalizer      # normalize composer.json
+      - unsupported_modules      # report modules with no supported release
+    auto_merge: false            # merge the PR/MR once its pipeline passes
+  security:
+    addons: []                   # minimal by default — don't interfere with the fix
+    auto_merge: false
 ```
 
-`--security` selects `addons.security`; otherwise `addons.normal` runs. Run
+`--security` selects the `security` block; otherwise `normal` runs. Run
 `drupdater addons` to list valid addon names.
+
+Keying on the run type rather than on the setting means configuring a security
+run is reading one stanza, instead of picking the `security` field out of every
+setting in the file.
+
+> [!NOTE]
+> **Changed layout.** `addons` and `auto_merge` used to be top-level keys, each
+> split by mode. They now live under `run_types.<mode>`. A config in the old
+> shape fails at startup with a message showing the replacement.
+
+#### Auto-merge
+
+`auto_merge` is off for both run types unless you turn it on. When enabled,
+drupdater asks the platform to merge the MR/PR as soon as its pipeline
+succeeds — on GitLab via auto-merge, on GitHub via the repository's auto-merge
+feature. Nothing is merged while checks are failing or pending; if the project
+has no pipeline at all, the merge happens immediately.
+
+The two run types are separate on purpose: auto-merging routine dependency
+bumps is a different risk decision from auto-merging a security fix, and you may
+well want one without the other.
+
+Requirements and behaviour:
+
+- **GitHub** — "Allow auto-merge" must be enabled in the repository settings,
+  and the token needs write access to pull requests. drupdater picks a merge
+  method the repository actually permits (merge commit, else squash, else
+  rebase). Whether the branch is deleted afterwards is the repository's
+  *Automatically delete head branches* setting.
+- **GitLab** — the token needs the Developer role or higher. The source branch
+  is deleted on merge.
+- Enabling auto-merge is best-effort: if it fails (feature disabled, token
+  lacks the scope, platform error) drupdater logs a warning and the run still
+  succeeds. The MR/PR is left in place for you to merge by hand. The outcome is
+  also recorded under `merge_request.auto_merge` in the
+  [run report](#run-report), so a failure is visible to tooling and not only in
+  the log.
 
 ### Environment variables
 
@@ -268,7 +313,10 @@ drupdater --dry-run --report ./drupdater-report.json
   "repository": "https://github.com/org/site.git",
   "base_branch": "main",
   "update_branch": "drupdater-3f81a2c",
-  "merge_request": { "url": "https://github.com/org/site/pull/42" },
+  "merge_request": {
+    "url": "https://github.com/org/site/pull/42",
+    "auto_merge": { "enabled": true }
+  },
   "sites": ["default"],
   "packages": [
     { "action": "Upgrade", "package": "drupal/core", "from": "10.1.8", "to": "10.2.0" }
@@ -300,6 +348,12 @@ whether a run is dominated by `composer install`, by site installs, or by Rector
 report (`composer_audit`, `update_hooks`, `unsupported_modules`,
 `composer_patches`). Addons with nothing to say are omitted rather than present
 and empty.
+
+**`merge_request.auto_merge`** is present only when the active run type asked
+for auto-merge, so "never requested" is distinguishable from "requested and
+failed". A failure sets `enabled: false` and an `error` while the run itself
+still reports `success` — which is exactly why it is here and not only in the
+log.
 
 Credentials never appear in the report: the repository URL is stripped of any
 embedded userinfo, and the finished document passes through the same redactor

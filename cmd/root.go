@@ -301,8 +301,10 @@ func loadProjectConfig(logger *zap.Logger, path string, cfg *internal.Config) er
 		zap.Bool("file_found", found),
 		zap.Strings("sites", cfg.Sites),
 		zap.Duration("timeout", cfg.Timeout),
-		zap.Strings("addons.normal", cfg.Addons.Normal),
-		zap.Strings("addons.security", cfg.Addons.Security),
+		zap.Strings("run_types.normal.addons", cfg.RunTypes.Normal.Addons),
+		zap.Bool("run_types.normal.auto_merge", cfg.RunTypes.Normal.AutoMerge),
+		zap.Strings("run_types.security.addons", cfg.RunTypes.Security.Addons),
+		zap.Bool("run_types.security.auto_merge", cfg.RunTypes.Security.AutoMerge),
 	)
 	return nil
 }
@@ -411,10 +413,7 @@ func createAddons(
 ) ([]internal.Addon, error) {
 	deps := addonDeps{logger: logger, drush: drush, composer: composer, drupalOrg: drupalOrg, git: git}
 
-	names := config.Addons.Normal
-	if config.Security {
-		names = config.Addons.Security
-	}
+	names := config.ActiveRunType().Addons
 
 	var addons []internal.Addon
 	added := map[string]bool{}
@@ -451,10 +450,10 @@ func createAddons(
 	return addons, nil
 }
 
-// validateAddons checks every addon named in either list is known, regardless of which mode
-// will run, so a typo in addons.security is caught even on a normal run (and vice versa).
+// validateAddons checks every addon named in either run type is known, regardless of which one
+// will run, so a typo under run_types.security is caught even on a normal run (and vice versa).
 func validateAddons(config internal.Config) error {
-	for _, name := range append(append([]string{}, config.Addons.Normal...), config.Addons.Security...) {
+	for _, name := range append(append([]string{}, config.RunTypes.Normal.Addons...), config.RunTypes.Security.Addons...) {
 		if _, ok := addonRegistry[name]; !ok {
 			return fmt.Errorf("unknown addon %q (run \"drupdater addons\" to list valid names)", name)
 		}
@@ -486,7 +485,7 @@ var addonsCmd = &cobra.Command{
 	Short: "List the addon names that can be set in .drupdater.yaml",
 	Run: func(cmd *cobra.Command, _ []string) {
 		out := cmd.OutOrStdout()
-		fmt.Fprintln(out, "Addons you can set under addons.normal / addons.security in .drupdater.yaml:")
+		fmt.Fprintln(out, "Addons you can set under run_types.normal.addons / run_types.security.addons in .drupdater.yaml:")
 		for _, n := range configurableAddons() {
 			fmt.Fprintf(out, "  %s\n", n)
 		}

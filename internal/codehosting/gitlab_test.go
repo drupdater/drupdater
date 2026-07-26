@@ -141,6 +141,163 @@ func TestGitlab_GetUser_HonorsContext(t *testing.T) {
 	assert.Empty(t, email)
 }
 
+// newAutoMergeServer serves the GetMergeRequest endpoint with the given sequence of
+// detailed_merge_status values (the last one repeats once exhausted) and accepts the merge.
+// It returns the server plus counters for the GET and PUT calls.
+func newAutoMergeServer(t *testing.T, statuses ...string) (*httptest.Server, *int, *int) {
+	t.Helper()
+	var getCount, putCount int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v4/projects/test_project/merge_requests/1":
+			status := statuses[min(getCount, len(statuses)-1)]
+			getCount++
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"iid":1,"detailed_merge_status":"` + status + `"}`))
+		case r.Method == http.MethodPut && r.URL.Path == "/api/v4/projects/test_project/merge_requests/1/merge":
+			putCount++
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"iid":1,"state":"merged"}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(server.Close)
+	return server, &getCount, &putCount
+}
+
+func TestGitlab_EnableAutoMerge_WaitsOutPendingStatus(t *testing.T) {
+	// GitLab computes mergeability asynchronously; the first reads are still pending.
+	mockServer, getCount, putCount := newAutoMergeServer(t, "preparing", "checking", "mergeable")
+
+	client, _ := gitlab.NewClient("", gitlab.WithBaseURL(mockServer.URL))
+	g := &Gitlab{client: client, projectPath: "test_project", retryInterval: 0}
+
+	err := g.EnableAutoMerge(context.Background(), MergeRequest{ID: 1})
+	require.NoError(t, err)
+	assert.Equal(t, 3, *getCount, "should poll while the merge status is still being computed")
+	assert.Equal(t, 1, *putCount)
+}
+
+// TestGitlab_EnableAutoMerge_AcceptsWhileCIRunning is the regression test for the feature's
+// central case: a pipeline-gated MR never reports "mergeable" before the pipeline finishes, so
+// waiting for that status would make auto-merge unusable on exactly the projects that want it.
+// A CI status is a settled answer and must be accepted straight away.
+func TestGitlab_EnableAutoMerge_AcceptsWhileCIRunning(t *testing.T) {
+	for _, status := range []string{"ci_still_running", "ci_must_pass"} {
+		t.Run(status, func(t *testing.T) {
+			mockServer, getCount, putCount := newAutoMergeServer(t, status)
+
+			client, _ := gitlab.NewClient("", gitlab.WithBaseURL(mockServer.URL))
+			g := &Gitlab{client: client, projectPath: "test_project", retryInterval: 0}
+
+			err := g.EnableAutoMerge(context.Background(), MergeRequest{ID: 1})
+			require.NoError(t, err)
+			assert.Equal(t, 1, *getCount, "a CI status is settled — no reason to keep polling")
+			assert.Equal(t, 1, *putCount, "auto-merge must be enabled while the pipeline runs")
+		})
+	}
+}
+
+func TestGitlab_EnableAutoMerge_StatusNeverSettles(t *testing.T) {
+	mockServer, getCount, putCount := newAutoMergeServer(t, "checking")
+
+	client, _ := gitlab.NewClient("", gitlab.WithBaseURL(mockServer.URL))
+	g := &Gitlab{client: client, projectPath: "test_project", retryInterval: 0}
+
+	err := g.EnableAutoMerge(context.Background(), MergeRequest{ID: 1})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "merge status was still pending after 7 checks")
+	assert.Equal(t, maxMergeStatusChecks, *getCount)
+	assert.Zero(t, *putCount, "must not attempt the merge when the status never settled")
+}
+
+func TestGitlab_EnableAutoMerge_MergeRetryOn405(t *testing.T) {
+	putCount := 0
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v4/projects/test_project/merge_requests/1":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"iid":1,"detailed_merge_status":"mergeable"}`))
+		case r.Method == http.MethodPut && r.URL.Path == "/api/v4/projects/test_project/merge_requests/1/merge":
+			putCount++
+			if putCount < 3 {
+				w.WriteHeader(http.StatusMethodNotAllowed)
+				_, _ = w.Write([]byte(`{"message":"405 Method Not Allowed"}`))
+			} else {
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(`{"iid":1,"state":"merged"}`))
+			}
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer mockServer.Close()
+
+	client, _ := gitlab.NewClient("", gitlab.WithBaseURL(mockServer.URL))
+	g := &Gitlab{client: client, projectPath: "test_project", retryInterval: 0}
+
+	err := g.EnableAutoMerge(context.Background(), MergeRequest{ID: 1})
+	require.NoError(t, err)
+	assert.Equal(t, 3, putCount, "should retry merge on 405")
+}
+
+func TestGitlab_EnableAutoMerge_MergeFailsAfterMaxRetries(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v4/projects/test_project/merge_requests/1":
+			w.WriteHeader(http.StatusOK)
+			// GitLab documents 405 as "the merge request cannot merge"; a draft is one
+			// settled status that produces it, and naming it makes the warning actionable.
+			_, _ = w.Write([]byte(`{"iid":1,"detailed_merge_status":"draft_status"}`))
+		case r.Method == http.MethodPut && r.URL.Path == "/api/v4/projects/test_project/merge_requests/1/merge":
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			_, _ = w.Write([]byte(`{"message":"405 Method Not Allowed"}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer mockServer.Close()
+
+	client, _ := gitlab.NewClient("", gitlab.WithBaseURL(mockServer.URL))
+	g := &Gitlab{client: client, projectPath: "test_project", retryInterval: 0}
+
+	err := g.EnableAutoMerge(context.Background(), MergeRequest{ID: 1})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "could not set auto merge for MR 1")
+	assert.Contains(t, err.Error(), `draft_status`, "the settled status names the real blocker")
+}
+
+func TestGitlab_EnableAutoMerge_GetMRError(t *testing.T) {
+	// Use 403 (not 5xx) to avoid retries by the underlying retryable HTTP client.
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"message":"403 Forbidden"}`))
+	}))
+	defer mockServer.Close()
+
+	client, _ := gitlab.NewClient("bad-token", gitlab.WithBaseURL(mockServer.URL))
+	g := &Gitlab{client: client, projectPath: "test_project", retryInterval: 0}
+
+	err := g.EnableAutoMerge(context.Background(), MergeRequest{ID: 1})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "could not set auto merge for MR 1")
+}
+
+func TestGitlab_EnableAutoMerge_HonorsContext(t *testing.T) {
+	g := newTestGitlab(t)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := g.EnableAutoMerge(ctx, MergeRequest{ID: 1})
+	require.ErrorIs(t, err, context.Canceled)
+}
+
 func TestGetUser_ReturnsEmptyStringsOnError(t *testing.T) {
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)

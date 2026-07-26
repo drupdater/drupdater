@@ -238,3 +238,54 @@ func phaseNames(phases []report.Phase) []string {
 
 	return names
 }
+
+// Auto-merge is best-effort: a failure only warns, so the report is the one machine-readable
+// place a consumer can learn that the MR it is waiting on will not merge itself.
+func TestReportRecordsAutoMergeOutcome(t *testing.T) {
+	t.Run("not requested leaves auto_merge absent", func(t *testing.T) {
+		h := newReportHarness(t, false)
+		h.expectFullRun(t)
+		h.repository.EXPECT().Push(mock.Anything).Return(nil)
+		h.vcsProvider.EXPECT().CreateMergeRequest(mock.Anything, mock.Anything, mock.Anything, mock.Anything, "main").
+			Return(codehosting.MergeRequest{URL: "https://example.com/mr/1"}, nil)
+
+		require.NoError(t, h.run(t))
+
+		require.NotNil(t, h.got.MergeRequest)
+		assert.Nil(t, h.got.MergeRequest.AutoMerge, "absent means never asked for")
+	})
+
+	t.Run("success is recorded as enabled", func(t *testing.T) {
+		h := newReportHarness(t, false)
+		h.config.RunTypes.Normal.AutoMerge = true
+		h.expectFullRun(t)
+		h.repository.EXPECT().Push(mock.Anything).Return(nil)
+		h.vcsProvider.EXPECT().CreateMergeRequest(mock.Anything, mock.Anything, mock.Anything, mock.Anything, "main").
+			Return(codehosting.MergeRequest{URL: "https://example.com/mr/1"}, nil)
+		h.vcsProvider.EXPECT().EnableAutoMerge(mock.Anything, mock.Anything).Return(nil)
+
+		require.NoError(t, h.run(t))
+
+		require.NotNil(t, h.got.MergeRequest.AutoMerge)
+		assert.True(t, h.got.MergeRequest.AutoMerge.Enabled)
+		assert.Empty(t, h.got.MergeRequest.AutoMerge.Error)
+	})
+
+	t.Run("failure is recorded without failing the run", func(t *testing.T) {
+		h := newReportHarness(t, false)
+		h.config.RunTypes.Normal.AutoMerge = true
+		h.expectFullRun(t)
+		h.repository.EXPECT().Push(mock.Anything).Return(nil)
+		h.vcsProvider.EXPECT().CreateMergeRequest(mock.Anything, mock.Anything, mock.Anything, mock.Anything, "main").
+			Return(codehosting.MergeRequest{URL: "https://example.com/mr/1"}, nil)
+		h.vcsProvider.EXPECT().EnableAutoMerge(mock.Anything, mock.Anything).
+			Return(errors.New("auto-merge is not allowed for this repository"))
+
+		require.NoError(t, h.run(t), "a failed auto-merge must not fail the run")
+
+		assert.Equal(t, report.StatusSuccess, h.got.Status)
+		require.NotNil(t, h.got.MergeRequest.AutoMerge)
+		assert.False(t, h.got.MergeRequest.AutoMerge.Enabled)
+		assert.Contains(t, h.got.MergeRequest.AutoMerge.Error, "not allowed")
+	})
+}

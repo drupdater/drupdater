@@ -98,6 +98,22 @@ type Report struct {
 // MergeRequest identifies the merge/pull request a successful run opened.
 type MergeRequest struct {
 	URL string `json:"url"`
+	// AutoMerge is nil when the active run type did not ask for auto-merge, so a consumer can
+	// tell "not requested" apart from "requested and failed".
+	AutoMerge *AutoMerge `json:"auto_merge,omitempty"`
+}
+
+// AutoMerge is the outcome of asking the platform to merge the MR/PR once its pipeline passes.
+//
+// It is reported because enabling auto-merge is best-effort: a failure is logged and the run
+// still succeeds, since the branch is pushed and the MR exists by then. That makes the log the
+// only other place the outcome appears, so without this a consumer reading the report would see
+// a clean success and never learn that the MR it is waiting on will not merge itself.
+type AutoMerge struct {
+	// Enabled is true when the platform accepted the request.
+	Enabled bool `json:"enabled"`
+	// Error is why the request failed, empty when it succeeded.
+	Error string `json:"error,omitempty"`
 }
 
 // PackageChange is one dependency change made by composer update.
@@ -229,6 +245,22 @@ func (r *Recorder) SetMergeRequest(url string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.report.MergeRequest = &MergeRequest{URL: SanitizeURL(url)}
+}
+
+// SetAutoMerge records the outcome of the auto-merge request. err is nil when the platform
+// accepted it. It is a no-op when no merge request was recorded, since auto-merge is only ever
+// requested for one that exists.
+func (r *Recorder) SetAutoMerge(err error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.report.MergeRequest == nil {
+		return
+	}
+	am := &AutoMerge{Enabled: err == nil}
+	if err != nil {
+		am.Error = err.Error()
+	}
+	r.report.MergeRequest.AutoMerge = am
 }
 
 // AddAddons collects a structured section from every addon that implements Reporter. Addons that

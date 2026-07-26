@@ -19,7 +19,7 @@ type Config struct {
 	DryRun        bool
 	Verbose       bool
 	Timeout       time.Duration
-	Addons        AddonsConfig
+	RunTypes      RunTypesConfig
 	// Concurrency bounds how many sites are installed/updated at once. It describes the
 	// machine the run happens on, not the project, so it's a CLI flag rather than a
 	// .drupdater.yaml key. A value <= 0 means "use GOMAXPROCS(0)".
@@ -29,10 +29,32 @@ type Config struct {
 	ReportPath string
 }
 
-// AddonsConfig lists which configurable addons run in each mode. Mandatory addons
-// (composer_allow_plugins, composer_patches, composer_diff, update_hooks) always run and are
-// not listed here.
-type AddonsConfig struct {
-	Normal   []string `yaml:"normal"`
-	Security []string `yaml:"security"`
+// RunTypesConfig groups the settings that differ between a normal and a security run. Keying
+// on the run type rather than on the setting keeps everything one mode does in one block, so
+// configuring a security run means reading one stanza instead of picking the `security` field
+// out of every setting in the file.
+type RunTypesConfig struct {
+	Normal   RunTypeConfig `yaml:"normal"`
+	Security RunTypeConfig `yaml:"security"`
+}
+
+// RunTypeConfig is what a single run type configures.
+type RunTypeConfig struct {
+	// Addons lists the configurable addons to run. Mandatory addons
+	// (composer_allow_plugins, composer_patches, composer_diff, update_hooks) always run and
+	// are not listed here, nor is composer_audit, which is added automatically in security mode.
+	Addons []string `yaml:"addons"`
+
+	// AutoMerge asks the platform to merge the MR/PR once its pipeline passes.
+	AutoMerge bool `yaml:"auto_merge"`
+}
+
+// ActiveRunType returns the settings for the run type this invocation selected. Every consumer
+// of a per-run-type setting goes through here, so the mapping from --security to a config block
+// is stated once.
+func (c Config) ActiveRunType() RunTypeConfig {
+	if c.Security {
+		return c.RunTypes.Security
+	}
+	return c.RunTypes.Normal
 }

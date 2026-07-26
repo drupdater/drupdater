@@ -106,7 +106,7 @@ func TestCreateDispatcher(t *testing.T) {
 	logger := zaptest.NewLogger(t)
 
 	t.Run("returns a non-nil dispatcher with addons subscribed", func(t *testing.T) {
-		config := internal.Config{Addons: internal.AddonsConfig{Normal: []string{"composer_normalizer"}}}
+		config := internal.Config{RunTypes: internal.RunTypesConfig{Normal: internal.RunTypeConfig{Addons: []string{"composer_normalizer"}}}}
 		addons, err := createAddons(logger, config, nil, nil, nil, nil)
 		require.NoError(t, err)
 		dispatcher := createDispatcher(addons)
@@ -124,7 +124,7 @@ func TestCreateAddons(t *testing.T) {
 
 	t.Run("mandatory addons plus the normal list", func(t *testing.T) {
 		config := internal.Config{
-			Addons: internal.AddonsConfig{Normal: []string{"code_beautifier"}},
+			RunTypes: internal.RunTypesConfig{Normal: internal.RunTypeConfig{Addons: []string{"code_beautifier"}}},
 		}
 		addons, err := createAddons(logger, config, nil, nil, nil, nil)
 		require.NoError(t, err)
@@ -135,9 +135,9 @@ func TestCreateAddons(t *testing.T) {
 	t.Run("security mode adds composer_audit even when not listed", func(t *testing.T) {
 		config := internal.Config{
 			Security: true,
-			Addons: internal.AddonsConfig{
-				Normal:   []string{"code_beautifier"},
-				Security: []string{"code_beautifier"}, // composer_audit intentionally omitted
+			RunTypes: internal.RunTypesConfig{
+				Normal:   internal.RunTypeConfig{Addons: []string{"code_beautifier"}},
+				Security: internal.RunTypeConfig{Addons: []string{"code_beautifier"}}, // composer_audit intentionally omitted
 			},
 		}
 		addons, err := createAddons(logger, config, nil, nil, nil, nil)
@@ -147,14 +147,14 @@ func TestCreateAddons(t *testing.T) {
 	})
 
 	t.Run("a mandatory addon listed in the YAML is not duplicated", func(t *testing.T) {
-		config := internal.Config{Addons: internal.AddonsConfig{Normal: []string{"update_hooks"}}}
+		config := internal.Config{RunTypes: internal.RunTypesConfig{Normal: internal.RunTypeConfig{Addons: []string{"update_hooks"}}}}
 		addons, err := createAddons(logger, config, nil, nil, nil, nil)
 		require.NoError(t, err)
 		assert.Len(t, addons, 4) // update_hooks is already mandatory
 	})
 
 	t.Run("an unknown addon name is an error", func(t *testing.T) {
-		config := internal.Config{Addons: internal.AddonsConfig{Normal: []string{"does_not_exist"}}}
+		config := internal.Config{RunTypes: internal.RunTypesConfig{Normal: internal.RunTypeConfig{Addons: []string{"does_not_exist"}}}}
 		_, err := createAddons(logger, config, nil, nil, nil, nil)
 		require.Error(t, err)
 	})
@@ -162,15 +162,15 @@ func TestCreateAddons(t *testing.T) {
 
 func TestValidateAddons(t *testing.T) {
 	t.Run("known names pass, including mandatory ones", func(t *testing.T) {
-		config := internal.Config{Addons: internal.AddonsConfig{
-			Normal:   []string{"code_beautifier", "update_hooks"},
-			Security: []string{"composer_normalizer"},
+		config := internal.Config{RunTypes: internal.RunTypesConfig{
+			Normal:   internal.RunTypeConfig{Addons: []string{"code_beautifier", "update_hooks"}},
+			Security: internal.RunTypeConfig{Addons: []string{"composer_normalizer"}},
 		}}
 		require.NoError(t, validateAddons(config))
 	})
 
 	t.Run("unknown name in the normal list is an error", func(t *testing.T) {
-		config := internal.Config{Addons: internal.AddonsConfig{Normal: []string{"nope"}}}
+		config := internal.Config{RunTypes: internal.RunTypesConfig{Normal: internal.RunTypeConfig{Addons: []string{"nope"}}}}
 		err := validateAddons(config)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "nope")
@@ -178,7 +178,7 @@ func TestValidateAddons(t *testing.T) {
 
 	t.Run("unknown name in the security list is caught regardless of mode", func(t *testing.T) {
 		// Security: false, yet a bad security-list name must still be rejected.
-		config := internal.Config{Addons: internal.AddonsConfig{Security: []string{"typo"}}}
+		config := internal.Config{RunTypes: internal.RunTypesConfig{Security: internal.RunTypeConfig{Addons: []string{"typo"}}}}
 		require.Error(t, validateAddons(config))
 	})
 }

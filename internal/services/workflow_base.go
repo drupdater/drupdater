@@ -571,6 +571,23 @@ func (ws *WorkflowBaseService) publishWork(ctx context.Context, repository GitRe
 	ws.logger.Info("merge request created", zap.String("url", mr.URL))
 	rec.SetMergeRequest(mr.URL)
 
+	// Auto-merge is a convenience on top of work that has already succeeded: the branch is
+	// pushed and the MR exists. Failing the run here (repository forbids auto-merge, token
+	// lacks the scope, platform hiccup) would report a red job for a perfectly good MR, so
+	// the error is logged and the run still succeeds. The MR is deliberately left in place.
+	//
+	// It is recorded either way, because a warning in the log is easy to miss and the report
+	// would otherwise show a clean success for a run whose MR will never merge itself.
+	if ws.config.ActiveRunType().AutoMerge {
+		err := ws.platform.EnableAutoMerge(ctx, mr)
+		rec.SetAutoMerge(err)
+		if err != nil {
+			ws.logger.Warn("failed to enable auto merge", zap.String("url", mr.URL), zap.Error(err))
+		} else {
+			ws.logger.Info("auto merge enabled", zap.String("url", mr.URL))
+		}
+	}
+
 	return nil
 }
 
