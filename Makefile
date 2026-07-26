@@ -4,7 +4,7 @@
 BINARY_NAME=drupdater
 DOCKER_IMAGE=drupdater-local
 VERSION=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
-LDFLAGS=-ldflags "-X main.version=${VERSION}"
+LDFLAGS=-ldflags "-X github.com/drupdater/drupdater/internal.Version=${VERSION}"
 
 # Default target
 .DEFAULT_GOAL := help
