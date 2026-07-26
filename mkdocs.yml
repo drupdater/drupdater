@@ -1,0 +1,148 @@
+site_name: Drupdater
+site_url: https://drupdater.github.io/
+site_description: >-
+  Automated, reviewable Drupal updates — as a pull or merge request, on every schedule.
+site_author: Drupdater contributors
+
+repo_url: https://github.com/drupdater/drupdater
+repo_name: drupdater/drupdater
+edit_uri: edit/main/docs/
+
+copyright: Licensed under the Apache License 2.0
+
+theme:
+  name: material
+  language: en
+  icon:
+    repo: fontawesome/brands/github
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - navigation.footer
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.tabs.link
+    - content.action.edit
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep purple
+      accent: deep purple
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep purple
+      accent: deep purple
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+extra_css:
+  - stylesheets/extra.css
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/drupdater/drupdater
+      name: Drupdater on GitHub
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  # base_path includes the repository root so pages can embed files that live
+  # beside the code — the addon golden files and .github/assert-report.jq — and
+  # therefore cannot drift from what the tests and CI actually use.
+  - pymdownx.snippets:
+      base_path:
+        - .
+        - docs
+      check_paths: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+
+plugins:
+  - search
+
+nav:
+  - Home: index.md
+  - Tutorials:
+      - tutorials/index.md
+      - Your first run: tutorials/first-run.md
+      - Scheduled updates in CI: tutorials/scheduled-updates.md
+  - How-to guides:
+      - how-to/index.md
+      - Run in GitHub Actions: how-to/github-actions.md
+      - Run in GitLab CI: how-to/gitlab-ci.md
+      - Run preflight checks: how-to/run-preflight-checks.md
+      - Update multiple sites: how-to/update-multiple-sites.md
+      - Use a private Composer registry: how-to/use-private-packagist.md
+      - Enable patch management: how-to/enable-patch-management.md
+      - Enable auto-merge: how-to/enable-auto-merge.md
+      - Consume the run report: how-to/consume-the-run-report.md
+      - Migrate the config layout: how-to/migrate-config-layout.md
+      - Troubleshoot a run: how-to/troubleshoot.md
+  - Reference:
+      - reference/index.md
+      - Command line:
+          - reference/cli/index.md
+          - drupdater: reference/cli/drupdater.md
+          - drupdater check: reference/cli/check.md
+          - drupdater addons: reference/cli/addons.md
+      - Configuration file: reference/configuration.md
+      - Environment variables: reference/environment-variables.md
+      - Addons:
+          - reference/addons/index.md
+          - composer_allow_plugins: reference/addons/composer-allow-plugins.md
+          - composer_patches: reference/addons/composer-patches.md
+          - composer_diff: reference/addons/composer-diff.md
+          - update_hooks: reference/addons/update-hooks.md
+          - composer_audit: reference/addons/composer-audit.md
+          - code_beautifier: reference/addons/code-beautifier.md
+          - deprecations_remover: reference/addons/deprecations-remover.md
+          - translations_updater: reference/addons/translations-updater.md
+          - composer_normalizer: reference/addons/composer-normalizer.md
+          - unsupported_modules: reference/addons/unsupported-modules.md
+      - Run report: reference/run-report.md
+      - Preflight checks: reference/preflight-checks.md
+      - Docker images: reference/docker-images.md
+  - Explanation:
+      - explanation/index.md
+      - How a run works: explanation/how-a-run-works.md
+      - The addon architecture: explanation/addon-architecture.md
+      - The configuration model: explanation/configuration-model.md
+      - Why a run report: explanation/why-a-run-report.md
+      - Credentials and redaction: explanation/credentials-and-redaction.md
+      - VCS provider detection: explanation/vcs-provider-detection.md
+      - What Drupdater does not do: explanation/non-goals.md
+  - Contributing:
+      - contributing/index.md
+      - Development setup: contributing/development.md
+      - Writing an addon: contributing/writing-an-addon.md
+      - Releasing: contributing/releasing.md
+      - Security policy: contributing/security-policy.md

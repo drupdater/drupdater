@@ -1,4 +1,4 @@
-.PHONY: build test clean mock lint fmt fix run docker-build docker-run help
+.PHONY: build test clean mock lint fmt fix run docker-build docker-run docs-serve docs-build help
 
 # Variables
 BINARY_NAME=drupdater
@@ -57,6 +57,12 @@ docker-run: ## Run Docker image (requires REPO and TOKEN args)
 update: ## Update dependencies
 	go get -u ./...
 	go mod tidy
+
+docs-serve: ## Preview the documentation site at http://127.0.0.1:8000
+	mkdocs serve
+
+docs-build: ## Build the documentation site into ./site (--strict fails on broken links)
+	mkdocs build --strict
 
 # Help target
 help: ## Display this help

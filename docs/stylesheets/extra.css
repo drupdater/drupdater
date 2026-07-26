@@ -1,0 +1,46 @@
+/*
+ * Brand colours.
+ *
+ * The previous documentation site was themed with Catppuccin Mocha Lavender,
+ * and that lavender is the project's only established visual cue — so it is
+ * carried over here rather than replaced. Material's `deep purple` palette in
+ * mkdocs.yml provides the shape (hover states, ripples, admonition tinting);
+ * these variables retint it.
+ *
+ * Light mode uses Catppuccin Latte's lavender (#7287fd), which has enough
+ * contrast to carry white header text. Mocha's lavender (#b4befe) is far too
+ * pale for that, so in dark mode it is paired with dark foreground text.
+ */
+
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: #7287fd;
+  --md-primary-fg-color--light: #8a9bfd;
+  --md-primary-fg-color--dark: #5a6fd8;
+  --md-primary-bg-color: #ffffff;
+  --md-primary-bg-color--light: rgba(255, 255, 255, 0.7);
+  --md-accent-fg-color: #7287fd;
+  --md-accent-fg-color--transparent: rgba(114, 135, 253, 0.1);
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #b4befe;
+  --md-primary-fg-color--light: #c7cffe;
+  --md-primary-fg-color--dark: #9aa6f5;
+  --md-primary-bg-color: #1e1e2e;
+  --md-primary-bg-color--light: rgba(30, 30, 46, 0.7);
+  --md-accent-fg-color: #b4befe;
+  --md-accent-fg-color--transparent: rgba(180, 190, 254, 0.1);
+}
+
+/*
+ * Reference tables carry a lot of narrow columns — flag names, addon names,
+ * report fields. Left-aligning and tightening them keeps a wide table readable
+ * without horizontal scrolling on a laptop.
+ */
+.md-typeset table:not([class]) th {
+  white-space: nowrap;
+}
+
+.md-typeset table:not([class]) code {
+  white-space: nowrap;
+}
