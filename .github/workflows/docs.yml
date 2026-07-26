@@ -1,0 +1,56 @@
+name: docs
+
+# Builds the documentation site and publishes it to the gh-pages branch of
+# drupdater/drupdater.github.io, which GitHub Pages serves at https://drupdater.github.io/.
+#
+# The sources live here, beside the code, so a change to a flag or an addon updates its own
+# documentation in the same pull request. Only the built HTML is pushed to the site repository.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "mkdocs.yml"
+      - "requirements-docs.txt"
+      # Snippet sources: these files are embedded into pages verbatim, so a change to one
+      # changes the published site even though it is not under docs/.
+      - "internal/addon/testdata/**"
+      - ".github/assert-report.jq"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+# The push to the site repository is authenticated by a deploy key, not by GITHUB_TOKEN.
+permissions:
+  contents: read
+
+concurrency:
+  group: docs
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+          cache: pip
+          cache-dependency-path: requirements-docs.txt
+
+      - run: pip install -r requirements-docs.txt
+
+      # --strict fails the build on a broken internal link or a nav entry pointing at a
+      # file that does not exist, so a bad link is caught here rather than published.
+      - run: mkdocs build --strict
+
+      - uses: peaceiris/actions-gh-pages@v4
+        with:
+          deploy_key: ${{ secrets.DOCS_DEPLOY_KEY }}
+          external_repository: drupdater/drupdater.github.io
+          publish_branch: gh-pages
+          publish_dir: ./site
+          # The site is generated, so its history carries no information worth keeping.
+          force_orphan: true
+          commit_message: "docs: publish from ${{ github.sha }}"

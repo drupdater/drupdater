@@ -8,6 +8,44 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Drupdater itself runs as a step in the project's CI pipeline, which already runs the project's test suite (PHPUnit/Behat/etc.) on the resulting MR/branch. Don't propose or add test-running functionality inside Drupdater — that responsibility belongs to CI, not this tool.
 
+## Documentation lives in `docs/`
+
+**`docs/` is the single source of truth for user-facing and architectural documentation**, published to <https://drupdater.github.io/> by `.github/workflows/docs.yml` on every push to `main`. It is organized on the [Diátaxis](https://diataxis.fr/) model:
+
+| Directory | Contains |
+|---|---|
+| `docs/tutorials/` | Learning-oriented walkthroughs |
+| `docs/how-to/` | Task-oriented recipes |
+| `docs/reference/` | CLI flags, `.drupdater.yaml` schema, all addons, report schema, preflight checks, Docker images |
+| `docs/explanation/` | Workflow phases, addon architecture, config model, credential handling, VCS detection, non-goals |
+| `docs/contributing/` | Development setup, writing an addon, releasing, security policy |
+
+**Do not duplicate reference material in this file or in the README.** The CLI flag table and the `.drupdater.yaml` schema used to exist in three places and drifted. They now live in `docs/reference/` only.
+
+### Keep docs in sync with code
+
+A change to any of the following **must** update its page in the same PR:
+
+| Change | Page to update |
+|---|---|
+| A CLI flag | `docs/reference/cli/drupdater.md` (or `check.md`) |
+| A `.drupdater.yaml` key or default | `docs/reference/configuration.md` |
+| An addon — behaviour, events, report data | `docs/reference/addons/<name>.md` **and** the catalogue table in `docs/reference/addons/index.md` |
+| The report schema | `docs/reference/run-report.md` |
+| A preflight check | `docs/reference/preflight-checks.md` |
+| An environment variable | `docs/reference/environment-variables.md` |
+| A workflow phase or event | `docs/explanation/how-a-run-works.md`, `docs/explanation/addon-architecture.md` |
+| Published PHP versions | `docs/reference/docker-images.md` |
+
+Verify with `make docs-build` (runs `mkdocs build --strict`, which fails on broken internal links and bad nav entries). Preview with `make docs-serve`.
+
+Some pages embed files from the repo via `pymdownx.snippets`, so they cannot drift:
+
+- `internal/addon/testdata/*.md` → the "pull request section" examples on addon pages
+- `.github/assert-report.jq` → `docs/how-to/consume-the-run-report.md`
+
+Changing a golden file changes the published example. `internal/addon/testdata/composer_diff.md` is a `Dummy Table` placeholder and is deliberately *not* embedded — that page hand-writes its example.
+
 ## Commands
 
 ```bash
@@ -18,6 +56,8 @@ make fmt            # Format code
 make mock           # Regenerate mocks (requires mockery v3)
 make update         # Update Go dependencies
 make docker-build   # Build multi-stage Docker image (Go binary + PHP runtime)
+make docs-serve     # Preview the documentation site
+make docs-build     # Build the documentation with --strict
 ```
 
 Run a single test:
@@ -30,110 +70,41 @@ Run the tool locally:
 make docker-run REPO=<git-url> TOKEN=<token>
 ```
 
-## Architecture
+## Code Map
 
-### Entry Point → Workflow
+Where things live. For *how they work*, read `docs/explanation/` rather than duplicating it here.
 
-`main.go` → `cmd/root.go` (Cobra) → `internal/services/workflow_base.go`
+| Path | Contains |
+|---|---|
+| `main.go` → `cmd/root.go` | Cobra commands, flag parsing, service construction, `addonRegistry`, `mandatoryAddons` |
+| `cmd/check.go` | The `check` command and its cheap/full check tiers |
+| `internal/services/workflow_base.go` | `StartUpdate` and the seven phases |
+| `internal/services/event.go` | The six workflow events and `AbortError` |
+| `internal/services/preflight.go` | Checks shared between `check` and the run's own `preflight` phase |
+| `internal/addon/` | The ten addons |
+| `internal/addon/report.go` | **Every addon's report contribution, together** — this file *is* the report's `addons` schema |
+| `internal/addon/templates/` | Go templates rendering the MR description sections |
+| `internal/configfile.go` | `.drupdater.yaml` loading, defaults, strict decode, legacy-layout rejection |
+| `internal/codehosting/` | GitHub and GitLab implementations, provider factory |
+| `internal/report/` | The published JSON report schema and its atomic writer |
+| `internal/logging/redact.go` | Value-based secret redaction, wrapping the zap core |
+| `pkg/` | One directory per wrapped external tool: `composer`, `drush`, `repo` (go-git), `phpcs`, `rector`, `drupal` (installer), `drupalorg` |
+| `scripts/` | PHP helpers copied into the image (`rector.php`, `unsupported-modules.php`, `config-resave.php`) |
 
-`root.go` is where CLI flags are parsed, core services are initialized (logger, cache, Composer/Drush/Git wrappers), the VCS provider (GitHub or GitLab) is detected via factory, and all addons are registered before the workflow starts. The repository URL is read from the checkout's `origin` remote unless `--clone`/`--repository-url` is given.
+### Invariants worth knowing before editing
 
-### Workflow Phases
-
-The workflow in `workflow_base.go` operates on a **single working directory** (the existing checkout by default, or a fresh clone with `--clone`). Old and new code live there sequentially; phases run linearly, with per-site work fanned out concurrently (limited to CPU cores):
-
-1. **acquire working copy** – open the existing checkout (default) or clone (`--clone`), then `composer install`
-2. **installSite(s)** – install each Drupal site via Drush at the current (old) code to build the baseline database
-3. **updateSharedCode** – run `composer update`, fire addon events, commit changes, create the update branch
-4. **updateSite(s)** – run Drush update hooks and config export per site against the updated code
-
-The site databases are SQLite files written beside the working directory (`{dir}/../{site}.sqlite`); checkout-mode runs clean these up afterward. At the end (unless `--dry-run`), a merge/pull request is created with a generated description.
-
-### Preflight Checks (`cmd/check.go`, `internal/services/preflight.go`)
-
-`drupdater check` validates a project's prerequisites without running an update — no `composer update`, no branch, no MR. The cheap checks (`.drupdater.yaml`/addon names, git history depth, PHP platform requirements, each site's `settings.php`, VCS host/token) run by default; `--full` additionally clones the repo to a scratch directory (never the live working copy) and runs a real `composer install` + `drush site-install --existing-config` per site. `CheckGitHistoryComplete` and `CheckPlatformRequirements` in `preflight.go` are shared with `workflow_base.go`'s own fail-fast startup checks, so a shallow checkout is caught the same way in both a real run and `check`.
-
-### Addon System (`internal/addon/`)
-
-Addons implement the `Addon` interface and subscribe to workflow events via `gookit/event`. They hook into pre/post composer update and pre/post site update events.
-
-Which addons run is data-driven: `cmd/root.go` holds an `addonRegistry` (name → constructor) and `mandatoryAddons`. Four addons always run — `composer_allow_plugins`, `composer_patches`, `composer_diff`, `update_hooks` — and `composer_audit` is additionally mandatory in security mode. The rest are *configurable* and listed per mode in `.drupdater.yaml` under `run_types.normal.addons` / `run_types.security.addons`; `--security` selects which block is used. Configurable addon names: `code_beautifier`, `deprecations_remover`, `translations_updater`, `composer_normalizer`, `unsupported_modules`. An unknown name in the active list aborts the run.
-
-Addons use Go templates in `internal/addon/templates/` to render the MR description sections.
-
-### VCS Provider (`internal/codehosting/`)
-
-Factory pattern in `factory.go` detects GitHub vs. GitLab from the repo URL and returns the appropriate implementation. Both implement the same platform interface for creating branches and merge/pull requests.
-
-### `pkg/` — CLI Wrappers
-
-Each subdirectory wraps an external tool:
-- `pkg/composer/` – Composer commands (install, update, audit, normalize)
-- `pkg/drush/` – Drush commands (site install, updatedb, config-import, translation)
-- `pkg/repo/` – go-git operations (clone, checkout, commit, push)
-- `pkg/phpcs/` – PHPCBF execution
-- `pkg/rector/` – Drupal-Rector execution
-- `pkg/drupalorg/` – HTTP calls to Drupal.org for patch metadata
-
-### Events (`internal/services/event.go`)
-
-Events fired during the workflow: `PreComposerUpdateEvent`, `PostComposerUpdateEvent`, `PostCodeUpdateEvent`, `PreSiteUpdateEvent`, `PostSiteUpdateEvent`, `PreMergeRequestCreateEvent`.
+- **Addons never call each other.** They communicate only through mutable event payloads (`PackagesToUpdate`, `PackagesToKeep`, `MinimalChanges`, `Title`).
+- **Event priority is load-bearing** on `pre-composer-update` and `post-code-update`. See `docs/explanation/addon-architecture.md` before changing one.
+- **`internal/addon/report.go` is a published contract.** Renaming a field there is a breaking change to `schema_version`.
+- **Report types mirror rather than reuse internal types** (`report.PackageChange` vs `composer.PackageChange`) so an internal refactor can't rename a published field.
+- **The report's deferred write is registered first**, so it runs last and is emitted on every exit path.
+- **Per-site events fire concurrently.** Addon state accumulated across sites must be mutex-guarded, and maps handed to the report must be copies.
 
 ## Configuration
 
-Config is split into two tiers, with no overlap:
+Two tiers with no overlap: **CLI flags** (how a run is invoked) and **`.drupdater.yaml`** (what the project needs, committed at the repo root). `Config.ActiveRunType()` is the single place `--security` maps to a config block — call it rather than branching on `config.Security`.
 
-- **CLI flags** — how a given run is invoked (volatile): token (positional arg, or the `DRUPDATER_TOKEN` env var when the arg is omitted), plus the flags below.
-- **`.drupdater.yaml`** — what the project needs (committed at the repo root, read from `<working-dir>/.drupdater.yaml` or `--config`). Loaded by `internal/configfile.go`; a missing file falls back to built-in defaults, absent keys keep their default, and unknown keys are rejected (strict decode). Keys: `sites`, `timeout` (Go duration string, e.g. `30m`), and `run_types.<normal|security>.{addons,auto_merge}`. Addon names in both run types are validated up front via `validateAddons`; `drupdater addons` lists valid names.
-
-### CLI Flags
-
-| Flag | Default | Effect |
-|------|---------|--------|
-| `--branch` | `main` | Branch to update/MR target; only used with `--clone` (checkout mode reads it from the checkout or CI branch var) |
-| `--working-dir` | `.` | Existing checkout to update in place (also where `.drupdater.yaml` is read from) |
-| `--clone` | false | Clone instead of using the checkout (needs `--repository-url`); for testing |
-| `--repository-url` | _(from `origin`)_ | Repo URL; required with `--clone`, else read from `origin` |
-| `--security` | false | Only apply security updates; selects the `run_types.security` block |
-| `--concurrency` | `GOMAXPROCS(0)` | Max concurrent per-site work in `forEachSite`; describes the machine, not the project, so it's a flag rather than a `.drupdater.yaml` key |
-| `--dry-run` | false | Skip pushing the branch and creating the MR (branch and commits are still made locally) |
-| `--report` | _(disabled)_ | Write the machine-readable JSON run report to this path (`internal/report`). Emitted on every exit path — success, failure and `--dry-run` — from `StartUpdate`'s defer. Also applies to `drupdater check`, which writes a `report.Check` instead |
-| `--verbose` | false | Debug-level structured logging |
-| `--config` | _(`<working-dir>/.drupdater.yaml`)_ | Path to the config file |
-
-### `.drupdater.yaml`
-
-```yaml
-sites: [default]      # Drupal site names; at least one is required
-timeout: 30m          # overall run timeout (Go duration; 0 disables)
-
-run_types:            # everything that differs between a normal and a security run
-  normal:
-    addons:               # configurable addons; mandatory addons always run
-      - code_beautifier
-      - deprecations_remover
-      - translations_updater
-      - composer_normalizer
-      - unsupported_modules
-    auto_merge: false     # ask the platform to merge the MR/PR once its pipeline passes
-  security:
-    addons: []            # minimal by default; composer_audit is added automatically
-    auto_merge: false
-```
-
-Global keys (`sites`, `timeout`) sit at the root; per-run-type keys live under `run_types`.
-`Config.ActiveRunType()` resolves `--security` to the right block and is the single place that
-mapping is stated — consumers call it rather than branching on `config.Security` themselves.
-
-The pre-`run_types` layout (top-level `addons` / `auto_merge`, each split by mode) is rejected
-by `checkLegacyLayout` with a message naming the replacement, since strict decode alone would
-only say "field addons not found".
-
-Auto-merge is off in both run types unless enabled. `publishWork` calls
-`Platform.EnableAutoMerge` after the MR/PR is created; failure is logged as a warning and
-does **not** fail the run, since by that point the branch is pushed and the MR exists. The
-outcome is recorded on the run report via `Recorder.SetAutoMerge` (`merge_request.auto_merge`),
-so a best-effort failure is still machine-readable.
+Full schema, defaults and validation rules: `docs/reference/configuration.md`. Rationale: `docs/explanation/configuration-model.md`.
 
 ## Mocking
 
@@ -141,4 +112,6 @@ Mocks are generated with mockery v3 (config in `.mockery.yml`). After changing a
 
 ## Docker
 
-The Dockerfile is multi-stage: stage 1 builds the Go binary, stage 2 is a PHP 8.3 runtime image with Composer and required PHP extensions. The Go binary is copied into the PHP image as the final artifact.
+The Dockerfile is multi-stage: stage 1 builds the Go binary, stage 2 is a PHP runtime image (`PHP_VERSION` build arg, default 8.3) with Composer and required PHP extensions. The Go binary is copied into the PHP image as the final artifact.
+
+Known gap: the Dockerfile's build stage does **not** pass `-ldflags`, so published images report `drupdater_version: "dev"` in the run report. Documented in `docs/reference/cli/index.md` and `docs/contributing/releasing.md`.

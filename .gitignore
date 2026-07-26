@@ -5,3 +5,6 @@
 
 graphify-out/cost.json        # local only
 graphify-out/cache/
+
+# mkdocs build output
+site/

@@ -1,15 +1,17 @@
 # Contributing to Drupdater
 
-Thanks for your interest in improving Drupdater. This guide covers how to get a
-change merged.
+Thanks for your interest in improving Drupdater.
+
+**The full contributor guide is at <https://drupdater.github.io/contributing/>.** It
+covers development setup, the `make` targets, the lint and coverage gates, writing an
+addon, and releasing.
 
 ## Before you start
 
-- For anything beyond a small fix, **open an issue first** to discuss the
-  approach. It avoids wasted work on a PR that doesn't fit the direction.
+- For anything beyond a small fix, **open an issue first** to discuss the approach. It
+  avoids wasted work on a PR that doesn't fit the direction.
 - Check existing [issues](https://github.com/drupdater/drupdater/issues) and
-  [pull requests](https://github.com/drupdater/drupdater/pulls) to avoid
-  duplication.
+  [pull requests](https://github.com/drupdater/drupdater/pulls) to avoid duplication.
 
 ## Development setup
 
@@ -28,6 +30,7 @@ make test    # run all tests
 make lint    # vet + staticcheck + golangci-lint
 make fmt     # format code
 make mock    # regenerate mocks after changing an interface (mockery v3)
+make help    # list every target
 ```
 
 Run a single test:
@@ -36,19 +39,34 @@ Run a single test:
 go test -v -run TestName ./path/to/package/...
 ```
 
+See [Development setup](https://drupdater.github.io/contributing/development/) for the
+full list, including what to do when `golangci-lint` refuses to run.
+
 ## Project layout
 
-See [`CLAUDE.md`](CLAUDE.md) for the architecture overview — workflow phases, the
-addon system, the VCS provider abstraction, and the `pkg/` CLI wrappers.
+See [Explanation](https://drupdater.github.io/explanation/) for the architecture overview —
+workflow phases, the addon system, the VCS provider abstraction, and the configuration
+model.
 
 ## Submitting a pull request
 
 1. Branch off `main`.
 2. Keep the PR focused on a single concern.
-3. Add or update tests for behavior changes.
+3. Add or update tests for behavior changes — changed packages need ≥ 90% coverage.
 4. If you changed an interface, run `make mock`.
 5. Run `make lint test` and make sure both pass.
 6. Write a clear PR description explaining the *why*, not just the *what*.
+
+## Documentation
+
+Documentation sources live in [`docs/`](docs/) and are published to
+<https://drupdater.github.io/> on every push to `main`. A change that alters a flag, a
+config key, an addon, or the report schema should update its documentation in the same PR.
+
+```bash
+make docs-serve    # preview at http://127.0.0.1:8000
+make docs-build    # build with --strict
+```
 
 ## Commit messages
 

@@ -1,0 +1,2 @@
+# Documentation toolchain. Build with `make docs-build`, preview with `make docs-serve`.
+mkdocs-material~=9.7
