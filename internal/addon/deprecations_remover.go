@@ -1,7 +1,10 @@
 package addon
 
 import (
+	"sort"
+
 	"github.com/drupdater/drupdater/internal/services"
+	"github.com/drupdater/drupdater/pkg/rector"
 	"github.com/gookit/event"
 
 	"github.com/go-git/go-git/v5"
@@ -13,6 +16,10 @@ type DeprecationsRemover struct {
 	logger   *zap.Logger
 	rector   Rector
 	composer Composer
+
+	// Which rector rules rewrote which files, for the report. Written once from the
+	// single post-code-update event, read after the run.
+	fixes []DeprecationFix
 }
 
 // NewDeprecationsRemover creates a new deprecations remover instance
@@ -87,6 +94,8 @@ func (dr *DeprecationsRemover) postCodeUpdateHandler(e event.Event) error {
 		return nil
 	}
 
+	dr.recordFixes(deprecationRemovalResult)
+
 	for _, file := range deprecationRemovalResult.ChangedFiles {
 		if _, err := evt.Worktree().Add(file); err != nil {
 			return err
@@ -114,4 +123,23 @@ func (dr *DeprecationsRemover) commitTemporaryRectorCleanup(worktree Worktree) e
 	}
 	_, err = worktree.Commit("Remove temporary drupal-rector installation", &git.CommitOptions{})
 	return err
+}
+
+// recordFixes captures what rector rewrote, so the report can say which rules fired on which
+// files rather than only that "some deprecations were removed".
+func (dr *DeprecationsRemover) recordFixes(result rector.ReturnOutput) {
+	rectorsByFile := make(map[string][]string, len(result.FileDiffs))
+	for _, diff := range result.FileDiffs {
+		rectorsByFile[diff.File] = diff.AppliedRectors
+	}
+
+	fixes := make([]DeprecationFix, 0, len(result.ChangedFiles))
+	for _, file := range result.ChangedFiles {
+		applied := rectorsByFile[file]
+		sort.Strings(applied)
+		fixes = append(fixes, DeprecationFix{File: file, AppliedRectors: applied})
+	}
+	// Sorted so two runs over unchanged code produce byte-identical sections.
+	sort.Slice(fixes, func(i, j int) bool { return fixes[i].File < fixes[j].File })
+	dr.fixes = fixes
 }
