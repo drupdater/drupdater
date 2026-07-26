@@ -89,7 +89,7 @@ jobs:
 
       - name: Clone project
         env:
-          REPO_TOKEN: ${{ secrets.DRUPDATER_TEST_TOKEN }}
+          REPO_TOKEN: ${{ secrets.DRUPDATER_TEST_TOKEN || github.token }}
           REPOSITORY_URL: ${{ inputs.repository_url }}
           BRANCH: ${{ inputs.branch }}
         run: |
@@ -113,7 +113,13 @@ jobs:
 
       - name: Run drupdater
         env:
-          REPO_TOKEN: ${{ secrets.DRUPDATER_TEST_TOKEN }}
+          # Fall back to the job's own GITHUB_TOKEN. A dry run still reaches the
+          # remote -- ensureUpdateBranchAvailable calls BranchExists
+          # unconditionally, it is not gated on --dry-run -- and go-git sends an
+          # empty password rather than no credential, which GitHub rejects
+          # outright. GITHUB_TOKEN is enough to list refs on a public target;
+          # pushing to one still needs DRUPDATER_TEST_TOKEN.
+          REPO_TOKEN: ${{ secrets.DRUPDATER_TEST_TOKEN || github.token }}
           DRUPALCODE_ACCESS_TOKEN: ${{ secrets.DRUPALCODE_ACCESS_TOKEN }}
           DRY_RUN: ${{ inputs.dry_run }}
           SECURITY: ${{ inputs.security }}
