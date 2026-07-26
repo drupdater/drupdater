@@ -103,6 +103,13 @@ jobs:
           # ("git history complete"), and a shallow clone cannot be pushed.
           git -c credential.helper='!f(){ echo username=oauth2; echo "password=$REPO_TOKEN"; };f' \
             clone --branch "$BRANCH" "$REPOSITORY_URL" ./run/project
+          # drupdater derives its commit identity from the VCS platform, which it
+          # only queries when it has a token. A checkout-mode --dry-run needs no
+          # token, so it falls back to the checkout's own identity -- and a fresh
+          # clone has none, which fails the first commit with "author field is
+          # required". A real CI checkout has the same gap.
+          git -C ./run/project config user.name  'drupdater integration test'
+          git -C ./run/project config user.email 'drupdater@users.noreply.github.com'
 
       - name: Run drupdater
         env:
@@ -126,6 +133,9 @@ jobs:
       - name: Summarise run report
         if: always()
         run: |
+          # The container runs as root and the report is written 0600, so both jq
+          # and upload-artifact get EACCES until the runner owns it back.
+          sudo chown -R "$(id -u):$(id -g)" ./run || true
           test -f ./run/report.json || { echo "::error::no run report was written"; exit 1; }
           jq -r '
             "status=\(.status)  mode=\(.mode)  dry_run=\(.dry_run)",
