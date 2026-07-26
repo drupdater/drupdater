@@ -579,7 +579,6 @@ func TestStartUpdateWithDryRun(t *testing.T) {
 	repositoryService.EXPECT().IsShallowClone("/tmp").Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(mock.Anything, "/tmp").Return("", nil)
 	repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound)
-	repositoryService.EXPECT().BranchExists(repository, mock.Anything, mock.Anything).Return(false, nil)
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
 
@@ -605,6 +604,9 @@ func TestStartUpdateWithDryRun(t *testing.T) {
 	drush.AssertExpectations(t)
 	mockComposer.AssertExpectations(t)
 	vcsProvider.AssertExpectations(t)
+	// A --dry-run never pushes, so ensureUpdateBranchAvailable deliberately skips the remote
+	// branch check -- reaching it used to make this configuration fail without a token.
+	repositoryService.AssertNotCalled(t, "BranchExists", mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestStartUpdateCheckoutDryRunWithoutPlatform(t *testing.T) {
@@ -642,7 +644,6 @@ func TestStartUpdateCheckoutDryRunWithoutPlatform(t *testing.T) {
 	repositoryService.EXPECT().IsShallowClone("/tmp").Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(mock.Anything, "/tmp").Return("", nil)
 	repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound)
-	repositoryService.EXPECT().BranchExists(repository, mock.Anything, mock.Anything).Return(false, nil)
 	// Checkout mode (Clone is unset): StartUpdate captures HEAD up front so it can restore the
 	// checkout if the run fails. This run succeeds, so it is never used to restore anything.
 	repository.EXPECT().Head().Return(plumbing.NewHashReference(plumbing.NewBranchReferenceName("main"), plumbing.NewHash("a")), nil)
@@ -667,6 +668,10 @@ func TestStartUpdateCheckoutDryRunWithoutPlatform(t *testing.T) {
 	repository.AssertExpectations(t)
 	drush.AssertExpectations(t)
 	mockComposer.AssertExpectations(t)
+	// A --dry-run never pushes, so ensureUpdateBranchAvailable deliberately skips the remote.
+	// This is the configuration documented as needing no token at all, and reaching the remote
+	// here used to fail it outright rather than merely need one.
+	repositoryService.AssertNotCalled(t, "BranchExists", mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestPublishWorkDeletesBranchOnMRFailure(t *testing.T) {
@@ -1640,5 +1645,73 @@ func TestCleanup(t *testing.T) {
 
 		assert.NoFileExists(t, filepath.Join(base, "site1.sqlite"))
 		assert.NoDirExists(t, filepath.Join(base, "private"))
+	})
+}
+
+func TestEnsureUpdateBranchAvailable(t *testing.T) {
+	const branch = "update-abc123"
+
+	newCheckout := func(t *testing.T) *git.Repository {
+		t.Helper()
+		checkout, err := git.PlainInit(t.TempDir(), false)
+		require.NoError(t, err)
+		return checkout
+	}
+
+	t.Run("a dry run never reaches the remote", func(t *testing.T) {
+		// The remote half of this check only matters when the branch is going to be pushed,
+		// and a --dry-run never pushes. Reaching out anyway breaks the one configuration
+		// documented as needing no token at all: a checkout-mode dry run. BranchExists is
+		// deliberately left unstubbed, so the mock fails the test if it is called.
+		repository := NewMockRepository(t)
+		ws := &WorkflowBaseService{
+			logger:     zap.NewNop(),
+			repository: repository,
+			config:     internal.Config{DryRun: true},
+		}
+
+		require.NoError(t, ws.ensureUpdateBranchAvailable(newCheckout(t), branch))
+	})
+
+	t.Run("a real run asks the remote and aborts when the branch is taken", func(t *testing.T) {
+		checkout := newCheckout(t)
+		repository := NewMockRepository(t)
+		repository.EXPECT().BranchExists(checkout, branch, "tok").Return(true, nil)
+		ws := &WorkflowBaseService{
+			logger:     zap.NewNop(),
+			repository: repository,
+			config:     internal.Config{DryRun: false, Token: "tok"},
+		}
+
+		err := ws.ensureUpdateBranchAvailable(checkout, branch)
+		var abort AbortError
+		require.ErrorAs(t, err, &abort)
+	})
+
+	t.Run("a real run proceeds when the remote does not have the branch", func(t *testing.T) {
+		checkout := newCheckout(t)
+		repository := NewMockRepository(t)
+		repository.EXPECT().BranchExists(checkout, branch, "tok").Return(false, nil)
+		ws := &WorkflowBaseService{
+			logger:     zap.NewNop(),
+			repository: repository,
+			config:     internal.Config{DryRun: false, Token: "tok"},
+		}
+
+		require.NoError(t, ws.ensureUpdateBranchAvailable(checkout, branch))
+	})
+
+	t.Run("a remote failure is surfaced", func(t *testing.T) {
+		checkout := newCheckout(t)
+		repository := NewMockRepository(t)
+		repository.EXPECT().BranchExists(checkout, branch, "").Return(false, assert.AnError)
+		ws := &WorkflowBaseService{
+			logger:     zap.NewNop(),
+			repository: repository,
+			config:     internal.Config{DryRun: false},
+		}
+
+		err := ws.ensureUpdateBranchAvailable(checkout, branch)
+		require.ErrorContains(t, err, "failed to check if branch exists")
 	})
 }

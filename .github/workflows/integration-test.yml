@@ -89,7 +89,7 @@ jobs:
 
       - name: Clone project
         env:
-          REPO_TOKEN: ${{ secrets.DRUPDATER_TEST_TOKEN || github.token }}
+          REPO_TOKEN: ${{ secrets.DRUPDATER_TEST_TOKEN }}
           REPOSITORY_URL: ${{ inputs.repository_url }}
           BRANCH: ${{ inputs.branch }}
         run: |
@@ -103,23 +103,15 @@ jobs:
           # ("git history complete"), and a shallow clone cannot be pushed.
           git -c credential.helper='!f(){ echo username=oauth2; echo "password=$REPO_TOKEN"; };f' \
             clone --branch "$BRANCH" "$REPOSITORY_URL" ./run/project
-          # drupdater derives its commit identity from the VCS platform, which it
-          # only queries when it has a token. A checkout-mode --dry-run needs no
-          # token, so it falls back to the checkout's own identity -- and a fresh
-          # clone has none, which fails the first commit with "author field is
-          # required". A real CI checkout has the same gap.
-          git -C ./run/project config user.name  'drupdater integration test'
-          git -C ./run/project config user.email 'drupdater@users.noreply.github.com'
+          # Deliberately NO git identity configured here. A fresh clone has none,
+          # which is exactly the case drupdater has to handle on its own -- leaving
+          # it unset is what makes this job a regression test for that fallback.
 
       - name: Run drupdater
         env:
-          # Fall back to the job's own GITHUB_TOKEN. A dry run still reaches the
-          # remote -- ensureUpdateBranchAvailable calls BranchExists
-          # unconditionally, it is not gated on --dry-run -- and go-git sends an
-          # empty password rather than no credential, which GitHub rejects
-          # outright. GITHUB_TOKEN is enough to list refs on a public target;
-          # pushing to one still needs DRUPDATER_TEST_TOKEN.
-          REPO_TOKEN: ${{ secrets.DRUPDATER_TEST_TOKEN || github.token }}
+          # No fallback token on purpose: a checkout-mode --dry-run is documented as
+          # needing none, so running it with an empty one keeps that promise tested.
+          REPO_TOKEN: ${{ secrets.DRUPDATER_TEST_TOKEN }}
           DRUPALCODE_ACCESS_TOKEN: ${{ secrets.DRUPALCODE_ACCESS_TOKEN }}
           DRY_RUN: ${{ inputs.dry_run }}
           SECURITY: ${{ inputs.security }}

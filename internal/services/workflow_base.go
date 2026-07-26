@@ -448,6 +448,15 @@ func (ws *WorkflowBaseService) ensureUpdateBranchAvailable(repository GitReposit
 		return fmt.Errorf("failed to check for a local %s branch: %w", updateBranchName, err)
 	}
 
+	// The remote half only matters when the branch is going to be pushed. A --dry-run never
+	// pushes, and reaching the remote here would break the one case that is documented as
+	// needing no token at all: a checkout-mode dry run. Worse than needing one, it fails
+	// outright without it — go-git sends an empty password rather than no credential, which
+	// the host rejects even for a public repository.
+	if ws.config.DryRun {
+		return nil
+	}
+
 	exists, err := ws.repository.BranchExists(repository, updateBranchName, ws.config.Token)
 	if err != nil {
 		return fmt.Errorf("failed to check if branch exists: %w", err)
