@@ -60,7 +60,7 @@ func TestCheckConfigAndAddons(t *testing.T) {
 
 	t.Run("an unknown addon name fails the second check only", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), ".drupdater.yaml")
-		require.NoError(t, os.WriteFile(path, []byte("addons:\n  normal: [no_such_addon]\n"), 0o600))
+		require.NoError(t, os.WriteFile(path, []byte("run_types:\n  normal:\n    addons: [no_such_addon]\n"), 0o600))
 
 		cfg := internal.Config{}
 		results := checkConfigAndAddons(path, &cfg)

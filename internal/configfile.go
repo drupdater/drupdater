@@ -35,10 +35,22 @@ func (t *flexTimeout) UnmarshalYAML(node *yaml.Node) error {
 
 // fileConfig mirrors the YAML-settable keys of .drupdater.yaml. Timeout is captured as a raw
 // scalar because yaml.v3 cannot decode a duration like "30m" into a time.Duration.
+//
+// Keys are split by scope: sites and timeout describe the whole run, everything that differs
+// between a normal and a security update lives under run_types. Nesting the run types under
+// their own key keeps them from ever colliding with a future global key.
 type fileConfig struct {
-	Sites   []string     `yaml:"sites"`
-	Timeout flexTimeout  `yaml:"timeout"`
-	Addons  AddonsConfig `yaml:"addons"`
+	Sites    []string       `yaml:"sites"`
+	Timeout  flexTimeout    `yaml:"timeout"`
+	RunTypes RunTypesConfig `yaml:"run_types"`
+}
+
+// legacyProbe detects the pre-run_types layout, where addons and auto_merge were top-level
+// keys each split by mode. Strict decoding already rejects them, but as "field addons not
+// found in type internal.fileConfig" — which says nothing about what to write instead.
+type legacyProbe struct {
+	Addons    *struct{} `yaml:"addons"`
+	AutoMerge *struct{} `yaml:"auto_merge"`
 }
 
 // defaultFileConfig returns a fileConfig pre-populated with defaults. Unmarshaling a YAML file
@@ -48,9 +60,11 @@ func defaultFileConfig() fileConfig {
 	return fileConfig{
 		Sites:   []string{"default"},
 		Timeout: "30m",
-		Addons: AddonsConfig{
-			Normal:   defaultNormalAddons,
-			Security: nil, // minimal by default; composer_audit is added automatically
+		RunTypes: RunTypesConfig{
+			Normal: RunTypeConfig{Addons: defaultNormalAddons},
+			// Security defaults to no configurable addons: it should be a minimal, focused
+			// fix, with only the mandatory ones and the automatic composer_audit running.
+			Security: RunTypeConfig{},
 		},
 	}
 }
@@ -69,6 +83,10 @@ func LoadConfigFile(path string, c *Config) (found bool, err error) {
 		return false, err
 	}
 
+	if err := checkLegacyLayout(data); err != nil {
+		return true, fmt.Errorf("in %s: %w", path, err)
+	}
+
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	dec.KnownFields(true)
 	// A file that is empty or contains only comments has no YAML document, which Decode
@@ -82,6 +100,35 @@ func LoadConfigFile(path string, c *Config) (found bool, err error) {
 		return true, fmt.Errorf("in %s: %w", path, err)
 	}
 	return true, nil
+}
+
+// checkLegacyLayout reports a config still written in the pre-run_types layout, naming the
+// replacement. Without it the run fails on the strict decode with "field addons not found in
+// type internal.fileConfig", which is accurate but leaves the reader to guess the new shape.
+func checkLegacyLayout(data []byte) error {
+	var probe legacyProbe
+	// Deliberately lenient: this asks only whether the legacy keys are present, so the decode
+	// is consulted just when it parsed. A malformed document is not this function's business —
+	// the strict decode in LoadConfigFile reports that, with proper context.
+	parsed := yaml.Unmarshal(data, &probe) == nil
+	if !parsed || (probe.Addons == nil && probe.AutoMerge == nil) {
+		return nil
+	}
+	return errors.New(`"addons" and "auto_merge" are now grouped per run type. Replace:
+  addons:
+    normal: [code_beautifier, ...]
+    security: []
+  auto_merge:
+    normal: false
+    security: true
+with:
+  run_types:
+    normal:
+      addons: [code_beautifier, ...]
+      auto_merge: false
+    security:
+      addons: []
+      auto_merge: true`)
 }
 
 func applyFileConfig(fc fileConfig, c *Config) error {
@@ -98,6 +145,6 @@ func applyFileConfig(fc fileConfig, c *Config) error {
 	}
 	c.Sites = fc.Sites
 	c.Timeout = timeout
-	c.Addons = fc.Addons
+	c.RunTypes = fc.RunTypes
 	return nil
 }

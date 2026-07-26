@@ -2,6 +2,7 @@ package codehosting
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -205,6 +206,128 @@ func TestGithub_DeleteBranch_HonorsContext(t *testing.T) {
 	cancel()
 
 	err := gh.DeleteBranch(ctx, "some-branch")
+	require.ErrorIs(t, err, context.Canceled)
+}
+
+// newAutoMergePRServer serves the PR endpoint with the given base repo JSON (the merge-method
+// flags) and a successful GraphQL mutation, capturing the mergeMethod variable that was sent.
+// Note the GraphQL path: WithEnterpriseURLs puts the REST root at /api/v3/, so "graphql"
+// resolves under it. Real GHES serves GraphQL at /api/graphql instead — see EnableAutoMerge.
+func newAutoMergePRServer(t *testing.T, baseRepoJSON string, gotMethod *string) *httptest.Server {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v3/repos/owner/repo/pulls/1":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"number":1,"node_id":"PR_kwDOABCDEF123","base":{"repo":` + baseRepoJSON + `}}`))
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v3/graphql":
+			var body struct {
+				Variables struct {
+					MergeMethod string `json:"mergeMethod"`
+				} `json:"variables"`
+			}
+			// A decode failure leaves gotMethod empty, which fails the caller's assertion;
+			// testifylint forbids require inside an HTTP handler.
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			*gotMethod = body.Variables.MergeMethod
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"data":{"enablePullRequestAutoMerge":{"pullRequest":{"autoMergeRequest":{"mergeMethod":"MERGE"}}}}}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(server.Close)
+	return server
+}
+
+func TestGithub_EnableAutoMerge_Success(t *testing.T) {
+	var gotMethod string
+	mockServer := newAutoMergePRServer(t, `{"allow_merge_commit":true}`, &gotMethod)
+
+	client, _ := github.NewClient(nil).WithEnterpriseURLs(mockServer.URL, "")
+	gh := &Github{client: client, owner: "owner", repo: "repo"}
+
+	err := gh.EnableAutoMerge(context.Background(), MergeRequest{ID: 1})
+	require.NoError(t, err)
+	assert.Equal(t, "MERGE", gotMethod)
+}
+
+// TestGithub_EnableAutoMerge_UsesPermittedMergeMethod covers repositories that disable merge
+// commits: requesting a method the repository forbids makes the mutation fail outright.
+func TestGithub_EnableAutoMerge_UsesPermittedMergeMethod(t *testing.T) {
+	tests := map[string]struct {
+		baseRepo string
+		want     string
+	}{
+		"squash only":     {`{"allow_merge_commit":false,"allow_squash_merge":true}`, "SQUASH"},
+		"rebase only":     {`{"allow_merge_commit":false,"allow_rebase_merge":true}`, "REBASE"},
+		"merge preferred": {`{"allow_merge_commit":true,"allow_squash_merge":true}`, "MERGE"},
+		"flags absent":    {`{}`, "MERGE"},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			var gotMethod string
+			mockServer := newAutoMergePRServer(t, tt.baseRepo, &gotMethod)
+
+			client, _ := github.NewClient(nil).WithEnterpriseURLs(mockServer.URL, "")
+			gh := &Github{client: client, owner: "owner", repo: "repo"}
+
+			require.NoError(t, gh.EnableAutoMerge(context.Background(), MergeRequest{ID: 1}))
+			assert.Equal(t, tt.want, gotMethod)
+		})
+	}
+}
+
+func TestGithub_EnableAutoMerge_GraphQLError(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v3/repos/owner/repo/pulls/1":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"number":1,"node_id":"PR_kwDOABCDEF123"}`))
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v3/graphql":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"errors":[{"message":"Auto-merge is not allowed for this repository"},{"message":"second problem"}]}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer mockServer.Close()
+
+	client, _ := github.NewClient(nil).WithEnterpriseURLs(mockServer.URL, "")
+	gh := &Github{client: client, owner: "owner", repo: "repo"}
+
+	err := gh.EnableAutoMerge(context.Background(), MergeRequest{ID: 1})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "Auto-merge is not allowed for this repository")
+	assert.Contains(t, err.Error(), "second problem", "every GraphQL error should be surfaced")
+}
+
+func TestGithub_EnableAutoMerge_GetPRError(t *testing.T) {
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"message":"Not Found"}`))
+	}))
+	defer mockServer.Close()
+
+	client, _ := github.NewClient(nil).WithEnterpriseURLs(mockServer.URL, "")
+	gh := &Github{client: client, owner: "owner", repo: "repo"}
+
+	err := gh.EnableAutoMerge(context.Background(), MergeRequest{ID: 1})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "could not enable auto merge for PR 1")
+}
+
+func TestGithub_EnableAutoMerge_HonorsContext(t *testing.T) {
+	client, _ := github.NewClient(nil).WithEnterpriseURLs("http://example.invalid", "")
+	gh := &Github{client: client, owner: "o", repo: "r"}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := gh.EnableAutoMerge(ctx, MergeRequest{ID: 1})
 	require.ErrorIs(t, err, context.Canceled)
 }
 

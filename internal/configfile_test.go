@@ -26,20 +26,20 @@ func TestLoadConfigFile(t *testing.T) {
 
 		assert.Equal(t, []string{"default"}, c.Sites)
 		assert.Equal(t, 30*time.Minute, c.Timeout)
-		assert.Equal(t, defaultNormalAddons, c.Addons.Normal)
-		assert.Empty(t, c.Addons.Security) // security is minimal by default
+		assert.Equal(t, defaultNormalAddons, c.RunTypes.Normal.Addons)
+		assert.Empty(t, c.RunTypes.Security.Addons) // security is minimal by default
 	})
 
 	t.Run("partial file keeps defaults for absent keys", func(t *testing.T) {
 		var c Config
-		found, err := LoadConfigFile(writeConfig(t, "addons:\n  normal: [code_beautifier]\n"), &c)
+		found, err := LoadConfigFile(writeConfig(t, "run_types:\n  normal:\n    addons: [code_beautifier]\n"), &c)
 		require.NoError(t, err)
 		assert.True(t, found)
 
-		assert.Equal(t, []string{"code_beautifier"}, c.Addons.Normal) // overridden
-		assert.Empty(t, c.Addons.Security)                            // default kept (minimal)
-		assert.Equal(t, []string{"default"}, c.Sites)                 // default kept
-		assert.Equal(t, 30*time.Minute, c.Timeout)                    // default kept
+		assert.Equal(t, []string{"code_beautifier"}, c.RunTypes.Normal.Addons) // overridden
+		assert.Empty(t, c.RunTypes.Security.Addons)                            // default kept (minimal)
+		assert.Equal(t, []string{"default"}, c.Sites)                          // default kept
+		assert.Equal(t, 30*time.Minute, c.Timeout)                             // default kept
 	})
 
 	t.Run("timeout string parses into a duration", func(t *testing.T) {
@@ -78,7 +78,7 @@ func TestLoadConfigFile(t *testing.T) {
 		assert.True(t, found)
 		assert.Equal(t, []string{"default"}, c.Sites)
 		assert.Equal(t, 30*time.Minute, c.Timeout)
-		assert.Equal(t, defaultNormalAddons, c.Addons.Normal)
+		assert.Equal(t, defaultNormalAddons, c.RunTypes.Normal.Addons)
 	})
 
 	t.Run("a comments-only file applies defaults", func(t *testing.T) {
@@ -117,5 +117,59 @@ func TestLoadConfigFile(t *testing.T) {
 		_, err := LoadConfigFile(writeConfig(t, "sites: [default, subsite_a]\n"), &c)
 		require.NoError(t, err)
 		assert.Equal(t, []string{"default", "subsite_a"}, c.Sites)
+	})
+
+	t.Run("a run type sets its addons and auto_merge together", func(t *testing.T) {
+		var c Config
+		_, err := LoadConfigFile(writeConfig(t, `run_types:
+  normal:
+    addons: [code_beautifier]
+    auto_merge: false
+  security:
+    addons: []
+    auto_merge: true
+`), &c)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"code_beautifier"}, c.RunTypes.Normal.Addons)
+		assert.False(t, c.RunTypes.Normal.AutoMerge)
+		assert.Empty(t, c.RunTypes.Security.Addons)
+		assert.True(t, c.RunTypes.Security.AutoMerge)
+	})
+
+	t.Run("auto_merge defaults to false for both run types", func(t *testing.T) {
+		var c Config
+		found, err := LoadConfigFile(filepath.Join(t.TempDir(), "absent.yaml"), &c)
+		require.NoError(t, err)
+		assert.False(t, found)
+		assert.False(t, c.RunTypes.Normal.AutoMerge)
+		assert.False(t, c.RunTypes.Security.AutoMerge)
+	})
+
+	t.Run("ActiveRunType follows the security flag", func(t *testing.T) {
+		c := Config{RunTypes: RunTypesConfig{
+			Normal:   RunTypeConfig{Addons: []string{"code_beautifier"}, AutoMerge: false},
+			Security: RunTypeConfig{Addons: []string{"composer_audit"}, AutoMerge: true},
+		}}
+		assert.Equal(t, []string{"code_beautifier"}, c.ActiveRunType().Addons)
+		assert.False(t, c.ActiveRunType().AutoMerge)
+
+		c.Security = true
+		assert.Equal(t, []string{"composer_audit"}, c.ActiveRunType().Addons)
+		assert.True(t, c.ActiveRunType().AutoMerge)
+	})
+
+	t.Run("the pre-run_types layout fails with a migration message", func(t *testing.T) {
+		// Strict decoding alone would say "field addons not found in type internal.fileConfig",
+		// which does not tell the reader what to write instead.
+		for _, body := range []string{
+			"addons:\n  normal: [code_beautifier]\n",
+			"auto_merge:\n  normal: true\n",
+		} {
+			var c Config
+			_, err := LoadConfigFile(writeConfig(t, body), &c)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "grouped per run type")
+			assert.Contains(t, err.Error(), "run_types:")
+		}
 	})
 }

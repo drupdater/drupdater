@@ -57,7 +57,7 @@ The site databases are SQLite files written beside the working directory (`{dir}
 
 Addons implement the `Addon` interface and subscribe to workflow events via `gookit/event`. They hook into pre/post composer update and pre/post site update events.
 
-Which addons run is data-driven: `cmd/root.go` holds an `addonRegistry` (name → constructor) and `mandatoryAddons`. Four addons always run — `composer_allow_plugins`, `composer_patches`, `composer_diff`, `update_hooks` — and `composer_audit` is additionally mandatory in security mode. The rest are *configurable* and listed per mode in `.drupdater.yaml` under `addons.normal` / `addons.security`; `--security` selects which list is used. Configurable addon names: `code_beautifier`, `deprecations_remover`, `translations_updater`, `composer_normalizer`, `unsupported_modules`. An unknown name in the active list aborts the run.
+Which addons run is data-driven: `cmd/root.go` holds an `addonRegistry` (name → constructor) and `mandatoryAddons`. Four addons always run — `composer_allow_plugins`, `composer_patches`, `composer_diff`, `update_hooks` — and `composer_audit` is additionally mandatory in security mode. The rest are *configurable* and listed per mode in `.drupdater.yaml` under `run_types.normal.addons` / `run_types.security.addons`; `--security` selects which block is used. Configurable addon names: `code_beautifier`, `deprecations_remover`, `translations_updater`, `composer_normalizer`, `unsupported_modules`. An unknown name in the active list aborts the run.
 
 Addons use Go templates in `internal/addon/templates/` to render the MR description sections.
 
@@ -84,7 +84,7 @@ Events fired during the workflow: `PreComposerUpdateEvent`, `PostComposerUpdateE
 Config is split into two tiers, with no overlap:
 
 - **CLI flags** — how a given run is invoked (volatile): token (positional arg, or the `DRUPDATER_TOKEN` env var when the arg is omitted), plus the flags below.
-- **`.drupdater.yaml`** — what the project needs (committed at the repo root, read from `<working-dir>/.drupdater.yaml` or `--config`). Loaded by `internal/configfile.go`; a missing file falls back to built-in defaults, absent keys keep their default, and unknown keys are rejected (strict decode). Keys: `sites`, `timeout` (Go duration string, e.g. `30m`), and `addons.normal` / `addons.security`. Addon names in both lists are validated up front via `validateAddons`; `drupdater addons` lists valid names.
+- **`.drupdater.yaml`** — what the project needs (committed at the repo root, read from `<working-dir>/.drupdater.yaml` or `--config`). Loaded by `internal/configfile.go`; a missing file falls back to built-in defaults, absent keys keep their default, and unknown keys are rejected (strict decode). Keys: `sites`, `timeout` (Go duration string, e.g. `30m`), and `run_types.<normal|security>.{addons,auto_merge}`. Addon names in both run types are validated up front via `validateAddons`; `drupdater addons` lists valid names.
 
 ### CLI Flags
 
@@ -94,7 +94,7 @@ Config is split into two tiers, with no overlap:
 | `--working-dir` | `.` | Existing checkout to update in place (also where `.drupdater.yaml` is read from) |
 | `--clone` | false | Clone instead of using the checkout (needs `--repository-url`); for testing |
 | `--repository-url` | _(from `origin`)_ | Repo URL; required with `--clone`, else read from `origin` |
-| `--security` | false | Only apply security updates; selects the `addons.security` list |
+| `--security` | false | Only apply security updates; selects the `run_types.security` block |
 | `--concurrency` | `GOMAXPROCS(0)` | Max concurrent per-site work in `forEachSite`; describes the machine, not the project, so it's a flag rather than a `.drupdater.yaml` key |
 | `--dry-run` | false | Skip pushing the branch and creating the MR (branch and commits are still made locally) |
 | `--report` | _(disabled)_ | Write the machine-readable JSON run report to this path (`internal/report`). Emitted on every exit path — success, failure and `--dry-run` — from `StartUpdate`'s defer. Also applies to `drupdater check`, which writes a `report.Check` instead |
@@ -106,15 +106,34 @@ Config is split into two tiers, with no overlap:
 ```yaml
 sites: [default]      # Drupal site names; at least one is required
 timeout: 30m          # overall run timeout (Go duration; 0 disables)
-addons:               # configurable addons per mode; mandatory addons always run
+
+run_types:            # everything that differs between a normal and a security run
   normal:
-    - code_beautifier
-    - deprecations_remover
-    - translations_updater
-    - composer_normalizer
-    - unsupported_modules
-  security: []            # minimal by default; composer_audit is added automatically
+    addons:               # configurable addons; mandatory addons always run
+      - code_beautifier
+      - deprecations_remover
+      - translations_updater
+      - composer_normalizer
+      - unsupported_modules
+    auto_merge: false     # ask the platform to merge the MR/PR once its pipeline passes
+  security:
+    addons: []            # minimal by default; composer_audit is added automatically
+    auto_merge: false
 ```
+
+Global keys (`sites`, `timeout`) sit at the root; per-run-type keys live under `run_types`.
+`Config.ActiveRunType()` resolves `--security` to the right block and is the single place that
+mapping is stated — consumers call it rather than branching on `config.Security` themselves.
+
+The pre-`run_types` layout (top-level `addons` / `auto_merge`, each split by mode) is rejected
+by `checkLegacyLayout` with a message naming the replacement, since strict decode alone would
+only say "field addons not found".
+
+Auto-merge is off in both run types unless enabled. `publishWork` calls
+`Platform.EnableAutoMerge` after the MR/PR is created; failure is logged as a warning and
+does **not** fail the run, since by that point the branch is pushed and the MR exists. The
+outcome is recorded on the run report via `Recorder.SetAutoMerge` (`merge_request.auto_merge`),
+so a best-effort failure is still machine-readable.
 
 ## Mocking
 

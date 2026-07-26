@@ -110,6 +110,64 @@ func TestRecorderMergeRequestIsNilWhenNoneWasCreated(t *testing.T) {
 	assert.Nil(t, rep.MergeRequest)
 }
 
+func TestRecorderAutoMergeOutcome(t *testing.T) {
+	t.Run("absent until requested", func(t *testing.T) {
+		rec := newTestRecorder()
+		rec.SetMergeRequest("https://example.com/mr/1")
+
+		rep := rec.Finish()
+		require.NotNil(t, rep.MergeRequest)
+		assert.Nil(t, rep.MergeRequest.AutoMerge, "nil distinguishes not-requested from failed")
+	})
+
+	t.Run("success records enabled with no error", func(t *testing.T) {
+		rec := newTestRecorder()
+		rec.SetMergeRequest("https://example.com/mr/1")
+		rec.SetAutoMerge(nil)
+
+		rep := rec.Finish()
+		require.NotNil(t, rep.MergeRequest.AutoMerge)
+		assert.True(t, rep.MergeRequest.AutoMerge.Enabled)
+		assert.Empty(t, rep.MergeRequest.AutoMerge.Error)
+	})
+
+	t.Run("failure records the reason", func(t *testing.T) {
+		rec := newTestRecorder()
+		rec.SetMergeRequest("https://example.com/mr/1")
+		rec.SetAutoMerge(errors.New("auto-merge is not allowed for this repository"))
+
+		rep := rec.Finish()
+		require.NotNil(t, rep.MergeRequest.AutoMerge)
+		assert.False(t, rep.MergeRequest.AutoMerge.Enabled)
+		assert.Equal(t, "auto-merge is not allowed for this repository", rep.MergeRequest.AutoMerge.Error)
+	})
+
+	t.Run("no merge request means nothing to attach to", func(t *testing.T) {
+		// A --dry-run never opens one, so there is no MR whose auto-merge state could be set.
+		rec := newTestRecorder()
+		rec.SetAutoMerge(errors.New("boom"))
+
+		assert.Nil(t, rec.Finish().MergeRequest)
+	})
+}
+
+// The auto_merge key must be omitted entirely when it was never requested, so a consumer can
+// test for its presence rather than having to distinguish false-because-failed from
+// false-because-unset.
+func TestAutoMergeOmittedFromJSONWhenNotRequested(t *testing.T) {
+	rec := newTestRecorder()
+	rec.SetMergeRequest("https://example.com/mr/1")
+
+	encoded, err := json.Marshal(rec.Finish().MergeRequest)
+	require.NoError(t, err)
+	assert.NotContains(t, string(encoded), "auto_merge")
+
+	rec.SetAutoMerge(nil)
+	encoded, err = json.Marshal(rec.Finish().MergeRequest)
+	require.NoError(t, err)
+	assert.Contains(t, string(encoded), `"auto_merge":{"enabled":true}`)
+}
+
 // reportingAddon implements both internal.Addon and Reporter.
 type reportingAddon struct {
 	key  string
