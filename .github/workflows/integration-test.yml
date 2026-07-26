@@ -54,6 +54,14 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+# Every job here only ever reads this repository: it clones the fixture over
+# plain HTTPS and talks to the fixture's remote with DRUPDATER_TEST_TOKEN, never
+# with GITHUB_TOKEN. Declared once at the top rather than per job so a job added
+# later inherits the restriction instead of silently getting the repository
+# default.
+permissions:
+  contents: read
+
 jobs:
   # Decides what to run. A label means "everything", a dispatch means "exactly
   # what I asked for", and keeping that decision in one place stops the matrix
@@ -168,8 +176,6 @@ jobs:
     name: ${{ matrix.fixture }} / ${{ matrix.mode }}
     runs-on: ubuntu-latest
     timeout-minutes: 75
-    permissions:
-      contents: read
     strategy:
       # One fixture or mode failing must not hide the state of the others.
       fail-fast: false
