@@ -4,9 +4,9 @@ name: Integration Test
 # whose composer.lock is deliberately frozen at an old resolution, so every run
 # has something to update.
 #
-# Manual on purpose: a single leg is a Docker build plus a real Drupal install,
-# far too slow to want on every push, and the unit suite in go.yml covers the
-# rest. Two ways in:
+# Manual on purpose: every leg installs Drupal for real, far too slow to want on
+# every push, and the unit suite in go.yml covers the rest. The image is built
+# once and shared, so adding fixtures costs runs but not rebuilds. Two ways in:
 #
 #   * add the "integration-test" label to a pull request. Every fixture runs in
 #     both normal and security mode, always as a dry run, and each leg shows up
@@ -69,9 +69,11 @@ jobs:
       dry_run: ${{ steps.set.outputs.dry_run }}
       verbose: ${{ steps.set.outputs.verbose }}
     steps:
-      - uses: actions/checkout@v7
+      - name: Checkout repository
+        uses: actions/checkout@v7
 
-      - id: set
+      - name: Resolve fixtures and run flags
+        id: set
         env:
           IS_DISPATCH: ${{ github.event_name == 'workflow_dispatch' }}
           IN_URL: ${{ inputs.repository_url }}
@@ -118,21 +120,11 @@ jobs:
           jq -r '.[] | "- \(.fixture) / \(.mode) -- \(.repository_url)@\(.branch)"' \
             <<<"$include" >> "$GITHUB_STEP_SUMMARY"
 
-  integration-test:
+  # The image is identical for every leg, so build it once and pass it along as
+  # an artifact. Building per leg meant 2 builds for one fixture and 2N for N.
+  build:
     needs: plan
-    name: ${{ matrix.fixture }} / ${{ matrix.mode }}
     runs-on: ubuntu-latest
-    timeout-minutes: 75
-    permissions:
-      contents: read
-    strategy:
-      # One fixture or mode failing must not hide the state of the others.
-      fail-fast: false
-      matrix:
-        include: ${{ fromJSON(needs.plan.outputs.include) }}
-    env:
-      TARGET_URL: ${{ matrix.repository_url }}
-      TARGET_BRANCH: ${{ matrix.branch }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -148,12 +140,45 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
-          load: true
           tags: drupdater:test
           build-args: |
             PHP_VERSION=8.4
+          outputs: type=docker,dest=/tmp/drupdater-image.tar
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Upload image
+        uses: actions/upload-artifact@v4
+        with:
+          name: drupdater-image
+          path: /tmp/drupdater-image.tar
+          retention-days: 1
+          if-no-files-found: error
+
+  integration-test:
+    needs: [plan, build]
+    name: ${{ matrix.fixture }} / ${{ matrix.mode }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    permissions:
+      contents: read
+    strategy:
+      # One fixture or mode failing must not hide the state of the others.
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.include) }}
+    env:
+      TARGET_URL: ${{ matrix.repository_url }}
+      TARGET_BRANCH: ${{ matrix.branch }}
+    steps:
+      - name: Download image
+        uses: actions/download-artifact@v4
+        with:
+          name: drupdater-image
+          path: /tmp
+
+      - name: Load image
+        run: docker load --input /tmp/drupdater-image.tar
 
       - name: Delete stale update branches
         if: needs.plan.outputs.dry_run != 'true'
