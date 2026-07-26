@@ -71,30 +71,31 @@ site is installed from scratch to build a baseline database, then the update run
 
 ## Step 3: read the log
 
-The run works through seven phases in order. In the log you will see each one start and
-finish:
+The log narrates the work as it happens:
 
 ```text
-INFO  starting phase  {"phase": "acquire working copy"}
-INFO  starting phase  {"phase": "preflight"}
-INFO  starting phase  {"phase": "composer install"}
-INFO  starting phase  {"phase": "baseline site install"}
-INFO  starting phase  {"phase": "update shared code"}
-INFO  starting phase  {"phase": "site update"}
+INFO  using checkout        {"url": "https://github.com/you/site.git", "branch": "main"}
+INFO  running composer install
+INFO  updating dependencies
+INFO  dependencies updated  {"total": 16, "installed": 2, "upgraded": 14, "downgraded": 0, "removed": 0}
+INFO  removing deprecations
+INFO  updating coding styles
+INFO  updating site         {"site": "default"}
+INFO  update hooks found    {"site": "default", "count": 4}
+INFO  exporting configuration {"site": "default"}
+INFO  update finished
 ```
 
-There is no `publish` phase — that is the one `--dry-run` skips.
+The log does not announce the seven phases — those are recorded in the report, with their
+durations, which you will read in the next step.
 
-Somewhere in `update shared code` you will see the summary of what Composer did:
-
-```text
-INFO  update summary  {"upgraded": 14, "installed": 2, "removed": 0, "downgraded": 0}
-```
+Nothing is pushed and no request is created: that is the `publish` phase, and `--dry-run`
+skips it.
 
 If instead you see:
 
 ```text
-WARN  update aborted  {"error": "no changes detected"}
+WARN  update aborted        {"error": "no changes detected"}
 ```
 
 then the project is already fully up to date. That is a success, not a failure — the
@@ -189,8 +190,8 @@ commit by commit.
 
 The branch name — `update-3f81a2c` — is derived from a hash of the resulting
 `composer.lock`. Run this again over unchanged dependencies and you will get the same name,
-and the run will abort with `branch already exists`. That is what stops duplicate pull
-requests.
+and the run will abort with `branch update-3f81a2c already exists, skipping`. That is
+what stops duplicate pull requests.
 
 ## Step 6: clean up
 

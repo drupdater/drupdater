@@ -10,11 +10,6 @@ afterwards which advisories were actually resolved, and retitles the pull reques
 | Report key | `composer_audit` |
 | Pull request section | "🛡️ Security Report" |
 
-## Why it exists
-
-It is what makes a security run different from a normal one. Without it, `--security`
-would just be a normal update with a different pull request title.
-
 ## What it does
 
 ### Before the update — deciding the scope
@@ -57,6 +52,11 @@ Rewrites the request title from the default monthly form to:
 Dated to the day rather than the month, because security updates are expected to arrive
 several times in one month and each needs to be distinguishable.
 
+## Why it exists
+
+It is what makes a security run different from a normal one. Without it, `--security`
+would just be a normal update with a different pull request title.
+
 ## Report section
 
 ```json
@@ -81,10 +81,9 @@ several times in one month and each needs to be distinguishable.
 }
 ```
 
-**`remaining` is the more actionable half.** These are advisories the update could not
-resolve — usually because the fix requires a major version bump, or because a
-[patch conflict](composer-patches.md) held the package back. They are what a fleet-wide
-exposure view is built from.
+`remaining` lists advisories the update could not resolve — usually because the fix
+requires a major version bump, or because a [patch conflict](composer-patches.md) held the
+package back.
 
 ## Pull request section
 

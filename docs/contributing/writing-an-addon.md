@@ -140,7 +140,7 @@ Three requirements:
   empty one.
 - **Report even when the work was "only" a code change.** Because addons swallow their own
   failures, one that silently broke looks exactly like one with nothing to do. This is not
-  hypothetical: `unsupported_modules` was silently broken on Drupal 11 for months.
+  hypothetical: it [has happened](../explanation/why-a-run-report.md).
 - **Sort anything unordered.** Two runs over unchanged input should produce byte-identical
   output so reports diff cleanly.
 

@@ -10,7 +10,7 @@ From the checkout:
 
 ```bash
 docker run -v "$(pwd)":/app -w /app \
-  ghcr.io/drupdater/drupdater-php8.3:v0.12.0 check
+  ghcr.io/drupdater/drupdater-php8.3:latest check
 ```
 
 This runs only the cheap checks — they take about a second. Output:
@@ -34,7 +34,7 @@ run fails partway through. `--full` proves it:
 
 ```bash
 docker run -v "$(pwd)":/app -w /app \
-  ghcr.io/drupdater/drupdater-php8.3:v0.12.0 \
+  ghcr.io/drupdater/drupdater-php8.3:latest \
   check --full
 ```
 
@@ -50,7 +50,7 @@ Pass a token and one more check runs — whether it authenticates and has API ac
 
 ```bash
 docker run -v "$(pwd)":/app -w /app -e DRUPDATER_TOKEN \
-  ghcr.io/drupdater/drupdater-php8.3:v0.12.0 check
+  ghcr.io/drupdater/drupdater-php8.3:latest check
 ```
 
 ```text
@@ -72,7 +72,7 @@ that has no credentials.
       drupdater-check:
         runs-on: ubuntu-latest
         container:
-          image: ghcr.io/drupdater/drupdater-php8.3:v0.12.0
+          image: ghcr.io/drupdater/drupdater-php8.3:latest
         steps:
           - uses: actions/checkout@v4
             with:
@@ -85,7 +85,7 @@ that has no credentials.
     ```yaml
     drupdater:check:
       image:
-        name: ghcr.io/drupdater/drupdater-php8.3:v0.12.0
+        name: ghcr.io/drupdater/drupdater-php8.3:latest
         entrypoint: [""]
       variables:
         GIT_DEPTH: "0"

@@ -31,7 +31,7 @@ jobs:
   drupdater:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/drupdater/drupdater-php8.3:v0.12.0
+      image: ghcr.io/drupdater/drupdater-php8.3:latest
     steps:
       - uses: actions/checkout@v4
         with:

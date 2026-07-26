@@ -11,12 +11,6 @@ a PHPCS configuration first if the project has none.
 | Pull request section | *(none)* |
 | Commits | `Add PHPCS config`, `Install drupal/coder`, `Update coding styles` |
 
-## Why it exists
-
-Drupal core version bumps regularly change what the `Drupal` and `DrupalPractice`
-standards require. Folding the resulting mechanical fixes into the same pull request as
-the update keeps them from accumulating into a separate cleanup task later.
-
 ## What it does
 
 ### Ensures a PHPCS configuration exists
@@ -41,6 +35,12 @@ If absent, it is required as a dev dependency and committed as `Install drupal/c
 Runs `phpcs` to collect violations, then `phpcbf` to fix them. Only files that actually
 had errors or warnings are staged, and the `Update coding styles` commit is made **only
 if something was staged** — so a run with nothing to fix leaves no empty commit behind.
+
+## Why it exists
+
+Drupal core version bumps regularly change what the `Drupal` and `DrupalPractice`
+standards require. Folding the resulting mechanical fixes into the same pull request as
+the update keeps them from accumulating into a separate cleanup task later.
 
 ## Report section
 

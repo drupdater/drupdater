@@ -111,7 +111,7 @@ Three conditions stop a run early, and all three exit `0`:
 | Condition | Message |
 |---|---|
 | `composer update` changed nothing | `no changes detected` |
-| The update branch already exists | `branch update-… already exists` |
+| The update branch already exists | `branch update-… already exists, skipping` |
 | A `--security` run found no advisories | `No security advisories found` |
 
 Internally these raise an abort signal that is logged as a warning rather than an error,

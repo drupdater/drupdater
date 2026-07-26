@@ -17,7 +17,7 @@ drupdater --dry-run --report ./drupdater-report.json
 ```json
 {
   "schema_version": 1,
-  "drupdater_version": "v0.12.0",
+  "drupdater_version": "v0.3.6",
   "started_at": "2026-07-25T02:00:00Z",
   "finished_at": "2026-07-25T02:14:31Z",
   "duration_seconds": 871.4,
@@ -166,7 +166,7 @@ drupdater check --report ./preflight.json
 ```json
 {
   "schema_version": 1,
-  "drupdater_version": "v0.12.0",
+  "drupdater_version": "v0.3.6",
   "checked_at": "2026-07-25T02:00:00Z",
   "ok": false,
   "results": [

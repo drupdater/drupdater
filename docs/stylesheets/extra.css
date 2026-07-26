@@ -20,6 +20,9 @@
   --md-primary-bg-color--light: rgba(255, 255, 255, 0.7);
   --md-accent-fg-color: #7287fd;
   --md-accent-fg-color--transparent: rgba(114, 135, 253, 0.1);
+  /* Landing-page hero wash — two tints of the same lavender. */
+  --dr-glow-strong: rgba(114, 135, 253, 0.28);
+  --dr-glow-soft: rgba(114, 135, 253, 0.12);
 }
 
 [data-md-color-scheme="slate"] {
@@ -30,6 +33,8 @@
   --md-primary-bg-color--light: rgba(30, 30, 46, 0.7);
   --md-accent-fg-color: #b4befe;
   --md-accent-fg-color--transparent: rgba(180, 190, 254, 0.1);
+  --dr-glow-strong: rgba(180, 190, 254, 0.18);
+  --dr-glow-soft: rgba(180, 190, 254, 0.07);
 }
 
 /*
@@ -43,4 +48,213 @@
 
 .md-typeset table:not([class]) code {
   white-space: nowrap;
+}
+
+/*
+ * Landing page (docs/index.md).
+ *
+ * The page hides the sidebars, so everything below is scoped to the classes it
+ * introduces rather than to a body class — nothing here can leak into a normal
+ * documentation page.
+ */
+
+.dr-hero {
+  display: grid;
+  gap: 2rem;
+  align-items: center;
+  margin: -1rem -0.8rem 2.5rem;
+  padding: 2.6rem 2rem;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 1rem;
+  background:
+    radial-gradient(75% 130% at 8% 0%, var(--dr-glow-strong), transparent 68%),
+    radial-gradient(60% 110% at 100% 100%, var(--dr-glow-soft), transparent 70%),
+    var(--md-code-bg-color);
+}
+
+@media screen and (min-width: 60em) {
+  .dr-hero {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+    padding: 3.2rem 2.6rem;
+  }
+}
+
+.md-typeset .dr-hero h1 {
+  margin: 0 0 0.4rem;
+  font-size: clamp(2rem, 5vw, 3rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  color: var(--md-primary-fg-color);
+}
+
+.md-typeset .dr-hero__tagline {
+  margin: 0 0 1rem;
+  font-size: 1.05rem;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--md-default-fg-color);
+}
+
+.md-typeset .dr-hero__copy > p {
+  color: var(--md-default-fg-color--light);
+}
+
+.md-typeset .dr-hero .md-button {
+  margin: 0.4rem 0.4rem 0 0;
+}
+
+.dr-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 1.4rem !important;
+}
+
+.dr-badge {
+  padding: 0.15rem 0.6rem;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 2rem;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--md-default-fg-color--light);
+  background: var(--md-default-bg-color);
+}
+
+.dr-badge--warn {
+  border-color: var(--md-accent-fg-color);
+  color: var(--md-accent-fg-color);
+}
+
+/*
+ * Terminal mock. Decorative — it is not real output, so Material's injected
+ * copy button (content.code.copy applies to every `pre > code`) is suppressed.
+ */
+.dr-term .md-code__button,
+.dr-term .md-code__nav {
+  display: none;
+}
+
+/*
+ * Below the two-column breakpoint the mock is wider than the viewport and would
+ * be clipped mid-line. It carries no information the copy beside it lacks, so it
+ * is simply dropped on narrow screens.
+ */
+@media screen and (max-width: 59.98em) {
+  .dr-term {
+    display: none;
+  }
+}
+
+.dr-term {
+  overflow: hidden;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 0.6rem;
+  box-shadow: 0 1rem 2.5rem rgb(0 0 0 / 18%);
+  background: var(--md-default-bg-color);
+}
+
+.dr-term__bar {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.7rem;
+  border-bottom: 1px solid var(--md-default-fg-color--lightest);
+  background: var(--md-code-bg-color);
+}
+
+.dr-term__bar i {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: var(--md-default-fg-color--lighter);
+}
+
+.dr-term__bar em {
+  margin-left: 0.4rem;
+  font-size: 0.6rem;
+  font-style: normal;
+  color: var(--md-default-fg-color--light);
+}
+
+.md-typeset .dr-term__body {
+  overflow-x: auto;
+  margin: 0;
+  padding: 1rem;
+  font-size: 0.62rem;
+  line-height: 1.85;
+  color: var(--md-default-fg-color--light);
+  background: transparent;
+}
+
+.dr-term__body .p { color: var(--md-accent-fg-color); }
+.dr-term__body .d { color: var(--md-default-fg-color--lighter); }
+.dr-term__body .ok { color: var(--md-primary-fg-color); font-weight: 600; }
+.dr-term__body .c { color: var(--md-default-fg-color--lighter); font-style: italic; }
+
+/* Card grids lift on hover so the four Diátaxis entry points read as targets. */
+.md-typeset .dr-cards > ul > li {
+  border-radius: 0.6rem;
+  transition: transform 125ms, box-shadow 125ms, border-color 125ms;
+}
+
+.md-typeset .dr-cards > ul > li:hover {
+  transform: translateY(-2px);
+  border-color: var(--md-accent-fg-color);
+  box-shadow: 0 0.4rem 1.2rem rgb(0 0 0 / 12%);
+}
+
+.md-typeset .dr-cards > ul > li .twemoji,
+.md-typeset .dr-cards > ul > li .lg {
+  color: var(--md-accent-fg-color);
+}
+
+/* The seven phases, as a numbered strip. */
+.md-typeset ol.dr-steps {
+  display: grid;
+  gap: 0.7rem;
+  margin: 1.2rem 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: dr-step;
+}
+
+@media screen and (min-width: 45em) {
+  .md-typeset ol.dr-steps {
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  }
+}
+
+.md-typeset ol.dr-steps > li {
+  position: relative;
+  margin: 0;
+  padding: 0.8rem 0.9rem 0.8rem 2.4rem;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 0.5rem;
+  counter-increment: dr-step;
+}
+
+.md-typeset ol.dr-steps > li::before {
+  content: counter(dr-step);
+  position: absolute;
+  top: 0.8rem;
+  left: 0.8rem;
+  font-size: 0.85rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--md-accent-fg-color);
+  opacity: 0.55;
+}
+
+.md-typeset ol.dr-steps > li strong {
+  display: block;
+  font-size: 0.72rem;
+}
+
+.md-typeset ol.dr-steps > li span {
+  display: block;
+  font-size: 0.68rem;
+  line-height: 1.5;
+  color: var(--md-default-fg-color--light);
 }

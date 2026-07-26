@@ -59,7 +59,7 @@ single most common reason a real run fails partway through, and `drupdater check
 reproduces it in isolation:
 
 ```text
-✗ site "default": installs from configuration
+✗ site "default" installs from configuration
 ```
 
 ### The run aborts on an unknown addon name
@@ -127,7 +127,7 @@ already current.
 
 Update branch names are content-addressed — derived from a hash of the resulting
 `composer.lock`. A rerun over unchanged dependencies produces the same branch name, and
-the run aborts with `branch <name> already exists`. That is the mechanism preventing
+the run aborts with `branch <name> already exists, skipping`. That is the mechanism preventing
 duplicate pull requests for identical updates.
 
 ### A package was not updated

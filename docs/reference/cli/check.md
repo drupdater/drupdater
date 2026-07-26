@@ -46,7 +46,7 @@ In short:
 7. `token authenticates` — only when a token was given
 
 With `--full`, three more are appended: `clone for full check`, `composer install`, and
-`site "<name>": installs from configuration` per site.
+`site "<name>" installs from configuration` per site.
 
 ## Safety
 
@@ -63,8 +63,7 @@ Results are printed one per line, with failures detailed:
 ✓ addon names resolve
 ✓ git history complete (not a shallow clone)
 ✓ PHP platform requirements satisfied
-✗ site "default": settings.php
-    not found at web/sites/default/settings.php
+✗ site "default": settings.php: not found at web/sites/default/settings.php
 ✓ repository host recognized (GitHub/GitLab)
 ```
 

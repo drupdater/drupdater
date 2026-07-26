@@ -109,6 +109,18 @@ The repository is cloned to a **scratch directory** — never the live working c
 everything is removed afterwards, including the clone, each `<site>.sqlite` and
 `private/<site>`.
 
+Four names can appear in this tier. Three of them replace the rest of the tier when they
+fail, because there is nothing left to check:
+
+### `sites install from configuration`
+
+Appears **only on failure**, when there is no repository URL to clone:
+
+```text
+✗ sites install from configuration: no repository URL to clone (pass --repository-url or
+run inside a checkout with an origin remote)
+```
+
 ### `clone for full check`
 
 Appears only if cloning fails. The branch defaults to `main` when not otherwise set.
@@ -119,7 +131,12 @@ A real `composer install` against the scratch clone. Catches unreachable private
 registries, missing [`COMPOSER_AUTH`](../how-to/use-private-packagist.md), and lock files
 that cannot be satisfied.
 
-### `site "<name>": installs from configuration`
+### `drush site-install --existing-config`
+
+Appears only on failure, when the Drush cache could not be initialised — so no site could
+be installed to check.
+
+### `site "<name>" installs from configuration`
 
 A real `drush site-install --existing-config` per site. **This is the definitive check**
 — it is exactly what the update's baseline install phase does, and the single most common

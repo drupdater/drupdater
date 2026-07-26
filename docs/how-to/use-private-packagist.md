@@ -82,7 +82,7 @@ Several entries can be combined in one object.
     ```bash
     docker run \
       -e COMPOSER_AUTH='{"http-basic":{"repo.packagist.com":{"username":"token","password":"<your-token>"}}}' \
-      ghcr.io/drupdater/drupdater-php8.3:v0.12.0 \
+      ghcr.io/drupdater/drupdater-php8.3:latest \
       <token> --clone --repository-url <repository-url>
     ```
 
@@ -96,8 +96,7 @@ drupdater check --full
 ```
 
 ```text
-✗ composer install
-    Could not authenticate against repo.packagist.com
+✗ composer install: Could not authenticate against repo.packagist.com
 ```
 
 ## How credentials are protected

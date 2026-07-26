@@ -10,16 +10,6 @@ upgrade path, no further fixes.
 | Report key | `unsupported_modules` |
 | Pull request section | "⚠️ Unsupported modules" |
 
-## Why it exists
-
-An unsupported module is a different problem from a vulnerable one. There is no update to
-apply, so [`composer_audit`](composer-audit.md) will never flag it and no amount of
-running Drupdater will fix it. It needs a human decision: replace the module, adopt it,
-or accept the risk.
-
-Surfacing it in the routine update pull request is the cheapest possible way to keep that
-decision from being forgotten for a year.
-
 ## What it does
 
 Queries Drupal's own update status for each site, via a helper script shipped in the
@@ -31,6 +21,16 @@ does not list the same module several times.
 This addon is **best-effort**: errors are logged and swallowed rather than failing the
 run. A transient problem reaching Drupal.org's update service should not lose an
 otherwise complete update.
+
+## Why it exists
+
+An unsupported module is a different problem from a vulnerable one. There is no update to
+apply, so [`composer_audit`](composer-audit.md) will never flag it and no amount of
+running Drupdater will fix it. It needs a human decision: replace the module, adopt it,
+or accept the risk.
+
+Surfacing it in the routine update pull request is the cheapest possible way to keep that
+decision from being forgotten for a year.
 
 ## Report section
 
@@ -60,11 +60,7 @@ Omitted when every installed module is supported.
 
 ## A note on silent failure
 
-This addon was, at one point, silently broken on Drupal 11: the procedural `UPDATE_*`
-constants it relied on were removed, and because it swallows its own errors every run
-stayed green while it reported nothing at all.
-
-That is the reason it reports to the run report even when it finds nothing worth
-mentioning in the pull request, and the reason CI asserts on the presence of its report
-key rather than only on the run's `status`. See [Consume the run
-report](../../how-to/consume-the-run-report.md).
+This addon was once broken for months without any run going red — the reason the report
+records it even when it finds nothing, and the reason to assert on its report key rather
+than on the run's `status`. See [Why a run
+report](../../explanation/why-a-run-report.md).
