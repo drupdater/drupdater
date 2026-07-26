@@ -106,6 +106,26 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []interna
 	}
 	rec := report.NewRecorder(internal.Version, mode, ws.config.DryRun, ws.config.RepositoryURL, ws.config.Branch, ws.config.Sites)
 
+	// Emit the report from its own defer, registered before anything that can fail, so that
+	// "written on every exit path" holds literally — including a clone or checkout that never
+	// gets far enough for there to be a working copy to clean up. Being registered first also
+	// makes it run last, so the report describes the run after every other teardown has had its
+	// say.
+	//
+	// An AbortError is not a failure — it is the workflow's way of saying there was nothing to
+	// do — so it is recorded as such rather than as an error the reader should act on.
+	defer func() {
+		if ws.reportSink == nil {
+			return
+		}
+		var abort AbortError
+		if errors.As(err, &abort) {
+			rec.SetNoChanges()
+		}
+		rec.AddAddons(addons)
+		ws.reportSink(rec.Finish())
+	}()
+
 	// Bound the whole run so a wedged subprocess or network call can't hang forever.
 	if ws.config.Timeout > 0 {
 		var cancel context.CancelFunc
@@ -124,8 +144,20 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []interna
 	// Acquire a single working directory: the existing checkout (default, CI) or a fresh
 	// clone (--clone, for local testing). Old and new code live in this one directory
 	// sequentially: install the baseline site, then composer update, then run update hooks.
-	repository, worktree, path, err := ws.acquireWorkingCopy(username, email)
-	if err != nil {
+	//
+	// Recorded as a phase like every other step: a bad token, an unreachable host or an
+	// unreadable checkout fails here, and that is one of the most common ways a run fails in
+	// practice — exactly what the report exists to name.
+	var (
+		repository GitRepository
+		worktree   Worktree
+		path       string
+	)
+	if err = rec.Run("acquire working copy", func() error {
+		var acquireErr error
+		repository, worktree, path, acquireErr = ws.acquireWorkingCopy(username, email)
+		return acquireErr
+	}); err != nil {
 		return err
 	}
 
@@ -139,18 +171,6 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []interna
 			ws.restoreOriginalCheckout(worktree, originalRef)
 		}
 		ws.cleanup(path)
-
-		// Emit the report last, so it describes the run as a whole. An AbortError is not a
-		// failure — it is the workflow's way of saying there was nothing to do — so it is
-		// recorded as such rather than as an error the reader should act on.
-		if ws.reportSink != nil {
-			var abort AbortError
-			if errors.As(err, &abort) {
-				rec.SetNoChanges()
-			}
-			rec.AddAddons(addons)
-			ws.reportSink(rec.Finish())
-		}
 	}()
 
 	return ws.runPhases(ctx, rec, repository, worktree, path, addons)

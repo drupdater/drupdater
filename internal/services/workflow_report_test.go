@@ -176,6 +176,26 @@ func TestReportWrittenOnFailureNamesThePhase(t *testing.T) {
 	assert.Nil(t, h.got.MergeRequest)
 }
 
+// Acquiring the working copy is the first thing that can fail, and one of the most common ways
+// a run fails in practice: a bad token, an unreachable host, an unreadable checkout. The report
+// must still be written — this is precisely the case "written on every exit path" is for.
+func TestReportWrittenWhenAcquiringTheWorkingCopyFails(t *testing.T) {
+	h := newReportHarness(t, false)
+	h.repoSvc.ExpectedCalls = nil
+	h.repoSvc.EXPECT().CloneRepository(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(nil, nil, "", errors.New("authentication failed"))
+
+	err := h.run(t)
+
+	require.Error(t, err)
+	require.NotNil(t, h.got, "a run that never got a working copy must still produce a report")
+	assert.Equal(t, report.StatusFailed, h.got.Status)
+	assert.Equal(t, "acquire working copy", h.got.FailedPhase)
+	assert.Contains(t, h.got.Error, "authentication failed")
+	assert.Empty(t, h.got.Packages)
+	assert.Nil(t, h.got.MergeRequest)
+}
+
 // "Nothing to update" is reported as its own status rather than as a failure, so a consumer
 // watching many repositories does not treat a healthy, up-to-date site as needing attention.
 func TestReportNoChangesIsNotAFailure(t *testing.T) {
