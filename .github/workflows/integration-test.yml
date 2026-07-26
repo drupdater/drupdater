@@ -53,9 +53,10 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      # Drupal CMS is Drupal 11, which requires PHP 8.3+. One version, no matrix:
-      # this job proves drupdater works against a real site, not that Drupal runs
-      # on every PHP release.
+      # One version, no matrix: this job proves drupdater works against a real
+      # site, not that Drupal runs on every PHP release. 8.4 has to match the
+      # target's config.platform.php -- its lock is resolved for 8.4.1 and pulls
+      # in Symfony 8, which will not install on anything earlier.
       - name: Build Docker image
         uses: docker/build-push-action@v7
         with:
@@ -63,7 +64,7 @@ jobs:
           load: true
           tags: drupdater:test
           build-args: |
-            PHP_VERSION=8.3
+            PHP_VERSION=8.4
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
