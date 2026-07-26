@@ -1,0 +1,8 @@
+[
+  {
+    "name": "drupal-cms",
+    "description": "Drupal CMS, core held a minor behind so every run has updates",
+    "repository_url": "https://github.com/drupdater/test-drupal-cms.git",
+    "branch": "main"
+  }
+]
