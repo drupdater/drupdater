@@ -1,27 +1,25 @@
 name: Integration Test
 
+# Runs drupdater end to end against a real Drupal site. The target is
+# drupdater/test-drupal-cms: a Drupal CMS checkout whose composer.lock is
+# deliberately frozen at an old resolution, so every run has something to update.
+#
+# Manual only, on purpose. Dispatch it from the branch of a PR whose change
+# warrants an end-to-end check; the unit suite in go.yml covers everything else.
+
 on:
   workflow_dispatch:
     inputs:
       repository_url:
         description: 'Drupal project repository URL'
-        required: true
+        required: false
+        default: 'https://github.com/drupdater/test-drupal-cms.git'
         type: string
       branch:
         description: 'Target branch in the project repository'
         required: false
         default: 'main'
         type: string
-      php_version:
-        description: 'PHP version'
-        required: false
-        default: '8.3'
-        type: choice
-        options:
-          - '8.2'
-          - '8.3'
-          - '8.4'
-          - '8.5'
       dry_run:
         description: 'Skip branch and MR creation'
         required: false
@@ -45,6 +43,7 @@ concurrency:
 jobs:
   integration-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 75
     permissions:
       contents: read
     steps:
@@ -54,6 +53,9 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
+      # Drupal CMS is Drupal 11, which requires PHP 8.3+. One version, no matrix:
+      # this job proves drupdater works against a real site, not that Drupal runs
+      # on every PHP release.
       - name: Build Docker image
         uses: docker/build-push-action@v7
         with:
@@ -61,9 +63,28 @@ jobs:
           load: true
           tags: drupdater:test
           build-args: |
-            PHP_VERSION=${{ inputs.php_version }}
+            PHP_VERSION=8.3
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Delete stale update branches
+        if: ${{ !inputs.dry_run }}
+        env:
+          REPO_TOKEN: ${{ secrets.DRUPDATER_TEST_TOKEN }}
+          REPOSITORY_URL: ${{ inputs.repository_url }}
+        run: |
+          # The target's composer.lock is frozen, so the update branch name
+          # (update-<lock content-hash>) is stable across runs. Left behind, it
+          # makes the next real run abort with "branch already exists", which
+          # reports as no_changes and exit 0 -- a green run that tested nothing.
+          git ls-remote --heads \
+            "$(echo "$REPOSITORY_URL" | sed "s#https://#https://oauth2:$REPO_TOKEN@#")" \
+            'refs/heads/update-*' | awk '{print $2}' | sed 's#refs/heads/##' \
+            | while read -r ref; do
+                echo "deleting stale branch $ref"
+                git push "$(echo "$REPOSITORY_URL" | sed "s#https://#https://oauth2:$REPO_TOKEN@#")" \
+                  --delete "$ref"
+              done
 
       - name: Clone project
         env:
@@ -71,20 +92,56 @@ jobs:
           REPOSITORY_URL: ${{ inputs.repository_url }}
           BRANCH: ${{ inputs.branch }}
         run: |
+          # ./run is the mount root, the project a level below it. drupdater
+          # writes <site>.sqlite and private/ into the checkout's PARENT
+          # (pkg/drupal/installer.go), so the parent has to be a real directory
+          # we control -- mounting the checkout itself at /workspace puts them
+          # in the container's /.
+          mkdir -p ./run
+          # No --depth: drupdater's preflight rejects a shallow checkout
+          # ("git history complete"), and a shallow clone cannot be pushed.
           git -c credential.helper='!f(){ echo username=oauth2; echo "password=$REPO_TOKEN"; };f' \
-            clone --branch "$BRANCH" --depth 1 "$REPOSITORY_URL" ./drupal-project
+            clone --branch "$BRANCH" "$REPOSITORY_URL" ./run/project
 
       - name: Run drupdater
         env:
           REPO_TOKEN: ${{ secrets.DRUPDATER_TEST_TOKEN }}
+          DRUPALCODE_ACCESS_TOKEN: ${{ secrets.DRUPALCODE_ACCESS_TOKEN }}
           DRY_RUN: ${{ inputs.dry_run }}
           SECURITY: ${{ inputs.security }}
           VERBOSE: ${{ inputs.verbose }}
         run: |
-          args=(--working-dir /workspace)
-          [ "$DRY_RUN" = "true" ] && args+=(--dry-run)
+          args=(--working-dir /workspace/project --report /workspace/report.json)
+          [ "$DRY_RUN" = "true" ]  && args+=(--dry-run)
           [ "$SECURITY" = "true" ] && args+=(--security)
-          [ "$VERBOSE" = "true" ] && args+=(--verbose)
+          [ "$VERBOSE" = "true" ]  && args+=(--verbose)
           docker run --rm \
-            -v "$(pwd)/drupal-project:/workspace" \
+            -e DRUPALCODE_ACCESS_TOKEN \
+            -v "$(pwd)/run:/workspace" \
             drupdater:test "$REPO_TOKEN" "${args[@]}"
+
+      # The report is written on every exit path, so this runs even when the
+      # container failed -- a failed run's report is the one worth reading.
+      - name: Summarise run report
+        if: always()
+        run: |
+          test -f ./run/report.json || { echo "::error::no run report was written"; exit 1; }
+          jq -r '
+            "status=\(.status)  mode=\(.mode)  dry_run=\(.dry_run)",
+            "failed_phase=\(.failed_phase // "-")  error=\(.error // "-")",
+            "packages=\(.packages | length)",
+            "phases:", (.phases[] | "  \(.name): ok=\(.ok) \(.duration_seconds)s \(.error // "")"),
+            "addons: \(.addons // {} | keys | join(", "))"
+          ' ./run/report.json | tee -a "$GITHUB_STEP_SUMMARY"
+          # The container exits 0 on an AbortError ("no changes", "branch already
+          # exists"), so exit status alone is not a verdict -- gate on the report.
+          jq -e '.status == "success" or .status == "no_changes"' ./run/report.json > /dev/null
+
+      - name: Upload run report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: drupdater-report
+          path: ./run/report.json
+          if-no-files-found: error
+          retention-days: 30
