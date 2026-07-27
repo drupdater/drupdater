@@ -27,8 +27,8 @@ type Composer interface {
 	SetConfig(ctx context.Context, dir string, key string, value string) error
 	GetDependencyPatches(ctx context.Context, dir string) (map[string]map[string]bool, error)
 
-	CheckIfPatchApplies(ctx context.Context, packageName string, packageVersion string, patchPath string) (bool, error)
-	CheckIfPatchesApply(ctx context.Context, packageName string, packageVersion string, patchPaths []string) (bool, error)
+	CheckIfPatchApplies(ctx context.Context, dir string, packageName string, packageVersion string, patchPath string) (bool, error)
+	CheckIfPatchesApply(ctx context.Context, dir string, packageName string, packageVersion string, patchPaths []string) (bool, error)
 	GetInstalledPlugins(ctx context.Context, dir string) (map[string]any, error)
 	IsPackageInstalled(ctx context.Context, dir string, packageToCheck string) (bool, error)
 	UpdateLockHash(ctx context.Context, dir string) error

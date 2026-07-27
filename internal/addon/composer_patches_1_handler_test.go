@@ -61,7 +61,7 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 		composerService.EXPECT().GetDependencyPatches(mock.Anything, path).Return(nil, nil)
 		drupalOrgService.EXPECT().FindIssueNumber("local patch").Return("", false)
 		drupalOrgService.EXPECT().FindIssueNumber("patches/x.patch").Return("", false)
-		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, "drupal/core", "8.8.0", path+"/patches/x.patch").Return(false, nil)
+		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, mock.Anything, "drupal/core", "8.8.0", path+"/patches/x.patch").Return(false, nil)
 
 		composerService.EXPECT().SetConfig(mock.Anything, path, "extra.patches", mock.Anything).Return(nil)
 		composerService.EXPECT().UpdateLockHash(mock.Anything, path).Return(nil)
@@ -88,7 +88,7 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 		composerService.EXPECT().GetDependencyPatches(mock.Anything, path).Return(nil, nil)
 		drupalOrgService.EXPECT().FindIssueNumber("local patch").Return("", false)
 		drupalOrgService.EXPECT().FindIssueNumber("patches/x.patch").Return("", false)
-		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, "drupal/core", "8.8.0", path+"/patches/x.patch").Return(true, nil)
+		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, mock.Anything, "drupal/core", "8.8.0", path+"/patches/x.patch").Return(true, nil)
 
 		h := &ComposerPatches1{logger: logger, composer: composerService, drupalOrg: drupalOrgService}
 		e := services.NewPreComposerUpdateEvent(t.Context(), path, worktree, []string{}, []string{}, false)

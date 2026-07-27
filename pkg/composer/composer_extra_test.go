@@ -146,11 +146,13 @@ func TestResetScratchProject(t *testing.T) {
 	require.NoError(t, afero.WriteFile(fs, service.tempDir+"/composer.lock", []byte("{}"), 0644))
 	require.NoError(t, afero.WriteFile(fs, service.tempDir+"/vendor/autoload.php", []byte("<?php"), 0644))
 
-	require.NoError(t, service.resetScratchProject())
+	require.NoError(t, service.resetScratchProject("/project"))
 
 	content, err := afero.ReadFile(fs, service.tempDir+"/composer.json")
 	require.NoError(t, err)
-	assert.JSONEq(t, scratchComposerJSON, string(content))
+	expected, err := service.buildScratchComposerJSON("/project")
+	require.NoError(t, err)
+	assert.JSONEq(t, string(expected), string(content))
 
 	lockExists, err := afero.Exists(fs, service.tempDir+"/composer.lock")
 	require.NoError(t, err)
@@ -364,14 +366,14 @@ func TestCheckIfPatchAppliesInitError(t *testing.T) {
 	// surface rather than being reported as "the patch does not apply".
 	service := &CLI{logger: zap.NewNop(), fs: afero.NewReadOnlyFs(afero.NewMemMapFs())}
 
-	_, err := service.CheckIfPatchApplies(t.Context(), "drupal/core", "10.1.0", "/patches/a.diff")
+	_, err := service.CheckIfPatchApplies(t.Context(), "/project", "drupal/core", "10.1.0", "/patches/a.diff")
 	require.Error(t, err)
 }
 
 func TestCheckIfPatchesApplyInitError(t *testing.T) {
 	service := &CLI{logger: zap.NewNop(), fs: afero.NewReadOnlyFs(afero.NewMemMapFs())}
 
-	_, err := service.CheckIfPatchesApply(t.Context(), "drupal/core", "10.1.0", []string{"/patches/a.diff"})
+	_, err := service.CheckIfPatchesApply(t.Context(), "/project", "drupal/core", "10.1.0", []string{"/patches/a.diff"})
 	require.Error(t, err)
 }
 

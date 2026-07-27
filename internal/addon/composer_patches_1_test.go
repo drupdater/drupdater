@@ -94,7 +94,7 @@ func TestUpdatePatches(t *testing.T) {
 		drupalOrgService.EXPECT().FindIssueNumber("local patch without issue number").Return("", false)
 		drupalOrgService.EXPECT().FindIssueNumber("patches/core/0001-local-patch.patch").Return("", false)
 
-		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/core/0001-local-patch.patch").Return(true, nil)
+		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/core/0001-local-patch.patch").Return(true, nil)
 		updater := &ComposerPatches1{
 			logger:    logger,
 			composer:  composerService,
@@ -134,7 +134,7 @@ func TestUpdatePatches(t *testing.T) {
 			"drupal/core": {"patches/local.patch": true},
 		}, nil)
 		drupalOrgService.EXPECT().FindIssueNumber(mock.Anything).Return("", false)
-		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/local.patch").Return(true, nil)
+		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/local.patch").Return(true, nil)
 
 		updater := &ComposerPatches1{logger: logger, composer: composerService, drupalOrg: drupalOrgService}
 		operations := []composer.PackageChange{{Action: "Upgrade", Package: "drupal/core", To: "8.8.0"}}
@@ -153,7 +153,7 @@ func TestUpdatePatches(t *testing.T) {
 		composerService.EXPECT().IsPackageInstalled(mock.Anything, "/tmp", "drupal/core").Return(true, nil)
 		composerService.EXPECT().GetDependencyPatches(mock.Anything, "/tmp").Return(nil, assert.AnError)
 		drupalOrgService.EXPECT().FindIssueNumber(mock.Anything).Return("", false)
-		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/local.patch").Return(true, nil)
+		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/local.patch").Return(true, nil)
 
 		updater := &ComposerPatches1{logger: logger, composer: composerService, drupalOrg: drupalOrgService}
 		operations := []composer.PackageChange{{Action: "Upgrade", Package: "drupal/core", To: "8.8.0"}}
@@ -172,9 +172,9 @@ func TestUpdatePatches(t *testing.T) {
 		composerService.EXPECT().IsPackageInstalled(mock.Anything, "/tmp", "drupal/core").Return(true, nil)
 		composerService.EXPECT().GetDependencyPatches(mock.Anything, "/tmp").Return(nil, nil)
 		drupalOrgService.EXPECT().FindIssueNumber(mock.Anything).Return("", false)
-		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/a.patch").Return(true, nil)
-		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/b.patch").Return(true, nil)
-		composerService.EXPECT().CheckIfPatchesApply(mock.Anything, "drupal/core", "8.8.0", mock.Anything).Return(true, nil)
+		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/a.patch").Return(true, nil)
+		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/b.patch").Return(true, nil)
+		composerService.EXPECT().CheckIfPatchesApply(mock.Anything, mock.Anything, "drupal/core", "8.8.0", mock.Anything).Return(true, nil)
 
 		updater := &ComposerPatches1{logger: logger, composer: composerService, drupalOrg: drupalOrgService}
 		operations := []composer.PackageChange{{Action: "Upgrade", Package: "drupal/core", To: "8.8.0"}}
@@ -192,9 +192,9 @@ func TestUpdatePatches(t *testing.T) {
 		composerService.EXPECT().IsPackageInstalled(mock.Anything, "/tmp", "drupal/core").Return(true, nil)
 		composerService.EXPECT().GetDependencyPatches(mock.Anything, "/tmp").Return(nil, nil)
 		drupalOrgService.EXPECT().FindIssueNumber(mock.Anything).Return("", false)
-		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/a.patch").Return(true, nil)
-		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/b.patch").Return(true, nil)
-		composerService.EXPECT().CheckIfPatchesApply(mock.Anything, "drupal/core", "8.8.0", mock.Anything).Return(false, assert.AnError)
+		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/a.patch").Return(true, nil)
+		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/b.patch").Return(true, nil)
+		composerService.EXPECT().CheckIfPatchesApply(mock.Anything, mock.Anything, "drupal/core", "8.8.0", mock.Anything).Return(false, assert.AnError)
 
 		updater := &ComposerPatches1{logger: logger, composer: composerService, drupalOrg: drupalOrgService}
 		operations := []composer.PackageChange{{Action: "Upgrade", Package: "drupal/core", To: "8.8.0"}}
@@ -252,7 +252,7 @@ func TestUpdatePatches(t *testing.T) {
 		drupalOrgService.EXPECT().FindIssueNumber("local patch without issue number").Return("", false)
 		drupalOrgService.EXPECT().FindIssueNumber("patches/core/0001-local-patch.patch").Return("", false)
 
-		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/core/0001-local-patch.patch").Return(false, nil)
+		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/core/0001-local-patch.patch").Return(false, nil)
 		composerService.EXPECT().IsPackageInstalled(mock.Anything, "/tmp", "drupal/core").Return(true, nil)
 		updater := &ComposerPatches1{
 			logger:    logger,
@@ -315,7 +315,7 @@ func TestUpdatePatches(t *testing.T) {
 			URL:    "https://www.drupal.org/node/123456",
 		}, nil)
 
-		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/remote/0001-remote.patch").Return(true, nil)
+		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/remote/0001-remote.patch").Return(true, nil)
 
 		updater := &ComposerPatches1{
 			logger:    logger,
@@ -374,8 +374,8 @@ func TestUpdatePatches(t *testing.T) {
 			},
 		}, nil)
 
-		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/remote/0001-remote.patch").Return(false, nil)
-		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/drupal/123456-111111-alot_of_problems.diff").Return(true, nil)
+		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/remote/0001-remote.patch").Return(false, nil)
+		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/drupal/123456-111111-alot_of_problems.diff").Return(true, nil)
 
 		var serverURL string
 		mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -474,8 +474,8 @@ func TestUpdatePatches(t *testing.T) {
 			},
 		}, nil)
 
-		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/remote/0001-remote.patch").Return(false, nil)
-		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/drupal/123456-111111-alot_of_problems.diff").Return(false, nil)
+		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/remote/0001-remote.patch").Return(false, nil)
+		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/drupal/123456-111111-alot_of_problems.diff").Return(false, nil)
 
 		var serverURL string
 		mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -583,7 +583,7 @@ func TestUpdatePatches(t *testing.T) {
 			}{MaschineName: "drupal"},
 		}, nil)
 
-		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/remote/0001-remote.patch").Return(false, nil)
+		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/remote/0001-remote.patch").Return(false, nil)
 
 		updater := &ComposerPatches1{
 			logger:    logger,
@@ -692,7 +692,7 @@ func TestUpdatePatches(t *testing.T) {
 
 		composerService.EXPECT().IsPackageInstalled(mock.Anything, "/tmp", "drupal/core").Return(true, nil)
 
-		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/remote/0001-remote.patch").Return(true, nil)
+		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/remote/0001-remote.patch").Return(true, nil)
 
 		drupalOrgService.EXPECT().FindIssueNumber("Issue #123456 \"With problems\"").Return("123456", true)
 		drupalOrgService.EXPECT().GetIssue(mock.Anything, "123456").Return(&drupalorg.Issue{
@@ -820,9 +820,9 @@ func TestUpdatePatches(t *testing.T) {
 		drupalOrgService.EXPECT().FindIssueNumber("patch two").Return("", false)
 		drupalOrgService.EXPECT().FindIssueNumber("patches/core/patch2.patch").Return("", false)
 
-		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/core/patch1.patch").Return(true, nil)
-		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/core/patch2.patch").Return(true, nil)
-		composerService.EXPECT().CheckIfPatchesApply(mock.Anything, "drupal/core", "8.8.0", mock.Anything).Return(false, nil)
+		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/core/patch1.patch").Return(true, nil)
+		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/core/patch2.patch").Return(true, nil)
+		composerService.EXPECT().CheckIfPatchesApply(mock.Anything, mock.Anything, "drupal/core", "8.8.0", mock.Anything).Return(false, nil)
 
 		updater := &ComposerPatches1{
 			logger:    logger,

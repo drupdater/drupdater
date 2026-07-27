@@ -345,7 +345,7 @@ Using version ^11.1 for drupal/core`
 			fs:     fs,
 		}
 
-		applies, err := service.CheckIfPatchApplies(t.Context(), "drupal/core", "1.0.0", "path/to/patch")
+		applies, err := service.CheckIfPatchApplies(t.Context(), "/project", "drupal/core", "1.0.0", "path/to/patch")
 		require.NoError(t, err)
 		assert.True(t, applies)
 	})
@@ -368,7 +368,7 @@ Using version ^11.1 for drupal/core`
 		}
 		defer func() { execCommand = exec.CommandContext }()
 
-		applies, err := service.CheckIfPatchApplies(t.Context(), "drupal/core", "1.0.0", "path/to/patch")
+		applies, err := service.CheckIfPatchApplies(t.Context(), "/project", "drupal/core", "1.0.0", "path/to/patch")
 		require.NoError(t, err)
 		assert.False(t, applies)
 	})
@@ -398,7 +398,7 @@ Using version ^11.1 for drupal/core`
 		// Use a package name that contains a double-quote and a backslash —
 		// these would break raw string concatenation but must be escaped by
 		// json.Marshal, resulting in valid JSON.
-		_, err := service.CheckIfPatchApplies(t.Context(), `drupal/"core"`, `1.0\0`, `path/to/"patch"`)
+		_, err := service.CheckIfPatchApplies(t.Context(), "/project", `drupal/"core"`, `1.0\0`, `path/to/"patch"`)
 		require.NoError(t, err)
 
 		// Read back the written composer.patches.json and confirm it is valid JSON.
@@ -848,6 +848,10 @@ func TestHelperProcess(*testing.T) {
 		return
 	}
 	if os.Getenv("GO_HELPER_PROCESS_ERROR") == "1" {
+		// A failing composer still prints why it failed, and some callers classify on it.
+		if out := os.Getenv("GO_HELPER_PROCESS_OUTPUT"); out != "" {
+			fmt.Fprintln(os.Stdout, out)
+		}
 		os.Exit(1)
 	}
 
@@ -868,7 +872,7 @@ func TestCheckIfPatchesApply(t *testing.T) {
 		defer func() { execCommand = exec.CommandContext }()
 
 		service := &CLI{logger: zap.NewNop(), fs: afero.NewOsFs()}
-		ok, err := service.CheckIfPatchesApply(context.Background(), "drupal/core", "10.6.0", patches)
+		ok, err := service.CheckIfPatchesApply(context.Background(), "/project", "drupal/core", "10.6.0", patches)
 		require.NoError(t, err)
 		assert.True(t, ok)
 
@@ -888,7 +892,7 @@ func TestCheckIfPatchesApply(t *testing.T) {
 		defer func() { execCommand = exec.CommandContext }()
 
 		service := &CLI{logger: zap.NewNop(), fs: afero.NewOsFs()}
-		ok, err := service.CheckIfPatchesApply(context.Background(), "drupal/core", "10.6.0", patches)
+		ok, err := service.CheckIfPatchesApply(context.Background(), "/project", "drupal/core", "10.6.0", patches)
 		require.NoError(t, err)
 		assert.False(t, ok)
 	})
@@ -897,7 +901,7 @@ func TestCheckIfPatchesApply(t *testing.T) {
 		service := &CLI{logger: zap.NewNop(), fs: afero.NewMemMapFs(), initErr: errors.New("init failed")}
 		service.initOnce.Do(func() {}) // mark init as done so initTempDir is skipped
 
-		ok, err := service.CheckIfPatchesApply(context.Background(), "drupal/core", "10.6.0", patches)
+		ok, err := service.CheckIfPatchesApply(context.Background(), "/project", "drupal/core", "10.6.0", patches)
 		require.ErrorContains(t, err, "init failed")
 		assert.False(t, ok)
 	})

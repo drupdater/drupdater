@@ -42,11 +42,24 @@ patches/<project>/<issue-id>-<sha>-<title>.diff
 Where a package carries several patches, they are validated as a set — patches that each
 apply alone but conflict with each other are caught.
 
+The test happens in a throwaway Composer project, which is given **the repositories your
+project declares** in addition to drupal.org and packagist.org. Without them a package
+served only from a private registry — a private fork of a contrib module, an in-house
+module, anything behind [Private Packagist](../../how-to/use-private-packagist.md) —
+could not be resolved for the test at all.
+
 ### Conflict
 
 If no working patch can be found, the package is **pinned to its currently installed
 version** rather than updated. The rest of the update proceeds. The pin is reported as a
 conflict so you know a package was deliberately held back and why.
+
+A pin means *the patch was tested and rejected*. When the test cannot be carried out at
+all — the package could not be downloaded, a registry was unreachable, a credential was
+refused — the package is **not** pinned and no conflict is reported; the run logs a
+warning naming the package and leaves it to update normally. An unverifiable patch is not
+a known-stale one, and pinning on that path would hold a package back on every run while
+blaming a conflict that never happened.
 
 Changes to `composer.json` and the `patches/` directory are committed as `Update patches`.
 

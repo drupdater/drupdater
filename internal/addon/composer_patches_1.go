@@ -349,9 +349,14 @@ func (h *ComposerPatches1) processSinglePatch(ctx context.Context, path string, 
 		absolutePath = path + "/" + patchPath
 	}
 
-	ok, err := h.composer.CheckIfPatchApplies(ctx, op.Package, op.To, absolutePath)
+	ok, err := h.composer.CheckIfPatchApplies(ctx, path, op.Package, op.To, absolutePath)
 	if err != nil {
-		h.logger.Debug("failed to check if patch applies", zap.Error(err))
+		// The check could not be carried out — most often because the package could not be
+		// obtained at all. Leave the package alone rather than recording a conflict: an
+		// unverifiable patch is not a known-stale one, and pinning on this path would hold the
+		// package back on every run while blaming a patch conflict that never happened.
+		h.logger.Warn("could not check whether the patch still applies, leaving the package unpinned",
+			zap.String("package", op.Package), zap.String("patch", patchPath), zap.Error(err))
 		return
 	}
 	if ok {
@@ -403,8 +408,9 @@ func (h *ComposerPatches1) processSinglePatch(ctx context.Context, path string, 
 	}
 
 	fullNewPath := newPatchDir + "/" + newPatchFile
-	if ok, err := h.composer.CheckIfPatchApplies(ctx, op.Package, op.To, path+"/"+fullNewPath); err != nil {
-		h.logger.Debug("failed to check if patch applies", zap.String("patch", fullNewPath), zap.Error(err))
+	if ok, err := h.composer.CheckIfPatchApplies(ctx, path, op.Package, op.To, path+"/"+fullNewPath); err != nil {
+		h.logger.Warn("could not check whether the merge request patch applies, leaving the package unpinned",
+			zap.String("package", op.Package), zap.String("patch", fullNewPath), zap.Error(err))
 		return
 	} else if ok {
 		if err := h.dropPatchFile(worktree, patchPath); err != nil {
@@ -438,9 +444,10 @@ func (h *ComposerPatches1) validateCombinedPatches(ctx context.Context, path str
 		patchPaths = append(patchPaths, absolutePath)
 	}
 
-	ok, err := h.composer.CheckIfPatchesApply(ctx, op.Package, op.To, patchPaths)
+	ok, err := h.composer.CheckIfPatchesApply(ctx, path, op.Package, op.To, patchPaths)
 	if err != nil {
-		h.logger.Debug("failed to check if patches apply together", zap.Error(err))
+		h.logger.Warn("could not check whether the patches apply together, leaving the package unpinned",
+			zap.String("package", op.Package), zap.Error(err))
 		return
 	}
 	if !ok {
