@@ -160,8 +160,8 @@ func TestValidateCombinedPatchesResolvesAbsoluteLocalPaths(t *testing.T) {
 	// was pinned on a patch conflict that did not exist.
 	composerService := NewMockComposer(t)
 	composerService.EXPECT().
-		CheckIfPatchesApply(mock.Anything, "drupal/core", "8.8.0", mock.Anything).
-		RunAndReturn(func(_ context.Context, _ string, _ string, paths []string) (bool, error) {
+		CheckIfPatchesApply(mock.Anything, mock.Anything, "drupal/core", "8.8.0", mock.Anything).
+		RunAndReturn(func(_ context.Context, _ string, _ string, _ string, paths []string) (bool, error) {
 			assert.ElementsMatch(t, []string{
 				"/tmp/patches/local.patch",
 				"/tmp//absolute/local.patch",

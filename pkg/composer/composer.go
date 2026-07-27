@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 
@@ -461,36 +463,193 @@ type lockPackage struct {
 	Extra json.RawMessage `json:"extra"`
 }
 
-// scratchComposerJSON is the base composer.json for the scratch project used to test whether a
-// patch applies. It is written fresh before every check (see resetScratchProject) rather than
-// once, so one check's `composer require` can never leave state a later, unrelated check reads.
-const scratchComposerJSON = `{
-	"name": "drupdater/patch-test",
-	"type": "project",
-	"repositories": [
-		{
-			"type": "composer",
-			"url": "https://packages.drupal.org/8"
-		}
-	],
-	"require": {
-		"cweagans/composer-patches": "~1.0"
-	},
-	"config": {
-		"allow-plugins": true
-	},
-	"extra": {
-		"composer-exit-on-patch-failure": true,
-		"patches-file": "composer.patches.json"
+// drupalOrgRepository is appended to every scratch project so a contrib module is resolvable even
+// when the project under test declares its repositories somewhere this code cannot read.
+const drupalOrgRepositoryURL = "https://packages.drupal.org/8"
+
+// scratchComposerProject is the composer.json of the scratch project used to test whether a patch
+// applies. It is written fresh before every check (see resetScratchProject) rather than once, so
+// one check's `composer require` can never leave state a later, unrelated check reads.
+type scratchComposerProject struct {
+	Name         string            `json:"name"`
+	Type         string            `json:"type"`
+	Repositories []json.RawMessage `json:"repositories"`
+	Require      map[string]string `json:"require"`
+	Config       map[string]any    `json:"config"`
+	Extra        map[string]any    `json:"extra"`
+}
+
+// buildScratchComposerJSON returns the scratch project's composer.json, carrying over the
+// repositories declared by the project in projectDir.
+//
+// Carrying them over is what makes the check work for packages that are not on packagist.org or
+// drupal.org: a private fork of a contrib module, an in-house module, or anything served only
+// from a private registry such as Private Packagist. Without them composer cannot resolve the
+// package here at all, `composer require` fails for a reason that has nothing to do with the
+// patch, and — because that failure is read as "the patch does not apply" — composer_patches
+// pins the package at its current version and tells the reviewer a patch conflicted when none
+// did. That repeats on every run, so the package never updates again.
+//
+// The project's own repositories come first, keeping the priority they have in the project, so a
+// private fork still wins over a public package of the same name. drupal.org is appended as a
+// fallback and packagist.org is left enabled even when the project disables it: this project
+// exists only to resolve one package plus composer-patches, and resolving more than the real
+// project can costs nothing here and cannot affect the real project's lock.
+func (s *CLI) buildScratchComposerJSON(projectDir string) ([]byte, error) {
+	repositories := s.projectRepositories(projectDir)
+
+	// Only add the drupal.org fallback when the project has not already declared it, so the
+	// project's own entry (which may carry credentials or a mirror URL) is not shadowed.
+	if !slices.ContainsFunc(repositories, func(raw json.RawMessage) bool {
+		return repositoryURL(raw) == drupalOrgRepositoryURL
+	}) {
+		repositories = append(repositories, json.RawMessage(
+			`{"type":"composer","url":"`+drupalOrgRepositoryURL+`"}`,
+		))
 	}
-}`
+
+	return json.Marshal(scratchComposerProject{
+		Name:         "drupdater/patch-test",
+		Type:         "project",
+		Repositories: repositories,
+		Require:      map[string]string{"cweagans/composer-patches": "~1.0"},
+		Config:       map[string]any{"allow-plugins": true},
+		Extra: map[string]any{
+			"composer-exit-on-patch-failure": true,
+			"patches-file":                   "composer.patches.json",
+		},
+	})
+}
+
+// projectRepositories returns the repository entries declared by the project in projectDir, ready
+// to be embedded in the scratch project.
+//
+// A project whose composer.json cannot be read or parsed yields no entries rather than an error:
+// the scratch project still works for everything on packagist.org and drupal.org, and failing the
+// patch check outright over it would be a worse outcome than checking against fewer repositories.
+func (s *CLI) projectRepositories(projectDir string) []json.RawMessage {
+	if projectDir == "" {
+		return nil
+	}
+
+	content, err := afero.ReadFile(s.fs, filepath.Join(projectDir, "composer.json"))
+	if err != nil {
+		s.logger.Debug("could not read the project's composer.json for the patch-test project",
+			zap.String("dir", projectDir), zap.Error(err))
+		return nil
+	}
+
+	var project struct {
+		Repositories json.RawMessage `json:"repositories"`
+	}
+	if err := json.Unmarshal(content, &project); err != nil || len(project.Repositories) == 0 {
+		return nil
+	}
+
+	// composer accepts both an array and an object keyed by name, and in both forms the order
+	// entries appear in is the resolution priority — repositories are canonical by default, so
+	// the first one offering a package name wins outright. That order has to survive into the
+	// scratch project, or a private fork declared ahead of a public repository loses to it here
+	// and its patch is tested against the wrong package.
+	var asArray []json.RawMessage
+	if err := json.Unmarshal(project.Repositories, &asArray); err != nil {
+		var ok bool
+		if asArray, ok = orderedObjectValues(project.Repositories); !ok {
+			return nil
+		}
+	}
+
+	repositories := make([]json.RawMessage, 0, len(asArray))
+	for _, raw := range asArray {
+		if entry, ok := normalizeRepository(raw, projectDir); ok {
+			repositories = append(repositories, entry)
+		}
+	}
+	return repositories
+}
+
+// orderedObjectValues returns a JSON object's values in the order they are declared, and whether
+// raw was an object at all.
+//
+// Decoding into a map[string]json.RawMessage would be shorter but loses that order, and sorting
+// the keys to get a deterministic result — as this once did — reorders the caller's repositories
+// into something the project never declared. Walking the token stream keeps the declared order,
+// which is both the meaningful one and already deterministic.
+func orderedObjectValues(raw json.RawMessage) ([]json.RawMessage, bool) {
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+
+	if token, err := decoder.Token(); err != nil || token != json.Delim('{') {
+		return nil, false
+	}
+
+	var values []json.RawMessage
+	for decoder.More() {
+		// The key, which the scratch project has no use for: composer identifies a repository by
+		// its type and URL, and the name only ever matters for overriding an entry by key.
+		if _, err := decoder.Token(); err != nil {
+			return nil, false
+		}
+		var value json.RawMessage
+		if err := decoder.Decode(&value); err != nil {
+			return nil, false
+		}
+		values = append(values, value)
+	}
+
+	return values, true
+}
+
+// normalizeRepository prepares one of the project's repository entries for the scratch project,
+// reporting false for entries that must not be carried over.
+//
+// Two adjustments matter. A disable entry such as {"packagist.org": false} is dropped, because
+// the scratch project needs packagist.org to resolve composer-patches even when the real project
+// routes everything through a mirror. And a "path" repository's relative URL is resolved against
+// the project, since the scratch project lives in a temp directory where that relative path
+// points nowhere.
+func normalizeRepository(raw json.RawMessage, projectDir string) (json.RawMessage, bool) {
+	var entry map[string]any
+	if err := json.Unmarshal(raw, &entry); err != nil {
+		return nil, false
+	}
+
+	// The disable form is a single repository name mapped to false. Matched on that exact shape
+	// rather than on "contains a boolean", because a real repository entry may legitimately
+	// carry one — {"type":"composer","url":"...","canonical":false} is how a mirror is declared.
+	if len(entry) == 1 {
+		for _, value := range entry {
+			if _, isBool := value.(bool); isBool {
+				return nil, false
+			}
+		}
+	}
+
+	url, _ := entry["url"].(string)
+	if entry["type"] == "path" && url != "" && !filepath.IsAbs(url) {
+		entry["url"] = filepath.Join(projectDir, url)
+		normalized, err := json.Marshal(entry)
+		if err != nil {
+			return nil, false
+		}
+		return normalized, true
+	}
+
+	return raw, true
+}
+
+// repositoryURL returns a repository entry's url, or "" when it has none.
+func repositoryURL(raw json.RawMessage) string {
+	var entry struct {
+		URL string `json:"url"`
+	}
+	if err := json.Unmarshal(raw, &entry); err != nil {
+		return ""
+	}
+	return entry.URL
+}
 
 func (s *CLI) initTempDir() {
 	s.tempDir, s.initErr = afero.TempDir(s.fs, "", "composer-service")
-	if s.initErr != nil {
-		return
-	}
-	s.initErr = afero.WriteFile(s.fs, s.tempDir+"/composer.json", []byte(scratchComposerJSON), 0644)
 }
 
 // resetScratchProject restores the scratch project to its pristine state before a new check
@@ -501,8 +660,15 @@ func (s *CLI) initTempDir() {
 // in the same run would make `composer require` fail for a reason that has nothing to do with
 // whether the patch under test actually applies, and — because that failure is deliberately read
 // as "the patch does not apply" — silently pins the wrong package version in the merge request.
-func (s *CLI) resetScratchProject() error {
-	if err := afero.WriteFile(s.fs, s.tempDir+"/composer.json", []byte(scratchComposerJSON), 0644); err != nil {
+//
+// The composer.json is rebuilt here rather than once at init because it carries the repositories
+// of the project under test, which are not known until a check asks for them.
+func (s *CLI) resetScratchProject(projectDir string) error {
+	composerJSON, err := s.buildScratchComposerJSON(projectDir)
+	if err != nil {
+		return fmt.Errorf("failed to build scratch composer.json: %w", err)
+	}
+	if err := afero.WriteFile(s.fs, s.tempDir+"/composer.json", composerJSON, 0644); err != nil {
 		return fmt.Errorf("failed to reset scratch composer.json: %w", err)
 	}
 	if err := s.fs.RemoveAll(s.tempDir + "/composer.lock"); err != nil {
@@ -537,13 +703,13 @@ type patchTestConfig struct {
 	Patches map[string]map[string]string `json:"patches"`
 }
 
-func (s *CLI) CheckIfPatchApplies(ctx context.Context, packageName string, packageVersion string, patchPath string) (bool, error) {
+func (s *CLI) CheckIfPatchApplies(ctx context.Context, projectDir string, packageName string, packageVersion string, patchPath string) (bool, error) {
 
 	s.initOnce.Do(s.initTempDir)
 	if s.initErr != nil {
 		return false, s.initErr
 	}
-	if err := s.resetScratchProject(); err != nil {
+	if err := s.resetScratchProject(projectDir); err != nil {
 		return false, err
 	}
 
@@ -567,20 +733,84 @@ func (s *CLI) CheckIfPatchApplies(ctx context.Context, packageName string, packa
 		return false, err
 	}
 
-	// Run composer require in the temporary directory
-	if _, err := s.Require(ctx, s.tempDir, packageName+":"+packageVersion, "--with-all-dependencies", "--quiet"); err != nil {
-		return false, nil //nolint:nilerr // composer failure means the patch does not apply, not an error
-	}
-
-	return true, nil
+	return s.requireIntoScratch(ctx, packageName, packageVersion)
 }
 
-func (s *CLI) CheckIfPatchesApply(ctx context.Context, packageName string, packageVersion string, patchPaths []string) (bool, error) {
+// requireIntoScratch installs the package under test into the scratch project and classifies what
+// happened: true when the patched package installed cleanly, false when composer obtained the
+// package but the patch was rejected, and an error when composer could not obtain the package at
+// all.
+//
+// That last case has to be told apart from the other two. A false return makes composer_patches
+// pin the package at its current version and report a patch conflict in the merge request, which
+// is the right answer for a patch that has gone stale and the wrong one for a package composer
+// never saw — an unreachable registry, a rejected credential, or a package this scratch project's
+// repositories do not carry. Reported as a conflict, that pins the package silently on every run
+// with a reason the reviewer cannot act on; reported as an error, the callers leave the package
+// alone and log it.
+//
+// Deliberately not --quiet: quiet suppresses the very message this classification reads. The
+// output only ever reaches the debug log.
+func (s *CLI) requireIntoScratch(ctx context.Context, packageName string, packageVersion string) (bool, error) {
+	out, err := s.execComposer(ctx, s.tempDir,
+		"require", "--ignore-platform-reqs", packageName+":"+packageVersion, "--with-all-dependencies")
+	if err == nil {
+		return true, nil
+	}
+
+	if reason, unresolvable := unresolvableReason(out); unresolvable {
+		return false, fmt.Errorf("could not obtain %s %s to test its patches (%s): %w", packageName, packageVersion, reason, err)
+	}
+
+	return false, nil //nolint:nilerr // composer obtained the package and the patch was rejected
+}
+
+// unresolvableReason reports whether composer's output says it could not obtain the package at
+// all, and why.
+//
+// A rejected patch is checked for first and wins outright, because the patterns below can appear
+// in output that describes a run which failed for a completely different reason. Composer's
+// dist-to-source fallback prints `The "<url>" file could not be downloaded (HTTP/1.1 404 Not
+// Found)` and then carries on successfully; scanning for the unresolvable patterns alone would
+// match that non-fatal warning and classify a genuine patch rejection as "could not obtain the
+// package". The caller would then leave the package unpinned and omit it from the conflict
+// report, and the merge request would ship a patch that does not apply — the inverse of the bug
+// this classification exists to prevent, and a worse one.
+//
+// Both are matched on composer's human-readable English output, which is inherently brittle: a
+// future Composer or composer-patches release that rewords a message silently changes the
+// classification. Keep these patterns in step with the tools' actual wording, and prefer adding a
+// pattern to loosening one.
+func unresolvableReason(out string) (string, bool) {
+	lower := strings.ToLower(out)
+
+	// composer-patches v1 prints the first form on any patch failure, and the second when
+	// composer-exit-on-patch-failure turns that failure into the exception that ends the run.
+	if strings.Contains(lower, "could not apply patch") || strings.Contains(lower, "cannot apply patch") {
+		return "", false
+	}
+
+	for _, candidate := range []struct{ pattern, reason string }{
+		{"could not find package", "not available from any configured repository"},
+		{"could not find a matching version", "not available from any configured repository"},
+		{"could not be found", "not available from any configured repository"},
+		{"invalid credentials", "repository authentication failed"},
+		{"authentication required", "repository authentication failed"},
+		{"could not be downloaded", "a required download failed"},
+	} {
+		if strings.Contains(lower, candidate.pattern) {
+			return candidate.reason, true
+		}
+	}
+	return "", false
+}
+
+func (s *CLI) CheckIfPatchesApply(ctx context.Context, projectDir string, packageName string, packageVersion string, patchPaths []string) (bool, error) {
 	s.initOnce.Do(s.initTempDir)
 	if s.initErr != nil {
 		return false, s.initErr
 	}
-	if err := s.resetScratchProject(); err != nil {
+	if err := s.resetScratchProject(projectDir); err != nil {
 		return false, err
 	}
 
@@ -600,10 +830,7 @@ func (s *CLI) CheckIfPatchesApply(ctx context.Context, packageName string, packa
 		return false, err
 	}
 
-	if _, err := s.Require(ctx, s.tempDir, packageName+":"+packageVersion, "--with-all-dependencies", "--quiet"); err != nil {
-		return false, nil //nolint:nilerr // composer failure means the patches do not apply, not an error
-	}
-	return true, nil
+	return s.requireIntoScratch(ctx, packageName, packageVersion)
 }
 
 func (s *CLI) GetInstalledPlugins(ctx context.Context, dir string) (map[string]any, error) {

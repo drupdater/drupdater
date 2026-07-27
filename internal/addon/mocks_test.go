@@ -113,8 +113,8 @@ func (_c *MockComposer_Audit_Call) RunAndReturn(run func(ctx context.Context, di
 }
 
 // CheckIfPatchApplies provides a mock function for the type MockComposer
-func (_mock *MockComposer) CheckIfPatchApplies(ctx context.Context, packageName string, packageVersion string, patchPath string) (bool, error) {
-	ret := _mock.Called(ctx, packageName, packageVersion, patchPath)
+func (_mock *MockComposer) CheckIfPatchApplies(ctx context.Context, dir string, packageName string, packageVersion string, patchPath string) (bool, error) {
+	ret := _mock.Called(ctx, dir, packageName, packageVersion, patchPath)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CheckIfPatchApplies")
@@ -122,16 +122,16 @@ func (_mock *MockComposer) CheckIfPatchApplies(ctx context.Context, packageName 
 
 	var r0 bool
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string) (bool, error)); ok {
-		return returnFunc(ctx, packageName, packageVersion, patchPath)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string, string) (bool, error)); ok {
+		return returnFunc(ctx, dir, packageName, packageVersion, patchPath)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string) bool); ok {
-		r0 = returnFunc(ctx, packageName, packageVersion, patchPath)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string, string) bool); ok {
+		r0 = returnFunc(ctx, dir, packageName, packageVersion, patchPath)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string, string) error); ok {
-		r1 = returnFunc(ctx, packageName, packageVersion, patchPath)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string, string, string) error); ok {
+		r1 = returnFunc(ctx, dir, packageName, packageVersion, patchPath)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -145,14 +145,15 @@ type MockComposer_CheckIfPatchApplies_Call struct {
 
 // CheckIfPatchApplies is a helper method to define mock.On call
 //   - ctx context.Context
+//   - dir string
 //   - packageName string
 //   - packageVersion string
 //   - patchPath string
-func (_e *MockComposer_Expecter) CheckIfPatchApplies(ctx any, packageName any, packageVersion any, patchPath any) *MockComposer_CheckIfPatchApplies_Call {
-	return &MockComposer_CheckIfPatchApplies_Call{Call: _e.mock.On("CheckIfPatchApplies", ctx, packageName, packageVersion, patchPath)}
+func (_e *MockComposer_Expecter) CheckIfPatchApplies(ctx any, dir any, packageName any, packageVersion any, patchPath any) *MockComposer_CheckIfPatchApplies_Call {
+	return &MockComposer_CheckIfPatchApplies_Call{Call: _e.mock.On("CheckIfPatchApplies", ctx, dir, packageName, packageVersion, patchPath)}
 }
 
-func (_c *MockComposer_CheckIfPatchApplies_Call) Run(run func(ctx context.Context, packageName string, packageVersion string, patchPath string)) *MockComposer_CheckIfPatchApplies_Call {
+func (_c *MockComposer_CheckIfPatchApplies_Call) Run(run func(ctx context.Context, dir string, packageName string, packageVersion string, patchPath string)) *MockComposer_CheckIfPatchApplies_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -170,11 +171,16 @@ func (_c *MockComposer_CheckIfPatchApplies_Call) Run(run func(ctx context.Contex
 		if args[3] != nil {
 			arg3 = args[3].(string)
 		}
+		var arg4 string
+		if args[4] != nil {
+			arg4 = args[4].(string)
+		}
 		run(
 			arg0,
 			arg1,
 			arg2,
 			arg3,
+			arg4,
 		)
 	})
 	return _c
@@ -185,14 +191,14 @@ func (_c *MockComposer_CheckIfPatchApplies_Call) Return(b bool, err error) *Mock
 	return _c
 }
 
-func (_c *MockComposer_CheckIfPatchApplies_Call) RunAndReturn(run func(ctx context.Context, packageName string, packageVersion string, patchPath string) (bool, error)) *MockComposer_CheckIfPatchApplies_Call {
+func (_c *MockComposer_CheckIfPatchApplies_Call) RunAndReturn(run func(ctx context.Context, dir string, packageName string, packageVersion string, patchPath string) (bool, error)) *MockComposer_CheckIfPatchApplies_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
 // CheckIfPatchesApply provides a mock function for the type MockComposer
-func (_mock *MockComposer) CheckIfPatchesApply(ctx context.Context, packageName string, packageVersion string, patchPaths []string) (bool, error) {
-	ret := _mock.Called(ctx, packageName, packageVersion, patchPaths)
+func (_mock *MockComposer) CheckIfPatchesApply(ctx context.Context, dir string, packageName string, packageVersion string, patchPaths []string) (bool, error) {
+	ret := _mock.Called(ctx, dir, packageName, packageVersion, patchPaths)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CheckIfPatchesApply")
@@ -200,16 +206,16 @@ func (_mock *MockComposer) CheckIfPatchesApply(ctx context.Context, packageName 
 
 	var r0 bool
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, []string) (bool, error)); ok {
-		return returnFunc(ctx, packageName, packageVersion, patchPaths)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string, []string) (bool, error)); ok {
+		return returnFunc(ctx, dir, packageName, packageVersion, patchPaths)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, []string) bool); ok {
-		r0 = returnFunc(ctx, packageName, packageVersion, patchPaths)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string, []string) bool); ok {
+		r0 = returnFunc(ctx, dir, packageName, packageVersion, patchPaths)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string, []string) error); ok {
-		r1 = returnFunc(ctx, packageName, packageVersion, patchPaths)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string, string, []string) error); ok {
+		r1 = returnFunc(ctx, dir, packageName, packageVersion, patchPaths)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -223,14 +229,15 @@ type MockComposer_CheckIfPatchesApply_Call struct {
 
 // CheckIfPatchesApply is a helper method to define mock.On call
 //   - ctx context.Context
+//   - dir string
 //   - packageName string
 //   - packageVersion string
 //   - patchPaths []string
-func (_e *MockComposer_Expecter) CheckIfPatchesApply(ctx any, packageName any, packageVersion any, patchPaths any) *MockComposer_CheckIfPatchesApply_Call {
-	return &MockComposer_CheckIfPatchesApply_Call{Call: _e.mock.On("CheckIfPatchesApply", ctx, packageName, packageVersion, patchPaths)}
+func (_e *MockComposer_Expecter) CheckIfPatchesApply(ctx any, dir any, packageName any, packageVersion any, patchPaths any) *MockComposer_CheckIfPatchesApply_Call {
+	return &MockComposer_CheckIfPatchesApply_Call{Call: _e.mock.On("CheckIfPatchesApply", ctx, dir, packageName, packageVersion, patchPaths)}
 }
 
-func (_c *MockComposer_CheckIfPatchesApply_Call) Run(run func(ctx context.Context, packageName string, packageVersion string, patchPaths []string)) *MockComposer_CheckIfPatchesApply_Call {
+func (_c *MockComposer_CheckIfPatchesApply_Call) Run(run func(ctx context.Context, dir string, packageName string, packageVersion string, patchPaths []string)) *MockComposer_CheckIfPatchesApply_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -244,15 +251,20 @@ func (_c *MockComposer_CheckIfPatchesApply_Call) Run(run func(ctx context.Contex
 		if args[2] != nil {
 			arg2 = args[2].(string)
 		}
-		var arg3 []string
+		var arg3 string
 		if args[3] != nil {
-			arg3 = args[3].([]string)
+			arg3 = args[3].(string)
+		}
+		var arg4 []string
+		if args[4] != nil {
+			arg4 = args[4].([]string)
 		}
 		run(
 			arg0,
 			arg1,
 			arg2,
 			arg3,
+			arg4,
 		)
 	})
 	return _c
@@ -263,7 +275,7 @@ func (_c *MockComposer_CheckIfPatchesApply_Call) Return(b bool, err error) *Mock
 	return _c
 }
 
-func (_c *MockComposer_CheckIfPatchesApply_Call) RunAndReturn(run func(ctx context.Context, packageName string, packageVersion string, patchPaths []string) (bool, error)) *MockComposer_CheckIfPatchesApply_Call {
+func (_c *MockComposer_CheckIfPatchesApply_Call) RunAndReturn(run func(ctx context.Context, dir string, packageName string, packageVersion string, patchPaths []string) (bool, error)) *MockComposer_CheckIfPatchesApply_Call {
 	_c.Call.Return(run)
 	return _c
 }

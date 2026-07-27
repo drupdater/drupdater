@@ -86,6 +86,24 @@ Several entries can be combined in one object.
       <token> --clone --repository-url <repository-url>
     ```
 
+## Patched private packages
+
+[`composer_patches`](../reference/addons/composer-patches.md) tests each patch in a
+throwaway Composer project before the update. That project is built with the repositories
+your `composer.json` declares, so a patched package that lives only in your private
+registry is resolvable there and its patch is tested like any other.
+
+Three details of how it is built are worth knowing:
+
+- **Your repositories keep their declared order**, which is Composer's resolution priority,
+  so a private fork declared ahead of a public repository still wins in the test. This
+  holds for both the array and the object form of `repositories`.
+- **A relative `path` repository is resolved against your project**, since the throwaway
+  project lives in a temp directory where a relative path points nowhere.
+- **`{"packagist.org": false}` is dropped**, so the throwaway project can still resolve
+  `cweagans/composer-patches` even if your project routes everything through a mirror.
+  This affects only the patch test; your project's own resolution is untouched.
+
 ## Verify it
 
 The `--full` [preflight check](run-preflight-checks.md) runs a real `composer install`,
