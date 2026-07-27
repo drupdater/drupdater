@@ -51,8 +51,10 @@ Changing a golden file changes the published example. `internal/addon/testdata/c
 ```bash
 make build          # Build binary
 make test           # Run all tests (go test -v ./...)
-make lint           # Run vet + staticcheck + golangci-lint
+make lint           # golangci-lint (govet, staticcheck, gosec, etc. — see .golangci.yml) + hadolint on the Dockerfile
 make fmt            # Format code
+make fix            # Apply go fix modernizers (interface{} → any, strings.Cut, etc.)
+make deadcode       # Find unreachable functions (go tool deadcode)
 make mock           # Regenerate mocks (requires mockery v3)
 make update         # Update Go dependencies
 make docker-build   # Build multi-stage Docker image (Go binary + PHP runtime)
