@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -547,16 +546,16 @@ func (s *CLI) projectRepositories(projectDir string) []json.RawMessage {
 		return nil
 	}
 
-	// composer accepts both an array and an object keyed by name. The object form is sorted by
-	// key so the generated composer.json is byte-stable across runs.
+	// composer accepts both an array and an object keyed by name, and in both forms the order
+	// entries appear in is the resolution priority — repositories are canonical by default, so
+	// the first one offering a package name wins outright. That order has to survive into the
+	// scratch project, or a private fork declared ahead of a public repository loses to it here
+	// and its patch is tested against the wrong package.
 	var asArray []json.RawMessage
 	if err := json.Unmarshal(project.Repositories, &asArray); err != nil {
-		var asObject map[string]json.RawMessage
-		if err := json.Unmarshal(project.Repositories, &asObject); err != nil {
+		var ok bool
+		if asArray, ok = orderedObjectValues(project.Repositories); !ok {
 			return nil
-		}
-		for _, name := range slices.Sorted(maps.Keys(asObject)) {
-			asArray = append(asArray, asObject[name])
 		}
 	}
 
@@ -567,6 +566,37 @@ func (s *CLI) projectRepositories(projectDir string) []json.RawMessage {
 		}
 	}
 	return repositories
+}
+
+// orderedObjectValues returns a JSON object's values in the order they are declared, and whether
+// raw was an object at all.
+//
+// Decoding into a map[string]json.RawMessage would be shorter but loses that order, and sorting
+// the keys to get a deterministic result — as this once did — reorders the caller's repositories
+// into something the project never declared. Walking the token stream keeps the declared order,
+// which is both the meaningful one and already deterministic.
+func orderedObjectValues(raw json.RawMessage) ([]json.RawMessage, bool) {
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+
+	if token, err := decoder.Token(); err != nil || token != json.Delim('{') {
+		return nil, false
+	}
+
+	var values []json.RawMessage
+	for decoder.More() {
+		// The key, which the scratch project has no use for: composer identifies a repository by
+		// its type and URL, and the name only ever matters for overriding an entry by key.
+		if _, err := decoder.Token(); err != nil {
+			return nil, false
+		}
+		var value json.RawMessage
+		if err := decoder.Decode(&value); err != nil {
+			return nil, false
+		}
+		values = append(values, value)
+	}
+
+	return values, true
 }
 
 // normalizeRepository prepares one of the project's repository entries for the scratch project,
@@ -736,10 +766,30 @@ func (s *CLI) requireIntoScratch(ctx context.Context, packageName string, packag
 }
 
 // unresolvableReason reports whether composer's output says it could not obtain the package at
-// all, and why. A patch that composer applied and rejected prints "Could not apply patch!", which
-// none of these patterns match.
+// all, and why.
+//
+// A rejected patch is checked for first and wins outright, because the patterns below can appear
+// in output that describes a run which failed for a completely different reason. Composer's
+// dist-to-source fallback prints `The "<url>" file could not be downloaded (HTTP/1.1 404 Not
+// Found)` and then carries on successfully; scanning for the unresolvable patterns alone would
+// match that non-fatal warning and classify a genuine patch rejection as "could not obtain the
+// package". The caller would then leave the package unpinned and omit it from the conflict
+// report, and the merge request would ship a patch that does not apply — the inverse of the bug
+// this classification exists to prevent, and a worse one.
+//
+// Both are matched on composer's human-readable English output, which is inherently brittle: a
+// future Composer or composer-patches release that rewords a message silently changes the
+// classification. Keep these patterns in step with the tools' actual wording, and prefer adding a
+// pattern to loosening one.
 func unresolvableReason(out string) (string, bool) {
 	lower := strings.ToLower(out)
+
+	// composer-patches v1 prints the first form on any patch failure, and the second when
+	// composer-exit-on-patch-failure turns that failure into the exception that ends the run.
+	if strings.Contains(lower, "could not apply patch") || strings.Contains(lower, "cannot apply patch") {
+		return "", false
+	}
+
 	for _, candidate := range []struct{ pattern, reason string }{
 		{"could not find package", "not available from any configured repository"},
 		{"could not find a matching version", "not available from any configured repository"},

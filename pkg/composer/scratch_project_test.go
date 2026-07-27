@@ -74,26 +74,46 @@ func TestBuildScratchComposerJSON(t *testing.T) {
 			"the drupal.org fallback must come last so the project's own repositories keep priority")
 	})
 
-	t.Run("accepts the object form and sorts it for a byte-stable result", func(t *testing.T) {
+	t.Run("keeps the object form in declaration order, not alphabetical order", func(t *testing.T) {
+		// Order is composer's resolution priority in the object form just as in the array form.
+		// Sorting by key -- which an earlier revision did, for byte-stability -- would put the
+		// public repository ahead of the private fork declared before it, so the fork loses and
+		// its patch is tested against the wrong package: the very failure this fix removes.
 		service, projectDir := newScratchCLI(t, `{
 			"repositories": {
-				"zeta": {"type": "composer", "url": "https://zeta.example.com"},
-				"alpha": {"type": "composer", "url": "https://alpha.example.com"}
+				"zeta-private-fork": {"type": "composer", "url": "https://zeta.example.com"},
+				"alpha-public": {"type": "composer", "url": "https://alpha.example.com"}
 			}
 		}`)
 
 		first, err := service.buildScratchComposerJSON(projectDir)
 		require.NoError(t, err)
-		second, err := service.buildScratchComposerJSON(projectDir)
-		require.NoError(t, err)
-		assert.Equal(t, string(first), string(second))
 
 		var project struct {
 			Repositories []map[string]any `json:"repositories"`
 		}
 		require.NoError(t, json.Unmarshal(first, &project))
-		assert.Equal(t, "https://alpha.example.com", project.Repositories[0]["url"])
-		assert.Equal(t, "https://zeta.example.com", project.Repositories[1]["url"])
+		assert.Equal(t, "https://zeta.example.com", project.Repositories[0]["url"])
+		assert.Equal(t, "https://alpha.example.com", project.Repositories[1]["url"])
+
+		// Declaration order is deterministic on its own, so byte-stability survives the change.
+		second, err := service.buildScratchComposerJSON(projectDir)
+		require.NoError(t, err)
+		assert.Equal(t, string(first), string(second))
+	})
+
+	t.Run("ignores a repositories object it cannot walk", func(t *testing.T) {
+		service, projectDir := newScratchCLI(t, `{"repositories": {"broken": }}`)
+
+		out, err := service.buildScratchComposerJSON(projectDir)
+		require.NoError(t, err)
+
+		var project struct {
+			Repositories []map[string]any `json:"repositories"`
+		}
+		require.NoError(t, json.Unmarshal(out, &project))
+		assert.Len(t, project.Repositories, 1)
+		assert.Equal(t, drupalOrgRepositoryURL, project.Repositories[0]["url"])
 	})
 
 	t.Run("drops a packagist.org disable entry", func(t *testing.T) {
@@ -122,6 +142,22 @@ func TestBuildScratchComposerJSON(t *testing.T) {
 		out, err := service.buildScratchComposerJSON(projectDir)
 		require.NoError(t, err)
 		assert.Contains(t, string(out), "https://mirror.example.com")
+	})
+
+	t.Run("skips an entry that is not a repository object", func(t *testing.T) {
+		service, projectDir := newScratchCLI(t, `{
+			"repositories": ["nonsense", {"type": "composer", "url": "https://real.example.com"}]
+		}`)
+
+		out, err := service.buildScratchComposerJSON(projectDir)
+		require.NoError(t, err)
+
+		var project struct {
+			Repositories []map[string]any `json:"repositories"`
+		}
+		require.NoError(t, json.Unmarshal(out, &project))
+		require.Len(t, project.Repositories, 2)
+		assert.Equal(t, "https://real.example.com", project.Repositories[0]["url"])
 	})
 
 	t.Run("resolves a relative path repository against the project", func(t *testing.T) {
@@ -200,6 +236,17 @@ func TestUnresolvableReason(t *testing.T) {
 		"auth required":        {"Authentication required (repo.packagist.com):", true},
 		"download failed":      {"The 'https://repo.packagist.com/acme/p2/x.json' file could not be downloaded", true},
 		"patch was rejected":   {"  - Applying patches for drupal/core\nCould not apply patch! Skipping.", false},
+		"exit-on-failure form": {`Cannot apply patch Issue #123: [Fix the thing](https://drupal.org/i/123)`, false},
+		// Composer's dist-to-source fallback prints a non-fatal "could not be downloaded" and
+		// carries on. Matching it would classify a real patch rejection as an unobtainable
+		// package, so the package would be left unpinned and the merge request would ship a patch
+		// that does not apply.
+		"rejection after a non-fatal download warning": {
+			`The "https://api.github.com/repos/acme/widget/zipball/abc" file could not be downloaded (HTTP/1.1 404 Not Found)
+    Now trying to download from source
+  - Syncing acme/widget (2.1.0) into cache
+  - Applying patches for acme/widget
+Could not apply patch! Skipping. The error was: patch does not apply`, false},
 		"unrelated failure":    {"Your requirements could not be resolved to an installable set of packages.", false},
 		"version conflict":     {"drupal/core 10.1.0 conflicts with drupal/foo 2.0.0", false},
 		"empty output at fail": {"", false},

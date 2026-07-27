@@ -93,8 +93,11 @@ throwaway Composer project before the update. That project is built with the rep
 your `composer.json` declares, so a patched package that lives only in your private
 registry is resolvable there and its patch is tested like any other.
 
-Two details of how it is built are worth knowing:
+Three details of how it is built are worth knowing:
 
+- **Your repositories keep their declared order**, which is Composer's resolution priority,
+  so a private fork declared ahead of a public repository still wins in the test. This
+  holds for both the array and the object form of `repositories`.
 - **A relative `path` repository is resolved against your project**, since the throwaway
   project lives in a temp directory where a relative path points nowhere.
 - **`{"packagist.org": false}` is dropped**, so the throwaway project can still resolve
