@@ -24,6 +24,9 @@ Drupdater itself runs as a step in the project's CI pipeline, which already runs
 
 ### Keep docs in sync with code
 
+Before finishing any task, check whether it touched something in the table below and, if so,
+update the matching page — don't leave it for a follow-up.
+
 A change to any of the following **must** update its page in the same PR:
 
 | Change | Page to update |
@@ -51,14 +54,21 @@ Changing a golden file changes the published example. `internal/addon/testdata/c
 ```bash
 make build          # Build binary
 make test           # Run all tests (go test -v ./...)
-make lint           # Run vet + staticcheck + golangci-lint
+make lint           # golangci-lint (govet, staticcheck, gosec, etc. — see .golangci.yml) + hadolint on the Dockerfile
 make fmt            # Format code
+make fix            # Apply go fix modernizers (interface{} → any, strings.Cut, etc.)
+make deadcode       # Find unreachable functions (go tool deadcode)
 make mock           # Regenerate mocks (requires mockery v3)
 make update         # Update Go dependencies
 make docker-build   # Build multi-stage Docker image (Go binary + PHP runtime)
 make docs-serve     # Preview the documentation site
 make docs-build     # Build the documentation with --strict
 ```
+
+`make lint`'s hadolint step shells out to `docker run hadolint/hadolint`, which needs a Docker
+daemon and registry access. In the Claude Code remote/web environment neither is available, so
+that step fails to even start — run `golangci-lint run ./...` directly there instead of `make
+lint` and don't treat the hadolint failure as a real lint error.
 
 Run a single test:
 ```bash
