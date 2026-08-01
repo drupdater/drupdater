@@ -233,8 +233,16 @@ func TestUpdatePatches(t *testing.T) {
 
 		report, newPatches := updater.updatePatches(t.Context(), "/tmp", worktree, operations, patches)
 		assert.Empty(t, newPatches["drupal/core"], "patch provided by a dependency should be removed from root")
-		assert.Len(t, report.Removed, 1)
-		assert.Equal(t, depPatch, report.Removed[0].PatchPath)
+		// Assert the whole record, not just the path. Every field ends up in the merge request:
+		// the package and description identify which patch was dropped, and the reason is the
+		// only explanation the reviewer gets for why it disappeared.
+		require.Len(t, report.Removed, 1)
+		assert.Equal(t, RemovedPatch{
+			Package:          "drupal/core",
+			PatchPath:        depPatch,
+			PatchDescription: "Issue #2869592: [Disabled update module](https://www.drupal.org/node/2869592)",
+			Reason:           "Patch is already applied by a dependency of drupal/core",
+		}, report.Removed[0])
 		assert.True(t, report.Changes())
 
 		composerService.AssertExpectations(t)

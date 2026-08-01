@@ -13,6 +13,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/gookit/event"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
@@ -50,6 +51,42 @@ func TestCreatePHPCSConfig(t *testing.T) {
 		_, err := cb.CreatePHPCSConfig(context.Background(), badPath, worktree)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to create phpcs.xml")
+	})
+
+	t.Run("Returns error when staging phpcs.xml fails", func(t *testing.T) {
+		composer := NewMockComposer(t)
+		worktree := NewMockWorktree(t)
+		tmpDir := t.TempDir()
+
+		composer.EXPECT().GetInstalledPackageVersion(anyCtx, tmpDir, "drupal/core").Return("10.1.0", nil)
+		composer.EXPECT().GetCustomCodeDirectories(anyCtx, tmpDir).Return([]string{"web/modules/custom"}, nil)
+		worktree.EXPECT().Add("phpcs.xml").Return(plumbing.ZeroHash, assert.AnError)
+
+		cb := NewCodeBeautifier(logger, nil, composer)
+
+		created, err := cb.CreatePHPCSConfig(context.Background(), tmpDir, worktree)
+		require.Error(t, err)
+		assert.False(t, created, "an unstaged config must not be reported as created")
+		assert.Contains(t, err.Error(), "failed to add file to commit")
+		require.ErrorIs(t, err, assert.AnError)
+	})
+
+	t.Run("Returns error when committing phpcs.xml fails", func(t *testing.T) {
+		composer := NewMockComposer(t)
+		worktree := NewMockWorktree(t)
+		tmpDir := t.TempDir()
+
+		composer.EXPECT().GetInstalledPackageVersion(anyCtx, tmpDir, "drupal/core").Return("10.1.0", nil)
+		composer.EXPECT().GetCustomCodeDirectories(anyCtx, tmpDir).Return([]string{"web/modules/custom"}, nil)
+		worktree.EXPECT().Add("phpcs.xml").Return(plumbing.ZeroHash, nil)
+		worktree.EXPECT().Commit("Add PHPCS config", mock.Anything).Return(plumbing.ZeroHash, assert.AnError)
+
+		cb := NewCodeBeautifier(logger, nil, composer)
+
+		created, err := cb.CreatePHPCSConfig(context.Background(), tmpDir, worktree)
+		require.Error(t, err)
+		assert.False(t, created)
+		require.ErrorIs(t, err, assert.AnError)
 	})
 
 	t.Run("Returns false and no error when no custom code directories found", func(t *testing.T) {
