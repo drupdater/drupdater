@@ -3,6 +3,8 @@ package cmd
 import (
 	"bytes"
 	"errors"
+	"runtime"
+	"strconv"
 	"testing"
 
 	"github.com/drupdater/drupdater/internal"
@@ -50,6 +52,42 @@ func TestNewLogger(t *testing.T) {
 		assert.False(t, logger.Core().Enabled(zapcore.DebugLevel))
 		assert.True(t, logger.Core().Enabled(zapcore.InfoLevel))
 	})
+}
+
+func TestPersistentFlagDefaults(t *testing.T) {
+	// The defaults are the behaviour of an invocation that passes no flags, and several of them
+	// are safety-critical: --security defaulting to true would silently change every run into a
+	// security-only one, and --clone defaulting to true would make drupdater clone instead of
+	// updating the checkout it was pointed at.
+	tests := []struct {
+		flag string
+		want string
+	}{
+		{flag: "branch", want: "main"},
+		{flag: "working-dir", want: "."},
+		{flag: "clone", want: "false"},
+		{flag: "repository-url", want: ""},
+		{flag: "security", want: "false"},
+		{flag: "dry-run", want: "false"},
+		{flag: "verbose", want: "false"},
+		{flag: "config", want: ""},
+		{flag: "report", want: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.flag, func(t *testing.T) {
+			f := rootCmd.PersistentFlags().Lookup(tt.flag)
+			require.NotNil(t, f, "flag %q is not registered", tt.flag)
+			assert.Equal(t, tt.want, f.DefValue)
+			assert.NotEmpty(t, f.Usage, "every flag needs help text")
+		})
+	}
+
+	// Not a literal: it reflects the container's CPU quota, so pin the source rather than a
+	// number that differs per machine.
+	concurrency := rootCmd.PersistentFlags().Lookup("concurrency")
+	require.NotNil(t, concurrency)
+	assert.Equal(t, strconv.Itoa(runtime.GOMAXPROCS(0)), concurrency.DefValue)
 }
 
 func TestNewCache(t *testing.T) {

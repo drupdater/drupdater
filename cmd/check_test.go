@@ -76,9 +76,14 @@ func TestCheckVCS(t *testing.T) {
 	ctx := t.Context()
 	logger := zap.NewNop()
 
+	// Every branch returns the same check name. It is what the user reads in the output, so an
+	// unnamed result would be useless even when OK and Detail are right.
+	const hostCheck = "repository host recognized (GitHub/GitLab)"
+
 	t.Run("no repository URL and no resolve error", func(t *testing.T) {
 		results := checkVCS(ctx, logger, "", "", nil)
 		require.Len(t, results, 1)
+		assert.Equal(t, hostCheck, results[0].Name)
 		assert.False(t, results[0].OK)
 		assert.Contains(t, results[0].Detail, "could not determine repository URL")
 	})
@@ -86,6 +91,7 @@ func TestCheckVCS(t *testing.T) {
 	t.Run("no repository URL surfaces the resolve error", func(t *testing.T) {
 		results := checkVCS(ctx, logger, "", "", errors.New("no origin remote"))
 		require.Len(t, results, 1)
+		assert.Equal(t, hostCheck, results[0].Name)
 		assert.False(t, results[0].OK)
 		assert.Equal(t, "no origin remote", results[0].Detail)
 	})
@@ -93,13 +99,17 @@ func TestCheckVCS(t *testing.T) {
 	t.Run("an unrecognized host fails", func(t *testing.T) {
 		results := checkVCS(ctx, logger, "not a url", "", nil)
 		require.Len(t, results, 1)
+		assert.Equal(t, hostCheck, results[0].Name)
 		assert.False(t, results[0].OK)
+		assert.NotEmpty(t, results[0].Detail, "a failure has to say why")
 	})
 
 	t.Run("a recognized host with no token stops after the host check", func(t *testing.T) {
 		results := checkVCS(ctx, logger, "https://github.com/acme/site.git", "", nil)
 		require.Len(t, results, 1)
+		assert.Equal(t, hostCheck, results[0].Name)
 		assert.True(t, results[0].OK)
+		assert.Empty(t, results[0].Detail, "a passing check needs no detail")
 	})
 }
 
@@ -251,8 +261,22 @@ func TestRunCheapChecks(t *testing.T) {
 func TestRunFullChecksNoRepositoryURL(t *testing.T) {
 	results := runFullChecks(t.Context(), zap.NewNop(), internal.Config{}, "")
 	require.Len(t, results, 1)
+	assert.Equal(t, "sites install from configuration", results[0].Name)
 	assert.False(t, results[0].OK)
 	assert.Contains(t, results[0].Detail, "no repository URL to clone")
+}
+
+func TestRunFullChecksDefaultsToMainBranch(t *testing.T) {
+	// With no branch configured the full check must still pick one; "main" is the default the
+	// clone is attempted with. The clone fails here (the URL is a bare directory), but the
+	// failure detail names the branch that was tried.
+	cfg := internal.Config{RepositoryURL: t.TempDir()}
+
+	results := runFullChecks(t.Context(), zap.NewNop(), cfg, "")
+	require.Len(t, results, 1)
+	assert.Equal(t, "clone for full check", results[0].Name)
+	assert.False(t, results[0].OK)
+	assert.NotEmpty(t, results[0].Detail)
 }
 
 func TestRunFullChecksCloneFailure(t *testing.T) {
