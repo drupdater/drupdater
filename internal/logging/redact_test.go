@@ -54,6 +54,29 @@ func TestRedactorRedactsPercentEncodedForm(t *testing.T) {
 	assert.NotContains(t, out, encoded)
 }
 
+// TestRedactorRedactsPathEncodedForm covers the other escaping. Which one a tool emits depends
+// on where the value sat in the URL, not on the value: the same token is "a+b" after a query
+// component is escaped and "a%20b" after a path segment is. Registering only the query form
+// left the path form — still a perfectly usable credential — readable in the log.
+func TestRedactorRedactsPathEncodedForm(t *testing.T) {
+	const token = "a b c"
+
+	var buf bytes.Buffer
+	redactor := NewRedactor()
+	redactor.Register(token)
+	logger := newTestLogger(&buf, redactor)
+
+	pathEncoded := url.PathEscape(token)
+	require.NotEqual(t, url.QueryEscape(token), pathEncoded)
+
+	logger.Info("clone failed for https://example.com/" + pathEncoded + "/repo.git")
+
+	out := buf.String()
+	assert.NotContains(t, out, token)
+	assert.NotContains(t, out, pathEncoded)
+	assert.Contains(t, out, "https://example.com/***/repo.git")
+}
+
 func TestRedactorRedactsStringFields(t *testing.T) {
 	const token = "field-secret"
 

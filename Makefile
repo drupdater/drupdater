@@ -1,4 +1,4 @@
-.PHONY: build test mutate clean mock lint fmt fix run docker-build docker-run docs-serve docs-build help
+.PHONY: build test test-property mutate clean mock lint fmt fix run docker-build docker-run docs-serve docs-build help
 
 # Variables
 BINARY_NAME=drupdater
@@ -16,6 +16,12 @@ build: ## Build the binary
 test: ## Run tests
 	go test -v ./...
 
+# RAPID_CHECKS rather than -rapid.checks: rapid only registers its flags in test binaries that
+# import it, so passing the flag to ./... fails on every package that has no property tests. The
+# environment variable is read at init and simply ignored by those packages.
+test-property: ## Run only the property tests, with far more generated cases than `make test`
+	RAPID_CHECKS=10000 go test ./... -run TestProperty
+
 clean: ## Clean build artifacts
 	rm -f ${BINARY_NAME}
 	go clean
@@ -30,8 +36,11 @@ lint: ## Run linters
 deadcode: ## Find unreachable functions
 	go tool deadcode -test ./...
 
+# RAPID_NOFAILFILE stops the property tests from recording a counterexample for every mutant
+# they kill. Those files are the point of a mutation run, not a finding about the real code, and
+# rapid replays whatever it finds under testdata/rapid on the next ordinary test run.
 mutate: ## Run mutation testing over the whole module
-	go tool mutago --config mutago.yaml --coverage --quiet --no-diffs \
+	RAPID_NOFAILFILE=1 go tool mutago --config mutago.yaml --coverage --quiet --no-diffs \
 		--logger-summary-json ./...
 
 fmt: ## Format code

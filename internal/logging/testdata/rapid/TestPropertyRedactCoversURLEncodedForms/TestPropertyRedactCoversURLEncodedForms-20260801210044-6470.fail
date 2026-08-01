@@ -1,0 +1,64 @@
+# 2026/08/01 21:00:44.537462 [TestPropertyRedactCoversURLEncodedForms] [rapid] draw secret: "-vuzR2 +z+"
+# 2026/08/01 21:00:44.537552 [TestPropertyRedactCoversURLEncodedForms] 
+# 	Error Trace:	/home/user/drupdater/internal/logging/redact_property_test.go:97
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:458
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:467
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:292
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:207
+# 	            				/home/user/drupdater/internal/logging/redact_property_test.go:85
+# 	            				/root/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.4.linux-amd64/src/runtime/asm_amd64.s:1771
+# 	Error:      	Not equal: 
+# 	            	expected: "***"
+# 	            	actual  : "-vuzR2%20+z+"
+# 	            	
+# 	            	Diff:
+# 	            	--- Expected
+# 	            	+++ Actual
+# 	            	@@ -1 +1 @@
+# 	            	-***
+# 	            	+-vuzR2%20+z+
+# 	Test:       	TestPropertyRedactCoversURLEncodedForms
+# 
+v0.4.8#11040429362938902097
+0x7eb1b38811a95
+0x0
+0x6b9ab789a6db0
+0x2
+0x5de8d9b91e5d2
+0x0
+0x1ed019d51b111d
+0x42
+0x106097dafe2e97
+0x0
+0x114d00d7fc86ad
+0x41
+0xa7dc0e3078a01
+0x0
+0x1f807ebb129134
+0xffffffffffffffff
+0x1c90c2ef95f31d
+0x0
+0x141491d8b6591a
+0x67
+0x23
+0x1897b9299f58ab
+0x0
+0x82fde68c3d686
+0x7
+0x181f8906d27fed
+0x0
+0x4b0b5548a26c
+0x0
+0x15999106b39007
+0x0
+0x7f84770c301a2
+0x1
+0x1b708d6181e0c5
+0x0
+0x1fb044ac19d9d2
+0xffffffffffffffff
+0x16226356212423
+0x0
+0x1dfd63bae75b8
+0x1
+0x49871db5b9c35

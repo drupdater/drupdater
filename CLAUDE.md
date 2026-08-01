@@ -54,6 +54,7 @@ Changing a golden file changes the published example. `internal/addon/testdata/c
 ```bash
 make build          # Build binary
 make test           # Run all tests (go test -v ./...)
+make test-property  # Only the property tests, with far more generated cases (rapid)
 make mutate         # Mutation testing over the whole module (mutago, pinned in go.mod)
 make lint           # golangci-lint (govet, staticcheck, gosec, etc. — see .golangci.yml) + hadolint on the Dockerfile
 make fmt            # Format code
@@ -124,6 +125,12 @@ Mocks are generated with mockery v3 (config in `.mockery.yml`). After changing a
 ## Mutation testing
 
 `mutago` (pinned via the `tool` directive in `go.mod`, configured in `mutago.yaml`) scores whether the tests *assert* rather than merely execute. CI enforces it on the lines a PR changes (`mutation` job in `.github/workflows/go.yml`, fails below 75 % MSI) and reports the whole module weekly (`.github/workflows/mutation.yml`, one matrix leg per package, never blocking). Suppress a genuinely equivalent mutant with a `// mutator-disable-next-line <mutator>` comment and a reason — never by lowering the threshold. Details: `docs/contributing/development.md`.
+
+## Property-based testing
+
+`pgregory.net/rapid` states invariants over generated input, next to the example-based tests. Convention: file `<subject>_property_test.go`, every test named `TestProperty…` (`make test-property` selects on that prefix). A property must state a law — idempotent, order-independent, round-trips, leaks nothing — never a second implementation of the function.
+
+**The seed is random on every run.** So when a property finds a bug, fix the code *and* add an ordinary test naming the counterexample: the blocking mutation gate must not depend on the exploration happening to hit the right input. Counterexamples rapid records under `testdata/rapid/*.fail` are replayed automatically and belong in the commit. Details: `docs/contributing/development.md`.
 
 ## Docker
 
