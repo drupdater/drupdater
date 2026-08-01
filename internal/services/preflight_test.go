@@ -18,6 +18,9 @@ func TestCheckGitHistoryComplete(t *testing.T) {
 		result := CheckGitHistoryComplete(repository, "/tmp")
 		assert.True(t, result.OK)
 		assert.Empty(t, result.Detail)
+		// The name is what identifies the check in the output; a passing result with a blank
+		// name tells the user nothing.
+		assert.NotEmpty(t, result.Name)
 	})
 
 	t.Run("a shallow clone fails with an actionable message", func(t *testing.T) {
@@ -26,6 +29,7 @@ func TestCheckGitHistoryComplete(t *testing.T) {
 
 		result := CheckGitHistoryComplete(repository, "/tmp")
 		assert.False(t, result.OK)
+		assert.NotEmpty(t, result.Name, "a failing check has to say which check failed")
 		assert.Contains(t, result.Detail, "shallow checkout detected")
 		assert.Contains(t, result.Detail, "fetch-depth")
 	})
