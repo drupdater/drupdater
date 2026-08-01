@@ -1628,6 +1628,13 @@ func TestCleanup(t *testing.T) {
 	})
 
 	t.Run("clone mode refuses to remove the temp dir itself", func(t *testing.T) {
+		// Point os.TempDir() at a sandbox first. This subtest deliberately asks cleanup()
+		// to delete the temp dir, relying on the guard in cleanup() to refuse — so if that
+		// guard is ever broken (a refactor, or a mutation-testing run that negates it),
+		// the RemoveAll must land in a directory owned by this test rather than wiping the
+		// machine's real temp dir out from under everything else running on it.
+		t.Setenv("TMPDIR", t.TempDir())
+
 		ws := &WorkflowBaseService{logger: logger, config: internal.Config{Clone: true}}
 		ws.cleanup(os.TempDir())
 		assert.DirExists(t, os.TempDir())
