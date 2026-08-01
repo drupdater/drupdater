@@ -170,7 +170,7 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	if config.ReportPath != "" {
 		opts = append(opts, services.WithReportSink(reportSink(logger, redactor, config.ReportPath)))
 	}
-	workflow := services.NewWorkflowBaseService(logger, config, drush, platform, git, installer, composer, dispatcher, opts...)
+	workflow := newWorkflowService(logger, config, drush, platform, git, installer, composer, dispatcher, opts...)
 
 	// Start the update workflow
 	err = workflow.StartUpdate(cmd.Context(), addons)
@@ -182,6 +182,30 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 		logger.Info("update finished")
 	}
 	return nil
+}
+
+// updateWorkflow is what runUpdate needs from the workflow: starting it. Kept narrow (rather
+// than the concrete *services.WorkflowBaseService) so a test can drive runUpdate to the end
+// without a real repository, composer and drush.
+type updateWorkflow interface {
+	StartUpdate(ctx context.Context, addons []internal.Addon) error
+}
+
+// newWorkflowService builds the update workflow. It is a variable purely as a test seam: every
+// step above it in runUpdate -- service construction, VCS provider selection, the addon
+// registry and the dispatcher -- runs for real, and only the run itself is replaced.
+var newWorkflowService = func(
+	logger *zap.Logger,
+	cfg internal.Config,
+	drushSvc services.Drush,
+	platform codehosting.Platform,
+	gitSvc services.Repository,
+	installerSvc services.Installer,
+	composerSvc services.Composer,
+	dispatcher services.EventDispatcher,
+	opts ...services.Option,
+) updateWorkflow {
+	return services.NewWorkflowBaseService(logger, cfg, drushSvc, platform, gitSvc, installerSvc, composerSvc, dispatcher, opts...)
 }
 
 // reportSink returns the callback that writes the run report to path.

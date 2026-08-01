@@ -2,14 +2,20 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/internal/codehosting"
+	"github.com/drupdater/drupdater/internal/services"
 	git "github.com/go-git/go-git/v5"
+	gitConfig "github.com/go-git/go-git/v5/config"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 // withRootCmdState saves and restores the package-level state runUpdate reads.
@@ -87,4 +93,112 @@ func TestRunUpdateFailsOnACheckoutWithoutAnOrigin(t *testing.T) {
 	require.Error(t, err)
 	assert.NotContains(t, err.Error(), "no token provided",
 		"a checkout-mode dry run must not demand credentials it will never use")
+}
+
+// fakeWorkflow stands in for the real update workflow so runUpdate can be driven to the end.
+type fakeWorkflow struct {
+	called bool
+	addons int
+	err    error
+}
+
+func (f *fakeWorkflow) StartUpdate(_ context.Context, addons []internal.Addon) error {
+	f.called = true
+	f.addons = len(addons)
+	return f.err
+}
+
+// withFakeWorkflow swaps the workflow constructor for one returning fake.
+func withFakeWorkflow(t *testing.T, fake *fakeWorkflow) {
+	t.Helper()
+	old := newWorkflowService
+	newWorkflowService = func(
+		*zap.Logger, internal.Config, services.Drush, codehosting.Platform,
+		services.Repository, services.Installer, services.Composer,
+		services.EventDispatcher, ...services.Option,
+	) updateWorkflow {
+		return fake
+	}
+	t.Cleanup(func() { newWorkflowService = old })
+}
+
+// checkoutWithOrigin returns a git checkout whose origin points at a GitHub URL, which is what
+// checkout mode needs to derive the repository URL and pick a VCS provider.
+func checkoutWithOrigin(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	r, err := git.PlainInit(dir, false)
+	require.NoError(t, err)
+
+	// A commit, so HEAD resolves and the branch can be derived from the checkout.
+	wt, err := r.Worktree()
+	require.NoError(t, err)
+	_, err = wt.Commit("init", &git.CommitOptions{
+		AllowEmptyCommits: true,
+		Author:            &object.Signature{Name: "t", Email: "t@example.com"},
+	})
+	require.NoError(t, err)
+
+	_, err = r.CreateRemote(&gitConfig.RemoteConfig{
+		Name: "origin",
+		URLs: []string{"https://github.com/acme/site.git"},
+	})
+	require.NoError(t, err)
+	return dir
+}
+
+func TestRunUpdateWiresUpAndStartsTheWorkflow(t *testing.T) {
+	// Everything up to the workflow runs for real here: the service constructors, checkout
+	// resolution, the addon registry and the dispatcher. Only the run itself is replaced, so
+	// this covers the wiring that a unit test otherwise cannot reach at all.
+	fake := &fakeWorkflow{}
+	withFakeWorkflow(t, fake)
+
+	t.Setenv("DRUPDATER_TOKEN", "dummy-token")
+	withRootCmdState(t, internal.Config{
+		WorkingDir: checkoutWithOrigin(t),
+		DryRun:     true,
+		Sites:      []string{"default"},
+	}, "")
+
+	require.NoError(t, runUpdateWith(t))
+	assert.True(t, fake.called, "the workflow has to actually be started")
+	assert.Positive(t, fake.addons, "the mandatory addons must reach the workflow")
+}
+
+func TestRunUpdateReportsAWorkflowFailure(t *testing.T) {
+	// A workflow error must surface. handleWorkflowError decides whether it is fatal; an
+	// ordinary error is, and swallowing it would report a failed update as a success.
+	fake := &fakeWorkflow{err: assert.AnError}
+	withFakeWorkflow(t, fake)
+
+	t.Setenv("DRUPDATER_TOKEN", "dummy-token")
+	withRootCmdState(t, internal.Config{
+		WorkingDir: checkoutWithOrigin(t),
+		DryRun:     true,
+		Sites:      []string{"default"},
+	}, "")
+
+	err := runUpdateWith(t)
+	require.Error(t, err)
+	require.ErrorIs(t, err, assert.AnError)
+}
+
+func TestRunUpdateWritesTheRunReport(t *testing.T) {
+	// --report registers a sink on the workflow. The file itself is written by the workflow,
+	// which is faked here, so what this pins is that requesting a report does not break the
+	// wiring -- the option path is otherwise never exercised.
+	fake := &fakeWorkflow{}
+	withFakeWorkflow(t, fake)
+
+	t.Setenv("DRUPDATER_TOKEN", "dummy-token")
+	withRootCmdState(t, internal.Config{
+		WorkingDir: checkoutWithOrigin(t),
+		DryRun:     true,
+		Sites:      []string{"default"},
+		ReportPath: filepath.Join(t.TempDir(), "run.json"),
+	}, "")
+
+	require.NoError(t, runUpdateWith(t))
+	assert.True(t, fake.called)
 }
