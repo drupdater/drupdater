@@ -76,6 +76,40 @@ func TestComposerPatches1_RenderTemplate_NoChanges(t *testing.T) {
 	assert.Empty(t, result)
 }
 
+func TestComposerPatches1_RenderTemplate_AnyChangeRenders(t *testing.T) {
+	// The empty check has three independent clauses, and each one alone must be enough to
+	// produce a section. Testing only "all empty" and "everything populated" would let any two
+	// of the three be deleted without a failure -- and the addon would then stay silent about a
+	// patch it had removed, updated or found conflicting.
+	tests := []struct {
+		name    string
+		updates PatchUpdates
+	}{
+		{
+			name:    "only removals",
+			updates: PatchUpdates{Removed: []RemovedPatch{{Package: "drupal/core", PatchPath: "p.patch", Reason: "fixed"}}},
+		},
+		{
+			name:    "only updates",
+			updates: PatchUpdates{Updated: []UpdatedPatch{{Package: "drupal/core", PreviousPatchPath: "old.patch", NewPatchPath: "new.patch"}}},
+		},
+		{
+			name:    "only conflicts",
+			updates: PatchUpdates{Conflicts: []ConflictPatch{{Package: "drupal/core", FixedVersion: "1.0", NewVersion: "1.1"}}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := &ComposerPatches1{logger: zap.NewNop(), patchUpdates: tt.updates}
+			result, err := h.RenderTemplate()
+			require.NoError(t, err)
+			assert.NotEmpty(t, result, "a change of any kind has to reach the merge request")
+			assert.Contains(t, result, "drupal/core")
+		})
+	}
+}
+
 func TestUpdatePatches(t *testing.T) {
 
 	logger := zap.NewNop()
