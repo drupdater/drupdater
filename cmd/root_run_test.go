@@ -3,6 +3,11 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"github.com/drupdater/drupdater/pkg/composer"
+	"github.com/drupdater/drupdater/pkg/drupalorg"
+	"github.com/drupdater/drupdater/pkg/drush"
+	"github.com/drupdater/drupdater/pkg/repo"
+	"github.com/spf13/cobra"
 	"os"
 	"path/filepath"
 	"testing"
@@ -201,4 +206,93 @@ func TestRunUpdateWritesTheRunReport(t *testing.T) {
 
 	require.NoError(t, runUpdateWith(t))
 	assert.True(t, fake.called)
+}
+
+func TestExecuteExitsNonZeroOnFailure(t *testing.T) {
+	// Execute is the process entry point: its whole job is turning a failed run into a non-zero
+	// exit status, which is what a CI pipeline reads. Nothing else asserts that.
+	var codes []int
+	oldExit := osExit
+	osExit = func(code int) { codes = append(codes, code) }
+	t.Cleanup(func() { osExit = oldExit })
+
+	oldArgs := rootCmd.Args
+	oldRunE := rootCmd.RunE
+	rootCmd.Args = cobra.ArbitraryArgs
+	rootCmd.RunE = func(*cobra.Command, []string) error { return assert.AnError }
+	rootCmd.SetOut(&bytes.Buffer{})
+	rootCmd.SetErr(&bytes.Buffer{})
+	rootCmd.SetArgs([]string{})
+	t.Cleanup(func() {
+		rootCmd.Args, rootCmd.RunE = oldArgs, oldRunE
+		rootCmd.SetOut(nil)
+		rootCmd.SetErr(nil)
+		rootCmd.SetArgs(nil)
+	})
+
+	Execute()
+	assert.Equal(t, []int{1}, codes)
+}
+
+func TestExecuteDoesNotExitOnSuccess(t *testing.T) {
+	var codes []int
+	oldExit := osExit
+	osExit = func(code int) { codes = append(codes, code) }
+	t.Cleanup(func() { osExit = oldExit })
+
+	oldArgs := rootCmd.Args
+	oldRunE := rootCmd.RunE
+	rootCmd.Args = cobra.ArbitraryArgs
+	rootCmd.RunE = func(*cobra.Command, []string) error { return nil }
+	rootCmd.SetOut(&bytes.Buffer{})
+	rootCmd.SetErr(&bytes.Buffer{})
+	rootCmd.SetArgs([]string{})
+	t.Cleanup(func() {
+		rootCmd.Args, rootCmd.RunE = oldArgs, oldRunE
+		rootCmd.SetOut(nil)
+		rootCmd.SetErr(nil)
+		rootCmd.SetArgs(nil)
+	})
+
+	Execute()
+	assert.Empty(t, codes, "a successful run must not exit non-zero")
+}
+
+func TestCreateAddonsPassesEveryDependency(t *testing.T) {
+	// createAddons builds one dependency struct and hands it to every addon factory. Nothing
+	// downstream reports a missing field, so a dependency dropped here would only surface as a
+	// nil-pointer panic in the middle of a real run.
+	var got addonDeps
+	oldRegistry, oldMandatory := addonRegistry, mandatoryAddons
+	// The probes delegate to a real factory, so an actual addon is constructed from the
+	// captured dependencies rather than a stand-in. Two of them, so the test also shows the
+	// same struct reaches every addon rather than only the first.
+	var second addonDeps
+	realFactory := oldRegistry["composer_diff"]
+	require.NotNil(t, realFactory)
+	addonRegistry = map[string]func(addonDeps) internal.Addon{
+		"probe":       func(d addonDeps) internal.Addon { got = d; return realFactory(d) },
+		"probe_other": func(d addonDeps) internal.Addon { second = d; return realFactory(d) },
+	}
+	mandatoryAddons = []string{"probe", "probe_other"}
+	t.Cleanup(func() { addonRegistry, mandatoryAddons = oldRegistry, oldMandatory })
+
+	logger := zap.NewNop()
+	cache, err := NewCache()
+	require.NoError(t, err)
+	drushSvc := drush.NewCLI(logger, cache)
+	composerSvc := composer.NewCLI(logger)
+	t.Cleanup(composerSvc.Cleanup)
+	drupalOrgSvc := drupalorg.NewHTTPClient(logger)
+	gitSvc := repo.NewGitRepositoryService(logger)
+
+	_, err = createAddons(logger, internal.Config{}, drushSvc, composerSvc, drupalOrgSvc, gitSvc)
+	require.NoError(t, err)
+
+	assert.Same(t, logger, got.logger)
+	assert.Equal(t, drushSvc, got.drush)
+	assert.Equal(t, composerSvc, got.composer)
+	assert.Equal(t, drupalOrgSvc, got.drupalOrg)
+	assert.Equal(t, gitSvc, got.git)
+	assert.Equal(t, got, second, "every addon receives the same dependency set")
 }

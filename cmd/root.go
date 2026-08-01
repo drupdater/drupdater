@@ -560,13 +560,17 @@ func init() {
 	rootCmd.AddCommand(addonsCmd)
 }
 
+// osExit is os.Exit, as a variable so a test can observe the exit code instead of ending the
+// test binary. Nothing else may replace it.
+var osExit = os.Exit
+
 func Execute() {
 	// Cancel the workflow context on SIGINT/SIGTERM so cleanup runs on termination.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	if err := rootCmd.ExecuteContext(ctx); err != nil {
-		os.Exit(1)
+		osExit(1)
 	}
 }
 

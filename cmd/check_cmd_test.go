@@ -2,7 +2,10 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"github.com/drupdater/drupdater/internal/codehosting"
+	"go.uber.org/zap"
 	"os"
 	"path/filepath"
 	"testing"
@@ -93,4 +96,73 @@ func TestCheckCommandWithoutReportPathWritesNoReport(t *testing.T) {
 	for _, e := range entries {
 		assert.NotContains(t, e.Name(), ".json", "no report may be written without --report")
 	}
+}
+
+// stubPlatform is a codehosting.Platform whose GetUser answer the test controls, so the token
+// check can be exercised without a live GitHub or GitLab API call.
+type stubPlatform struct {
+	name  string
+	email string
+}
+
+func (s stubPlatform) CreateMergeRequest(context.Context, string, string, string, string) (codehosting.MergeRequest, error) {
+	return codehosting.MergeRequest{}, nil
+}
+func (s stubPlatform) DeleteBranch(context.Context, string) error                      { return nil }
+func (s stubPlatform) GetUser(context.Context) (string, string)                        { return s.name, s.email }
+func (s stubPlatform) EnableAutoMerge(context.Context, codehosting.MergeRequest) error { return nil }
+
+func withVcsProvider(t *testing.T, platform codehosting.Platform, err error) {
+	t.Helper()
+	old := newVcsProvider
+	newVcsProvider = func(string, string, *zap.Logger) (codehosting.Platform, error) {
+		return platform, err
+	}
+	t.Cleanup(func() { newVcsProvider = old })
+}
+
+func TestCheckVCSTokenBranch(t *testing.T) {
+	const url = "https://github.com/acme/site.git"
+	logger := zap.NewNop()
+
+	t.Run("a token that authenticates passes", func(t *testing.T) {
+		withVcsProvider(t, stubPlatform{name: "bot", email: "bot@example.com"}, nil)
+
+		results := checkVCS(t.Context(), logger, url, "tok", nil)
+		require.Len(t, results, 2, "a token adds the authentication check")
+		assert.True(t, results[1].OK)
+		assert.Equal(t, "token authenticates", results[1].Name)
+		assert.Empty(t, results[1].Detail)
+	})
+
+	t.Run("a token the platform does not recognise fails", func(t *testing.T) {
+		// Both identity fields empty is how a token without API access comes back -- the call
+		// succeeds but returns nothing, so an OK here would pass a token that cannot be used.
+		withVcsProvider(t, stubPlatform{}, nil)
+
+		results := checkVCS(t.Context(), logger, url, "tok", nil)
+		require.Len(t, results, 2)
+		assert.False(t, results[1].OK)
+		assert.Contains(t, results[1].Detail, "did not authenticate")
+	})
+
+	t.Run("an email alone still counts as authenticated", func(t *testing.T) {
+		// GitHub apps report no user name but do return an email; treating that as a failure
+		// would reject a perfectly usable token.
+		withVcsProvider(t, stubPlatform{email: "bot@example.com"}, nil)
+
+		results := checkVCS(t.Context(), logger, url, "tok", nil)
+		require.Len(t, results, 2)
+		assert.True(t, results[1].OK)
+	})
+
+	t.Run("a provider that cannot be built fails the check", func(t *testing.T) {
+		withVcsProvider(t, nil, assert.AnError)
+
+		results := checkVCS(t.Context(), logger, url, "tok", nil)
+		require.Len(t, results, 2)
+		assert.False(t, results[1].OK)
+		assert.Equal(t, "token authenticates", results[1].Name)
+		assert.NotEmpty(t, results[1].Detail)
+	})
 }

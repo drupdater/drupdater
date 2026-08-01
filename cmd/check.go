@@ -182,6 +182,13 @@ func checkConfigAndAddons(path string, cfg *internal.Config) []services.CheckRes
 	return append(results, services.CheckResult{Name: "addon names resolve", OK: true})
 }
 
+// newVcsProvider resolves a repository URL and token to a VCS platform. It is a variable so the
+// token check can be tested without reaching GitHub or GitLab: the real factory builds a live
+// API client, and calling GetUser on it would make a network request.
+var newVcsProvider = func(repositoryURL string, token string, logger *zap.Logger) (codehosting.Platform, error) {
+	return codehosting.NewDefaultVcsProviderFactory().Create(repositoryURL, token, logger)
+}
+
 // checkVCS reports whether the repository URL routes to a known VCS provider (GitHub or
 // GitLab) and, when a token is given, whether it authenticates. resolveErr is the error (if
 // any) from deriving the repository URL out of the checkout, surfaced here since that's the
@@ -206,7 +213,7 @@ func checkVCS(ctx context.Context, logger *zap.Logger, repositoryURL string, tok
 	}
 
 	const tokenCheckName = "token authenticates"
-	platform, err := codehosting.NewDefaultVcsProviderFactory().Create(repositoryURL, token, logger)
+	platform, err := newVcsProvider(repositoryURL, token, logger)
 	if err != nil {
 		return append(results, services.CheckResult{Name: tokenCheckName, OK: false, Detail: err.Error()})
 	}
