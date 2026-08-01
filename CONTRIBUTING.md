@@ -27,6 +27,7 @@ Common tasks:
 
 ```bash
 make test    # run all tests
+make mutate  # mutation testing (mutago) — checks the tests actually assert
 make lint    # vet + staticcheck + golangci-lint
 make fmt     # format code
 make mock    # regenerate mocks after changing an interface (mockery v3)
@@ -52,7 +53,10 @@ model.
 
 1. Branch off `main`.
 2. Keep the PR focused on a single concern.
-3. Add or update tests for behavior changes — changed packages need ≥ 90% coverage.
+3. Add or update tests for behavior changes — changed packages need ≥ 90% coverage. CI also
+   runs mutation testing on the lines you changed; those tests need to actually *assert*, not
+   just execute the code. See [Mutation
+   testing](https://drupdater.github.io/contributing/development/#mutation-testing).
 4. If you changed an interface, run `make mock`.
 5. Run `make lint test` and make sure both pass.
 6. Write a clear PR description explaining the *why*, not just the *what*.

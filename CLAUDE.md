@@ -54,6 +54,7 @@ Changing a golden file changes the published example. `internal/addon/testdata/c
 ```bash
 make build          # Build binary
 make test           # Run all tests (go test -v ./...)
+make mutate         # Mutation testing over the whole module (mutago, pinned in go.mod)
 make lint           # golangci-lint (govet, staticcheck, gosec, etc. — see .golangci.yml) + hadolint on the Dockerfile
 make fmt            # Format code
 make fix            # Apply go fix modernizers (interface{} → any, strings.Cut, etc.)
@@ -118,7 +119,11 @@ Full schema, defaults and validation rules: `docs/reference/configuration.md`. R
 
 ## Mocking
 
-Mocks are generated with mockery v3 (config in `.mockery.yml`). After changing an interface, regenerate with `make mock`. Mock files live alongside their source packages with a `mock_*.go` naming pattern.
+Mocks are generated with mockery v3 (config in `.mockery.yml`). After changing an interface, regenerate with `make mock`. The `testify` template emits one consolidated `mocks_test.go` per package, in the package it mocks.
+
+## Mutation testing
+
+`mutago` (pinned via the `tool` directive in `go.mod`, configured in `mutago.yaml`) scores whether the tests *assert* rather than merely execute. CI enforces it on the lines a PR changes (`mutation` job in `.github/workflows/go.yml`, fails below 70 % MSI) and reports the whole module weekly (`.github/workflows/mutation.yml`, never blocking). Suppress a genuinely equivalent mutant with a `// mutator-disable-next-line <mutator>` comment and a reason — never by lowering the threshold. Details: `docs/contributing/development.md`.
 
 ## Docker
 

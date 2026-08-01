@@ -1,0 +1,82 @@
+name: Mutation Testing
+
+# Scores the whole module with mutation testing: every mutant that survives is a
+# line the tests execute but do not actually check.
+#
+# Deliberately informational -- it never fails the build. The blocking gate is
+# the `mutation` job in go.yml, which scores only the lines a pull request
+# changes. This run exists to track the module-wide score over time and to
+# produce a worklist of surviving mutants in existing code.
+#
+# The `mutation-report` artifact holds mutago-agentic.json: each survivor with
+# its diff, surrounding context and the test file that should have caught it.
+# Download it to pick off survivors package by package.
+
+on:
+  schedule:
+    # Mondays, 04:00 UTC.
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  mutation-full:
+    name: mutation (full module)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Mutation testing
+        continue-on-error: true
+        run: |
+          go tool mutago \
+            --config mutago.yaml \
+            --coverage \
+            --logger-summary-json \
+            --logger-agentic-json \
+            --quiet \
+            --no-diffs \
+            ./...
+
+      - name: Mutation Summary
+        if: always()
+        run: |
+          echo "## Mutation Testing (full module)" >> $GITHUB_STEP_SUMMARY
+          if [ ! -f mutago-summary.json ]; then
+            echo "No summary produced -- the run did not get far enough." >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
+          jq -r '
+            "| Metric | Value |",
+            "|---|---|",
+            "| MSI | \(.msi * 100 | . * 100 | round / 100)% |",
+            "| Covered-code MSI | \(.coveredCodeMsi * 100 | . * 100 | round / 100)% |",
+            "| Killed | \(.killedCount) |",
+            "| Escaped | \(.escapedCount) |",
+            "| Not covered | \(.notCoveredCount) |",
+            "| Errored | \(.errorCount) |",
+            "| Total | \(.totalMutantsCount) |"
+          ' mutago-summary.json >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload mutation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-report
+          path: |
+            mutago-summary.json
+            mutago-agentic.json
+          if-no-files-found: warn
+          retention-days: 30

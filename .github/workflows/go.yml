@@ -90,6 +90,61 @@ jobs:
       - name: Check for dead code
         run: go tool deadcode -test ./... | tee /tmp/deadcode.txt; [ ! -s /tmp/deadcode.txt ]
 
+  # Mutation testing, scoped to the lines this pull request touches.
+  #
+  # Line coverage only proves a line ran; this proves a test fails when the line
+  # is wrong. Scoring the whole module on every PR would take ~20 minutes and
+  # would fail on pre-existing survivors, so the gate looks at changed lines
+  # only -- new code has to be tested well, existing code is left to the weekly
+  # full run in mutation.yml.
+  mutation:
+    name: mutation
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # --git-diff-lines diffs against the merge base, which needs history.
+          fetch-depth: 0
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Mutation testing on changed lines
+        run: |
+          go tool mutago \
+            --config mutago.yaml \
+            --coverage \
+            --git-diff-lines \
+            --git-diff-base origin/${{ github.base_ref }} \
+            --ignore-msi-with-no-mutations \
+            --min-msi 70 \
+            --logger-github \
+            --logger-summary-json \
+            --quiet \
+            --no-diffs \
+            ./...
+
+      - name: Mutation Summary
+        if: always()
+        run: |
+          echo "## Mutation Testing (changed lines)" >> $GITHUB_STEP_SUMMARY
+          if [ ! -f mutago-summary.json ]; then
+            echo "No summary produced." >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
+          jq -r '
+            if .totalMutantsCount == 0 then
+              "No mutable lines changed."
+            else
+              "**MSI:** \(.msi * 100 | floor)% "
+              + "(\(.killedCount) killed, \(.escapedCount) escaped, "
+              + "\(.notCoveredCount) not covered, \(.totalMutantsCount) total)"
+            end
+          ' mutago-summary.json >> $GITHUB_STEP_SUMMARY
+
   govulncheck:
     name: govulncheck
     runs-on: ubuntu-latest

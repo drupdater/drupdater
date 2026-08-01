@@ -8,3 +8,7 @@ graphify-out/cache/
 
 # mkdocs build output
 site/
+
+# mutation testing output
+mutago-*.json
+mutago-report.html
