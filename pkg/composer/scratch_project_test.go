@@ -48,6 +48,39 @@ func newScratchCLI(t *testing.T, projectComposerJSON string) (*CLI, string) {
 	return service, projectDir
 }
 
+func TestBuildScratchComposerJSONShape(t *testing.T) {
+	// Every other test here decodes only "repositories", so nothing pins the rest of the
+	// document -- yet each remaining field is what makes the patch check work at all:
+	// composer-patches must be required for patches to be applied, plugins must be allowed for
+	// it to run, and composer-exit-on-patch-failure is what turns a failed patch into a
+	// non-zero exit instead of a silent pass that reports every patch as applying cleanly.
+	service, projectDir := newScratchCLI(t, "")
+
+	out, err := service.buildScratchComposerJSON(projectDir)
+	require.NoError(t, err)
+
+	var project struct {
+		Name         string            `json:"name"`
+		Type         string            `json:"type"`
+		Require      map[string]string `json:"require"`
+		Config       map[string]any    `json:"config"`
+		Extra        map[string]any    `json:"extra"`
+		Repositories []map[string]any  `json:"repositories"`
+	}
+	require.NoError(t, json.Unmarshal(out, &project))
+
+	assert.Equal(t, "drupdater/patch-test", project.Name)
+	assert.Equal(t, "project", project.Type)
+	assert.Equal(t, map[string]string{"cweagans/composer-patches": "~1.0"}, project.Require)
+	assert.Equal(t, true, project.Config["allow-plugins"])
+	assert.Equal(t, true, project.Extra["composer-exit-on-patch-failure"])
+	assert.Equal(t, "composer.patches.json", project.Extra["patches-file"])
+
+	// With no project composer.json, the drupal.org fallback is the only repository.
+	require.Len(t, project.Repositories, 1)
+	assert.Equal(t, drupalOrgRepositoryURL, project.Repositories[0]["url"])
+}
+
 func TestBuildScratchComposerJSON(t *testing.T) {
 	t.Run("carries the project's repositories, in order, ahead of the drupal.org fallback", func(t *testing.T) {
 		// The regression this guards: a package served only from a private registry could not be

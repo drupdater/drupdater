@@ -54,6 +54,52 @@ func TestExecComposer(t *testing.T) {
 
 }
 
+func TestGetComposerUpdatesMatchesEveryOccurrence(t *testing.T) {
+	// Two of each action. The parser asks the regexes for *all* matches; with only one of a
+	// kind, "first match only" and "all matches" are indistinguishable, and a real update
+	// touching several packages would silently report just one of them per category.
+	logData := `- Upgrading drupal/core (10.2.0 => 10.3.1)
+- Upgrading drupal/token (1.11.0 => 1.13.0)
+- Downgrading drupal/paragraphs (1.17.0 => 1.16.0)
+- Downgrading drupal/webform (6.2.0 => 6.1.5)
+- Removing drupal/legacy (1.0.0)
+- Removing drupal/obsolete (2.3.4)
+- Installing drupal/new_module (1.2.3)
+- Installing drupal/another (0.9.0)`
+
+	service := &CLI{logger: zap.NewNop(), fs: afero.NewMemMapFs()}
+
+	execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+		cs := []string{"-test.run=TestHelperProcess", "--", logData}
+		cs = append(cs, arg...)
+		cmd := exec.CommandContext(ctx, os.Args[0], cs...) //nolint:gosec // test helper process
+		cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
+		return cmd
+	}
+	t.Cleanup(func() { execCommand = exec.CommandContext })
+
+	changes, err := service.Update(t.Context(), "/tmp", []string{}, []string{}, false, true)
+	require.NoError(t, err)
+	require.Len(t, changes, 8)
+
+	byAction := map[string][]PackageChange{}
+	for _, c := range changes {
+		byAction[c.Action] = append(byAction[c.Action], c)
+	}
+	for _, action := range []string{"Upgrade", "Downgrade", "Remove", "Install"} {
+		assert.Len(t, byAction[action], 2, "both %s lines must be reported", action)
+	}
+
+	assert.Equal(t, "drupal/token", byAction["Upgrade"][1].Package)
+	assert.Equal(t, "1.11.0", byAction["Upgrade"][1].From)
+	assert.Equal(t, "1.13.0", byAction["Upgrade"][1].To)
+	assert.Equal(t, "drupal/webform", byAction["Downgrade"][1].Package)
+	assert.Equal(t, "drupal/obsolete", byAction["Remove"][1].Package)
+	assert.Empty(t, byAction["Remove"][1].To, "a removal has no target version")
+	assert.Equal(t, "drupal/another", byAction["Install"][1].Package)
+	assert.Empty(t, byAction["Install"][1].From, "an install has no previous version")
+}
+
 func TestGetComposerUpdates(t *testing.T) {
 
 	logData := `- Removing behat/mink-selenium2-driver (v1.7.0)
@@ -528,6 +574,66 @@ func TestCheckPlatformReqs(t *testing.T) {
 		out, err := service.CheckPlatformReqs(t.Context(), "/tmp")
 		require.NoError(t, err)
 		assert.Empty(t, out)
+	})
+
+	t.Run("output with trailing noise after the array", func(t *testing.T) {
+		// Combined stdout/stderr can interleave text on both sides of the payload, so the span
+		// runs to the *last* closing bracket rather than the first.
+		//
+		// Known limit: trailing text containing its own brackets (say "Done in 0.4s [cached]")
+		// would extend the span past the payload and fail to parse. Composer does not emit that
+		// today, and widening the extraction to a real scanner is a behaviour change this test
+		// deliberately does not assume.
+		json := "Checking platform requirements using the lock file\n" +
+			`[{"name":"php","version":"8.4.23","status":"success","failed_requirement":null,"provider":null}]` +
+			"\nDone in 0.4s"
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", json}
+			cs = append(cs, arg...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...) //nolint:gosec // test helper process
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		t.Cleanup(func() { execCommand = exec.CommandContext })
+
+		out, err := service.CheckPlatformReqs(t.Context(), "/tmp")
+		require.NoError(t, err)
+		assert.Empty(t, out)
+	})
+
+	t.Run("output with no JSON array at all", func(t *testing.T) {
+		// composer failing before it produces a payload must surface as a parse error naming
+		// the real output, not as an empty "everything is fine" result.
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", "Could not open input file: composer"}
+			cs = append(cs, arg...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...) //nolint:gosec // test helper process
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		t.Cleanup(func() { execCommand = exec.CommandContext })
+
+		_, err := service.CheckPlatformReqs(t.Context(), "/tmp")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to parse composer check-platform-reqs output")
+		assert.Contains(t, err.Error(), "Could not open input file")
+	})
+
+	t.Run("output whose brackets are in the wrong order", func(t *testing.T) {
+		// "]" before "[" must not be treated as a payload span; slicing on it would panic or
+		// yield nonsense, so the guard requires the closing bracket to come after the opening.
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", "] not json ["}
+			cs = append(cs, arg...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...) //nolint:gosec // test helper process
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		t.Cleanup(func() { execCommand = exec.CommandContext })
+
+		_, err := service.CheckPlatformReqs(t.Context(), "/tmp")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to parse composer check-platform-reqs output")
 	})
 
 	t.Run("php requirement not satisfied", func(t *testing.T) {
