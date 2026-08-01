@@ -120,7 +120,7 @@ jobs:
             --git-diff-lines \
             --git-diff-base origin/${{ github.base_ref }} \
             --ignore-msi-with-no-mutations \
-            --min-msi 70 \
+            --min-msi 75 \
             --logger-github \
             --logger-summary-json \
             --quiet \

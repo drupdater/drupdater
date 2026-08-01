@@ -123,7 +123,7 @@ Mocks are generated with mockery v3 (config in `.mockery.yml`). After changing a
 
 ## Mutation testing
 
-`mutago` (pinned via the `tool` directive in `go.mod`, configured in `mutago.yaml`) scores whether the tests *assert* rather than merely execute. CI enforces it on the lines a PR changes (`mutation` job in `.github/workflows/go.yml`, fails below 70 % MSI) and reports the whole module weekly (`.github/workflows/mutation.yml`, never blocking). Suppress a genuinely equivalent mutant with a `// mutator-disable-next-line <mutator>` comment and a reason — never by lowering the threshold. Details: `docs/contributing/development.md`.
+`mutago` (pinned via the `tool` directive in `go.mod`, configured in `mutago.yaml`) scores whether the tests *assert* rather than merely execute. CI enforces it on the lines a PR changes (`mutation` job in `.github/workflows/go.yml`, fails below 75 % MSI) and reports the whole module weekly (`.github/workflows/mutation.yml`, one matrix leg per package, never blocking). Suppress a genuinely equivalent mutant with a `// mutator-disable-next-line <mutator>` comment and a reason — never by lowering the threshold. Details: `docs/contributing/development.md`.
 
 ## Docker
 

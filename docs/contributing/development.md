@@ -131,7 +131,7 @@ went unnoticed. Read it as a question: *which assertion would have caught this?*
 
 | Where | Scope | Blocking |
 |---|---|---|
-| `mutation` job in `go.yml` | Only the lines the pull request changes | **Yes** — fails below 70 % MSI |
+| `mutation` job in `go.yml` | Only the lines the pull request changes | **Yes** — fails below 75 % MSI |
 | `mutation.yml` | The whole module, weekly and on demand | No |
 
 Scoring the full module on every pull request would be slow and would fail on survivors
@@ -139,19 +139,35 @@ nobody touched, so the gate looks at changed lines only: new code has to be test
 existing gaps are left to the weekly run. A pull request that changes no mutable code
 generates no mutants and passes.
 
-For calibration, packages measured when the gate was introduced scored 68–74 % MSI — all of
-them at 90 %+ line coverage:
+The module scored 67 % MSI when mutation testing was introduced, at 90 %+ line coverage
+throughout — the tests ran the code without checking much of it. Every package was then
+brought above the gate, so 75 % is the standard the codebase already meets rather than a
+stretch target.
 
-| Package | MSI | Covered-code MSI |
-|---|---|---|
-| `pkg/phpcs` | 73.1 % | 73.1 % |
-| `internal/report` | 73.6 % | 81.8 % |
-| `pkg/composer` | 72.9 % | 77.6 % |
-| `internal/logging` | 67.7 % | 73.0 % |
+Note that a small diff makes the score coarse: with seven mutants, one extra survivor moves
+the number by 14 points. A narrowly-failing pull request usually needs one more assertion,
+not a rewrite.
 
-So 70 % is roughly today's standard rather than a stretch target. Note that a small diff
-makes the score coarse — with seven mutants, one extra survivor moves the number by 14
-points — so a narrowly-failing pull request usually needs one more assertion, not a rewrite.
+### What the survivors kept turning out to be
+
+The same few shapes accounted for most of them, and they are worth recognising before writing
+new tests:
+
+- **`mock.Anything` for a `context.Context`.** By far the biggest single cause. It lets a call
+  site pass `nil` instead of propagating the context, silently disabling cancellation and the
+  run timeout for everything below it. Match the context instead — exactly where the value is
+  the one under test, or with a non-nil matcher where the workflow derives a child context.
+- **Asserting absence rather than the result.** `assert.NotContains(secret)` passes whether the
+  secret was redacted or the whole field was dropped. Assert what the output became.
+- **`assert.Contains(err.Error(), …)` for a wrapped error.** Removing `%w` leaves the message
+  unchanged, so only `ErrorIs`/`ErrorAs` catches a broken error chain.
+- **Struct literals nobody reads back.** Request payloads, constructor fields and check
+  results were built and never inspected, so any field could be dropped.
+- **One malformed input for a multi-clause guard.** A check of three conditions needs one case
+  per clause, or two thirds of it can be deleted unnoticed.
+- **Error branches that need a failing filesystem.** An in-memory `afero.Fs` never fails, so
+  write, close and flush error paths stay unreachable until a wrapper makes them fail on
+  demand. `internal/report` and `pkg/drupal` both have one to copy.
 
 The weekly run scores one package per matrix leg rather than the module in one go, so it
 finishes in the time of its slowest package and a failed leg can be re-run on its own. A

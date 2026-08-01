@@ -43,7 +43,7 @@ func TestUpdateTranslationsEventHandlerWithoutLocaleDeploy(t *testing.T) {
 	ctx := context.Background()
 
 	// Configure mock expectations
-	mockDrush.EXPECT().IsModuleEnabled(mock.Anything, "/tmp", "example.com", "locale_deploy").Return(false, nil)
+	mockDrush.EXPECT().IsModuleEnabled(anyCtx, "/tmp", "example.com", "locale_deploy").Return(false, nil)
 
 	// Execute
 	event := services.NewPostSiteUpdateEvent(ctx, path, worktree, "example.com")
@@ -66,9 +66,9 @@ func TestUpdateTranslationsEventHandlerWithLocaleDeploy(t *testing.T) {
 	ctx := context.Background()
 
 	// Configure mock expectations
-	mockDrush.EXPECT().IsModuleEnabled(mock.Anything, "/tmp", "example.com", "locale_deploy").Return(true, nil)
-	mockDrush.EXPECT().LocalizeTranslations(mock.Anything, "/tmp", "example.com").Return(nil)
-	mockDrush.EXPECT().GetTranslationPath(mock.Anything, "/tmp", "example.com", true).Return("translations", nil)
+	mockDrush.EXPECT().IsModuleEnabled(anyCtx, "/tmp", "example.com", "locale_deploy").Return(true, nil)
+	mockDrush.EXPECT().LocalizeTranslations(anyCtx, "/tmp", "example.com").Return(nil)
+	mockDrush.EXPECT().GetTranslationPath(anyCtx, "/tmp", "example.com", true).Return("translations", nil)
 
 	mockRepository.EXPECT().IsSomethingStagedInPath(worktree, "translations").Return(true)
 
@@ -100,9 +100,9 @@ func TestUpdateTranslationsEventHandlerSkipsWhenTranslationPathUnavailable(t *te
 	path := "/tmp"
 	ctx := context.Background()
 
-	mockDrush.EXPECT().IsModuleEnabled(mock.Anything, "/tmp", "example.com", "locale_deploy").Return(true, nil)
-	mockDrush.EXPECT().LocalizeTranslations(mock.Anything, "/tmp", "example.com").Return(nil)
-	mockDrush.EXPECT().GetTranslationPath(mock.Anything, "/tmp", "example.com", true).Return("", assert.AnError)
+	mockDrush.EXPECT().IsModuleEnabled(anyCtx, "/tmp", "example.com", "locale_deploy").Return(true, nil)
+	mockDrush.EXPECT().LocalizeTranslations(anyCtx, "/tmp", "example.com").Return(nil)
+	mockDrush.EXPECT().GetTranslationPath(anyCtx, "/tmp", "example.com", true).Return("", assert.AnError)
 
 	// Execute
 	event := services.NewPostSiteUpdateEvent(ctx, path, worktree, "example.com")

@@ -25,18 +25,18 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 		drupalOrgService := NewMockDrupalOrg(t)
 		worktree := NewMockWorktree(t)
 
-		composerService.EXPECT().GetConfig(mock.Anything, path, "extra.patches").
+		composerService.EXPECT().GetConfig(anyCtx, path, "extra.patches").
 			Return(`{"drupal/core":{"Issue #1: [t](u)":"`+depPatch+`"}}`, nil)
-		composerService.EXPECT().Update(mock.Anything, path, []string{}, []string{}, false, true).
+		composerService.EXPECT().Update(anyCtx, path, []string{}, []string{}, false, true).
 			Return([]composer.PackageChange{}, nil)
-		composerService.EXPECT().IsPackageInstalled(mock.Anything, path, "drupal/core").Return(true, nil)
-		composerService.EXPECT().GetDependencyPatches(mock.Anything, path).
+		composerService.EXPECT().IsPackageInstalled(anyCtx, path, "drupal/core").Return(true, nil)
+		composerService.EXPECT().GetDependencyPatches(anyCtx, path).
 			Return(map[string]map[string]bool{"drupal/core": {depPatch: true}}, nil)
 
 		var written string
-		composerService.EXPECT().SetConfig(mock.Anything, path, "extra.patches", mock.Anything).
+		composerService.EXPECT().SetConfig(anyCtx, path, "extra.patches", mock.Anything).
 			Run(func(_ context.Context, _, _, value string) { written = value }).Return(nil)
-		composerService.EXPECT().UpdateLockHash(mock.Anything, path).Return(nil)
+		composerService.EXPECT().UpdateLockHash(anyCtx, path).Return(nil)
 		worktree.EXPECT().AddGlob("composer.*").Return(nil)
 		worktree.EXPECT().Commit("Update patches", mock.Anything).Return(plumbing.NewHash(""), nil)
 
@@ -53,18 +53,18 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 		drupalOrgService := NewMockDrupalOrg(t)
 		worktree := NewMockWorktree(t)
 
-		composerService.EXPECT().GetConfig(mock.Anything, path, "extra.patches").
+		composerService.EXPECT().GetConfig(anyCtx, path, "extra.patches").
 			Return(`{"drupal/core":{"local patch":"patches/x.patch"}}`, nil)
-		composerService.EXPECT().Update(mock.Anything, path, []string{}, []string{}, false, true).
+		composerService.EXPECT().Update(anyCtx, path, []string{}, []string{}, false, true).
 			Return([]composer.PackageChange{{Action: "Upgrade", Package: "drupal/core", From: "8.7.0", To: "8.8.0"}}, nil)
-		composerService.EXPECT().IsPackageInstalled(mock.Anything, path, "drupal/core").Return(true, nil)
-		composerService.EXPECT().GetDependencyPatches(mock.Anything, path).Return(nil, nil)
+		composerService.EXPECT().IsPackageInstalled(anyCtx, path, "drupal/core").Return(true, nil)
+		composerService.EXPECT().GetDependencyPatches(anyCtx, path).Return(nil, nil)
 		drupalOrgService.EXPECT().FindIssueNumber("local patch").Return("", false)
 		drupalOrgService.EXPECT().FindIssueNumber("patches/x.patch").Return("", false)
-		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, mock.Anything, "drupal/core", "8.8.0", path+"/patches/x.patch").Return(false, nil)
+		composerService.EXPECT().CheckIfPatchApplies(anyCtx, mock.Anything, "drupal/core", "8.8.0", path+"/patches/x.patch").Return(false, nil)
 
-		composerService.EXPECT().SetConfig(mock.Anything, path, "extra.patches", mock.Anything).Return(nil)
-		composerService.EXPECT().UpdateLockHash(mock.Anything, path).Return(nil)
+		composerService.EXPECT().SetConfig(anyCtx, path, "extra.patches", mock.Anything).Return(nil)
+		composerService.EXPECT().UpdateLockHash(anyCtx, path).Return(nil)
 		worktree.EXPECT().AddGlob("composer.*").Return(nil)
 		worktree.EXPECT().Commit("Update patches", mock.Anything).Return(plumbing.NewHash(""), nil)
 
@@ -80,15 +80,15 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 		drupalOrgService := NewMockDrupalOrg(t)
 		worktree := NewMockWorktree(t)
 
-		composerService.EXPECT().GetConfig(mock.Anything, path, "extra.patches").
+		composerService.EXPECT().GetConfig(anyCtx, path, "extra.patches").
 			Return(`{"drupal/core":{"local patch":"patches/x.patch"}}`, nil)
-		composerService.EXPECT().Update(mock.Anything, path, []string{}, []string{}, false, true).
+		composerService.EXPECT().Update(anyCtx, path, []string{}, []string{}, false, true).
 			Return([]composer.PackageChange{{Action: "Upgrade", Package: "drupal/core", To: "8.8.0"}}, nil)
-		composerService.EXPECT().IsPackageInstalled(mock.Anything, path, "drupal/core").Return(true, nil)
-		composerService.EXPECT().GetDependencyPatches(mock.Anything, path).Return(nil, nil)
+		composerService.EXPECT().IsPackageInstalled(anyCtx, path, "drupal/core").Return(true, nil)
+		composerService.EXPECT().GetDependencyPatches(anyCtx, path).Return(nil, nil)
 		drupalOrgService.EXPECT().FindIssueNumber("local patch").Return("", false)
 		drupalOrgService.EXPECT().FindIssueNumber("patches/x.patch").Return("", false)
-		composerService.EXPECT().CheckIfPatchApplies(mock.Anything, mock.Anything, "drupal/core", "8.8.0", path+"/patches/x.patch").Return(true, nil)
+		composerService.EXPECT().CheckIfPatchApplies(anyCtx, mock.Anything, "drupal/core", "8.8.0", path+"/patches/x.patch").Return(true, nil)
 
 		h := &ComposerPatches1{logger: logger, composer: composerService, drupalOrg: drupalOrgService}
 		e := services.NewPreComposerUpdateEvent(t.Context(), path, worktree, []string{}, []string{}, false)
@@ -102,10 +102,10 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 		composerService := NewMockComposer(t)
 		worktree := NewMockWorktree(t)
 
-		composerService.EXPECT().GetConfig(mock.Anything, path, "extra.patches").Return("", errors.New("not defined"))
-		composerService.EXPECT().Update(mock.Anything, path, []string{}, []string{}, false, true).
+		composerService.EXPECT().GetConfig(anyCtx, path, "extra.patches").Return("", errors.New("not defined"))
+		composerService.EXPECT().Update(anyCtx, path, []string{}, []string{}, false, true).
 			Return([]composer.PackageChange{}, nil)
-		composerService.EXPECT().GetDependencyPatches(mock.Anything, path).Return(nil, nil)
+		composerService.EXPECT().GetDependencyPatches(anyCtx, path).Return(nil, nil)
 
 		h := &ComposerPatches1{logger: logger, composer: composerService}
 		e := services.NewPreComposerUpdateEvent(t.Context(), path, worktree, []string{}, []string{}, false)
@@ -117,7 +117,7 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 		composerService := NewMockComposer(t)
 		worktree := NewMockWorktree(t)
 
-		composerService.EXPECT().GetConfig(mock.Anything, path, "extra.patches").Return("not-json", nil)
+		composerService.EXPECT().GetConfig(anyCtx, path, "extra.patches").Return("not-json", nil)
 
 		h := &ComposerPatches1{logger: logger, composer: composerService}
 		e := services.NewPreComposerUpdateEvent(t.Context(), path, worktree, []string{}, []string{}, false)
@@ -138,23 +138,23 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 			{
 				name: "SetConfig",
 				arrange: func(c *MockComposer, _ *MockWorktree) {
-					c.EXPECT().SetConfig(mock.Anything, path, "extra.patches", mock.Anything).Return(errors.New("x"))
+					c.EXPECT().SetConfig(anyCtx, path, "extra.patches", mock.Anything).Return(errors.New("x"))
 				},
 				wantErr: "failed to set composer config",
 			},
 			{
 				name: "UpdateLockHash",
 				arrange: func(c *MockComposer, _ *MockWorktree) {
-					c.EXPECT().SetConfig(mock.Anything, path, "extra.patches", mock.Anything).Return(nil)
-					c.EXPECT().UpdateLockHash(mock.Anything, path).Return(errors.New("x"))
+					c.EXPECT().SetConfig(anyCtx, path, "extra.patches", mock.Anything).Return(nil)
+					c.EXPECT().UpdateLockHash(anyCtx, path).Return(errors.New("x"))
 				},
 				wantErr: "failed to update composer lock hash",
 			},
 			{
 				name: "AddGlob",
 				arrange: func(c *MockComposer, w *MockWorktree) {
-					c.EXPECT().SetConfig(mock.Anything, path, "extra.patches", mock.Anything).Return(nil)
-					c.EXPECT().UpdateLockHash(mock.Anything, path).Return(nil)
+					c.EXPECT().SetConfig(anyCtx, path, "extra.patches", mock.Anything).Return(nil)
+					c.EXPECT().UpdateLockHash(anyCtx, path).Return(nil)
 					w.EXPECT().AddGlob("composer.*").Return(errors.New("x"))
 				},
 				wantErr: "failed to add composer.* files",
@@ -162,8 +162,8 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 			{
 				name: "Commit",
 				arrange: func(c *MockComposer, w *MockWorktree) {
-					c.EXPECT().SetConfig(mock.Anything, path, "extra.patches", mock.Anything).Return(nil)
-					c.EXPECT().UpdateLockHash(mock.Anything, path).Return(nil)
+					c.EXPECT().SetConfig(anyCtx, path, "extra.patches", mock.Anything).Return(nil)
+					c.EXPECT().UpdateLockHash(anyCtx, path).Return(nil)
 					w.EXPECT().AddGlob("composer.*").Return(nil)
 					w.EXPECT().Commit("Update patches", mock.Anything).Return(plumbing.NewHash(""), errors.New("x"))
 				},
@@ -176,12 +176,12 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 				composerService := NewMockComposer(t)
 				worktree := NewMockWorktree(t)
 
-				composerService.EXPECT().GetConfig(mock.Anything, path, "extra.patches").
+				composerService.EXPECT().GetConfig(anyCtx, path, "extra.patches").
 					Return(`{"drupal/core":{"Issue #1: [t](u)":"`+depPatch+`"}}`, nil)
-				composerService.EXPECT().Update(mock.Anything, path, []string{}, []string{}, false, true).
+				composerService.EXPECT().Update(anyCtx, path, []string{}, []string{}, false, true).
 					Return([]composer.PackageChange{}, nil)
-				composerService.EXPECT().IsPackageInstalled(mock.Anything, path, "drupal/core").Return(true, nil)
-				composerService.EXPECT().GetDependencyPatches(mock.Anything, path).
+				composerService.EXPECT().IsPackageInstalled(anyCtx, path, "drupal/core").Return(true, nil)
+				composerService.EXPECT().GetDependencyPatches(anyCtx, path).
 					Return(map[string]map[string]bool{"drupal/core": {depPatch: true}}, nil)
 				tc.arrange(composerService, worktree)
 
@@ -197,8 +197,8 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 		composerService := NewMockComposer(t)
 		worktree := NewMockWorktree(t)
 
-		composerService.EXPECT().GetConfig(mock.Anything, path, "extra.patches").Return("{}", nil)
-		composerService.EXPECT().Update(mock.Anything, path, []string{}, []string{}, false, true).
+		composerService.EXPECT().GetConfig(anyCtx, path, "extra.patches").Return("{}", nil)
+		composerService.EXPECT().Update(anyCtx, path, []string{}, []string{}, false, true).
 			Return(nil, errors.New("boom"))
 
 		h := &ComposerPatches1{logger: logger, composer: composerService}

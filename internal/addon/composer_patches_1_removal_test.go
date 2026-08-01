@@ -66,12 +66,12 @@ func TestUpdatePatchesRemovesRemotePatchForFixedIssue(t *testing.T) {
 	const patchURL = "https://www.drupal.org/files/issues/123456-1.patch"
 
 	composerService := NewMockComposer(t)
-	composerService.EXPECT().GetDependencyPatches(mock.Anything, "/tmp").Return(nil, nil).Maybe()
-	composerService.EXPECT().IsPackageInstalled(mock.Anything, "/tmp", "drupal/core").Return(true, nil)
+	composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
+	composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/core").Return(true, nil)
 
 	drupalOrgService := NewMockDrupalOrg(t)
 	drupalOrgService.EXPECT().FindIssueNumber("Issue #123456").Return("123456", true)
-	drupalOrgService.EXPECT().GetIssue(mock.Anything, "123456").Return(fixedIssue(), nil)
+	drupalOrgService.EXPECT().GetIssue(anyCtx, "123456").Return(fixedIssue(), nil)
 
 	// No worktree.Remove expectation: calling it with a URL is exactly the bug under test, and
 	// the mock fails the test if it is called.
@@ -103,12 +103,12 @@ func TestUpdatePatchesKeepsPatchWhenRemovalFails(t *testing.T) {
 	const patchPath = "patches/drupal/123456.patch"
 
 	composerService := NewMockComposer(t)
-	composerService.EXPECT().GetDependencyPatches(mock.Anything, "/tmp").Return(nil, nil).Maybe()
-	composerService.EXPECT().IsPackageInstalled(mock.Anything, "/tmp", "drupal/core").Return(true, nil)
+	composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
+	composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/core").Return(true, nil)
 
 	drupalOrgService := NewMockDrupalOrg(t)
 	drupalOrgService.EXPECT().FindIssueNumber("Issue #123456").Return("123456", true)
-	drupalOrgService.EXPECT().GetIssue(mock.Anything, "123456").Return(fixedIssue(), nil)
+	drupalOrgService.EXPECT().GetIssue(anyCtx, "123456").Return(fixedIssue(), nil)
 
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Remove(patchPath).Return(plumbing.NewHash(""), assert.AnError)
