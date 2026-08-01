@@ -43,7 +43,7 @@ func TestUpdateTranslationsEventHandlerWithoutLocaleDeploy(t *testing.T) {
 	ctx := context.Background()
 
 	// Configure mock expectations
-	mockDrush.EXPECT().IsModuleEnabled(mock.Anything, "/tmp", "example.com", "locale_deploy").Return(false, nil)
+	mockDrush.EXPECT().IsModuleEnabled(anyCtx, "/tmp", "example.com", "locale_deploy").Return(false, nil)
 
 	// Execute
 	event := services.NewPostSiteUpdateEvent(ctx, path, worktree, "example.com")
@@ -51,6 +51,11 @@ func TestUpdateTranslationsEventHandlerWithoutLocaleDeploy(t *testing.T) {
 
 	// Assert
 	require.NoError(t, err)
+	// The recorded result is what reaches the run report. Without it, "skipped because
+	// locale_deploy is off" and "ran and changed nothing" are indistinguishable to a reader.
+	assert.Equal(t, map[string]TranslationResult{
+		"example.com": {Skipped: "locale_deploy not enabled"},
+	}, handler.results)
 	mockDrush.AssertExpectations(t)
 }
 
@@ -66,9 +71,9 @@ func TestUpdateTranslationsEventHandlerWithLocaleDeploy(t *testing.T) {
 	ctx := context.Background()
 
 	// Configure mock expectations
-	mockDrush.EXPECT().IsModuleEnabled(mock.Anything, "/tmp", "example.com", "locale_deploy").Return(true, nil)
-	mockDrush.EXPECT().LocalizeTranslations(mock.Anything, "/tmp", "example.com").Return(nil)
-	mockDrush.EXPECT().GetTranslationPath(mock.Anything, "/tmp", "example.com", true).Return("translations", nil)
+	mockDrush.EXPECT().IsModuleEnabled(anyCtx, "/tmp", "example.com", "locale_deploy").Return(true, nil)
+	mockDrush.EXPECT().LocalizeTranslations(anyCtx, "/tmp", "example.com").Return(nil)
+	mockDrush.EXPECT().GetTranslationPath(anyCtx, "/tmp", "example.com", true).Return("translations", nil)
 
 	mockRepository.EXPECT().IsSomethingStagedInPath(worktree, "translations").Return(true)
 
@@ -82,6 +87,9 @@ func TestUpdateTranslationsEventHandlerWithLocaleDeploy(t *testing.T) {
 
 	// Assert
 	require.NoError(t, err)
+	assert.Equal(t, map[string]TranslationResult{
+		"example.com": {Path: "translations", Updated: true},
+	}, handler.results, "a committed translation update has to be reported as updated")
 	mockDrush.AssertExpectations(t)
 	mockRepository.AssertExpectations(t)
 	worktree.AssertExpectations(t)
@@ -100,9 +108,9 @@ func TestUpdateTranslationsEventHandlerSkipsWhenTranslationPathUnavailable(t *te
 	path := "/tmp"
 	ctx := context.Background()
 
-	mockDrush.EXPECT().IsModuleEnabled(mock.Anything, "/tmp", "example.com", "locale_deploy").Return(true, nil)
-	mockDrush.EXPECT().LocalizeTranslations(mock.Anything, "/tmp", "example.com").Return(nil)
-	mockDrush.EXPECT().GetTranslationPath(mock.Anything, "/tmp", "example.com", true).Return("", assert.AnError)
+	mockDrush.EXPECT().IsModuleEnabled(anyCtx, "/tmp", "example.com", "locale_deploy").Return(true, nil)
+	mockDrush.EXPECT().LocalizeTranslations(anyCtx, "/tmp", "example.com").Return(nil)
+	mockDrush.EXPECT().GetTranslationPath(anyCtx, "/tmp", "example.com", true).Return("", assert.AnError)
 
 	// Execute
 	event := services.NewPostSiteUpdateEvent(ctx, path, worktree, "example.com")
@@ -110,7 +118,40 @@ func TestUpdateTranslationsEventHandlerSkipsWhenTranslationPathUnavailable(t *te
 
 	// Assert
 	require.NoError(t, err)
+	// The skip reason carries the underlying error, so the report says why translations were
+	// left alone rather than silently omitting the site.
+	require.Len(t, handler.results, 1)
+	assert.Empty(t, handler.results["example.com"].Path)
+	assert.False(t, handler.results["example.com"].Updated)
+	assert.Contains(t, handler.results["example.com"].Skipped, "translation path not available")
+	assert.Contains(t, handler.results["example.com"].Skipped, assert.AnError.Error())
 	mockDrush.AssertExpectations(t)
 	worktree.AssertNotCalled(t, "Add", mock.Anything)
+	worktree.AssertNotCalled(t, "Commit", mock.Anything, mock.Anything)
+}
+
+func TestUpdateTranslationsEventHandlerRecordsNothingToCommit(t *testing.T) {
+	// Translations were localized but produced no change. The site must still appear in the
+	// report with its path -- and explicitly not as updated, which is what tells a reviewer the
+	// merge request contains no translation commit.
+	mockDrush := NewMockDrush(t)
+	mockRepository := NewMockRepository(t)
+	handler := NewTranslationsUpdater(zap.NewNop(), mockDrush, mockRepository)
+
+	worktree := NewMockWorktree(t)
+
+	mockDrush.EXPECT().IsModuleEnabled(anyCtx, "/tmp", "example.com", "locale_deploy").Return(true, nil)
+	mockDrush.EXPECT().LocalizeTranslations(anyCtx, "/tmp", "example.com").Return(nil)
+	mockDrush.EXPECT().GetTranslationPath(anyCtx, "/tmp", "example.com", true).Return("translations", nil)
+	worktree.EXPECT().Add("translations").Return(plumbing.NewHash(""), nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil)
+	mockRepository.EXPECT().IsSomethingStagedInPath(worktree, "translations").Return(false)
+
+	event := services.NewPostSiteUpdateEvent(context.Background(), "/tmp", worktree, "example.com")
+	require.NoError(t, handler.postSiteUpdateHandler(event))
+
+	assert.Equal(t, map[string]TranslationResult{
+		"example.com": {Path: "translations"},
+	}, handler.results)
 	worktree.AssertNotCalled(t, "Commit", mock.Anything, mock.Anything)
 }

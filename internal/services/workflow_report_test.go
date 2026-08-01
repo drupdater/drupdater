@@ -62,8 +62,8 @@ func newReportHarness(t *testing.T, dryRun bool) *reportHarness {
 	h.repoSvc.EXPECT().CloneRepository(h.config.RepositoryURL, h.config.Branch, h.config.Token, "user", "mail").
 		Return(h.repository, h.worktree, "/tmp", nil).Maybe()
 	h.repoSvc.EXPECT().IsShallowClone("/tmp").Return(false, nil).Maybe()
-	h.composer.EXPECT().CheckPlatformReqs(mock.Anything, "/tmp").Return("", nil).Maybe()
-	h.composer.EXPECT().Install(mock.Anything, "/tmp").Return(nil).Maybe()
+	h.composer.EXPECT().CheckPlatformReqs(anyCtx, "/tmp").Return("", nil).Maybe()
+	h.composer.EXPECT().Install(anyCtx, "/tmp").Return(nil).Maybe()
 
 	return h
 }
@@ -76,16 +76,16 @@ func (h *reportHarness) expectFullRun(t *testing.T) {
 	h.worktree.EXPECT().AddGlob(mock.Anything).Return(nil).Maybe()
 	h.worktree.EXPECT().Checkout(mock.Anything).Return(nil).Maybe()
 
-	h.installer.EXPECT().Install(mock.Anything, "/tmp", "site1").Return(nil).Maybe()
-	h.installer.EXPECT().ConfigureDatabase(mock.Anything, "/tmp", "site1").Return(nil).Maybe()
-	h.drush.EXPECT().UpdateSite(mock.Anything, "/tmp", "site1").Return(nil).Maybe()
-	h.drush.EXPECT().ExportConfiguration(mock.Anything, "/tmp", "site1").Return(nil).Maybe()
-	h.drush.EXPECT().ConfigResave(mock.Anything, "/tmp", "site1").Return(nil).Maybe()
+	h.installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil).Maybe()
+	h.installer.EXPECT().ConfigureDatabase(anyCtx, "/tmp", "site1").Return(nil).Maybe()
+	h.drush.EXPECT().UpdateSite(anyCtx, "/tmp", "site1").Return(nil).Maybe()
+	h.drush.EXPECT().ExportConfiguration(anyCtx, "/tmp", "site1").Return(nil).Maybe()
+	h.drush.EXPECT().ConfigResave(anyCtx, "/tmp", "site1").Return(nil).Maybe()
 
 	h.repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound).Maybe()
 	h.repoSvc.EXPECT().BranchExists(h.repository, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 	h.composer.EXPECT().GetLockHash("/tmp").Return("dummy-hash", nil).Maybe()
-	h.composer.EXPECT().Update(mock.Anything, "/tmp", mock.Anything, mock.Anything, false, false).
+	h.composer.EXPECT().Update(anyCtx, "/tmp", mock.Anything, mock.Anything, false, false).
 		Return([]composer.PackageChange{{Action: "Upgrade", Package: "drupal/core", From: "9.0.0", To: "9.1.0"}}, nil).Maybe()
 }
 
@@ -105,7 +105,7 @@ func TestReportWrittenOnSuccessfulRun(t *testing.T) {
 	h := newReportHarness(t, false)
 	h.expectFullRun(t)
 	h.repository.EXPECT().Push(mock.Anything).Return(nil)
-	h.vcsProvider.EXPECT().CreateMergeRequest(mock.Anything, mock.Anything, mock.Anything, mock.Anything, "main").
+	h.vcsProvider.EXPECT().CreateMergeRequest(anyCtx, mock.Anything, mock.Anything, mock.Anything, "main").
 		Return(codehosting.MergeRequest{URL: "https://example.com/mr/1"}, nil)
 
 	require.NoError(t, h.run(t))
@@ -133,7 +133,7 @@ func TestReportRepositoryURLHasNoCredentials(t *testing.T) {
 	h := newReportHarness(t, false)
 	h.expectFullRun(t)
 	h.repository.EXPECT().Push(mock.Anything).Return(nil)
-	h.vcsProvider.EXPECT().CreateMergeRequest(mock.Anything, mock.Anything, mock.Anything, mock.Anything, "main").
+	h.vcsProvider.EXPECT().CreateMergeRequest(anyCtx, mock.Anything, mock.Anything, mock.Anything, "main").
 		Return(codehosting.MergeRequest{}, nil)
 
 	require.NoError(t, h.run(t))
@@ -163,7 +163,7 @@ func TestReportWrittenOnDryRun(t *testing.T) {
 func TestReportWrittenOnFailureNamesThePhase(t *testing.T) {
 	h := newReportHarness(t, false)
 	h.worktree.EXPECT().Checkout(mock.Anything).Return(nil).Maybe()
-	h.installer.EXPECT().Install(mock.Anything, "/tmp", "site1").Return(errors.New("drush exploded"))
+	h.installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(errors.New("drush exploded"))
 	h.repository.EXPECT().Head().Return(nil, plumbing.ErrReferenceNotFound).Maybe()
 
 	err := h.run(t)
@@ -201,10 +201,10 @@ func TestReportWrittenWhenAcquiringTheWorkingCopyFails(t *testing.T) {
 func TestReportNoChangesIsNotAFailure(t *testing.T) {
 	h := newReportHarness(t, false)
 	h.worktree.EXPECT().Checkout(mock.Anything).Return(nil).Maybe()
-	h.installer.EXPECT().Install(mock.Anything, "/tmp", "site1").Return(nil).Maybe()
-	h.installer.EXPECT().ConfigureDatabase(mock.Anything, "/tmp", "site1").Return(nil).Maybe()
+	h.installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil).Maybe()
+	h.installer.EXPECT().ConfigureDatabase(anyCtx, "/tmp", "site1").Return(nil).Maybe()
 	h.repository.EXPECT().Head().Return(nil, plumbing.ErrReferenceNotFound).Maybe()
-	h.composer.EXPECT().Update(mock.Anything, "/tmp", mock.Anything, mock.Anything, false, false).
+	h.composer.EXPECT().Update(anyCtx, "/tmp", mock.Anything, mock.Anything, false, false).
 		Return([]composer.PackageChange{}, nil)
 
 	err := h.run(t)
@@ -246,7 +246,7 @@ func TestReportRecordsAutoMergeOutcome(t *testing.T) {
 		h := newReportHarness(t, false)
 		h.expectFullRun(t)
 		h.repository.EXPECT().Push(mock.Anything).Return(nil)
-		h.vcsProvider.EXPECT().CreateMergeRequest(mock.Anything, mock.Anything, mock.Anything, mock.Anything, "main").
+		h.vcsProvider.EXPECT().CreateMergeRequest(anyCtx, mock.Anything, mock.Anything, mock.Anything, "main").
 			Return(codehosting.MergeRequest{URL: "https://example.com/mr/1"}, nil)
 
 		require.NoError(t, h.run(t))
@@ -260,9 +260,9 @@ func TestReportRecordsAutoMergeOutcome(t *testing.T) {
 		h.config.RunTypes.Normal.AutoMerge = true
 		h.expectFullRun(t)
 		h.repository.EXPECT().Push(mock.Anything).Return(nil)
-		h.vcsProvider.EXPECT().CreateMergeRequest(mock.Anything, mock.Anything, mock.Anything, mock.Anything, "main").
+		h.vcsProvider.EXPECT().CreateMergeRequest(anyCtx, mock.Anything, mock.Anything, mock.Anything, "main").
 			Return(codehosting.MergeRequest{URL: "https://example.com/mr/1"}, nil)
-		h.vcsProvider.EXPECT().EnableAutoMerge(mock.Anything, mock.Anything).Return(nil)
+		h.vcsProvider.EXPECT().EnableAutoMerge(anyCtx, mock.Anything).Return(nil)
 
 		require.NoError(t, h.run(t))
 
@@ -276,9 +276,9 @@ func TestReportRecordsAutoMergeOutcome(t *testing.T) {
 		h.config.RunTypes.Normal.AutoMerge = true
 		h.expectFullRun(t)
 		h.repository.EXPECT().Push(mock.Anything).Return(nil)
-		h.vcsProvider.EXPECT().CreateMergeRequest(mock.Anything, mock.Anything, mock.Anything, mock.Anything, "main").
+		h.vcsProvider.EXPECT().CreateMergeRequest(anyCtx, mock.Anything, mock.Anything, mock.Anything, "main").
 			Return(codehosting.MergeRequest{URL: "https://example.com/mr/1"}, nil)
-		h.vcsProvider.EXPECT().EnableAutoMerge(mock.Anything, mock.Anything).
+		h.vcsProvider.EXPECT().EnableAutoMerge(anyCtx, mock.Anything).
 			Return(errors.New("auto-merge is not allowed for this repository"))
 
 		require.NoError(t, h.run(t), "a failed auto-merge must not fail the run")

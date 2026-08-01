@@ -17,6 +17,7 @@ make build
 ```bash
 make build          # build the binary (injects the version via -ldflags)
 make test           # go test -v ./...
+make mutate         # mutation testing over the whole module (mutago)
 make lint           # golangci-lint + hadolint on the Dockerfile
 make fmt            # go fmt ./...
 make fix            # go fix ./... (interface{} → any, strings.Cut, …)
@@ -101,6 +102,99 @@ get past it — fix the code.
 Changed packages must reach **≥ 90%** coverage. The hook prints per-package totals; add
 tests before committing if any package is below.
 
+## Mutation testing
+
+Coverage proves a line *ran*. It does not prove a test *fails* when that line is wrong — a
+test that exercises a function without asserting anything scores the same as one that checks
+every branch. Mutation testing closes that gap: it rewrites the source in small ways (`==` →
+`!=`, `&&` → `||`, dropping a `defer`, zeroing a return value) and reports every mutant the
+suite fails to notice. A surviving mutant is a behaviour change no test objects to.
+
+The tool is [mutago](https://github.com/quality-gates/mutago), pinned as a `tool` directive in
+`go.mod` and configured in `mutago.yaml`. Run it over the whole module:
+
+```bash
+make mutate
+```
+
+That takes 25–35 minutes — the module produces roughly 3000 mutants and each one re-runs the
+tests for its package. To iterate on one package, pass it directly:
+
+```bash
+go tool mutago --config mutago.yaml --coverage ./pkg/phpcs
+```
+
+Each survivor prints as `ESCAPED <file>:<line> (<mutator>)` with a diff of the change that
+went unnoticed. Read it as a question: *which assertion would have caught this?*
+
+### In CI
+
+| Where | Scope | Blocking |
+|---|---|---|
+| `mutation` job in `go.yml` | Only the lines the pull request changes | **Yes** — fails below 75 % MSI |
+| `mutation.yml` | The whole module, weekly and on demand | No |
+
+Scoring the full module on every pull request would be slow and would fail on survivors
+nobody touched, so the gate looks at changed lines only: new code has to be tested properly,
+existing gaps are left to the weekly run. A pull request that changes no mutable code
+generates no mutants and passes.
+
+The module scored 67 % MSI when mutation testing was introduced, at 90 %+ line coverage
+throughout — the tests ran the code without checking much of it. Every package was then
+brought above the gate, so 75 % is the standard the codebase already meets rather than a
+stretch target.
+
+Note that a small diff makes the score coarse: with seven mutants, one extra survivor moves
+the number by 14 points. A narrowly-failing pull request usually needs one more assertion,
+not a rewrite.
+
+### What the survivors kept turning out to be
+
+The same few shapes accounted for most of them, and they are worth recognising before writing
+new tests:
+
+- **`mock.Anything` for a `context.Context`.** By far the biggest single cause. It lets a call
+  site pass `nil` instead of propagating the context, silently disabling cancellation and the
+  run timeout for everything below it. Match the context instead — exactly where the value is
+  the one under test, or with a non-nil matcher where the workflow derives a child context.
+- **Asserting absence rather than the result.** `assert.NotContains(secret)` passes whether the
+  secret was redacted or the whole field was dropped. Assert what the output became.
+- **`assert.Contains(err.Error(), …)` for a wrapped error.** Removing `%w` leaves the message
+  unchanged, so only `ErrorIs`/`ErrorAs` catches a broken error chain.
+- **Struct literals nobody reads back.** Request payloads, constructor fields and check
+  results were built and never inspected, so any field could be dropped.
+- **One malformed input for a multi-clause guard.** A check of three conditions needs one case
+  per clause, or two thirds of it can be deleted unnoticed.
+- **Error branches that need a failing filesystem.** An in-memory `afero.Fs` never fails, so
+  write, close and flush error paths stay unreachable until a wrapper makes them fail on
+  demand. `internal/report` and `pkg/drupal` both have one to copy.
+
+The weekly run scores one package per matrix leg rather than the module in one go, so it
+finishes in the time of its slowest package and a failed leg can be re-run on its own. A
+final job sums the per-package counts into the module-wide score and writes both tables to
+the job summary.
+
+Each leg uploads a `mutation-report-<package>` artifact containing `mutago-agentic.json` —
+every survivor with its diff, surrounding context and the test file that should have caught
+it. That is the worklist for improving existing tests.
+
+### When a mutant is a false positive
+
+Some mutations are genuinely equivalent — logging text, a `cap` hint on a slice, a defensive
+branch that cannot be reached. Suppress those at the source, never by lowering the threshold:
+
+```go
+// mutator-disable-func
+func alwaysEquivalent() { … }
+
+// mutator-disable-next-line statement/remove
+buf := make([]byte, 0, 64)
+```
+
+Use the narrowest form that works — name the specific mutator rather than `*` — and add a
+comment saying *why* the mutation is equivalent. If you cannot articulate the reason, the
+mutant is probably telling you about a missing assertion.
+
 ## Mocks
 
 Mocks are generated by [mockery v3](https://vektra.github.io/mockery/), configured in
@@ -112,7 +206,8 @@ After changing any interface:
 make mock
 ```
 
-Mock files live beside their source packages, named `mock_*.go`. Do not edit them by hand.
+mockery's `testify` template emits one consolidated `mocks_test.go` per package, in the
+package it mocks. Do not edit those files by hand.
 
 ## Code layout
 

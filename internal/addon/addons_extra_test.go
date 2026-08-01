@@ -1,6 +1,7 @@
 package addon
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -38,8 +39,8 @@ func TestComposerAllowPluginsNilMapIsNotAPanic(t *testing.T) {
 	// A project with no per-package allow-plugins entries yields an empty map. If the addon
 	// ever holds a nil map, assigning a newly discovered plugin into it panics.
 	composerService := NewMockComposer(t)
-	composerService.EXPECT().GetInstalledPlugins(mock.Anything, "/tmp").Return(map[string]any{"new/plugin": nil}, nil)
-	composerService.EXPECT().SetAllowPlugins(mock.Anything, "/tmp", map[string]bool{"new/plugin": false}).Return(nil)
+	composerService.EXPECT().GetInstalledPlugins(anyCtx, "/tmp").Return(map[string]any{"new/plugin": nil}, nil)
+	composerService.EXPECT().SetAllowPlugins(anyCtx, "/tmp", map[string]bool{"new/plugin": false}).Return(nil)
 
 	ap := NewComposerAllowPlugins(zap.NewNop(), composerService)
 	ap.allowPlugins = nil // as if GetAllowPlugins had produced nothing
@@ -52,7 +53,7 @@ func TestComposerAllowPluginsNilMapIsNotAPanic(t *testing.T) {
 func TestComposerAllowPluginsErrors(t *testing.T) {
 	t.Run("reading the config fails", func(t *testing.T) {
 		composerService := NewMockComposer(t)
-		composerService.EXPECT().GetAllowPlugins(mock.Anything, "/tmp").Return(nil, assert.AnError)
+		composerService.EXPECT().GetAllowPlugins(anyCtx, "/tmp").Return(nil, assert.AnError)
 
 		ap := NewComposerAllowPlugins(zap.NewNop(), composerService)
 		err := ap.preComposerUpdateHandler(services.NewPreComposerUpdateEvent(t.Context(), "/tmp", nil, nil, nil, false))
@@ -62,7 +63,7 @@ func TestComposerAllowPluginsErrors(t *testing.T) {
 
 	t.Run("listing installed plugins fails", func(t *testing.T) {
 		composerService := NewMockComposer(t)
-		composerService.EXPECT().GetInstalledPlugins(mock.Anything, "/tmp").Return(nil, assert.AnError)
+		composerService.EXPECT().GetInstalledPlugins(anyCtx, "/tmp").Return(nil, assert.AnError)
 
 		ap := NewComposerAllowPlugins(zap.NewNop(), composerService)
 		require.Error(t, ap.postComposerUpdateHandler(services.NewPostComposerUpdateEvent(t.Context(), "/tmp", nil)))
@@ -70,8 +71,8 @@ func TestComposerAllowPluginsErrors(t *testing.T) {
 
 	t.Run("writing the config back fails", func(t *testing.T) {
 		composerService := NewMockComposer(t)
-		composerService.EXPECT().GetInstalledPlugins(mock.Anything, "/tmp").Return(map[string]any{}, nil)
-		composerService.EXPECT().SetAllowPlugins(mock.Anything, "/tmp", mock.Anything).Return(assert.AnError)
+		composerService.EXPECT().GetInstalledPlugins(anyCtx, "/tmp").Return(map[string]any{}, nil)
+		composerService.EXPECT().SetAllowPlugins(anyCtx, "/tmp", mock.Anything).Return(assert.AnError)
 
 		ap := NewComposerAllowPlugins(zap.NewNop(), composerService)
 		ap.allowPlugins = map[string]bool{}
@@ -85,8 +86,8 @@ func TestComposerDiffLogFailureDoesNotFailTheRun(t *testing.T) {
 	core, logs := observer.New(zap.WarnLevel)
 
 	composerService := NewMockComposer(t)
-	composerService.EXPECT().Diff(mock.Anything, "/tmp", true).Return("| linked table |", nil)
-	composerService.EXPECT().Diff(mock.Anything, "/tmp", false).Return("", assert.AnError)
+	composerService.EXPECT().Diff(anyCtx, "/tmp", true).Return("| linked table |", nil)
+	composerService.EXPECT().Diff(anyCtx, "/tmp", false).Return("", assert.AnError)
 
 	cd := NewComposerDiff(zap.New(core), composerService)
 	err := cd.postComposerUpdateHandler(services.NewPostComposerUpdateEvent(t.Context(), "/tmp", nil))
@@ -99,7 +100,7 @@ func TestComposerDiffLogFailureDoesNotFailTheRun(t *testing.T) {
 
 func TestComposerDiffFailure(t *testing.T) {
 	composerService := NewMockComposer(t)
-	composerService.EXPECT().Diff(mock.Anything, "/tmp", true).Return("", assert.AnError)
+	composerService.EXPECT().Diff(anyCtx, "/tmp", true).Return("", assert.AnError)
 
 	cd := NewComposerDiff(zap.NewNop(), composerService)
 	err := cd.postComposerUpdateHandler(services.NewPostComposerUpdateEvent(t.Context(), "/tmp", nil))
@@ -110,7 +111,7 @@ func TestComposerDiffFailure(t *testing.T) {
 func TestComposerNormalizerErrors(t *testing.T) {
 	t.Run("install check fails", func(t *testing.T) {
 		composerService := NewMockComposer(t)
-		composerService.EXPECT().IsPackageInstalled(mock.Anything, "/tmp", "ergebnis/composer-normalize").Return(false, assert.AnError)
+		composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "ergebnis/composer-normalize").Return(false, assert.AnError)
 
 		cn := NewComposerNormalizer(zap.NewNop(), composerService)
 		require.Error(t, cn.postComposerUpdateHandler(services.NewPostComposerUpdateEvent(t.Context(), "/tmp", nil)))
@@ -118,8 +119,8 @@ func TestComposerNormalizerErrors(t *testing.T) {
 
 	t.Run("normalize fails", func(t *testing.T) {
 		composerService := NewMockComposer(t)
-		composerService.EXPECT().IsPackageInstalled(mock.Anything, "/tmp", "ergebnis/composer-normalize").Return(true, nil)
-		composerService.EXPECT().Normalize(mock.Anything, "/tmp").Return("", assert.AnError)
+		composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "ergebnis/composer-normalize").Return(true, nil)
+		composerService.EXPECT().Normalize(anyCtx, "/tmp").Return("", assert.AnError)
 
 		cn := NewComposerNormalizer(zap.NewNop(), composerService)
 		err := cn.postComposerUpdateHandler(services.NewPostComposerUpdateEvent(t.Context(), "/tmp", nil))
@@ -131,8 +132,8 @@ func TestComposerNormalizerErrors(t *testing.T) {
 func TestDeprecationsRemoverErrors(t *testing.T) {
 	t.Run("installing rector fails", func(t *testing.T) {
 		composerService := NewMockComposer(t)
-		composerService.EXPECT().IsPackageInstalled(mock.Anything, "/tmp", "palantirnet/drupal-rector").Return(false, nil)
-		composerService.EXPECT().Require(mock.Anything, "/tmp", []string{"palantirnet/drupal-rector"}).Return("", assert.AnError)
+		composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "palantirnet/drupal-rector").Return(false, nil)
+		composerService.EXPECT().Require(anyCtx, "/tmp", []string{"palantirnet/drupal-rector"}).Return("", assert.AnError)
 
 		dr := NewDeprecationsRemover(zap.NewNop(), NewMockRector(t), composerService)
 		require.Error(t, dr.postCodeUpdateHandler(services.NewPostCodeUpdateEvent(t.Context(), "/tmp", nil)))
@@ -140,8 +141,8 @@ func TestDeprecationsRemoverErrors(t *testing.T) {
 
 	t.Run("listing custom code directories fails", func(t *testing.T) {
 		composerService := NewMockComposer(t)
-		composerService.EXPECT().IsPackageInstalled(mock.Anything, "/tmp", "palantirnet/drupal-rector").Return(true, nil)
-		composerService.EXPECT().GetCustomCodeDirectories(mock.Anything, "/tmp").Return(nil, assert.AnError)
+		composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "palantirnet/drupal-rector").Return(true, nil)
+		composerService.EXPECT().GetCustomCodeDirectories(anyCtx, "/tmp").Return(nil, assert.AnError)
 
 		dr := NewDeprecationsRemover(zap.NewNop(), NewMockRector(t), composerService)
 		require.Error(t, dr.postCodeUpdateHandler(services.NewPostCodeUpdateEvent(t.Context(), "/tmp", nil)))
@@ -149,13 +150,13 @@ func TestDeprecationsRemoverErrors(t *testing.T) {
 
 	t.Run("removing the temporarily installed rector fails", func(t *testing.T) {
 		composerService := NewMockComposer(t)
-		composerService.EXPECT().IsPackageInstalled(mock.Anything, "/tmp", "palantirnet/drupal-rector").Return(false, nil)
-		composerService.EXPECT().Require(mock.Anything, "/tmp", []string{"palantirnet/drupal-rector"}).Return("", nil)
-		composerService.EXPECT().GetCustomCodeDirectories(mock.Anything, "/tmp").Return([]string{"web/modules/custom"}, nil)
-		composerService.EXPECT().Remove(mock.Anything, "/tmp", []string{"palantirnet/drupal-rector"}).Return("", assert.AnError)
+		composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "palantirnet/drupal-rector").Return(false, nil)
+		composerService.EXPECT().Require(anyCtx, "/tmp", []string{"palantirnet/drupal-rector"}).Return("", nil)
+		composerService.EXPECT().GetCustomCodeDirectories(anyCtx, "/tmp").Return([]string{"web/modules/custom"}, nil)
+		composerService.EXPECT().Remove(anyCtx, "/tmp", []string{"palantirnet/drupal-rector"}).Return("", assert.AnError)
 
 		runner := NewMockRector(t)
-		runner.EXPECT().Run(mock.Anything, "/tmp", []string{"web/modules/custom"}).Return(rector.ReturnOutput{}, nil)
+		runner.EXPECT().Run(anyCtx, "/tmp", []string{"web/modules/custom"}).Return(rector.ReturnOutput{}, nil)
 
 		dr := NewDeprecationsRemover(zap.NewNop(), runner, composerService)
 		require.Error(t, dr.postCodeUpdateHandler(services.NewPostCodeUpdateEvent(t.Context(), "/tmp", nil)))
@@ -163,11 +164,11 @@ func TestDeprecationsRemoverErrors(t *testing.T) {
 
 	t.Run("staging a changed file fails", func(t *testing.T) {
 		composerService := NewMockComposer(t)
-		composerService.EXPECT().IsPackageInstalled(mock.Anything, "/tmp", "palantirnet/drupal-rector").Return(true, nil)
-		composerService.EXPECT().GetCustomCodeDirectories(mock.Anything, "/tmp").Return([]string{"web/modules/custom"}, nil)
+		composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "palantirnet/drupal-rector").Return(true, nil)
+		composerService.EXPECT().GetCustomCodeDirectories(anyCtx, "/tmp").Return([]string{"web/modules/custom"}, nil)
 
 		runner := NewMockRector(t)
-		runner.EXPECT().Run(mock.Anything, "/tmp", []string{"web/modules/custom"}).Return(rector.ReturnOutput{
+		runner.EXPECT().Run(anyCtx, "/tmp", []string{"web/modules/custom"}).Return(rector.ReturnOutput{
 			Totals:       rector.ReturnOutputTotals{ChangedFiles: 1},
 			ChangedFiles: []string{"web/modules/custom/a.php"},
 		}, nil)
@@ -187,7 +188,7 @@ func TestTranslationsUpdaterErrors(t *testing.T) {
 
 	t.Run("module check fails", func(t *testing.T) {
 		drushService := NewMockDrush(t)
-		drushService.EXPECT().IsModuleEnabled(mock.Anything, "/tmp", "site1", "locale_deploy").Return(false, assert.AnError)
+		drushService.EXPECT().IsModuleEnabled(anyCtx, "/tmp", "site1", "locale_deploy").Return(false, assert.AnError)
 
 		tu := NewTranslationsUpdater(zap.NewNop(), drushService, NewMockRepository(t))
 		require.Error(t, tu.postSiteUpdateHandler(newEvent(nil)))
@@ -195,8 +196,8 @@ func TestTranslationsUpdaterErrors(t *testing.T) {
 
 	t.Run("localizing translations fails", func(t *testing.T) {
 		drushService := NewMockDrush(t)
-		drushService.EXPECT().IsModuleEnabled(mock.Anything, "/tmp", "site1", "locale_deploy").Return(true, nil)
-		drushService.EXPECT().LocalizeTranslations(mock.Anything, "/tmp", "site1").Return(assert.AnError)
+		drushService.EXPECT().IsModuleEnabled(anyCtx, "/tmp", "site1", "locale_deploy").Return(true, nil)
+		drushService.EXPECT().LocalizeTranslations(anyCtx, "/tmp", "site1").Return(assert.AnError)
 
 		tu := NewTranslationsUpdater(zap.NewNop(), drushService, NewMockRepository(t))
 		require.Error(t, tu.postSiteUpdateHandler(newEvent(nil)))
@@ -206,9 +207,9 @@ func TestTranslationsUpdaterErrors(t *testing.T) {
 		// GetTranslationPath refuses to return an empty path, because handing that to
 		// Worktree.Add would stage the entire working tree.
 		drushService := NewMockDrush(t)
-		drushService.EXPECT().IsModuleEnabled(mock.Anything, "/tmp", "site1", "locale_deploy").Return(true, nil)
-		drushService.EXPECT().LocalizeTranslations(mock.Anything, "/tmp", "site1").Return(nil)
-		drushService.EXPECT().GetTranslationPath(mock.Anything, "/tmp", "site1", true).Return("", errors.New("does not resolve"))
+		drushService.EXPECT().IsModuleEnabled(anyCtx, "/tmp", "site1", "locale_deploy").Return(true, nil)
+		drushService.EXPECT().LocalizeTranslations(anyCtx, "/tmp", "site1").Return(nil)
+		drushService.EXPECT().GetTranslationPath(anyCtx, "/tmp", "site1", true).Return("", errors.New("does not resolve"))
 
 		tu := NewTranslationsUpdater(zap.NewNop(), drushService, NewMockRepository(t))
 		require.NoError(t, tu.postSiteUpdateHandler(newEvent(nil)))
@@ -216,9 +217,9 @@ func TestTranslationsUpdaterErrors(t *testing.T) {
 
 	t.Run("staging the translation path fails", func(t *testing.T) {
 		drushService := NewMockDrush(t)
-		drushService.EXPECT().IsModuleEnabled(mock.Anything, "/tmp", "site1", "locale_deploy").Return(true, nil)
-		drushService.EXPECT().LocalizeTranslations(mock.Anything, "/tmp", "site1").Return(nil)
-		drushService.EXPECT().GetTranslationPath(mock.Anything, "/tmp", "site1", true).Return("translations", nil)
+		drushService.EXPECT().IsModuleEnabled(anyCtx, "/tmp", "site1", "locale_deploy").Return(true, nil)
+		drushService.EXPECT().LocalizeTranslations(anyCtx, "/tmp", "site1").Return(nil)
+		drushService.EXPECT().GetTranslationPath(anyCtx, "/tmp", "site1", true).Return("translations", nil)
 
 		worktree := NewMockWorktree(t)
 		worktree.EXPECT().Add("translations").Return(plumbing.NewHash(""), assert.AnError)
@@ -231,9 +232,9 @@ func TestTranslationsUpdaterErrors(t *testing.T) {
 
 	t.Run("committing the translations fails", func(t *testing.T) {
 		drushService := NewMockDrush(t)
-		drushService.EXPECT().IsModuleEnabled(mock.Anything, "/tmp", "site1", "locale_deploy").Return(true, nil)
-		drushService.EXPECT().LocalizeTranslations(mock.Anything, "/tmp", "site1").Return(nil)
-		drushService.EXPECT().GetTranslationPath(mock.Anything, "/tmp", "site1", true).Return("translations", nil)
+		drushService.EXPECT().IsModuleEnabled(anyCtx, "/tmp", "site1", "locale_deploy").Return(true, nil)
+		drushService.EXPECT().LocalizeTranslations(anyCtx, "/tmp", "site1").Return(nil)
+		drushService.EXPECT().GetTranslationPath(anyCtx, "/tmp", "site1", true).Return("translations", nil)
 
 		worktree := NewMockWorktree(t)
 		worktree.EXPECT().Add("translations").Return(plumbing.NewHash(""), nil)
@@ -252,7 +253,7 @@ func TestTranslationsUpdaterErrors(t *testing.T) {
 
 func TestUpdateHooksHandlerError(t *testing.T) {
 	drushService := NewMockDrush(t)
-	drushService.EXPECT().GetUpdateHooks(mock.Anything, "/tmp", "site1").Return(nil, assert.AnError)
+	drushService.EXPECT().GetUpdateHooks(anyCtx, "/tmp", "site1").Return(nil, assert.AnError)
 
 	uh := NewUpdateHooks(zap.NewNop(), drushService)
 	err := uh.preSiteUpdateHandler(services.NewPreSiteUpdateEvent(t.Context(), "/tmp", nil, "site1"))
@@ -265,8 +266,8 @@ func TestUnsupportedModulesDeduplicatesAcrossSites(t *testing.T) {
 	module := drush.UnsupportedModule{Name: "old_module", InstalledVersion: "1.0", RecommendedVersion: "None"}
 
 	drushService := NewMockDrush(t)
-	drushService.EXPECT().GetUnsupportedModules(mock.Anything, "/tmp", "site1").Return([]drush.UnsupportedModule{module}, nil)
-	drushService.EXPECT().GetUnsupportedModules(mock.Anything, "/tmp", "site2").Return([]drush.UnsupportedModule{module}, nil)
+	drushService.EXPECT().GetUnsupportedModules(anyCtx, "/tmp", "site1").Return([]drush.UnsupportedModule{module}, nil)
+	drushService.EXPECT().GetUnsupportedModules(anyCtx, "/tmp", "site2").Return([]drush.UnsupportedModule{module}, nil)
 
 	um := NewUnsupportedModules(zap.NewNop(), drushService)
 	require.NoError(t, um.preSiteUpdateHandler(services.NewPreSiteUpdateEvent(t.Context(), "/tmp", nil, "site1")))
@@ -288,3 +289,12 @@ func countOccurrences(haystack string, needle string) int {
 	}
 	return count
 }
+
+// anyCtx matches any non-nil context.Context in a mock expectation.
+//
+// Addons receive the context on the event payload and hand it to every service call. Matching
+// it with mock.Anything let a call site drop it entirely without a test noticing, which would
+// silently disable cancellation and the run timeout for everything below that point. The exact
+// value cannot always be pinned -- the workflow derives per-site contexts -- but requiring
+// non-nil catches the failure that matters.
+var anyCtx = mock.MatchedBy(func(ctx context.Context) bool { return ctx != nil })

@@ -2,9 +2,11 @@ package codehosting
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -46,13 +48,40 @@ func TestNewGitlab_MissingHost(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestNewGitlab_WiresUpTheClient(t *testing.T) {
+	logger := zap.NewNop()
+
+	g, err := newGitlab("gitlab.example.com", "group/project", "dummy-token", logger)
+	require.NoError(t, err)
+
+	// Every field the constructor sets matters at runtime and none of them are visible in the
+	// happy-path API tests, which build a Gitlab literal directly.
+	assert.NotNil(t, g.client)
+	assert.Equal(t, "gitlab.example.com", g.client.BaseURL().Host)
+	assert.Equal(t, "group/project", g.projectPath)
+	assert.Same(t, logger, g.logger)
+	// EnableAutoMerge polls on this interval; a zero value would spin without pausing.
+	assert.Equal(t, 5*time.Second, g.retryInterval)
+}
+
 func TestCreateMergeRequest(t *testing.T) {
+
+	var sent struct {
+		SourceBranch string `json:"source_branch"`
+		TargetBranch string `json:"target_branch"`
+		Title        string `json:"title"`
+		Description  string `json:"description"`
+	}
 
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
 		jsonString := make([]byte, 0)
 		if r.URL.Path == "/api/v4/projects/test_project/merge_requests" {
+			// Capture what was actually sent. Asserting only on the response would let any of
+			// the request fields be dropped unnoticed -- a merge request with no title or no
+			// source branch is the tool failing at its one job.
+			assert.NoError(t, json.NewDecoder(r.Body).Decode(&sent))
 			jsonString = []byte(`{"iid": 1, "web_url": "http://example.com"}`)
 			w.WriteHeader(http.StatusOK)
 		} else {
@@ -75,6 +104,11 @@ func TestCreateMergeRequest(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), mr.ID)
 	assert.Equal(t, "http://example.com", mr.URL)
+
+	assert.Equal(t, "source-branch", sent.SourceBranch)
+	assert.Equal(t, "target-branch", sent.TargetBranch)
+	assert.Equal(t, "Test MR", sent.Title)
+	assert.Equal(t, "This is a test MR", sent.Description)
 }
 
 func TestGitlab_CreateMergeRequest_HonorsContext(t *testing.T) {

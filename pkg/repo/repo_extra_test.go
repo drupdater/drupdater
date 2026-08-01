@@ -7,12 +7,16 @@ import (
 
 	git "github.com/go-git/go-git/v5"
 	gitConfig "github.com/go-git/go-git/v5/config"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/go-git/go-git/v5/plumbing/transport"
 
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 func TestPathWithin(t *testing.T) {
@@ -110,6 +114,37 @@ func TestGetRemoteURLErrorsOnNonRepository(t *testing.T) {
 
 	_, err := service.GetRemoteURL(t.TempDir())
 	require.Error(t, err)
+	// The cause must survive the wrapper, so callers can tell "not a repository" apart from
+	// "no origin" rather than matching on message text.
+	require.ErrorIs(t, err, git.ErrRepositoryNotExists)
+}
+
+func TestGetRemoteURLErrorsWhenOriginMissing(t *testing.T) {
+	service := NewGitRepositoryService(zap.NewNop())
+
+	dir := t.TempDir()
+	_, err := git.PlainInit(dir, false)
+	require.NoError(t, err)
+
+	_, err = service.GetRemoteURL(dir)
+	require.Error(t, err)
+	require.ErrorIs(t, err, git.ErrRemoteNotFound)
+}
+
+func TestOpenRepositoryErrorsOnNonRepository(t *testing.T) {
+	service := NewGitRepositoryService(zap.NewNop())
+
+	_, _, _, err := service.OpenRepository(t.TempDir(), "Bot", "bot@example.com")
+	require.Error(t, err)
+	require.ErrorIs(t, err, git.ErrRepositoryNotExists)
+}
+
+func TestIsShallowCloneErrorsOnNonRepository(t *testing.T) {
+	service := NewGitRepositoryService(zap.NewNop())
+
+	_, err := service.IsShallowClone(t.TempDir())
+	require.Error(t, err)
+	require.ErrorIs(t, err, git.ErrRepositoryNotExists)
 }
 
 func TestCloneRepository(t *testing.T) {
@@ -141,10 +176,65 @@ func TestCloneRepository(t *testing.T) {
 		t.Cleanup(func() { _ = os.RemoveAll(path) })
 	})
 
+	t.Run("clones shallow and without tags", func(t *testing.T) {
+		// Both are deliberate CloneOptions with no other visible effect, so without this they
+		// could be dropped silently. Depth keeps the clone cheap; NoTags keeps a project's
+		// release tags out of a throwaway update clone.
+		source, r := initRepoWithCommit(t)
+
+		// Three commits in total, so the clone is distinguishable from both a full clone and a
+		// depth-2 one -- go-git still marks a depth-2 clone of a two-commit source as shallow.
+		wt, err := r.Worktree()
+		require.NoError(t, err)
+		var tip plumbing.Hash
+		for _, msg := range []string{"second", "third"} {
+			tip, err = wt.Commit(msg, &git.CommitOptions{
+				AllowEmptyCommits: true,
+				Author:            &object.Signature{Name: "t", Email: "t@example.com"},
+			})
+			require.NoError(t, err)
+		}
+		_, err = r.CreateTag("v1.0.0", tip, nil)
+		require.NoError(t, err)
+
+		head, err := r.Head()
+		require.NoError(t, err)
+
+		_, _, path, err := service.CloneRepository(source, head.Name().Short(), "", "Bot", "bot@example.com")
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = os.RemoveAll(path) })
+
+		shallow, err := service.IsShallowClone(path)
+		require.NoError(t, err)
+		assert.True(t, shallow, "Depth: 1 should truncate the history")
+
+		cloneShallow, err := git.PlainOpen(path)
+		require.NoError(t, err)
+		shallowCommits, err := cloneShallow.Storer.Shallow()
+		require.NoError(t, err)
+		clonedHead, err := cloneShallow.Head()
+		require.NoError(t, err)
+		// The graft point is the tip itself. Any greater depth grafts further back, so
+		// comparing against HEAD -- rather than counting graft points, of which there is one
+		// either way -- is what pins the depth to exactly 1.
+		require.Len(t, shallowCommits, 1)
+		assert.Equal(t, clonedHead.Hash(), shallowCommits[0])
+
+		cloned, err := git.PlainOpen(path)
+		require.NoError(t, err)
+
+		tags, err := cloned.Tags()
+		require.NoError(t, err)
+		tagCount := 0
+		require.NoError(t, tags.ForEach(func(*plumbing.Reference) error { tagCount++; return nil }))
+		assert.Zero(t, tagCount, "Tags: NoTags should keep the source's tags out of the clone")
+	})
+
 	t.Run("returns the clone error for an unreachable repository", func(t *testing.T) {
 		_, _, _, err := service.CloneRepository(t.TempDir(), "main", "", "Bot", "bot@example.com")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "git clone")
+		require.ErrorIs(t, err, transport.ErrRepositoryNotFound)
 	})
 
 	t.Run("returns the clone error for a branch that does not exist", func(t *testing.T) {
@@ -245,6 +335,90 @@ func isolateGitConfig(t *testing.T) string {
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
 	return home
+}
+
+func TestIsSomethingStagedInPathOnStatusError(t *testing.T) {
+	core, logs := observer.New(zapcore.ErrorLevel)
+	service := NewGitRepositoryService(zap.New(core))
+
+	worktree := NewMockWorktree(t)
+	// The status is deliberately non-empty. With an empty one the guarded and unguarded
+	// versions both return false, so the test could not tell them apart; here, dropping the
+	// guard would let the loop below report a staged file from a status that failed to load.
+	worktree.EXPECT().Status().Return(git.Status{
+		"file1.txt": &git.FileStatus{Staging: git.Modified},
+	}, assert.AnError)
+
+	assert.False(t, service.IsSomethingStagedInPath(worktree, ""))
+	assert.Equal(t, 1, logs.FilterMessage("failed to get worktree status").Len(),
+		"a failed status must surface in the log rather than pass as 'nothing staged'")
+}
+
+func TestPrepareCheckoutKeepsExistingGlobalIdentity(t *testing.T) {
+	service := NewGitRepositoryService(zap.NewNop())
+
+	// The fallback must only fire when *nothing* supplies an identity. A developer running
+	// drupdater against their own checkout has a global git identity, and overwriting it in
+	// the repository config would attribute their later commits to drupdater.
+	home := isolateGitConfig(t)
+	require.NoError(t, os.WriteFile(filepath.Join(home, ".gitconfig"),
+		[]byte("[user]\n\tname = Real Person\n\temail = real@example.com\n"), 0o600))
+
+	dir := t.TempDir()
+	_, err := git.PlainInit(dir, false)
+	require.NoError(t, err)
+
+	_, _, _, err = service.OpenRepository(dir, "", "")
+	require.NoError(t, err)
+
+	r, err := git.PlainOpen(dir)
+	require.NoError(t, err)
+	cfg, err := r.Config()
+	require.NoError(t, err)
+	assert.NotEqual(t, defaultCommitName, cfg.User.Name)
+	assert.NotEqual(t, defaultCommitEmail, cfg.User.Email)
+}
+
+func TestPrepareCheckoutKeepsExplicitIdentity(t *testing.T) {
+	service := NewGitRepositoryService(zap.NewNop())
+
+	// An identity passed in by the caller (resolved from the VCS platform) must win even when
+	// no git config anywhere supplies one -- otherwise every commit would be attributed to the
+	// generic fallback instead of the bot account the run authenticated as.
+	isolateGitConfig(t)
+
+	dir := t.TempDir()
+	_, err := git.PlainInit(dir, false)
+	require.NoError(t, err)
+
+	_, _, _, err = service.OpenRepository(dir, "Bot", "bot@example.com")
+	require.NoError(t, err)
+
+	r, err := git.PlainOpen(dir)
+	require.NoError(t, err)
+	cfg, err := r.Config()
+	require.NoError(t, err)
+	assert.Equal(t, "Bot", cfg.User.Name)
+	assert.Equal(t, "bot@example.com", cfg.User.Email)
+}
+
+func TestPrepareCheckoutReportsHookRemovalFailure(t *testing.T) {
+	isolateGitConfig(t)
+
+	dir := t.TempDir()
+	_, err := git.PlainInit(dir, false)
+	require.NoError(t, err)
+	hooks := filepath.Join(dir, ".git", "hooks")
+	require.NoError(t, os.MkdirAll(hooks, 0o750))
+	require.NoError(t, os.WriteFile(filepath.Join(hooks, "prepare-commit-msg"), []byte("#!/bin/sh\n"), 0o600))
+
+	// Stat succeeds but Remove cannot: a hook that is found and then left in place would let
+	// `drush config:export --commit` run it, which is exactly what the removal prevents.
+	roService := &GitRepositoryService{logger: zap.NewNop(), fs: afero.NewReadOnlyFs(afero.NewOsFs())}
+
+	_, _, _, err = roService.OpenRepository(dir, "Bot", "bot@example.com")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to remove prepare-commit-msg hook")
 }
 
 func TestPrepareCheckoutCommitIdentityFallback(t *testing.T) {

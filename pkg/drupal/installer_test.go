@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/spf13/afero"
-	"github.com/stretchr/testify/mock"
 	"gopkg.in/yaml.v3"
 
 	"go.uber.org/zap"
@@ -45,11 +44,11 @@ profile: thunder
 	t.Run("Success", func(t *testing.T) {
 		// Setup mocks
 		drush := NewMockDrush(t)
-		drush.EXPECT().InstallSite(mock.Anything, "/tmp", "site1").Return(nil)
-		drush.EXPECT().GetConfigSyncDir(mock.Anything, "/tmp", "site1", false).Return(configSyncDir, nil)
+		drush.EXPECT().InstallSite(t.Context(), "/tmp", "site1").Return(nil)
+		drush.EXPECT().GetConfigSyncDir(t.Context(), "/tmp", "site1", false).Return(configSyncDir, nil)
 
 		composer := NewMockComposer(t)
-		composer.EXPECT().GetConfig(mock.Anything, "/tmp", "extra.drupal-scaffold.locations.web-root").Return("web", nil)
+		composer.EXPECT().GetConfig(t.Context(), "/tmp", "extra.drupal-scaffold.locations.web-root").Return("web", nil)
 
 		installer := &Installer{
 			logger:   logger,
@@ -91,11 +90,11 @@ $settings['hash_salt'] = 'changeme';
 	t.Run("Failure", func(t *testing.T) {
 		// Setup mocks
 		drush := NewMockDrush(t)
-		drush.EXPECT().InstallSite(mock.Anything, "/tmp", "site1").Return(errors.New("failed to install site"))
-		drush.EXPECT().GetConfigSyncDir(mock.Anything, "/tmp", "site1", false).Return(configSyncDir, nil)
+		drush.EXPECT().InstallSite(t.Context(), "/tmp", "site1").Return(errors.New("failed to install site"))
+		drush.EXPECT().GetConfigSyncDir(t.Context(), "/tmp", "site1", false).Return(configSyncDir, nil)
 
 		composer := NewMockComposer(t)
-		composer.EXPECT().GetConfig(mock.Anything, "/tmp", "extra.drupal-scaffold.locations.web-root").Return("web", nil)
+		composer.EXPECT().GetConfig(t.Context(), "/tmp", "extra.drupal-scaffold.locations.web-root").Return("web", nil)
 
 		installer := &Installer{
 			logger:   logger,
@@ -148,7 +147,7 @@ profile: thunder
 		t.Fatalf("Failed to close temp file: %v", err)
 	}
 
-	drush.EXPECT().GetConfigSyncDir(mock.Anything, "/tmp", "default", false).Return("/tmp", nil)
+	drush.EXPECT().GetConfigSyncDir(t.Context(), "/tmp", "default", false).Return("/tmp", nil)
 
 	installer := &Installer{
 		logger: logger,
@@ -222,7 +221,7 @@ profile: standard
 		t.Fatalf("Failed to close temp file: %v", err)
 	}
 
-	drush.EXPECT().GetConfigSyncDir(mock.Anything, "/tmp", "default", false).Return("/tmp", nil)
+	drush.EXPECT().GetConfigSyncDir(t.Context(), "/tmp", "default", false).Return("/tmp", nil)
 
 	installer := &Installer{
 		logger: logger,

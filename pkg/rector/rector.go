@@ -62,6 +62,12 @@ func (s *CLI) Run(ctx context.Context, dir string, customCodeDirectories []strin
 	if len(customCodeDirectories) == 0 {
 		s.logger.Debug("no custom code directories found")
 		return ReturnOutput{
+			// Known equivalent mutant: dropping this field yields ReturnOutputTotals{}, which is
+			// exactly what the explicit zeros produce, so no test can tell the two apart. It is
+			// left un-suppressed on purpose -- the annotation keys off the enclosing literal's
+			// position, so silencing it would also silence the FileDiffs and ChangedFiles
+			// mutants below, and those are real and killed. The zeros are spelled out because
+			// this is the documented "nothing to do" result.
 			Totals: ReturnOutputTotals{
 				ChangedFiles: 0,
 				Errors:       0,

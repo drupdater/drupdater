@@ -76,102 +76,136 @@ names you can set there. See the README for the full file format.`,
 		cmd.SilenceUsage = true
 		cmd.SilenceErrors = true
 
-		// Values subprocesses (Composer, Drush, git) can echo back in their own output — most
-		// often a credential embedded in a URL after a failed authenticated fetch. Registered
-		// as soon as each becomes known so nothing is logged unredacted in between; never
-		// logged itself, including at debug level with --verbose.
-		redactor := logging.NewRedactor()
-		registerEnvSecrets(redactor)
-
-		// Initialize the logger first so config errors are reported (errors are silenced by Cobra).
-		logger, err := NewLogger(config, redactor)
-		if err != nil {
-			// No logger yet, so this one report has to go straight to stderr.
-			fmt.Fprintln(cmd.ErrOrStderr(), "failed to initialize logger:", err)
-			return err
-		}
-
-		config.Token, err = resolveToken(args, config)
-		if err != nil {
-			logger.Error("missing token", zap.Error(err))
-			return err
-		}
-		redactor.Register(config.Token)
-
-		// Load per-project config from .drupdater.yaml (sites, timeout, addons). A missing file
-		// falls back to built-in defaults.
-		if err := loadProjectConfig(logger, configFilePath(configFile, config.WorkingDir), &config); err != nil {
-			return err
-		}
-
-		cache, err := NewCache()
-		if err != nil {
-			logger.Error("failed to create cache", zap.Error(err))
-			return err
-		}
-
-		// Create core service instances
-		drush := drush.NewCLI(logger, cache)
-		composer := composer.NewCLI(logger)
-		// Patch-apply checks build a scratch composer project in a temp directory; drop it
-		// when the run ends rather than leaving a vendor tree behind on every invocation.
-		defer composer.Cleanup()
-		drupalOrg := drupalorg.NewHTTPClient(logger)
-		installer := drupal.NewInstaller(logger, drush, composer)
-		git := repo.NewGitRepositoryService(logger)
-
-		// In checkout mode the repository URL and target branch come from the checkout, so
-		// they don't have to be passed in. --branch only applies to --clone.
-		if !config.Clone {
-			if err := resolveCheckoutSettings(git, &config); err != nil {
-				return err
-			}
-			logger.Info("using checkout", zap.String("url", config.RepositoryURL), zap.String("branch", config.Branch))
-
-			// CI mounts the checkout owned by a different user than the container runs as, so
-			// the git binary (invoked by drush/composer) refuses it as "dubious ownership".
-			// Mark it safe so those child processes can run git against it.
-			ensureGitSafeDirectory(cmd.Context(), logger, config.WorkingDir)
-		}
-
-		// Only construct the VCS platform when a run will actually use it: cloning (may be
-		// authenticated) or publishing (pushing + creating the MR, i.e. anything without
-		// --dry-run). A checkout-mode --dry-run run does neither, so it needs no VCS client and
-		// no token — see tokenRequired.
-		var platform codehosting.Platform
-		if tokenRequired(config) {
-			vcsProviderFactory := codehosting.NewDefaultVcsProviderFactory()
-			platform, err = vcsProviderFactory.Create(config.RepositoryURL, config.Token, logger)
-			if err != nil {
-				logger.Error("failed to create VCS provider", zap.Error(err))
-				return err
-			}
-		}
-
-		// Create the event dispatcher and register addons as subscribers
-		addons, err := createAddons(logger, config, drush, composer, drupalOrg, git)
-		if err != nil {
-			return err
-		}
-		dispatcher := createDispatcher(addons)
-
-		var opts []services.Option
-		if config.ReportPath != "" {
-			opts = append(opts, services.WithReportSink(reportSink(logger, redactor, config.ReportPath)))
-		}
-		workflow := services.NewWorkflowBaseService(logger, config, drush, platform, git, installer, composer, dispatcher, opts...)
-
-		// Start the update workflow
-		err = workflow.StartUpdate(cmd.Context(), addons)
-		if err != nil {
-			if err := handleWorkflowError(logger, err); err != nil {
-				return err
-			}
-		} else {
-			logger.Info("update finished")
-		}
-		return nil
+		return runUpdate(cmd, args)
 	},
+}
+
+// runUpdate is the body of the root command's RunE.
+//
+// It lives here as a named function rather than inline in the cobra literal so it can be called
+// directly from a test: a closure assigned to RunE is invisible to `go tool cover -func` and
+// cannot be exercised without going through cobra's whole Execute path.
+func runUpdate(cmd *cobra.Command, args []string) error {
+
+	// Values subprocesses (Composer, Drush, git) can echo back in their own output — most
+	// often a credential embedded in a URL after a failed authenticated fetch. Registered
+	// as soon as each becomes known so nothing is logged unredacted in between; never
+	// logged itself, including at debug level with --verbose.
+	redactor := logging.NewRedactor()
+	registerEnvSecrets(redactor)
+
+	// Initialize the logger first so config errors are reported (errors are silenced by Cobra).
+	logger, err := NewLogger(config, redactor)
+	if err != nil {
+		// No logger yet, so this one report has to go straight to stderr.
+		fmt.Fprintln(cmd.ErrOrStderr(), "failed to initialize logger:", err)
+		return err
+	}
+
+	config.Token, err = resolveToken(args, config)
+	if err != nil {
+		logger.Error("missing token", zap.Error(err))
+		return err
+	}
+	redactor.Register(config.Token)
+
+	// Load per-project config from .drupdater.yaml (sites, timeout, addons). A missing file
+	// falls back to built-in defaults.
+	if err := loadProjectConfig(logger, configFilePath(configFile, config.WorkingDir), &config); err != nil {
+		return err
+	}
+
+	cache, err := NewCache()
+	if err != nil {
+		logger.Error("failed to create cache", zap.Error(err))
+		return err
+	}
+
+	// Create core service instances
+	drush := drush.NewCLI(logger, cache)
+	composer := composer.NewCLI(logger)
+	// Patch-apply checks build a scratch composer project in a temp directory; drop it
+	// when the run ends rather than leaving a vendor tree behind on every invocation.
+	defer composer.Cleanup()
+	drupalOrg := drupalorg.NewHTTPClient(logger)
+	installer := drupal.NewInstaller(logger, drush, composer)
+	git := repo.NewGitRepositoryService(logger)
+
+	// In checkout mode the repository URL and target branch come from the checkout, so
+	// they don't have to be passed in. --branch only applies to --clone.
+	if !config.Clone {
+		if err := resolveCheckoutSettings(git, &config); err != nil {
+			return err
+		}
+		logger.Info("using checkout", zap.String("url", config.RepositoryURL), zap.String("branch", config.Branch))
+
+		// CI mounts the checkout owned by a different user than the container runs as, so
+		// the git binary (invoked by drush/composer) refuses it as "dubious ownership".
+		// Mark it safe so those child processes can run git against it.
+		ensureGitSafeDirectory(cmd.Context(), logger, config.WorkingDir)
+	}
+
+	// Only construct the VCS platform when a run will actually use it: cloning (may be
+	// authenticated) or publishing (pushing + creating the MR, i.e. anything without
+	// --dry-run). A checkout-mode --dry-run run does neither, so it needs no VCS client and
+	// no token — see tokenRequired.
+	var platform codehosting.Platform
+	if tokenRequired(config) {
+		vcsProviderFactory := codehosting.NewDefaultVcsProviderFactory()
+		platform, err = vcsProviderFactory.Create(config.RepositoryURL, config.Token, logger)
+		if err != nil {
+			logger.Error("failed to create VCS provider", zap.Error(err))
+			return err
+		}
+	}
+
+	// Create the event dispatcher and register addons as subscribers
+	addons, err := createAddons(logger, config, drush, composer, drupalOrg, git)
+	if err != nil {
+		return err
+	}
+	dispatcher := createDispatcher(addons)
+
+	var opts []services.Option
+	if config.ReportPath != "" {
+		opts = append(opts, services.WithReportSink(reportSink(logger, redactor, config.ReportPath)))
+	}
+	workflow := newWorkflowService(logger, config, drush, platform, git, installer, composer, dispatcher, opts...)
+
+	// Start the update workflow
+	err = workflow.StartUpdate(cmd.Context(), addons)
+	if err != nil {
+		if err := handleWorkflowError(logger, err); err != nil {
+			return err
+		}
+	} else {
+		logger.Info("update finished")
+	}
+	return nil
+}
+
+// updateWorkflow is what runUpdate needs from the workflow: starting it. Kept narrow (rather
+// than the concrete *services.WorkflowBaseService) so a test can drive runUpdate to the end
+// without a real repository, composer and drush.
+type updateWorkflow interface {
+	StartUpdate(ctx context.Context, addons []internal.Addon) error
+}
+
+// newWorkflowService builds the update workflow. It is a variable purely as a test seam: every
+// step above it in runUpdate -- service construction, VCS provider selection, the addon
+// registry and the dispatcher -- runs for real, and only the run itself is replaced.
+var newWorkflowService = func(
+	logger *zap.Logger,
+	cfg internal.Config,
+	drushSvc services.Drush,
+	platform codehosting.Platform,
+	gitSvc services.Repository,
+	installerSvc services.Installer,
+	composerSvc services.Composer,
+	dispatcher services.EventDispatcher,
+	opts ...services.Option,
+) updateWorkflow {
+	return services.NewWorkflowBaseService(logger, cfg, drushSvc, platform, gitSvc, installerSvc, composerSvc, dispatcher, opts...)
 }
 
 // reportSink returns the callback that writes the run report to path.
@@ -526,13 +560,17 @@ func init() {
 	rootCmd.AddCommand(addonsCmd)
 }
 
+// osExit is os.Exit, as a variable so a test can observe the exit code instead of ending the
+// test binary. Nothing else may replace it.
+var osExit = os.Exit
+
 func Execute() {
 	// Cancel the workflow context on SIGINT/SIGTERM so cleanup runs on termination.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	if err := rootCmd.ExecuteContext(ctx); err != nil {
-		os.Exit(1)
+		osExit(1)
 	}
 }
 

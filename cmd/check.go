@@ -182,6 +182,13 @@ func checkConfigAndAddons(path string, cfg *internal.Config) []services.CheckRes
 	return append(results, services.CheckResult{Name: "addon names resolve", OK: true})
 }
 
+// newVcsProvider resolves a repository URL and token to a VCS platform. It is a variable so the
+// token check can be tested without reaching GitHub or GitLab: the real factory builds a live
+// API client, and calling GetUser on it would make a network request.
+var newVcsProvider = func(repositoryURL string, token string, logger *zap.Logger) (codehosting.Platform, error) {
+	return codehosting.NewDefaultVcsProviderFactory().Create(repositoryURL, token, logger)
+}
+
 // checkVCS reports whether the repository URL routes to a known VCS provider (GitHub or
 // GitLab) and, when a token is given, whether it authenticates. resolveErr is the error (if
 // any) from deriving the repository URL out of the checkout, surfaced here since that's the
@@ -206,7 +213,7 @@ func checkVCS(ctx context.Context, logger *zap.Logger, repositoryURL string, tok
 	}
 
 	const tokenCheckName = "token authenticates"
-	platform, err := codehosting.NewDefaultVcsProviderFactory().Create(repositoryURL, token, logger)
+	platform, err := newVcsProvider(repositoryURL, token, logger)
 	if err != nil {
 		return append(results, services.CheckResult{Name: tokenCheckName, OK: false, Detail: err.Error()})
 	}
@@ -215,6 +222,52 @@ func checkVCS(ctx context.Context, logger *zap.Logger, repositoryURL string, tok
 		return append(results, services.CheckResult{Name: tokenCheckName, OK: false, Detail: "did not authenticate, or lacks API access"})
 	}
 	return append(results, services.CheckResult{Name: tokenCheckName, OK: true})
+}
+
+// fullCheckComposer is what the --full tier needs from composer: the install it performs, the
+// scratch-directory cleanup it owes, and the config lookup drupal.Installer makes.
+type fullCheckComposer interface {
+	drupal.Composer
+	Install(ctx context.Context, path string) error
+	Cleanup()
+}
+
+// siteInstaller is the one method the tier needs from drupal.Installer.
+type siteInstaller interface {
+	Install(ctx context.Context, dir string, site string) error
+}
+
+// fullCheckDeps are the external tools the --full tier drives. They are constructors rather
+// than ready-made values so the tier keeps its original ordering: composer is only built once
+// the clone succeeded, and the installer only once composer install succeeded.
+//
+// Grouping them here is what makes the tier's control flow testable -- which failure aborts,
+// which are collected per site, what gets cleaned up -- without performing a real clone, a
+// real composer install and a real site install, which together are most of a run's cost.
+type fullCheckDeps struct {
+	clone        func(repositoryURL string, branch string, token string) (string, error)
+	newComposer  func() fullCheckComposer
+	newInstaller func(fullCheckComposer) (siteInstaller, error)
+}
+
+// newFullCheckDeps builds the real services. It is a variable so tests can substitute doubles,
+// the same way execCommand is swapped in the pkg/* wrappers.
+var newFullCheckDeps = func(logger *zap.Logger) fullCheckDeps {
+	return fullCheckDeps{
+		clone: func(repositoryURL string, branch string, token string) (string, error) {
+			_, _, path, err := repo.NewGitRepositoryService(logger).
+				CloneRepository(repositoryURL, branch, token, "", "")
+			return path, err
+		},
+		newComposer: func() fullCheckComposer { return composer.NewCLI(logger) },
+		newInstaller: func(c fullCheckComposer) (siteInstaller, error) {
+			cache, err := NewCache()
+			if err != nil {
+				return nil, err
+			}
+			return drupal.NewInstaller(logger, drush.NewCLI(logger, cache), c), nil
+		},
+	}
 }
 
 // runFullChecks is the --full tier: it clones the repository to a scratch directory (never the
@@ -234,14 +287,15 @@ func runFullChecks(ctx context.Context, logger *zap.Logger, cfg internal.Config,
 		branch = "main"
 	}
 
-	gitSvc := repo.NewGitRepositoryService(logger)
-	_, _, path, err := gitSvc.CloneRepository(cfg.RepositoryURL, branch, token, "", "")
+	deps := newFullCheckDeps(logger)
+
+	path, err := deps.clone(cfg.RepositoryURL, branch, token)
 	if err != nil {
 		return []services.CheckResult{{Name: "clone for full check", OK: false, Detail: err.Error()}}
 	}
 	defer cleanupFullCheckArtifacts(path, cfg.Sites)
 
-	composerCLI := composer.NewCLI(logger)
+	composerCLI := deps.newComposer()
 	defer composerCLI.Cleanup()
 
 	if err := composerCLI.Install(ctx, path); err != nil {
@@ -249,11 +303,10 @@ func runFullChecks(ctx context.Context, logger *zap.Logger, cfg internal.Config,
 	}
 	results := []services.CheckResult{{Name: "composer install", OK: true}}
 
-	cache, err := NewCache()
+	installer, err := deps.newInstaller(composerCLI)
 	if err != nil {
 		return append(results, services.CheckResult{Name: "drush site-install --existing-config", OK: false, Detail: err.Error()})
 	}
-	installer := drupal.NewInstaller(logger, drush.NewCLI(logger, cache), composerCLI)
 
 	for _, site := range cfg.Sites {
 		name := fmt.Sprintf("site %q installs from configuration", site)

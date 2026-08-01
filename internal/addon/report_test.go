@@ -44,6 +44,38 @@ func TestComposerAuditReportDataNilWhenNothingToReport(t *testing.T) {
 	assert.Nil(t, ca.ReportData(), "an addon with nothing to say must not add an empty section")
 }
 
+func TestComposerAuditReportDataOnEitherHalfAlone(t *testing.T) {
+	advisory := composer.Advisory{CVE: "CVE-3", PackageName: "drupal/baz"}
+
+	t.Run("only fixed advisories", func(t *testing.T) {
+		// The update closed the advisory: worth reporting on its own, since it is the evidence
+		// the update was security-relevant.
+		ca := &ComposerAudit{
+			beforeAudit: composer.Audit{Advisories: []composer.Advisory{advisory}},
+			afterAudit:  composer.Audit{},
+		}
+		data, ok := ca.ReportData().(SecurityAdvisories)
+		require.True(t, ok, "a fixed advisory alone must still produce a section")
+		require.Len(t, data.Fixed, 1)
+		assert.Equal(t, "CVE-3", data.Fixed[0].CVE)
+		assert.Empty(t, data.Remaining)
+	})
+
+	t.Run("only remaining advisories", func(t *testing.T) {
+		// Nothing was fixed but something is still open: reporting this is the whole point of
+		// the audit, and suppressing it would hide a live vulnerability from the reviewer.
+		ca := &ComposerAudit{
+			beforeAudit: composer.Audit{Advisories: []composer.Advisory{advisory}},
+			afterAudit:  composer.Audit{Advisories: []composer.Advisory{advisory}},
+		}
+		data, ok := ca.ReportData().(SecurityAdvisories)
+		require.True(t, ok, "a remaining advisory alone must still produce a section")
+		assert.Empty(t, data.Fixed)
+		require.Len(t, data.Remaining, 1)
+		assert.Equal(t, "CVE-3", data.Remaining[0].CVE)
+	})
+}
+
 func TestUpdateHooksReportData(t *testing.T) {
 	uh := &UpdateHooks{
 		hooks: UpdateHooksPerSite{

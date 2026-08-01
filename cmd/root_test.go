@@ -3,6 +3,8 @@ package cmd
 import (
 	"bytes"
 	"errors"
+	"runtime"
+	"strconv"
 	"testing"
 
 	"github.com/drupdater/drupdater/internal"
@@ -50,6 +52,42 @@ func TestNewLogger(t *testing.T) {
 		assert.False(t, logger.Core().Enabled(zapcore.DebugLevel))
 		assert.True(t, logger.Core().Enabled(zapcore.InfoLevel))
 	})
+}
+
+func TestPersistentFlagDefaults(t *testing.T) {
+	// The defaults are the behaviour of an invocation that passes no flags, and several of them
+	// are safety-critical: --security defaulting to true would silently change every run into a
+	// security-only one, and --clone defaulting to true would make drupdater clone instead of
+	// updating the checkout it was pointed at.
+	tests := []struct {
+		flag string
+		want string
+	}{
+		{flag: "branch", want: "main"},
+		{flag: "working-dir", want: "."},
+		{flag: "clone", want: "false"},
+		{flag: "repository-url", want: ""},
+		{flag: "security", want: "false"},
+		{flag: "dry-run", want: "false"},
+		{flag: "verbose", want: "false"},
+		{flag: "config", want: ""},
+		{flag: "report", want: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.flag, func(t *testing.T) {
+			f := rootCmd.PersistentFlags().Lookup(tt.flag)
+			require.NotNil(t, f, "flag %q is not registered", tt.flag)
+			assert.Equal(t, tt.want, f.DefValue)
+			assert.NotEmpty(t, f.Usage, "every flag needs help text")
+		})
+	}
+
+	// Not a literal: it reflects the container's CPU quota, so pin the source rather than a
+	// number that differs per machine.
+	concurrency := rootCmd.PersistentFlags().Lookup("concurrency")
+	require.NotNil(t, concurrency)
+	assert.Equal(t, strconv.Itoa(runtime.GOMAXPROCS(0)), concurrency.DefValue)
 }
 
 func TestNewCache(t *testing.T) {
@@ -251,5 +289,31 @@ func TestResolveCheckoutBranch(t *testing.T) {
 		t.Setenv("CI_COMMIT_REF_NAME", "")
 		_, err := resolveCheckoutBranch(svc, initRepo(t, true))
 		require.Error(t, err)
+	})
+
+	t.Run("falls back to the GitLab CI variable", func(t *testing.T) {
+		// Both CI variables are consulted. With only the GitHub one covered, dropping the GitLab
+		// operand would go unnoticed and every detached GitLab CI run would fail to find its
+		// branch.
+		t.Setenv("GITHUB_REF_NAME", "")
+		t.Setenv("CI_COMMIT_REF_NAME", "release-2")
+		branch, err := resolveCheckoutBranch(svc, initRepo(t, true))
+		require.NoError(t, err)
+		assert.Equal(t, "release-2", branch)
+	})
+
+	t.Run("prefers the GitHub variable when both are set", func(t *testing.T) {
+		t.Setenv("GITHUB_REF_NAME", "from-github")
+		t.Setenv("CI_COMMIT_REF_NAME", "from-gitlab")
+		branch, err := resolveCheckoutBranch(svc, initRepo(t, true))
+		require.NoError(t, err)
+		assert.Equal(t, "from-github", branch)
+	})
+
+	t.Run("errors when the path is not a checkout", func(t *testing.T) {
+		_, err := resolveCheckoutBranch(svc, t.TempDir())
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to determine branch from checkout")
+		require.ErrorIs(t, err, git.ErrRepositoryNotExists, "the cause must survive the wrapper")
 	})
 }

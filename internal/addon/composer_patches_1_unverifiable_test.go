@@ -32,8 +32,8 @@ func TestUpdatePatchesLeavesUnverifiablePatchesUnpinned(t *testing.T) {
 		path := t.TempDir()
 
 		composerService := NewMockComposer(t)
-		composerService.EXPECT().GetDependencyPatches(mock.Anything, path).Return(nil, nil).Maybe()
-		composerService.EXPECT().IsPackageInstalled(mock.Anything, path, "drupal/core").Return(true, nil)
+		composerService.EXPECT().GetDependencyPatches(anyCtx, path).Return(nil, nil).Maybe()
+		composerService.EXPECT().IsPackageInstalled(anyCtx, path, "drupal/core").Return(true, nil)
 		composerService.EXPECT().
 			CheckIfPatchApplies(mock.Anything, path, "drupal/core", "8.8.0", path+"/patches/x.patch").
 			Return(false, unverifiable)
@@ -57,8 +57,8 @@ func TestUpdatePatchesLeavesUnverifiablePatchesUnpinned(t *testing.T) {
 		path := t.TempDir()
 
 		composerService := NewMockComposer(t)
-		composerService.EXPECT().GetDependencyPatches(mock.Anything, path).Return(nil, nil).Maybe()
-		composerService.EXPECT().IsPackageInstalled(mock.Anything, path, "drupal/core").Return(true, nil)
+		composerService.EXPECT().GetDependencyPatches(anyCtx, path).Return(nil, nil).Maybe()
+		composerService.EXPECT().IsPackageInstalled(anyCtx, path, "drupal/core").Return(true, nil)
 		// The declared patch is genuinely rejected, so a replacement is fetched from the issue
 		// fork -- and checking *that* one is what cannot be carried out.
 		composerService.EXPECT().
@@ -70,7 +70,7 @@ func TestUpdatePatchesLeavesUnverifiablePatchesUnpinned(t *testing.T) {
 
 		drupalOrgService := NewMockDrupalOrg(t)
 		drupalOrgService.EXPECT().FindIssueNumber(`Issue #123456 "With problems"`).Return("123456", true)
-		drupalOrgService.EXPECT().GetIssue(mock.Anything, "123456").Return(&drupalorg.Issue{
+		drupalOrgService.EXPECT().GetIssue(anyCtx, "123456").Return(&drupalorg.Issue{
 			ID:     "123456",
 			Title:  "Alot of problems",
 			Status: "1",

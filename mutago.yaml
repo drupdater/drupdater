@@ -1,0 +1,14 @@
+# Mutation testing configuration — https://github.com/quality-gates/mutago
+#
+# Only loaded when passed explicitly with `--config mutago.yaml`; there is no
+# auto-discovery. The decoder rejects unknown keys, so a typo aborts the run.
+#
+# Thresholds deliberately live on the command line, not here: the pull request
+# gate scores only the changed lines while the weekly full run is informational,
+# so they need different values.
+
+# `_test.go` files are never mutated, which already covers the generated mockery
+# files (one `mocks_test.go` per package). This keeps any other generated source
+# out as well.
+ignore_source_lines:
+  - "// Code generated"

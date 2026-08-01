@@ -1,4 +1,4 @@
-.PHONY: build test clean mock lint fmt fix run docker-build docker-run docs-serve docs-build help
+.PHONY: build test mutate clean mock lint fmt fix run docker-build docker-run docs-serve docs-build help
 
 # Variables
 BINARY_NAME=drupdater
@@ -29,6 +29,10 @@ lint: ## Run linters
 
 deadcode: ## Find unreachable functions
 	go tool deadcode -test ./...
+
+mutate: ## Run mutation testing over the whole module
+	go tool mutago --config mutago.yaml --coverage --quiet --no-diffs \
+		--logger-summary-json ./...
 
 fmt: ## Format code
 	go fmt ./...
