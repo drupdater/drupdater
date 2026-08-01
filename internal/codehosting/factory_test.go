@@ -188,6 +188,12 @@ func TestParseGitURL(t *testing.T) {
 		{name: "empty", raw: "", wantErr: true},
 		{name: "no host", raw: "https:///user/repo", wantErr: true},
 		{name: "scp without path", raw: "git@github.com", wantErr: true},
+		// One case per clause of the SCP validation, so no single check can be dropped
+		// without a failure. "git@github.com" above only exercises the missing-colon clause.
+		{name: "scp with empty path", raw: "git@github.com:", wantErr: true},
+		{name: "scp with empty host", raw: ":owner/repo", wantErr: true},
+		// The user part is optional: a bare "@" prefix still leaves a usable host.
+		{name: "scp with empty user", raw: "@github.com:owner/repo.git", wantHost: "github.com", wantPath: "owner/repo"},
 	}
 
 	for _, tt := range tests {

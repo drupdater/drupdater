@@ -33,17 +33,56 @@ func TestGithub_GetRepo(t *testing.T) {
 }
 
 func TestNewGithub_InvalidPath(t *testing.T) {
-	_, err := newGithub("owner", "dummy-token", zap.NewNop())
-	require.Error(t, err)
+	tests := []struct {
+		name string
+		path string
+	}{
+		{name: "no separator", path: "owner"},
+		{name: "empty", path: ""},
+		{name: "only separators", path: "//"},
+		{name: "missing repo", path: "owner/"},
+		{name: "missing owner", path: "/repo"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := newGithub(tt.path, "dummy-token", zap.NewNop())
+			require.Error(t, err)
+		})
+	}
+}
+
+func TestNewGithub_WiresUpTheClient(t *testing.T) {
+	logger := zap.NewNop()
+
+	gh, err := newGithub("owner/repo", "dummy-token", logger)
+	require.NoError(t, err)
+
+	// The surrounding API tests build a Github literal directly, so nothing else asserts what
+	// the constructor actually populates.
+	assert.NotNil(t, gh.client)
+	assert.Equal(t, "owner", gh.owner)
+	assert.Equal(t, "repo", gh.repo)
+	assert.Same(t, logger, gh.logger)
 }
 
 func TestGithub_CreateMergeRequest(t *testing.T) {
+	var sent struct {
+		Head  string `json:"head"`
+		Base  string `json:"base"`
+		Title string `json:"title"`
+		Body  string `json:"body"`
+	}
+
 	// Setup mock HTTP server
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
 		var jsonString []byte
 		if r.URL.Path == "/api/v3/repos/test_owner/test_project/pulls" {
+			// Check what was sent, not just what came back: without this any of the pull
+			// request fields could go missing unnoticed.
+			assert.NoError(t, json.NewDecoder(r.Body).Decode(&sent))
 			jsonString = []byte(`{"number": 1, "html_url": "http://example.com"}`)
 			w.WriteHeader(http.StatusOK)
 		} else {
@@ -70,6 +109,11 @@ func TestGithub_CreateMergeRequest(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), mr.ID)
 	assert.Equal(t, "http://example.com", mr.URL)
+
+	assert.Equal(t, "source-branch", sent.Head)
+	assert.Equal(t, "target-branch", sent.Base)
+	assert.Equal(t, "Test MR", sent.Title)
+	assert.Equal(t, "This is a test MR", sent.Body)
 }
 
 func TestGithub_GetUser_Returns403FallbackSilently(t *testing.T) {
