@@ -884,10 +884,13 @@ func TestUpdatePatches(t *testing.T) {
 
 		report, _ := updater.updatePatches(t.Context(), "/tmp", worktree, operations, patches)
 		assert.True(t, report.Changes())
-		assert.Len(t, report.Conflicts, 1)
-		assert.Equal(t, "drupal/core", report.Conflicts[0].Package)
-		assert.Equal(t, "8.7.0", report.Conflicts[0].FixedVersion)
-		assert.Equal(t, "8.8.0", report.Conflicts[0].NewVersion)
+		require.Len(t, report.Conflicts, 1)
+		assert.Equal(t, ConflictPatch{
+			Package:          "drupal/core",
+			FixedVersion:     "8.7.0",
+			NewVersion:       "8.8.0",
+			PatchDescription: "Multiple patches do not apply together",
+		}, report.Conflicts[0], "the description is the reviewer's only clue as to why the version was held back")
 
 		composerService.AssertExpectations(t)
 		drupalOrgService.AssertExpectations(t)
