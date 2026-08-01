@@ -290,4 +290,30 @@ func TestResolveCheckoutBranch(t *testing.T) {
 		_, err := resolveCheckoutBranch(svc, initRepo(t, true))
 		require.Error(t, err)
 	})
+
+	t.Run("falls back to the GitLab CI variable", func(t *testing.T) {
+		// Both CI variables are consulted. With only the GitHub one covered, dropping the GitLab
+		// operand would go unnoticed and every detached GitLab CI run would fail to find its
+		// branch.
+		t.Setenv("GITHUB_REF_NAME", "")
+		t.Setenv("CI_COMMIT_REF_NAME", "release-2")
+		branch, err := resolveCheckoutBranch(svc, initRepo(t, true))
+		require.NoError(t, err)
+		assert.Equal(t, "release-2", branch)
+	})
+
+	t.Run("prefers the GitHub variable when both are set", func(t *testing.T) {
+		t.Setenv("GITHUB_REF_NAME", "from-github")
+		t.Setenv("CI_COMMIT_REF_NAME", "from-gitlab")
+		branch, err := resolveCheckoutBranch(svc, initRepo(t, true))
+		require.NoError(t, err)
+		assert.Equal(t, "from-github", branch)
+	})
+
+	t.Run("errors when the path is not a checkout", func(t *testing.T) {
+		_, err := resolveCheckoutBranch(svc, t.TempDir())
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to determine branch from checkout")
+		require.ErrorIs(t, err, git.ErrRepositoryNotExists, "the cause must survive the wrapper")
+	})
 }
