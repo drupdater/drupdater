@@ -8,9 +8,15 @@ name: Mutation Testing
 # changes. This run exists to track the module-wide score over time and to
 # produce a worklist of surviving mutants in existing code.
 #
-# The `mutation-report` artifact holds mutago-agentic.json: each survivor with
-# its diff, surrounding context and the test file that should have caught it.
-# Download it to pick off survivors package by package.
+# Split one leg per package rather than a single `./...` run: the whole module
+# is ~3000 mutants and over half an hour serially, where the matrix finishes in
+# the time of its slowest package. A leg that fails or times out can be re-run
+# on its own, and `fail-fast: false` keeps one bad package from discarding the
+# other thirteen results.
+#
+# The per-package `mutation-report-*` artifacts hold mutago-agentic.json: each
+# survivor with its diff, surrounding context and the test file that should have
+# caught it. Download them to pick off survivors package by package.
 
 on:
   schedule:
@@ -26,13 +32,14 @@ permissions:
   contents: read
 
 jobs:
-  mutation-full:
-    name: mutation (full module)
+  # Discover the packages to score instead of hardcoding them, so adding a
+  # package to the module adds a leg here automatically. Packages without tests
+  # are skipped -- mutago has nothing to score there.
+  plan:
+    name: plan
     runs-on: ubuntu-latest
-    # ~3000 mutants after deduplication. Measured cost is 0.2-0.5s per mutant on
-    # four cores, so a clean run is 25-35 minutes; the ceiling is deliberately
-    # loose because nothing depends on this job finishing quickly.
-    timeout-minutes: 60
+    outputs:
+      packages: ${{ steps.list.outputs.packages }}
     steps:
       - uses: actions/checkout@v7
 
@@ -40,6 +47,39 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
+
+      - name: List packages with tests
+        id: list
+        run: |
+          module=$(go list -m)
+          packages=$(go list -f '{{if .TestGoFiles}}{{.ImportPath}}{{end}}' ./... \
+            | sed "s|^$module$|.|; s|^$module/|./|" \
+            | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "packages=$packages" >> "$GITHUB_OUTPUT"
+          echo "Scoring: $packages"
+
+  mutate:
+    name: mutate ${{ matrix.package }}
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJson(needs.plan.outputs.packages) }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # Artifact names cannot contain "/", and the aggregate job needs to know
+      # which package a summary came from.
+      - name: Derive slug
+        id: slug
+        run: echo "slug=$(echo '${{ matrix.package }}' | sed 's|^\./||; s|/|_|g; s|^\.$|root|')" >> "$GITHUB_OUTPUT"
 
       - name: Mutation testing
         continue-on-error: true
@@ -51,35 +91,75 @@ jobs:
             --logger-agentic-json \
             --quiet \
             --no-diffs \
-            ./...
+            ${{ matrix.package }}
 
-      - name: Mutation Summary
+      # Tag the summary with its package so the aggregate job can label rows.
+      - name: Label summary
         if: always()
         run: |
-          echo "## Mutation Testing (full module)" >> $GITHUB_STEP_SUMMARY
-          if [ ! -f mutago-summary.json ]; then
-            echo "No summary produced -- the run did not get far enough." >> $GITHUB_STEP_SUMMARY
-            exit 0
+          if [ -s mutago-summary.json ]; then
+            jq --arg p '${{ matrix.package }}' '. + {package: $p}' mutago-summary.json \
+              > "summary-${{ steps.slug.outputs.slug }}.json"
           fi
-          jq -r '
-            "| Metric | Value |",
-            "|---|---|",
-            "| MSI | \(.msi * 100 | . * 100 | round / 100)% |",
-            "| Covered-code MSI | \(.coveredCodeMsi * 100 | . * 100 | round / 100)% |",
-            "| Killed | \(.killedCount) |",
-            "| Escaped | \(.escapedCount) |",
-            "| Not covered | \(.notCoveredCount) |",
-            "| Errored | \(.errorCount) |",
-            "| Total | \(.totalMutantsCount) |"
-          ' mutago-summary.json >> $GITHUB_STEP_SUMMARY
 
-      - name: Upload mutation report
+      - name: Upload report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mutation-report
+          name: mutation-report-${{ steps.slug.outputs.slug }}
           path: |
-            mutago-summary.json
+            summary-${{ steps.slug.outputs.slug }}.json
             mutago-agentic.json
           if-no-files-found: warn
           retention-days: 30
+
+  aggregate:
+    name: aggregate
+    needs: mutate
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: mutation-report-*
+          merge-multiple: true
+          path: reports
+
+      # MSI is killed/total and covered-code MSI is killed/(total - notCovered),
+      # so both aggregate by summing counts. Averaging the per-package
+      # percentages would weight a 26-mutant package like a 424-mutant one.
+      - name: Module-wide score
+        run: |
+          shopt -s nullglob
+          files=(reports/summary-*.json)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No package summaries were produced." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          echo "## Mutation Testing (full module)" >> "$GITHUB_STEP_SUMMARY"
+          jq -s -r '
+            def pct($n; $d): if $d == 0 then "n/a" else "\($n * 10000 / $d | round / 100)%" end;
+            (map(.killedCount)         | add) as $killed
+            | (map(.totalMutantsCount) | add) as $total
+            | (map(.escapedCount)      | add) as $escaped
+            | (map(.notCoveredCount)   | add) as $notCovered
+            | (map(.errorCount)        | add) as $errored
+            | "| Metric | Value |", "|---|---|",
+              "| MSI | \(pct($killed; $total)) |",
+              "| Covered-code MSI | \(pct($killed; $total - $notCovered)) |",
+              "| Killed | \($killed) |",
+              "| Escaped | \($escaped) |",
+              "| Not covered | \($notCovered) |",
+              "| Errored | \($errored) |",
+              "| Total mutants | \($total) |",
+              "| Packages scored | \(length) |"
+          ' "${files[@]}" >> "$GITHUB_STEP_SUMMARY"
+
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Per package" >> "$GITHUB_STEP_SUMMARY"
+          jq -s -r '
+            "| Package | MSI | Escaped | Mutants |", "|---|---|---|---|",
+            (sort_by(.msi)[] |
+              "| `\(.package)` | \(.msi * 10000 | round / 100)% | \(.escapedCount) | \(.totalMutantsCount) |")
+          ' "${files[@]}" >> "$GITHUB_STEP_SUMMARY"

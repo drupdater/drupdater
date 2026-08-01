@@ -153,9 +153,14 @@ So 70 % is roughly today's standard rather than a stretch target. Note that a sm
 makes the score coarse — with seven mutants, one extra survivor moves the number by 14
 points — so a narrowly-failing pull request usually needs one more assertion, not a rewrite.
 
-The weekly run uploads a `mutation-report` artifact containing `mutago-agentic.json` — every
-survivor with its diff, surrounding context and the test file that should have caught it.
-That is the worklist for improving existing tests.
+The weekly run scores one package per matrix leg rather than the module in one go, so it
+finishes in the time of its slowest package and a failed leg can be re-run on its own. A
+final job sums the per-package counts into the module-wide score and writes both tables to
+the job summary.
+
+Each leg uploads a `mutation-report-<package>` artifact containing `mutago-agentic.json` —
+every survivor with its diff, surrounding context and the test file that should have caught
+it. That is the worklist for improving existing tests.
 
 ### When a mutant is a false positive
 
