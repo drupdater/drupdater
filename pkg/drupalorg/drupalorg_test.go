@@ -1,9 +1,11 @@
 package drupalorg
 
 import (
+	"io"
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 
@@ -14,8 +16,14 @@ import (
 )
 
 func TestNewHTTPClient_HasTimeout(t *testing.T) {
-	c := NewHTTPClient(zap.NewNop())
+	logger := zap.NewNop()
+	c := NewHTTPClient(logger)
+
 	assert.Equal(t, 30*time.Second, c.client.Timeout)
+	// The base URL is the only thing pointing this client at drupal.org; the tests below all
+	// override it, so nothing else pins the production default.
+	assert.Equal(t, "https://www.drupal.org", c.DrupalOrgBaseURL)
+	assert.Same(t, logger, c.logger)
 }
 
 func TestGetIssue_Timeout(t *testing.T) {
@@ -36,6 +44,12 @@ func TestGetIssue_Timeout(t *testing.T) {
 	issue, err := service.GetIssue(context.Background(), "12345")
 	require.Error(t, err)
 	assert.Nil(t, issue)
+	assert.Contains(t, err.Error(), "failed to make request")
+	// The transport failure has to stay reachable so a caller can tell a timeout from a
+	// refused connection.
+	var urlErr *url.Error
+	require.ErrorAs(t, err, &urlErr)
+	assert.True(t, urlErr.Timeout())
 }
 
 func TestGetIssue(t *testing.T) {
@@ -97,6 +111,28 @@ func TestGetIssue_Failure(t *testing.T) {
 	// Assertions
 	require.Error(t, err)
 	assert.Nil(t, issue)
+}
+
+func TestGetIssue_MalformedBody(t *testing.T) {
+	// drupal.org answering 200 with something that is not the expected JSON must be reported as
+	// a decode failure, with the cause still reachable.
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"nid": `))
+	}))
+	defer mockServer.Close()
+
+	service := &HTTPClient{
+		DrupalOrgBaseURL: mockServer.URL,
+		logger:           zaptest.NewLogger(t),
+		client:           &http.Client{},
+	}
+
+	issue, err := service.GetIssue(context.Background(), "12345")
+	require.Error(t, err)
+	assert.Nil(t, issue)
+	assert.Contains(t, err.Error(), "failed to decode response")
+	require.ErrorIs(t, err, io.ErrUnexpectedEOF, "the decode error must survive the wrapper")
 }
 
 func TestFindIssueNumber(t *testing.T) {
