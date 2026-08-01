@@ -29,7 +29,10 @@ jobs:
   mutation-full:
     name: mutation (full module)
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # ~3000 mutants after deduplication. Measured cost is 0.2-0.5s per mutant on
+    # four cores, so a clean run is 25-35 minutes; the ceiling is deliberately
+    # loose because nothing depends on this job finishing quickly.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
 

@@ -117,7 +117,7 @@ The tool is [mutago](https://github.com/quality-gates/mutago), pinned as a `tool
 make mutate
 ```
 
-That takes a while — the module produces a few thousand mutants and each one re-runs the
+That takes 25–35 minutes — the module produces roughly 3000 mutants and each one re-runs the
 tests for its package. To iterate on one package, pass it directly:
 
 ```bash
@@ -138,6 +138,20 @@ Scoring the full module on every pull request would be slow and would fail on su
 nobody touched, so the gate looks at changed lines only: new code has to be tested properly,
 existing gaps are left to the weekly run. A pull request that changes no mutable code
 generates no mutants and passes.
+
+For calibration, packages measured when the gate was introduced scored 68–74 % MSI — all of
+them at 90 %+ line coverage:
+
+| Package | MSI | Covered-code MSI |
+|---|---|---|
+| `pkg/phpcs` | 73.1 % | 73.1 % |
+| `internal/report` | 73.6 % | 81.8 % |
+| `pkg/composer` | 72.9 % | 77.6 % |
+| `internal/logging` | 67.7 % | 73.0 % |
+
+So 70 % is roughly today's standard rather than a stretch target. Note that a small diff
+makes the score coarse — with seven mutants, one extra survivor moves the number by 14
+points — so a narrowly-failing pull request usually needs one more assertion, not a rewrite.
 
 The weekly run uploads a `mutation-report` artifact containing `mutago-agentic.json` — every
 survivor with its diff, surrounding context and the test file that should have caught it.
