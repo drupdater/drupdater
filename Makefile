@@ -1,4 +1,4 @@
-.PHONY: build test mutate clean mock lint fmt fix run docker-build docker-run docs-serve docs-build help
+.PHONY: build test test-race mutate clean mock lint fmt fix run docker-build docker-run docs-serve docs-build help
 
 # Variables
 BINARY_NAME=drupdater
@@ -15,6 +15,9 @@ build: ## Build the binary
 
 test: ## Run tests
 	go test -v ./...
+
+test-race: ## Run tests under the race detector (as CI does)
+	go test -race ./...
 
 clean: ## Clean build artifacts
 	rm -f ${BINARY_NAME}

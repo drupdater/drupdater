@@ -33,8 +33,13 @@ jobs:
     - name: Build
       run: go build -v ./...
 
+    # -race is the point of this step beyond running the tests: drupdater installs and updates
+    # sites concurrently (one goroutine per site, via errgroup) and addons accumulate state
+    # across those goroutines behind a mutex. A dropped or misplaced lock produces no failure
+    # on its own -- the tests pass, and the corruption only shows up as a wrong report or a
+    # crash under load on a real project.
     - name: Test
-      run: go test -v ./... -coverprofile=coverage.txt
+      run: go test -race -v ./... -coverprofile=coverage.txt
 
     - name: Coverage Summary
       if: always()

@@ -54,6 +54,7 @@ Changing a golden file changes the published example. `internal/addon/testdata/c
 ```bash
 make build          # Build binary
 make test           # Run all tests (go test -v ./...)
+make test-race      # Run tests under the race detector, as CI does
 make mutate         # Mutation testing over the whole module (mutago, pinned in go.mod)
 make lint           # golangci-lint (govet, staticcheck, gosec, etc. — see .golangci.yml) + hadolint on the Dockerfile
 make fmt            # Format code

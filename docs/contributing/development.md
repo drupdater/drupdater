@@ -17,6 +17,7 @@ make build
 ```bash
 make build          # build the binary (injects the version via -ldflags)
 make test           # go test -v ./...
+make test-race      # go test -race ./... (what CI runs)
 make mutate         # mutation testing over the whole module (mutago)
 make lint           # golangci-lint + hadolint on the Dockerfile
 make fmt            # go fmt ./...
@@ -101,6 +102,23 @@ get past it — fix the code.
 
 Changed packages must reach **≥ 90%** coverage. The hook prints per-package totals; add
 tests before committing if any package is below.
+
+## The race detector
+
+CI runs the test suite with `-race`. Reproduce a CI-only failure locally with:
+
+```bash
+make test-race
+```
+
+It is on because drupdater is concurrent where it matters: sites are installed and updated one
+goroutine per site through an `errgroup`, and addons accumulate state across those goroutines
+behind a mutex. A dropped or misplaced lock does not fail a test on its own — the suite passes
+and the corruption surfaces later as a wrong report, or as a crash under load on a real
+project. The race detector is the only thing in the pipeline that catches that class at all.
+
+It costs roughly six times the runtime (about 20 s to about 2 min on the CI runner), which is
+why `make test` stays fast for the edit-run loop and only CI pays the full price.
 
 ## Mutation testing
 
