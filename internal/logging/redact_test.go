@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"net/url"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -61,10 +62,17 @@ func TestRedactorRedactsStringFields(t *testing.T) {
 	redactor.Register(token)
 	logger := newTestLogger(&buf, redactor)
 
-	logger.Info("command output", zap.String("output", "auth failed with token "+token))
+	logger.Info("command output", zap.String("output", "auth failed with token "+token),
+		zap.String("step", "composer update"), zap.Int("attempt", 2))
 
 	out := buf.String()
 	assert.NotContains(t, out, token)
+	// Assert what the field became, not just that the secret is gone: dropping the fields
+	// entirely would also satisfy NotContains.
+	assert.Contains(t, out, `"output":"auth failed with token ***"`)
+	// Fields with nothing to redact must survive untouched, including non-string kinds.
+	assert.Contains(t, out, `"step":"composer update"`)
+	assert.Contains(t, out, `"attempt":2`)
 }
 
 func TestRedactorRedactsErrorFields(t *testing.T) {
@@ -80,6 +88,9 @@ func TestRedactorRedactsErrorFields(t *testing.T) {
 
 	out := buf.String()
 	assert.NotContains(t, out, token)
+	// The error field survives with only the secret replaced -- the surrounding diagnostic
+	// text is the reason the entry is being logged at all.
+	assert.Contains(t, out, `"error":"composer update failed: 401 for https://***@example.com"`)
 }
 
 func TestRedactorRedactsFieldsAddedWithWith(t *testing.T) {
@@ -94,6 +105,7 @@ func TestRedactorRedactsFieldsAddedWithWith(t *testing.T) {
 
 	out := buf.String()
 	assert.NotContains(t, out, token)
+	assert.Contains(t, out, `"output":"leaked ***"`)
 }
 
 func TestRedactorIgnoresEmptyValues(t *testing.T) {
@@ -119,8 +131,87 @@ func TestRedactorLongestSecretWinsOverSubstring(t *testing.T) {
 	logger.Info("value: secret-extended")
 
 	out := buf.String()
-	assert.NotContains(t, out, "secret-extended")
-	assert.NotContains(t, out, "secret")
+	// Assert the whole result, not just that the secrets are absent. Replacing shortest-first
+	// yields "***-extended", which still contains neither "secret" nor "secret-extended" --
+	// absence checks alone cannot tell the correct ordering from the broken one.
+	assert.Contains(t, out, `"msg":"value: ***"`)
+	assert.NotContains(t, out, "-extended")
+}
+
+func TestRedactorRebuildsReplacerAfterNewSecret(t *testing.T) {
+	redactor := NewRedactor()
+	redactor.Register("first")
+	// Force the replacer to be built, so the next Register has a cached one to invalidate.
+	require.Equal(t, "***", redactor.Redact("first"))
+
+	redactor.Register("second")
+
+	// A secret registered after the first log line must still be redacted -- credentials are
+	// discovered mid-run (Composer auth, a resolved clone URL), not all at startup.
+	assert.Equal(t, "***", redactor.Redact("second"))
+	assert.Equal(t, "***", redactor.Redact("first"))
+}
+
+func TestRedactorKeepsReplacerWhenNothingChanged(t *testing.T) {
+	redactor := NewRedactor()
+	redactor.Register("token")
+	built := redactor.currentReplacer()
+	require.NotNil(t, built)
+
+	redactor.Register("token") // already known
+	redactor.Register("")      // ignored
+
+	// Re-registering known or empty values must not throw the built replacer away: Register is
+	// called repeatedly as credentials are resolved, and rebuilding on every call would make
+	// redaction cost grow with the number of calls rather than the number of secrets.
+	assert.Same(t, built, redactor.currentReplacer())
+}
+
+func TestRedactorRegistersRawAndEncodedForms(t *testing.T) {
+	// Characters QueryEscape rewrites, so the two forms are genuinely different strings.
+	const secret = "p@ss word/1"
+	encoded := url.QueryEscape(secret)
+	require.NotEqual(t, secret, encoded)
+
+	redactor := NewRedactor()
+	redactor.Register(secret)
+
+	assert.Equal(t, "***", redactor.Redact(secret))
+	assert.Equal(t, "***", redactor.Redact(encoded))
+}
+
+func TestRedactorRegisterIsSafeForConcurrentUse(t *testing.T) {
+	redactor := NewRedactor()
+
+	var wg sync.WaitGroup
+	for i := range 8 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			redactor.Register(fmt.Sprintf("secret-%d", i))
+		}()
+	}
+	wg.Wait()
+
+	for i := range 8 {
+		assert.Equal(t, "***", redactor.Redact(fmt.Sprintf("secret-%d", i)))
+	}
+}
+
+func TestCoreSkipsEntriesBelowLevel(t *testing.T) {
+	var buf bytes.Buffer
+	redactor := NewRedactor()
+
+	encoder := zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig())
+	base := zapcore.NewCore(encoder, zapcore.AddSync(&buf), zapcore.InfoLevel)
+	logger := zap.New(WrapCore(redactor)(base))
+
+	logger.Debug("below the level")
+	logger.Info("at the level")
+
+	out := buf.String()
+	assert.NotContains(t, out, "below the level")
+	assert.Contains(t, out, "at the level")
 }
 
 func TestCoreSyncDelegates(t *testing.T) {
