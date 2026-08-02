@@ -193,7 +193,7 @@ jobs:
           sparse-checkout-cone-mode: false
 
       - name: Download image
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: drupdater-image
           path: /tmp
