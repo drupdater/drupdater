@@ -94,7 +94,7 @@ func TestPropertyNewCheckIsOKOnlyWhenEveryResultIs(t *testing.T) {
 			}
 		}), 0, 8).Draw(t, "results")
 
-		check := NewCheck("1.2.3", results)
+		check := NewCheck("1.2.3", ToolVersions{}, results)
 
 		// The document's OK mirrors the command's exit status, so a single failing check has to
 		// pull it down no matter where in the list it sits.
@@ -118,7 +118,7 @@ func TestPropertyNewCheckIgnoresResultOrder(t *testing.T) {
 		}), 0, 8).Draw(t, "results")
 		shuffled := rapid.Permutation(results).Draw(t, "shuffled")
 
-		assert.Equal(t, NewCheck("1.2.3", results).OK, NewCheck("1.2.3", shuffled).OK)
+		assert.Equal(t, NewCheck("1.2.3", ToolVersions{}, results).OK, NewCheck("1.2.3", ToolVersions{}, shuffled).OK)
 	})
 }
 

@@ -9,6 +9,16 @@ updates:
       - "dependencies"
       - "go"
 
+  # Keeps the Dockerfile's pinned base images current -- notably composer's minor.
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "docker"
+
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

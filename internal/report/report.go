@@ -46,10 +46,20 @@ const (
 	ModeSecurity Mode = "security"
 )
 
+// ToolVersions records the versions of the tools whose behaviour the outcome depends on. Without
+// them, a fleet of repositories failing the same phase after an upstream composer release is
+// unattributable. Embedded in both documents so the two cannot drift on field names.
+type ToolVersions struct {
+	ComposerVersion string `json:"composer_version,omitempty"`
+	PHPVersion      string `json:"php_version,omitempty"`
+}
+
 // Report is the top-level document written to the --report path.
 type Report struct {
 	SchemaVersion    int    `json:"schema_version"`
 	DrupdaterVersion string `json:"drupdater_version"`
+	// Embedded, so these land beside drupdater_version rather than nested under a key.
+	ToolVersions
 
 	StartedAt       time.Time `json:"started_at"`
 	FinishedAt      time.Time `json:"finished_at"`
@@ -208,6 +218,14 @@ func (r *Recorder) SetNoChanges() {
 	r.report.Error = ""
 }
 
+// SetToolVersions records the versions of the tools driving the run. A setter because reading
+// them costs a subprocess the recorder must already exist to outlive.
+func (r *Recorder) SetToolVersions(versions ToolVersions) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.report.ToolVersions = versions
+}
+
 // SetPackages records the dependency changes composer made.
 func (r *Recorder) SetPackages(changes []PackageChange) {
 	r.mu.Lock()
@@ -291,9 +309,10 @@ func (r *Recorder) Finish() Report {
 // Check is the document "drupdater check --report" writes. A distinct shape from Report: a
 // preflight has no phases, packages or branch, only prerequisites and whether each holds.
 type Check struct {
-	SchemaVersion    int       `json:"schema_version"`
-	DrupdaterVersion string    `json:"drupdater_version"`
-	CheckedAt        time.Time `json:"checked_at"`
+	SchemaVersion    int    `json:"schema_version"`
+	DrupdaterVersion string `json:"drupdater_version"`
+	ToolVersions
+	CheckedAt time.Time `json:"checked_at"`
 	// OK is false when any individual check failed, mirroring the command's exit status.
 	OK      bool          `json:"ok"`
 	Results []CheckResult `json:"results"`
@@ -308,10 +327,11 @@ type CheckResult struct {
 }
 
 // NewCheck assembles the check document from the results the command produced.
-func NewCheck(version string, results []CheckResult) Check {
+func NewCheck(version string, tools ToolVersions, results []CheckResult) Check {
 	return Check{
 		SchemaVersion:    SchemaVersion,
 		DrupdaterVersion: version,
+		ToolVersions:     tools,
 		CheckedAt:        time.Now(),
 		OK:               !slices.ContainsFunc(results, func(r CheckResult) bool { return !r.OK }),
 		Results:          results,

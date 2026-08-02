@@ -69,10 +69,12 @@ func TestWriteCheckReportWritesWhenPathGiven(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "check.json")
 	core, logs := observer.New(zapcore.InfoLevel)
 
-	writeCheckReport(zap.New(core), logging.NewRedactor(), path, []services.CheckResult{
-		{Name: "git history complete", OK: true},
-		{Name: "platform requirements", OK: false, Detail: "php 8.4 required"},
-	})
+	writeCheckReport(zap.New(core), logging.NewRedactor(), path,
+		report.ToolVersions{ComposerVersion: "2.10.2", PHPVersion: "8.3.14"},
+		[]services.CheckResult{
+			{Name: "git history complete", OK: true},
+			{Name: "platform requirements", OK: false, Detail: "php 8.4 required"},
+		})
 
 	raw, err := os.ReadFile(path)
 	require.NoError(t, err)
@@ -81,6 +83,8 @@ func TestWriteCheckReportWritesWhenPathGiven(t *testing.T) {
 	require.NoError(t, json.Unmarshal(raw, &decoded))
 	assert.False(t, decoded.OK, "one failing check makes the whole preflight not OK")
 	assert.Len(t, decoded.Results, 2)
+	assert.Equal(t, "2.10.2", decoded.ComposerVersion, "the check document says which composer it checked against")
+	assert.Equal(t, "8.3.14", decoded.PHPVersion)
 	assert.Equal(t, 1, logs.FilterMessage("check report written").Len())
 }
 
@@ -88,7 +92,7 @@ func TestWriteCheckReportWritesWhenPathGiven(t *testing.T) {
 func TestWriteCheckReportDoesNothingWithoutAPath(t *testing.T) {
 	dir := t.TempDir()
 
-	writeCheckReport(zap.NewNop(), logging.NewRedactor(), "", []services.CheckResult{{Name: "a", OK: true}})
+	writeCheckReport(zap.NewNop(), logging.NewRedactor(), "", report.ToolVersions{}, []services.CheckResult{{Name: "a", OK: true}})
 
 	entries, err := os.ReadDir(dir)
 	require.NoError(t, err)
@@ -101,7 +105,7 @@ func TestWriteCheckReportWarnsWhenTheWriteFails(t *testing.T) {
 	require.NoError(t, os.WriteFile(blocker, []byte("not a directory"), 0o600))
 
 	core, logs := observer.New(zapcore.WarnLevel)
-	writeCheckReport(zap.New(core), logging.NewRedactor(), filepath.Join(blocker, "check.json"), nil)
+	writeCheckReport(zap.New(core), logging.NewRedactor(), filepath.Join(blocker, "check.json"), report.ToolVersions{}, nil)
 
 	assert.Equal(t, 1, logs.FilterMessage("failed to write check report").Len())
 }

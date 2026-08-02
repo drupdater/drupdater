@@ -363,18 +363,57 @@ func TestWriteFailsOnUnserialisableAddonData(t *testing.T) {
 	assert.Contains(t, err.Error(), "encode report")
 }
 
+// Embedded fields must serialise as siblings of drupdater_version, not nested. Decoded into a
+// map because a round trip through Report would hide exactly that mistake.
+func TestToolVersionsSerialiseBesideDrupdaterVersion(t *testing.T) {
+	rec := newTestRecorder()
+	rec.SetToolVersions(ToolVersions{ComposerVersion: "2.10.2", PHPVersion: "8.3.14"})
+
+	encoded, err := json.Marshal(rec.Finish())
+	require.NoError(t, err)
+
+	var decoded map[string]any
+	require.NoError(t, json.Unmarshal(encoded, &decoded))
+	assert.Equal(t, "2.10.2", decoded["composer_version"])
+	assert.Equal(t, "8.3.14", decoded["php_version"])
+	assert.NotContains(t, decoded, "ToolVersions")
+}
+
+func TestCheckCarriesToolVersions(t *testing.T) {
+	check := NewCheck("dev", ToolVersions{ComposerVersion: "2.10.2", PHPVersion: "8.3.14"}, nil)
+
+	encoded, err := json.Marshal(check)
+	require.NoError(t, err)
+
+	var decoded map[string]any
+	require.NoError(t, json.Unmarshal(encoded, &decoded))
+	assert.Equal(t, "2.10.2", decoded["composer_version"])
+	assert.Equal(t, "8.3.14", decoded["php_version"])
+}
+
+// A failed lookup omits the fields rather than publishing empty strings.
+func TestUnknownToolVersionsAreOmitted(t *testing.T) {
+	encoded, err := json.Marshal(newTestRecorder().Finish())
+	require.NoError(t, err)
+
+	var decoded map[string]any
+	require.NoError(t, json.Unmarshal(encoded, &decoded))
+	assert.NotContains(t, decoded, "composer_version")
+	assert.NotContains(t, decoded, "php_version")
+}
+
 func TestNewCheckIsOKOnlyWhenEveryResultPasses(t *testing.T) {
-	passing := NewCheck("dev", []CheckResult{{Name: "a", OK: true}, {Name: "b", OK: true}})
+	passing := NewCheck("dev", ToolVersions{}, []CheckResult{{Name: "a", OK: true}, {Name: "b", OK: true}})
 	assert.True(t, passing.OK)
 	assert.Equal(t, SchemaVersion, passing.SchemaVersion)
 	assert.Len(t, passing.Results, 2)
 
-	failing := NewCheck("dev", []CheckResult{{Name: "a", OK: true}, {Name: "b", OK: false, Detail: "missing"}})
+	failing := NewCheck("dev", ToolVersions{}, []CheckResult{{Name: "a", OK: true}, {Name: "b", OK: false, Detail: "missing"}})
 	assert.False(t, failing.OK)
 }
 
 func TestNewCheckWithNoResultsIsOK(t *testing.T) {
-	assert.True(t, NewCheck("dev", nil).OK)
+	assert.True(t, NewCheck("dev", ToolVersions{}, nil).OK)
 }
 
 func TestWriteCheckProducesRedactedJSON(t *testing.T) {
@@ -382,7 +421,7 @@ func TestWriteCheckProducesRedactedJSON(t *testing.T) {
 	fs := afero.NewMemMapFs()
 	path := "/out/check.json"
 
-	check := NewCheck("dev", []CheckResult{
+	check := NewCheck("dev", ToolVersions{}, []CheckResult{
 		{Name: "token authenticates", OK: false, Detail: "401 for https://user:" + token + "@example.com"},
 	})
 	redact := func(s string) string { return strings.ReplaceAll(s, token, "***") }

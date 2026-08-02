@@ -65,13 +65,13 @@ In the [run report](../run-report.md) those cases are distinguishable: `status` 
 There is currently **no `--version` flag and no `version` subcommand**. The build version
 is only reported in the `drupdater_version` field of the [run report](../run-report.md).
 
-!!! warning "Published images report `dev`"
+The version string is injected at build time via `-ldflags`, which both the `Makefile` and
+the `Dockerfile` do, so the published `ghcr.io/drupdater/drupdater-php*` images report the
+release tag they were built from. A binary built with a plain `go build` reports `"dev"`.
 
-    The version string is injected at build time via `-ldflags`, which the `Makefile`
-    does but the `Dockerfile` does not. Binaries inside the published
-    `ghcr.io/drupdater/drupdater-php*` images therefore report `drupdater_version:
-    "dev"` rather than the release tag. To know which version you are running, rely on
-    the image tag you pinned rather than the report field.
+The report also names the [Composer and PHP
+versions](../run-report.md#composer_version-and-php_version) the run drove, which is
+usually the more useful half of "what produced this result".
 
 ## Global behaviour
 

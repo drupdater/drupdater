@@ -125,6 +125,9 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []interna
 		defer cancel()
 	}
 
+	// After the timeout, so the lookup is bounded too. Not a phase: it cannot fail the run.
+	rec.SetToolVersions(LookupToolVersions(ctx, ws.logger, ws.composer))
+
 	// platform is nil for a checkout-mode --dry-run run with no token (see cmd/root.go's
 	// tokenRequired): that run never pushes or creates an MR, so no VCS client was built and
 	// the checkout's own git identity (already configured locally, e.g. by CI) is used as-is.

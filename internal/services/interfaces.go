@@ -15,6 +15,7 @@ type Composer interface {
 	GetLockHash(dir string) (string, error)
 	CheckPlatformReqs(ctx context.Context, dir string) (string, error)
 	GetConfig(ctx context.Context, dir string, key string) (string, error)
+	Version(ctx context.Context) (composer.Versions, error)
 }
 
 type Drush interface {

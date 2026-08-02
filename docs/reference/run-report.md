@@ -18,6 +18,8 @@ drupdater --dry-run --report ./drupdater-report.json
 {
   "schema_version": 1,
   "drupdater_version": "v0.3.6",
+  "composer_version": "2.10.2",
+  "php_version": "8.3.14",
   "started_at": "2026-07-25T02:00:00Z",
   "finished_at": "2026-07-25T02:14:31Z",
   "duration_seconds": 871.4,
@@ -53,7 +55,9 @@ drupdater --dry-run --report ./drupdater-report.json
 | Field | Type | Notes |
 |---|---|---|
 | `schema_version` | int | Currently `1`. See [schema stability](#schema-stability) |
-| `drupdater_version` | string | The build version. **`"dev"` in the published Docker images** — see [version information](cli/index.md#version-information) |
+| `drupdater_version` | string | The build version — see [version information](cli/index.md#version-information) |
+| `composer_version` | string | The Composer the run drove, from `composer --version`. Omitted if the lookup failed |
+| `php_version` | string | The PHP Composer ran on, from the same lookup. Omitted if the lookup failed |
 | `started_at` | timestamp | RFC 3339 |
 | `finished_at` | timestamp | RFC 3339 |
 | `duration_seconds` | float | Wall-clock duration of the whole run |
@@ -117,6 +121,19 @@ jq -r '.merge_request_description' ./report.json
 ```
 
 Both are absent from a run that failed before the `render merge request` phase.
+
+### `composer_version` and `php_version`
+
+Read once per run from `composer --version`, and logged as well as recorded.
+
+Drupdater is a wrapper around Composer, so Composer is the largest single influence on
+what a run does — and its defaults change between minor releases. Without these fields, a
+fleet of repositories that all start failing the same phase after an upstream Composer
+release gives a reader no way to attribute it. The published images
+[pin the Composer minor](docker-images.md#what-is-in-the-image) for the same reason.
+
+Both are omitted if the lookup failed. It is one subprocess for a field no update depends
+on, so it never fails the run.
 
 ### `packages`
 
@@ -187,6 +204,8 @@ drupdater check --report ./preflight.json
 {
   "schema_version": 1,
   "drupdater_version": "v0.3.6",
+  "composer_version": "2.10.2",
+  "php_version": "8.3.14",
   "checked_at": "2026-07-25T02:00:00Z",
   "ok": false,
   "results": [
