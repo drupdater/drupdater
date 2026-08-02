@@ -121,8 +121,8 @@ func TestConfigureDatabaseIsIdempotent(t *testing.T) {
 	assert.Equal(t, 1, strings.Count(first, settingsMarker))
 	assert.Equal(t, 1, strings.Count(first, "$settings['hash_salt']"))
 
-	// Second call: the marker is present, so it must return early without touching the file.
-	// GetConfig is still needed to locate settings.php; GetConfigSyncDir is not reached.
+	// Second call: the marker is present, so the append is skipped without touching the file.
+	// core.extension.yml is still checked, which is why GetConfigSyncDir is reached again.
 	require.NoError(t, installer.ConfigureDatabase(t.Context(), "/project", "site1"))
 
 	after, err = afero.ReadFile(fs, "/project/web/sites/site1/settings.php")
@@ -131,7 +131,7 @@ func TestConfigureDatabaseIsIdempotent(t *testing.T) {
 
 	// The skip is only visible in the log, so without this a silent second write and a correct
 	// skip would look identical from the outside.
-	assert.Equal(t, 1, logs.FilterMessage("database already configured, skipping").Len())
+	assert.Equal(t, 1, logs.FilterMessage("settings already configured, skipping").Len())
 	assert.Equal(t, 1, logs.FilterMessage("writing settings").Len())
 	writing := logs.FilterMessage("writing settings").All()[0].ContextMap()
 	assert.Equal(t, "/project/web/sites/site1/settings.php", writing["path"])
@@ -330,4 +330,39 @@ func TestRemoveProfileErrors(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, string(out), "profile: thunder")
 	})
+}
+
+func TestConfigureDatabaseRestoresSqliteOnAReusedWorkingCopy(t *testing.T) {
+	// Regression: settings.php and core.extension.yml go out of sync across runs, and only
+	// settings.php carries the marker.
+	//
+	// settings.php is deliberately never committed, so it survives a run with the marker in it.
+	// core.extension.yml does get committed, and the configuration export writes it *without*
+	// sqlite because config_exclude_modules excludes it. Reuse the working copy -- which is
+	// exactly what the integration job's idempotency check does, and what any CI runner with a
+	// cached checkout does -- and the second run finds the marker set and the module entry gone.
+	//
+	// Guarding the module entry behind the marker therefore left the site uninstallable:
+	// "Unable to uninstall the SQLite module because: The module 'SQLite' is providing the
+	// database driver 'sqlite'".
+	settingsFromEarlierRun := "<?php\n\n" + settingsMarker + "\n$databases['default']['default'] = [];\n"
+	installer, fs, drush, composer := newTestInstaller(t, coreExtensionWithoutSqlite, settingsFromEarlierRun)
+
+	composer.EXPECT().GetConfig(t.Context(), "/project", "extra.drupal-scaffold.locations.web-root").Return("web", nil)
+	drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1", false).Return("/config/sync", nil)
+
+	require.NoError(t, installer.ConfigureDatabase(t.Context(), "/project", "site1"))
+
+	core, err := afero.ReadFile(fs, "/config/sync/core.extension.yml")
+	require.NoError(t, err)
+	var parsed map[string]any
+	require.NoError(t, yaml.Unmarshal(core, &parsed))
+	assert.Equal(t, 0, parsed["module"].(map[string]any)["sqlite"],
+		"sqlite must be put back even though settings.php was already configured")
+
+	// The append stays skipped: the marker still does its original job.
+	after, err := afero.ReadFile(fs, "/project/web/sites/site1/settings.php")
+	require.NoError(t, err)
+	assert.Equal(t, settingsFromEarlierRun, string(after),
+		"settings.php must not gain a second database block")
 }
