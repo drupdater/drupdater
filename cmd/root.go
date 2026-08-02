@@ -37,13 +37,11 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-// config holds the application configuration
 var config internal.Config
 
 // configFile is the path to .drupdater.yaml; empty means <working-dir>/.drupdater.yaml.
 var configFile string
 
-// rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "drupdater [token]",
 	Short: "Drupal Updater",
@@ -61,9 +59,8 @@ names you can set there. See the README for the full file format.`,
 		if config.Clone && config.RepositoryURL == "" {
 			return errors.New("--repository-url is required with --clone")
 		}
-		// Validate the URL format when one is given, against what the provider factory accepts
-		// (HTTP(S) and SCP-style git URLs) rather than a stricter URL parser that would reject
-		// git@host:owner/repo.git even though cloning and provider detection handle it.
+		// Validated against what the provider factory accepts, not a stricter URL parser that
+		// would reject git@host:owner/repo.git even though clone and detection handle it.
 		if config.RepositoryURL != "" {
 			if err := codehosting.ValidateRepositoryURL(config.RepositoryURL); err != nil {
 				return fmt.Errorf("invalid repository URL: %w", err)
@@ -72,7 +69,6 @@ names you can set there. See the README for the full file format.`,
 		return nil
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Silence default error handling
 		cmd.SilenceUsage = true
 		cmd.SilenceErrors = true
 
@@ -80,17 +76,12 @@ names you can set there. See the README for the full file format.`,
 	},
 }
 
-// runUpdate is the body of the root command's RunE.
-//
-// It lives here as a named function rather than inline in the cobra literal so it can be called
-// directly from a test: a closure assigned to RunE is invisible to `go tool cover -func` and
-// cannot be exercised without going through cobra's whole Execute path.
+// runUpdate is the body of the root command's RunE. Named rather than inline so a test can call
+// it directly: a closure assigned to RunE is invisible to `go tool cover -func`.
 func runUpdate(cmd *cobra.Command, args []string) error {
 
-	// Values subprocesses (Composer, Drush, git) can echo back in their own output — most
-	// often a credential embedded in a URL after a failed authenticated fetch. Registered
-	// as soon as each becomes known so nothing is logged unredacted in between; never
-	// logged itself, including at debug level with --verbose.
+	// Secrets are registered the moment each becomes known, so nothing is logged unredacted in
+	// between — subprocesses echo credentials back after a failed authenticated fetch.
 	redactor := logging.NewRedactor()
 	registerEnvSecrets(redactor)
 
@@ -109,8 +100,6 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	}
 	redactor.Register(config.Token)
 
-	// Load per-project config from .drupdater.yaml (sites, timeout, addons). A missing file
-	// falls back to built-in defaults.
 	if err := loadProjectConfig(logger, configFilePath(configFile, config.WorkingDir), &config); err != nil {
 		return err
 	}
@@ -121,11 +110,9 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Create core service instances
 	drush := drush.NewCLI(logger, cache)
 	composer := composer.NewCLI(logger)
-	// Patch-apply checks build a scratch composer project in a temp directory; drop it
-	// when the run ends rather than leaving a vendor tree behind on every invocation.
+	// Patch checks leave a scratch project with a full vendor tree behind otherwise.
 	defer composer.Cleanup()
 	drupalOrg := drupalorg.NewHTTPClient(logger)
 	installer := drupal.NewInstaller(logger, drush, composer)
@@ -139,16 +126,13 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 		}
 		logger.Info("using checkout", zap.String("url", config.RepositoryURL), zap.String("branch", config.Branch))
 
-		// CI mounts the checkout owned by a different user than the container runs as, so
-		// the git binary (invoked by drush/composer) refuses it as "dubious ownership".
-		// Mark it safe so those child processes can run git against it.
+		// CI mounts the checkout under a different user than the container runs as, so git
+		// refuses it as "dubious ownership" in every drush/composer subprocess.
 		ensureGitSafeDirectory(cmd.Context(), logger, config.WorkingDir)
 	}
 
-	// Only construct the VCS platform when a run will actually use it: cloning (may be
-	// authenticated) or publishing (pushing + creating the MR, i.e. anything without
-	// --dry-run). A checkout-mode --dry-run run does neither, so it needs no VCS client and
-	// no token — see tokenRequired.
+	// Built only for a run that uses it — cloning or publishing. A checkout-mode --dry-run does
+	// neither, so it needs no client and no token; see tokenRequired.
 	var platform codehosting.Platform
 	if tokenRequired(config) {
 		vcsProviderFactory := codehosting.NewDefaultVcsProviderFactory()
@@ -159,7 +143,6 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Create the event dispatcher and register addons as subscribers
 	addons, err := createAddons(logger, config, drush, composer, drupalOrg, git)
 	if err != nil {
 		return err
@@ -172,7 +155,6 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	}
 	workflow := newWorkflowService(logger, config, drush, platform, git, installer, composer, dispatcher, opts...)
 
-	// Start the update workflow
 	err = workflow.StartUpdate(cmd.Context(), addons)
 	if err != nil {
 		if err := handleWorkflowError(logger, err); err != nil {
@@ -184,16 +166,14 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// updateWorkflow is what runUpdate needs from the workflow: starting it. Kept narrow (rather
-// than the concrete *services.WorkflowBaseService) so a test can drive runUpdate to the end
-// without a real repository, composer and drush.
+// updateWorkflow is all runUpdate needs from the workflow. Kept narrow so a test can drive
+// runUpdate to the end without a real repository, composer and drush.
 type updateWorkflow interface {
 	StartUpdate(ctx context.Context, addons []internal.Addon) error
 }
 
-// newWorkflowService builds the update workflow. It is a variable purely as a test seam: every
-// step above it in runUpdate -- service construction, VCS provider selection, the addon
-// registry and the dispatcher -- runs for real, and only the run itself is replaced.
+// newWorkflowService builds the update workflow. A variable purely as a test seam: everything
+// above it in runUpdate runs for real, and only the run itself is replaced.
 var newWorkflowService = func(
 	logger *zap.Logger,
 	cfg internal.Config,
@@ -208,12 +188,9 @@ var newWorkflowService = func(
 	return services.NewWorkflowBaseService(logger, cfg, drushSvc, platform, gitSvc, installerSvc, composerSvc, dispatcher, opts...)
 }
 
-// reportSink returns the callback that writes the run report to path.
-//
-// A failure to write the report is logged and swallowed: the report describes the run, it is not
-// the run. Turning a full, successful update into a failed command because a path was not
-// writable would be a worse outcome than the missing file — and on the failure path, masking the
-// real error with a filesystem one would be worse still.
+// reportSink returns the callback that writes the run report to path. A write failure is logged
+// and swallowed: the report describes the run, it is not the run, and on the failure path it
+// would mask the real error.
 func reportSink(logger *zap.Logger, redactor *logging.Redactor, path string) func(report.Report) {
 	return func(rep report.Report) {
 		if err := report.Write(afero.NewOsFs(), path, rep, redactor.Redact); err != nil {
@@ -224,13 +201,9 @@ func reportSink(logger *zap.Logger, redactor *logging.Redactor, path string) fun
 	}
 }
 
-// resolveToken returns the access token: the positional argument when one is given, otherwise
-// DRUPDATER_TOKEN. The environment variable is the preferred form because it keeps the token
-// out of the process list and the shell history.
-//
-// The token is only mandatory when the run will use it — see tokenRequired. A checkout-mode
-// --dry-run run pushes nothing and creates no MR, so it can proceed with no token and no
-// DRUPDATER_TOKEN set at all.
+// resolveToken returns the access token: the positional argument, else DRUPDATER_TOKEN, which is
+// preferred because it stays out of the process list and shell history. Mandatory only when the
+// run will use it — see tokenRequired.
 func resolveToken(args []string, cfg internal.Config) (string, error) {
 	var token string
 	if len(args) == 1 && args[0] != "" {
@@ -244,34 +217,25 @@ func resolveToken(args []string, cfg internal.Config) (string, error) {
 	return token, nil
 }
 
-// tokenRequired reports whether this run performs an operation that needs VCS credentials:
-// cloning (--clone, which may be authenticated) or publishing (pushing the update branch and
-// creating the merge/pull request — i.e. any run without --dry-run). A checkout-mode --dry-run
-// run does neither.
+// tokenRequired reports whether this run needs VCS credentials: cloning (which may be
+// authenticated) or publishing. A checkout-mode --dry-run does neither.
 func tokenRequired(cfg internal.Config) bool {
 	return cfg.Clone || !cfg.DryRun
 }
 
-// registerEnvSecrets registers every credential-bearing environment value a subprocess
-// (Composer, Drush, git) might echo back in its own output, so nothing leaks unredacted between
-// the moment a value becomes known and the moment it might appear in a log line. Shared by the
-// real run and "drupdater check", which shells out to the same subprocesses and must redact the
-// same secrets from anything it prints.
+// registerEnvSecrets registers every credential-bearing environment value a subprocess might
+// echo back. Shared by the real run and "drupdater check", which drives the same subprocesses.
 func registerEnvSecrets(redactor *logging.Redactor) {
 	redactor.Register(os.Getenv("DRUPALCODE_ACCESS_TOKEN"))
 	registerComposerAuth(redactor, os.Getenv("COMPOSER_AUTH"))
 }
 
-// registerComposerAuth registers the credentials carried by a COMPOSER_AUTH env value with the
-// redactor. COMPOSER_AUTH is a JSON object (http-basic/bearer/gitlab-token/github-oauth/... per
-// host, see the Composer docs) and Composer echoes the individual password or token value it
-// contains — typically embedded in a URL after a failed authenticated fetch — not the blob
-// itself, so registering only the raw string would never match that output. Every string leaf of
-// the parsed JSON is registered individually, except values keyed "username": Composer's
-// documented http-basic form for package registries (e.g. Packagist.com) commonly sets username
-// to the literal word "token", which is not a secret and must not be redacted from unrelated log
-// output that happens to contain that word. The raw value is registered too, as a fallback for a
-// value that fails to parse as JSON.
+// registerComposerAuth registers the credentials inside a COMPOSER_AUTH value.
+//
+// Composer echoes the individual password or token, not the JSON blob, so every string leaf is
+// registered separately. "username" values are skipped: the documented http-basic form commonly
+// sets it to the literal word "token", which must not be redacted from unrelated output. The raw
+// value is registered too, as a fallback when it does not parse as JSON.
 func registerComposerAuth(redactor *logging.Redactor, composerAuth string) {
 	redactor.Register(composerAuth)
 
@@ -282,9 +246,8 @@ func registerComposerAuth(redactor *logging.Redactor, composerAuth string) {
 	redactor.Register(composerAuthSecretLeaves(parsed, "")...)
 }
 
-// composerAuthSecretLeaves returns every string value found anywhere in a decoded COMPOSER_AUTH
-// JSON structure (as produced by json.Unmarshal into `any`), recursing through nested objects and
-// arrays, except values reached through a "username" key (see registerComposerAuth).
+// composerAuthSecretLeaves returns every string value in a decoded COMPOSER_AUTH structure,
+// except those reached through a "username" key (see registerComposerAuth).
 func composerAuthSecretLeaves(v any, key string) []string {
 	switch t := v.(type) {
 	case string:
@@ -343,9 +306,8 @@ func loadProjectConfig(logger *zap.Logger, path string, cfg *internal.Config) er
 	return nil
 }
 
-// resolveCheckoutSettings fills in the repository URL and target branch from the checkout,
-// which is where checkout mode takes them from instead of flags. --branch only applies to
-// --clone, so it is overwritten here.
+// resolveCheckoutSettings fills in the repository URL and target branch from the checkout.
+// --branch only applies to --clone, so it is overwritten here.
 func resolveCheckoutSettings(git *repo.GitRepositoryService, cfg *internal.Config) error {
 	if cfg.RepositoryURL == "" {
 		remoteURL, err := git.GetRemoteURL(cfg.WorkingDir)
@@ -381,8 +343,7 @@ func resolveCheckoutBranch(git *repo.GitRepositoryService, workingDir string) (s
 }
 
 // ensureGitSafeDirectory adds dir to git's global safe.directory list unless it (or "*") is
-// already trusted, so repeated checkout-mode runs on a developer machine don't append a
-// duplicate entry to the user's global gitconfig on every invocation.
+// already trusted, so repeated runs don't append duplicates to the user's global gitconfig.
 func ensureGitSafeDirectory(ctx context.Context, logger *zap.Logger, dir string) {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
@@ -439,11 +400,9 @@ var addonRegistry = map[string]func(addonDeps) internal.Addon{
 
 // mandatoryAddons always run, regardless of the .drupdater.yaml addon lists.
 //
-// composer_audit and unsupported_modules are in here together, and for the same reason: between
-// them they answer "what in this project is no longer getting fixes?" — composer_audit for the
-// packages Packagist knows about, unsupported_modules for the modules Drupal.org knows about.
-// Either one alone covers half a project. They also render that answer as a single list, which
-// only works if both run on every update rather than one in each mode.
+// composer_audit and unsupported_modules are here for the same reason: between them they answer
+// "what is no longer getting fixes?" — Packagist's view and Drupal.org's. Either alone covers
+// half a project, and they render one shared list, which needs both on every update.
 var mandatoryAddons = []string{
 	"composer_allow_plugins",
 	"composer_patches",
@@ -496,8 +455,8 @@ func createAddons(
 	return addons, nil
 }
 
-// validateAddons checks every addon named in either run type is known, regardless of which one
-// will run, so a typo under run_types.security is caught even on a normal run (and vice versa).
+// validateAddons checks both run types, so a typo under run_types.security is caught on a normal
+// run too.
 func validateAddons(config internal.Config) error {
 	for _, name := range append(append([]string{}, config.RunTypes.Normal.Addons...), config.RunTypes.Security.Addons...) {
 		if _, ok := addonRegistry[name]; !ok {
@@ -507,8 +466,8 @@ func validateAddons(config internal.Config) error {
 	return nil
 }
 
-// configurableAddons returns the sorted addon names a user can set in .drupdater.yaml — every
-// registered addon except the mandatoryAddons, which always run.
+// configurableAddons returns the sorted addon names settable in .drupdater.yaml: every
+// registered addon except the mandatory ones.
 func configurableAddons() []string {
 	excluded := make(map[string]bool, len(mandatoryAddons))
 	for _, n := range mandatoryAddons {
@@ -537,7 +496,7 @@ var addonsCmd = &cobra.Command{
 	},
 }
 
-// createDispatcher creates a new event manager and subscribes all addons to it.
+// createDispatcher subscribes every addon to a new event manager.
 func createDispatcher(addons []internal.Addon) services.EventDispatcher {
 	dispatcher := event.NewManager("")
 	for _, addon := range addons {

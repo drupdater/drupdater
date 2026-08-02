@@ -15,20 +15,16 @@ import (
 )
 
 func TestGithub_GetOwner(t *testing.T) {
-	// Setup
 	gh, err := newGithub("owner/repo", "dummy-token", zap.NewNop())
 	require.NoError(t, err)
 
-	// Assert
 	assert.Equal(t, "owner", gh.owner)
 }
 
 func TestGithub_GetRepo(t *testing.T) {
-	// Setup
 	gh, err := newGithub("owner/repo", "dummy-token", zap.NewNop())
 	require.NoError(t, err)
 
-	// Assert
 	assert.Equal(t, "repo", gh.repo)
 }
 
@@ -74,7 +70,6 @@ func TestGithub_CreateMergeRequest(t *testing.T) {
 		Body  string `json:"body"`
 	}
 
-	// Setup mock HTTP server
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
@@ -102,10 +97,8 @@ func TestGithub_CreateMergeRequest(t *testing.T) {
 		repo:   "test_project",
 	}
 
-	// Execute
 	mr, err := gh.CreateMergeRequest(context.Background(), "Test MR", "This is a test MR", "source-branch", "target-branch")
 
-	// Assert
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), mr.ID)
 	assert.Equal(t, "http://example.com", mr.URL)

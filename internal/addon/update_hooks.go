@@ -11,10 +11,8 @@ import (
 	"go.uber.org/zap"
 )
 
-// UpdateHooksPerSite maps site names to their update hooks
 type UpdateHooksPerSite map[string]map[string]drush.UpdateHook
 
-// UpdateHooks represents the update hooks addon
 type UpdateHooks struct {
 	internal.BasicAddon
 	logger *zap.Logger
@@ -25,7 +23,6 @@ type UpdateHooks struct {
 	hooks UpdateHooksPerSite
 }
 
-// NewUpdateHooks creates a new update hooks instance
 func NewUpdateHooks(logger *zap.Logger, drush Drush) *UpdateHooks {
 	return &UpdateHooks{
 		logger: logger,
@@ -34,7 +31,6 @@ func NewUpdateHooks(logger *zap.Logger, drush Drush) *UpdateHooks {
 	}
 }
 
-// SubscribedEvents returns the events this addon listens to
 func (uh *UpdateHooks) SubscribedEvents() map[string]any {
 	return map[string]any{
 		"pre-site-update": event.ListenerItem{
@@ -44,10 +40,8 @@ func (uh *UpdateHooks) SubscribedEvents() map[string]any {
 	}
 }
 
-// RenderTemplate returns the rendered template for this addon. Locking here is not required for
-// correctness today — the workflow only calls it after every site's forEachSite goroutine has
-// returned, and errgroup.Wait establishes a happens-before edge for that — but that ordering is
-// an invariant of the caller, not of this type, so mu still guards the read.
+// RenderTemplate locks even though errgroup.Wait already orders every site's goroutine before
+// this call: that ordering is the caller's invariant, not this type's.
 func (uh *UpdateHooks) RenderTemplate() (string, error) {
 	uh.mu.Lock()
 	defer uh.mu.Unlock()

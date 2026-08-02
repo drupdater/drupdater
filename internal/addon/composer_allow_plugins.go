@@ -9,7 +9,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// ComposerAllowPlugins handles composer plugin management during updates
 type ComposerAllowPlugins struct {
 	internal.BasicAddon
 	logger   *zap.Logger
@@ -19,7 +18,6 @@ type ComposerAllowPlugins struct {
 	newAllowPlugins []string
 }
 
-// NewComposerAllowPlugins creates a new DefaultAllowPlugins instance
 func NewComposerAllowPlugins(logger *zap.Logger, composer Composer) *ComposerAllowPlugins {
 	return &ComposerAllowPlugins{
 		logger:   logger,
@@ -27,7 +25,6 @@ func NewComposerAllowPlugins(logger *zap.Logger, composer Composer) *ComposerAll
 	}
 }
 
-// SubscribedEvents returns the events this addon subscribes to
 func (ap *ComposerAllowPlugins) SubscribedEvents() map[string]any {
 	return map[string]any{
 		"pre-composer-update": event.ListenerItem{
@@ -41,7 +38,6 @@ func (ap *ComposerAllowPlugins) SubscribedEvents() map[string]any {
 	}
 }
 
-// RenderTemplate returns the rendered template for this addon
 func (ap *ComposerAllowPlugins) RenderTemplate() (string, error) {
 	if len(ap.newAllowPlugins) == 0 {
 		return "", nil
@@ -62,7 +58,6 @@ func (ap *ComposerAllowPlugins) preComposerUpdateHandler(e event.Event) error {
 		return fmt.Errorf("failed to get composer allow plugins: %w", err)
 	}
 
-	// Allow all plugins during update
 	return ap.composer.SetConfig(evt.Context(), evt.Path(), "allow-plugins", "true")
 }
 
@@ -74,13 +69,11 @@ func (ap *ComposerAllowPlugins) postComposerUpdateHandler(e event.Event) error {
 		return err
 	}
 
-	// The map is written to below, so it must never be nil — a project with no allow-plugins
-	// entries yields an empty map, and assigning into a nil map panics.
+	// Written to below, so it must never be nil: assigning into a nil map panics.
 	if ap.allowPlugins == nil {
 		ap.allowPlugins = map[string]bool{}
 	}
 
-	// Add new plugins to allow-plugins
 	for key := range allPlugins {
 		if _, ok := ap.allowPlugins[key]; !ok {
 			ap.allowPlugins[key] = false

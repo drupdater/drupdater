@@ -9,14 +9,12 @@ import (
 	"go.uber.org/zap"
 )
 
-// ComposerNormalizer handles normalization of composer.json files.
 type ComposerNormalizer struct {
 	internal.BasicAddon
 	logger   *zap.Logger
 	composer Composer
 }
 
-// NewComposerNormalizer creates a new composer normalizer instance.
 func NewComposerNormalizer(logger *zap.Logger, composer Composer) *ComposerNormalizer {
 	return &ComposerNormalizer{
 		logger:   logger,
@@ -24,7 +22,6 @@ func NewComposerNormalizer(logger *zap.Logger, composer Composer) *ComposerNorma
 	}
 }
 
-// SubscribedEvents returns the events this addon listens to.
 func (cn *ComposerNormalizer) SubscribedEvents() map[string]any {
 	return map[string]any{
 		"post-composer-update": event.ListenerItem{
@@ -34,7 +31,7 @@ func (cn *ComposerNormalizer) SubscribedEvents() map[string]any {
 	}
 }
 
-// RenderTemplate returns an empty string as this addon doesn't generate any reporting content.
+// RenderTemplate is empty: normalizing composer.json is visible in the diff, not in a section.
 func (cn *ComposerNormalizer) RenderTemplate() (string, error) {
 	return "", nil
 }

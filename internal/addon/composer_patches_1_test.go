@@ -930,7 +930,6 @@ func TestUpdatePatches(t *testing.T) {
 }
 
 func TestComposer_Patches_1_RenderTemplate(t *testing.T) {
-	// Setup
 	fixture, err := os.ReadFile("testdata/composer_patches_1.md")
 	require.NoError(t, err, "Failed to read test fixture")
 
@@ -939,7 +938,6 @@ func TestComposer_Patches_1_RenderTemplate(t *testing.T) {
 	composerRunner := NewMockComposer(t)
 	drupalorgService := NewMockDrupalOrg(t)
 
-	// Initialize system under test
 	ap := NewComposerPatches1(logger, composerRunner, drupalorgService, http.DefaultClient)
 	ap.patchUpdates = PatchUpdates{
 		Conflicts: []ConflictPatch{
@@ -975,10 +973,8 @@ func TestComposer_Patches_1_RenderTemplate(t *testing.T) {
 		},
 	}
 
-	// Execute
 	result, err := ap.RenderTemplate()
 
-	// Verify
 	require.NoError(t, err)
 	assert.Equal(t, expected, result)
 }

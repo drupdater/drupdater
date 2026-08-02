@@ -16,8 +16,7 @@ import (
 
 type Drush interface {
 	InstallSite(ctx context.Context, path string, site string) error
-	// GetConfigSyncDir returns the site's config sync directory; relative controls whether the
-	// path is returned relative to path (true) or as the absolute path drush reports (false).
+	// GetConfigSyncDir returns the site's config sync directory, relative to path or absolute.
 	GetConfigSyncDir(ctx context.Context, path string, site string, relative bool) (string, error)
 }
 
@@ -60,11 +59,9 @@ func (is *Installer) Install(ctx context.Context, path string, site string) erro
 	return nil
 }
 
-// settingsMarker tags the block ConfigureDatabase appends to a site's settings.php. The run
-// configures each site twice — once to build the baseline database, once before the update
-// hooks — and both calls target the same file now that old and new code share one working
-// directory. The marker makes the append idempotent instead of stacking duplicate database,
-// hash_salt and private-path settings.
+// settingsMarker tags the block ConfigureDatabase appends to settings.php. Each site is
+// configured twice against the same file — baseline, then before the update hooks — so the
+// marker keeps the append idempotent instead of stacking duplicate settings.
 const settingsMarker = "// Added by drupdater: test database settings."
 
 func (is *Installer) ConfigureDatabase(ctx context.Context, dir string, site string) error {
@@ -118,9 +115,8 @@ if (isset($settings['config_exclude_modules'])) {
 
 	siteLogger.Debug("writing settings", zap.String("path", settingsPath), zap.String("settings", settings))
 
-	// Append the database and file settings to the site's existing settings.php. The file is
-	// expected to already exist (every installed Drupal site has one); a missing file is an
-	// error rather than something to create, since our snippet alone is not a valid settings.php.
+	// A missing settings.php is an error, not something to create: this snippet alone is not a
+	// valid one, and every installed site already has the file.
 	f, err := is.fs.OpenFile(settingsPath, os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to open settings file: %w", err)
@@ -146,19 +142,16 @@ func (is *Installer) isSqliteModuleEnabled(ctx context.Context, dir string, site
 	coreExtensionPath := configSyncDir + "/core.extension.yml"
 	siteLogger.Debug("checking if sqlite module is enabled", zap.String("path", coreExtensionPath))
 
-	// Read the existing YAML file
 	file, err := afero.ReadFile(is.fs, coreExtensionPath)
 	if err != nil {
 		return false, fmt.Errorf("failed to read core extension file: %w", err)
 	}
 
-	// Unmarshal the YAML data
 	var config map[string]any
 	if err := yaml.Unmarshal(file, &config); err != nil {
 		return false, fmt.Errorf("failed to unmarshal core extension file: %w", err)
 	}
 
-	// Check if the sqlite module is enabled
 	modules, ok := config["module"].(map[string]any)
 	if !ok {
 		return false, fmt.Errorf("core extension file %s has no module section", coreExtensionPath)
@@ -181,13 +174,11 @@ func (is *Installer) addSqliteModule(ctx context.Context, dir string, site strin
 		return err
 	}
 	coreExtensionPath := configSyncDir + "/core.extension.yml"
-	// Read the existing YAML file
 	file, err := afero.ReadFile(is.fs, coreExtensionPath)
 	if err != nil {
 		return fmt.Errorf("failed to read core extension file: %w", err)
 	}
 
-	// Unmarshal the YAML data
 	var config map[string]any
 	if err := yaml.Unmarshal(file, &config); err != nil {
 		return fmt.Errorf("failed to unmarshal core extension file: %w", err)
@@ -199,13 +190,11 @@ func (is *Installer) addSqliteModule(ctx context.Context, dir string, site strin
 	}
 	modules["sqlite"] = 0
 
-	// Marshal the updated config back to YAML
 	updatedConfig, err := yaml.Marshal(config)
 	if err != nil {
 		return fmt.Errorf("failed to marshal updated config: %w", err)
 	}
 
-	// Write the updated config back to the file
 	if err := afero.WriteFile(is.fs, coreExtensionPath, updatedConfig, 0644); err != nil {
 		return fmt.Errorf("failed to write updated core extension file: %w", err)
 	}
@@ -223,7 +212,6 @@ func (is *Installer) RemoveProfile(ctx context.Context, dir string, site string)
 	}
 	coreExtensionPath := configSyncDir + "/core.extension.yml"
 
-	// Open the file for reading
 	fileToRead, err := is.fs.Open(coreExtensionPath)
 	if err != nil {
 		siteLogger.Error("failed to open file", zap.Error(err))
@@ -233,11 +221,8 @@ func (is *Installer) RemoveProfile(ctx context.Context, dir string, site string)
 
 	profiles := []string{"standard"}
 
-	// Read all lines into a slice, excluding both the "profile: <name>" key and the profile's
-	// own entry in the module list (profiles are listed under module: with a high weight). A
-	// line is dropped if it matches any configured profile; it is kept only when it matches
-	// none — checking that once per line (not once per profile) so extra profiles can't
-	// duplicate the kept lines.
+	// Drop both the "profile: <name>" key and the profile's own entry under module:. Matched
+	// once per line rather than once per profile, or extra profiles would duplicate kept lines.
 	var lines []string
 	scanner := bufio.NewScanner(fileToRead)
 	for scanner.Scan() {
@@ -259,7 +244,6 @@ func (is *Installer) RemoveProfile(ctx context.Context, dir string, site string)
 		return fmt.Errorf("failed to read file: %w", err)
 	}
 
-	// Rewrite the file without the target line
 	file, err := is.fs.Create(coreExtensionPath)
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)

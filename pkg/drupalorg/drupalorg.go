@@ -46,9 +46,8 @@ func (s *HTTPClient) GetIssue(ctx context.Context, issueID string) (*Issue, erro
 	}
 	defer resp.Body.Close()
 
-	// Check the status before decoding: drupal.org answers an unknown node or an outage with
-	// an HTML error page, which would otherwise surface as an opaque "failed to decode
-	// response" instead of naming the real problem.
+	// Status before decoding: drupal.org answers an unknown node or an outage with an HTML
+	// error page, which would otherwise surface as an opaque decode failure.
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to fetch issue %s: unexpected status %s", issueID, resp.Status)
 	}
@@ -62,10 +61,8 @@ func (s *HTTPClient) GetIssue(ctx context.Context, issueID string) (*Issue, erro
 }
 
 func (s *HTTPClient) FindIssueNumber(text string) (string, bool) {
-	// Define a regex pattern to match issue numbers
 	re := regexp.MustCompile(`(\d{6,})`)
 
-	// Find first match
 	matches := re.FindStringSubmatch(text)
 	if matches == nil {
 		return "", false

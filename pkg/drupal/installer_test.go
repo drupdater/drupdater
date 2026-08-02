@@ -57,13 +57,11 @@ profile: thunder
 			fs:       fs,
 		}
 
-		// Execute
 		err := installer.Install(t.Context(), "/tmp", "site1")
 		if err != nil {
 			t.Fatalf("Failed to install Drupal: %v", err)
 		}
 
-		// Assert
 		settingsContent, err := afero.ReadFile(fs, settingsPath)
 		if err != nil {
 			t.Fatalf("Failed to read updated content from settings.php: %v", err)
@@ -103,10 +101,8 @@ $settings['hash_salt'] = 'changeme';
 			fs:       fs,
 		}
 
-		// Execute
 		err := installer.Install(t.Context(), "/tmp", "site1")
 
-		// Assert
 		if err == nil {
 			t.Fatalf("Expected an error but got nil")
 		}
@@ -114,7 +110,6 @@ $settings['hash_salt'] = 'changeme';
 }
 
 func TestAddSqliteModule(t *testing.T) {
-	// Setup
 	logger := zap.NewNop()
 	drush := NewMockDrush(t)
 	fs := afero.NewMemMapFs()
@@ -155,12 +150,10 @@ profile: thunder
 		fs:     fs,
 	}
 
-	// Execute
 	if err := installer.addSqliteModule(t.Context(), "/tmp", "default"); err != nil {
 		t.Fatalf("Failed to add SQLite module: %v", err)
 	}
 
-	// Assert
 	updatedContent, err := afero.ReadFile(fs, tempFile.Name())
 	if err != nil {
 		t.Fatalf("Failed to read updated content from temp file: %v", err)
@@ -188,7 +181,6 @@ profile: thunder
 }
 
 func TestRemoveProfile(t *testing.T) {
-	// Setup
 	logger := zap.NewNop()
 	drush := NewMockDrush(t)
 	fs := afero.NewMemMapFs()
@@ -229,12 +221,10 @@ profile: standard
 		fs:     fs,
 	}
 
-	// Execute
 	if err := installer.RemoveProfile(t.Context(), "/tmp", "default"); err != nil {
 		t.Fatalf("Failed to remove profile: %v", err)
 	}
 
-	// Assert
 	expectedContent := `
 _core:
   default_config_hash: 4GIX5Esnc_umpXUBj4IIocRX7Mt5fPhm4AgXfE3E56E

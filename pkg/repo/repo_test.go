@@ -22,7 +22,6 @@ type mockWorktree struct {
 }
 
 func TestIsSomethingStaged(t *testing.T) {
-	// Setup
 	logger := zap.NewNop()
 	service := NewGitRepositoryService(logger)
 
@@ -103,10 +102,8 @@ func TestIsSomethingStaged(t *testing.T) {
 			worktree := NewMockWorktree(t)
 			worktree.EXPECT().Status().Return(tt.worktree.status, tt.worktree.err)
 
-			// Execute
 			result := service.IsSomethingStagedInPath(worktree, tt.worktree.dir)
 
-			// Assert
 			assert.Equal(t, tt.expected, result)
 		})
 	}

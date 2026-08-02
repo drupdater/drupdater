@@ -112,6 +112,10 @@ Where things live. For *how they work*, read `docs/explanation/` rather than dup
 - **The report's deferred write is registered first**, so it runs last and is emitted on every exit path.
 - **Per-site events fire concurrently.** Addon state accumulated across sites must be mutex-guarded, and maps handed to the report must be copies.
 
+## Comments
+
+Keep comments short, simple and precise. One line where one line does. Say *why*, not what the code already says. No restating the signature, no commented-out code, no filler.
+
 ## Configuration
 
 Two tiers with no overlap: **CLI flags** (how a run is invoked) and **`.drupdater.yaml`** (what the project needs, committed at the repo root). `Config.ActiveRunType()` is the single place `--security` maps to a config block — call it rather than branching on `config.Security`.

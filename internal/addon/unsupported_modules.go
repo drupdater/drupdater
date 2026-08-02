@@ -18,10 +18,8 @@ import (
 // which is a different risk category than a security vulnerability caught by composer_audit.
 //
 // It also renders the abandoned packages composer_audit hands it on pre-merge-request-create.
-// Those come from Packagist rather than drupal.org and cover the non-Drupal libraries this
-// addon cannot see, but they say the same thing to a reviewer — no further fixes are coming,
-// decide what to do — so they belong in one list rather than in two sections that differ only
-// by which addon found them.
+// Those come from Packagist and cover the non-Drupal libraries this addon cannot see, but they
+// tell a reviewer the same thing — no further fixes are coming — so they share one list.
 type UnsupportedModules struct {
 	internal.BasicAddon
 	logger *zap.Logger
@@ -32,14 +30,13 @@ type UnsupportedModules struct {
 	mu      sync.Mutex
 	modules map[string]drush.UnsupportedModule
 
-	// abandoned is written once, from pre-merge-request-create, which fires after every site's
-	// goroutine has finished — so unlike modules it needs no lock.
+	// Written once from pre-merge-request-create, which fires after every site's goroutine has
+	// finished, so unlike modules it needs no lock.
 	abandoned []services.AbandonedPackage
 }
 
-// EndOfLifeEntry is one row of the merged "unsupported or abandoned" table. The two sources
-// answer different questions, so the row keeps a Status naming which one it came from rather
-// than pretending a module version and a replacement package are the same column.
+// EndOfLifeEntry is one row of the merged "unsupported or abandoned" table. Status names the
+// source, rather than pretending a module version and a replacement package are one column.
 type EndOfLifeEntry struct {
 	Name string
 	// Status is "Unsupported module" or "Abandoned package".
@@ -60,17 +57,15 @@ func NewUnsupportedModules(logger *zap.Logger, drushClient Drush) *UnsupportedMo
 	}
 }
 
-// SubscribedEvents returns the events this addon listens to.
 func (um *UnsupportedModules) SubscribedEvents() map[string]any {
 	return map[string]any{
 		"pre-site-update": event.ListenerItem{
 			Priority: event.Normal,
 			Listener: event.ListenerFunc(um.preSiteUpdateHandler),
 		},
-		// Below Normal: composer_audit puts the abandoned packages on this event at Normal, and
-		// this addon renders them. Running at the same priority would leave which of the two
-		// goes first to the dispatcher, and the list would sometimes be read before it is
-		// written.
+		// Below Normal: composer_audit puts the abandoned packages on this event at Normal. At
+		// equal priority the dispatcher decides the order, and the list would sometimes be read
+		// before it is written.
 		"pre-merge-request-create": event.ListenerItem{
 			Priority: event.BelowNormal,
 			Listener: event.ListenerFunc(um.preMergeRequestCreateHandler),
@@ -89,13 +84,10 @@ func (um *UnsupportedModules) RenderTemplate() (string, error) {
 	return um.Render("unsupported_modules.go.tmpl", entries)
 }
 
-// endOfLifeEntries returns the merged table rows, sorted by name — one list rather than two
-// groups, because the Status column already says which kind each row is and a reviewer looking
-// for a particular package should not have to know which addon found it first.
-//
-// Sorting is also what makes the section byte-stable: both halves originate from maps, whose
-// iteration order is random, so an unsorted table would differ between two runs over an
-// unchanged project.
+// endOfLifeEntries returns the merged table rows, sorted by name. One list rather than two
+// groups: the Status column already says which kind each row is, and a reviewer should not have
+// to know which addon found a package. Sorting also makes the section byte-stable — both halves
+// come from maps, whose iteration order is random.
 func (um *UnsupportedModules) endOfLifeEntries() []EndOfLifeEntry {
 	entries := make([]EndOfLifeEntry, 0, len(um.modules)+len(um.abandoned))
 
@@ -133,12 +125,9 @@ func (um *UnsupportedModules) endOfLifeEntries() []EndOfLifeEntry {
 	return entries
 }
 
-// collectModules returns the modules gathered so far.
-//
-// The lock is not required for correctness today — the workflow only renders after every site's
-// forEachSite goroutine has returned, and errgroup.Wait establishes a happens-before edge for
-// that — but that ordering is an invariant of the caller, not of this type, so mu still guards
-// the read.
+// collectModules returns the modules gathered so far. The lock is not needed today —
+// errgroup.Wait already orders every site's goroutine before rendering — but that is the
+// caller's invariant, not this type's.
 func (um *UnsupportedModules) collectModules() []drush.UnsupportedModule {
 	um.mu.Lock()
 	defer um.mu.Unlock()
@@ -146,9 +135,8 @@ func (um *UnsupportedModules) collectModules() []drush.UnsupportedModule {
 	return slices.Collect(maps.Values(um.modules))
 }
 
-// preMergeRequestCreateHandler takes the abandoned packages composer_audit found so they can be
-// rendered alongside the unsupported modules. It does not log them: composer_audit already
-// logged the count when it ran the audit that produced them.
+// preMergeRequestCreateHandler takes composer_audit's abandoned packages so they render
+// alongside the unsupported modules. Not logged here — composer_audit already logged the count.
 func (um *UnsupportedModules) preMergeRequestCreateHandler(e event.Event) error {
 	evt := e.(*services.PreMergeRequestCreateEvent)
 
@@ -157,9 +145,8 @@ func (um *UnsupportedModules) preMergeRequestCreateHandler(e event.Event) error 
 	return nil
 }
 
-// preSiteUpdateHandler checks a site for unsupported modules. This is a best-effort, informational
-// check: failures (e.g. the update status service being unreachable) are logged and swallowed
-// rather than aborting the run, since an unsupported module is reported, not treated as an error.
+// preSiteUpdateHandler checks a site for unsupported modules. Best-effort: an unreachable update
+// status service is logged and swallowed, since an unsupported module is reported, not an error.
 func (um *UnsupportedModules) preSiteUpdateHandler(e event.Event) error {
 	evt := e.(*services.PreSiteUpdateEvent)
 

@@ -11,19 +11,16 @@ import (
 	"go.uber.org/zap"
 )
 
-// TranslationsUpdater handles updating translations for Drupal sites
 type TranslationsUpdater struct {
 	logger     *zap.Logger
 	drush      Drush
 	repository Repository
 
-	// Per-site outcome for the report. post-site-update fires concurrently across sites,
-	// hence the mutex.
+	// Per-site outcome for the report. post-site-update fires concurrently, hence the mutex.
 	mu      sync.Mutex
 	results map[string]TranslationResult
 }
 
-// NewTranslationsUpdater creates a new translations updater instance
 func NewTranslationsUpdater(logger *zap.Logger, drush Drush, repository Repository) *TranslationsUpdater {
 	return &TranslationsUpdater{
 		logger:     logger,
@@ -32,7 +29,6 @@ func NewTranslationsUpdater(logger *zap.Logger, drush Drush, repository Reposito
 	}
 }
 
-// SubscribedEvents returns the events this addon listens to
 func (tu *TranslationsUpdater) SubscribedEvents() map[string]any {
 	return map[string]any{
 		"post-site-update": event.ListenerItem{
@@ -42,7 +38,6 @@ func (tu *TranslationsUpdater) SubscribedEvents() map[string]any {
 	}
 }
 
-// RenderTemplate returns the rendered template for this addon
 func (tu *TranslationsUpdater) RenderTemplate() (string, error) {
 	return "", nil
 }

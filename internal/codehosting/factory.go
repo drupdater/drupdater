@@ -10,37 +10,30 @@ import (
 	"go.uber.org/zap"
 )
 
-// Platform defines the interface for version control system providers.
+// Platform is a version control hosting provider.
 type Platform interface {
-	// CreateMergeRequest creates a merge/pull request on the platform.
 	CreateMergeRequest(ctx context.Context, title string, description string, sourceBranch string, targetBranch string) (MergeRequest, error)
 
-	// DeleteBranch removes a remote branch from the platform.
 	DeleteBranch(ctx context.Context, branch string) error
 
-	// GetUser returns the user name and email from the platform.
 	GetUser(ctx context.Context) (name string, email string)
 
-	// EnableAutoMerge sets the merge/pull request to merge automatically when all conditions are met.
+	// EnableAutoMerge merges once every condition the platform enforces is met.
 	EnableAutoMerge(ctx context.Context, mr MergeRequest) error
 }
 
-// MergeRequest represents a merge or pull request on a code hosting platform.
 type MergeRequest struct {
 	ID  int64  `json:"id"`
 	URL string `json:"url"`
 }
 
-// DefaultVcsProviderFactory creates appropriate Platform implementations
-// based on repository URLs.
 type DefaultVcsProviderFactory struct{}
 
-// NewDefaultVcsProviderFactory creates a new factory for VCS providers.
 func NewDefaultVcsProviderFactory() *DefaultVcsProviderFactory {
 	return &DefaultVcsProviderFactory{}
 }
 
-// Create returns a Platform implementation appropriate for the given repository URL.
+// Create returns the Platform implementation for a repository URL.
 func (vpf *DefaultVcsProviderFactory) Create(repositoryURL string, token string, logger *zap.Logger) (Platform, error) {
 	host, path, err := parseGitURL(repositoryURL)
 	if err != nil {
@@ -60,9 +53,8 @@ func (vpf *DefaultVcsProviderFactory) Create(repositoryURL string, token string,
 	}
 }
 
-// providerFromEnv returns the VCS provider from CI environment variables, which are
-// authoritative and work for self-hosted instances whose hostnames don't contain the
-// provider name. Returns "" when no CI environment is detected.
+// providerFromEnv reads the provider from CI environment variables, which are authoritative and
+// work for self-hosted instances whose hostname does not name the provider. "" when not in CI.
 func providerFromEnv() string {
 	if os.Getenv("GITHUB_ACTIONS") == "true" {
 		return "github"
@@ -73,9 +65,8 @@ func providerFromEnv() string {
 	return ""
 }
 
-// providerFromHost determines the VCS provider type from the repository host. Matching on the
-// host (not the whole URL) avoids misrouting a GitHub repo whose owner/name contains "gitlab"
-// (e.g. github.com/foo/gitlab-migration).
+// providerFromHost matches on the host, not the whole URL, so github.com/foo/gitlab-migration
+// is not misrouted to GitLab.
 func providerFromHost(host string) string {
 	host = strings.ToLower(host)
 	switch {
@@ -88,17 +79,15 @@ func providerFromHost(host string) string {
 	}
 }
 
-// ValidateRepositoryURL reports whether raw is a repository URL this tool can route to a
-// provider. It exists so callers validate against what Create actually accepts — including
-// SCP-style git URLs, which url.ParseRequestURI rejects because they carry no scheme.
+// ValidateRepositoryURL reports whether raw is a URL this tool can route to a provider, so
+// callers validate against what Create accepts — including scheme-less SCP-style git URLs.
 func ValidateRepositoryURL(raw string) error {
 	_, _, err := parseGitURL(raw)
 	return err
 }
 
-// parseGitURL extracts the host and "owner/repo" path from a repository URL, accepting both
-// HTTP(S) URLs (https://host/owner/repo.git) and SCP-style git URLs (git@host:owner/repo.git).
-// Any trailing ".git" and surrounding slashes are stripped.
+// parseGitURL extracts the host and "owner/repo" from either an HTTP(S) URL or an SCP-style git
+// URL (git@host:owner/repo.git), stripping any trailing ".git".
 func parseGitURL(raw string) (host string, path string, err error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {

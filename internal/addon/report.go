@@ -9,42 +9,30 @@ import (
 
 // This file holds every addon's contribution to the machine-readable run report (--report).
 //
-// The methods live together rather than beside each addon's other code on purpose: together they
-// are the report's addons schema, which is a published contract, and keeping them in one place
-// makes it reviewable as a whole. Scattered across eight files it is very easy to change a field
-// name without noticing that a consumer depends on it.
+// Together these methods are the report's addons schema, a published contract. Scattered across
+// eight files it is easy to rename a field without noticing a consumer depends on it.
 //
-// Each addon satisfies report.Reporter structurally -- ReportKey() string and ReportData() any --
-// so none of them has to import the report package. Addons that do not implement it are simply
-// absent from the report.
-//
-// The keys match the names used in .drupdater.yaml's addon lists, so a report reads the same way
-// the project is configured.
+// Each addon satisfies report.Reporter structurally, so none of them imports the report package.
+// The keys match .drupdater.yaml's addon names, so a report reads the way the project is
+// configured.
 //
 // Two addons deliberately contribute nothing:
 //
-//   - composer_diff renders a markdown dependency table for the merge request. The same
-//     information is already in the report's top-level "packages" field, in structured form,
-//     straight from composer update -- a markdown table in a JSON document would be strictly
-//     worse than what is already there.
-//   - composer_normalizer only reorders composer.json; that a run normalised it is visible in
-//     the diff and has no consumer beyond it.
+//   - composer_diff renders a markdown table of what the top-level "packages" field already
+//     carries in structured form.
+//   - composer_normalizer only reorders composer.json, which the diff shows.
 //
-// Everything else reports, including addons whose work is "only" a code change. Reading the
-// diff tells you what changed but not whether the addon ran at all, and most addons log and
-// swallow their own failures -- so an addon that silently did nothing is indistinguishable
-// from one with nothing to do unless it says so here.
+// Everything else reports, even addons whose work is "only" a code change: most log and swallow
+// their own failures, so one that silently did nothing is otherwise indistinguishable from one
+// with nothing to do.
 
 // --- composer_audit ---
 
 // SecurityAdvisories is the composer_audit section: which advisories the update resolved and
-// which are still open afterwards. The remaining advisories are the more actionable half — they
-// are what a fleet-wide exposure view is built from.
+// which are still open. Remaining is the more actionable half — a fleet-wide exposure view is
+// built from it.
 //
-// Abandoned is the other thing `composer audit` reports and the same run is already paying for:
-// packages their maintainers have marked abandoned, with the suggested replacement when there
-// is one. It is not an advisory — abandonment is a standing condition, not something this
-// update changed — but it is the same shape of finding as an unsupported module, on the
+// Abandoned is not an advisory but the same shape of finding as an unsupported module, on the
 // non-Drupal packages unsupported_modules cannot see.
 type SecurityAdvisories struct {
 	Fixed     []composer.Advisory         `json:"fixed"`
@@ -73,9 +61,8 @@ func (ca *ComposerAudit) ReportData() any {
 // ReportKey implements report.Reporter.
 func (uh *UpdateHooks) ReportKey() string { return "update_hooks" }
 
-// ReportData implements report.Reporter. The result is keyed by site, matching the shape the
-// merge request description uses, because in a multisite run the same module can have different
-// pending hooks per site.
+// ReportData implements report.Reporter. Keyed by site, like the merge request description:
+// in a multisite run the same module can have different pending hooks per site.
 func (uh *UpdateHooks) ReportData() any {
 	uh.mu.Lock()
 	defer uh.mu.Unlock()
@@ -84,8 +71,7 @@ func (uh *UpdateHooks) ReportData() any {
 		return nil
 	}
 
-	// Copy rather than hand out the live map: the report is serialised after the run, but the
-	// caller has no way to know that this map is mutex-guarded state.
+	// Copy: the caller has no way to know this map is mutex-guarded state.
 	out := make(map[string]map[string]drush.UpdateHook, len(uh.hooks))
 	for site, hooks := range uh.hooks {
 		siteHooks := make(map[string]drush.UpdateHook, len(hooks))
@@ -103,9 +89,8 @@ func (uh *UpdateHooks) ReportData() any {
 // ReportKey implements report.Reporter.
 func (um *UnsupportedModules) ReportKey() string { return "unsupported_modules" }
 
-// ReportData implements report.Reporter. Modules are sorted by name so two runs over an
-// unchanged site produce byte-identical sections, which lets a consumer diff reports directly
-// instead of having to normalise map ordering first.
+// ReportData implements report.Reporter. Sorted by name so two runs over an unchanged site
+// produce byte-identical sections a consumer can diff directly.
 func (um *UnsupportedModules) ReportData() any {
 	um.mu.Lock()
 	defer um.mu.Unlock()
@@ -151,9 +136,9 @@ func (h *ComposerPatches1) ReportData() any {
 
 // --- code_beautifier ---
 
-// CodingStyleFixes is the code_beautifier section: which files PHPCBF actually fixed and
-// committed, and how many violations PHPCS considered fixable beforehand. The two differ when a
-// violation is reported fixable but PHPCBF cannot fix it in practice.
+// CodingStyleFixes is the code_beautifier section: which files PHPCBF fixed and committed, and
+// how many violations PHPCS called fixable beforehand. The two differ when PHPCBF cannot fix a
+// violation it reported as fixable.
 type CodingStyleFixes struct {
 	Files   []string `json:"files"`
 	Fixable int      `json:"fixable"`
@@ -192,10 +177,9 @@ func (dr *DeprecationsRemover) ReportData() any {
 
 // --- translations_updater ---
 
-// TranslationResult is one site's outcome. Skipped is set when the addon bailed out early, which
-// it does by design when locale_deploy is not enabled or the translation path does not resolve --
-// both previously visible only in the logs, and both indistinguishable from "ran and found
-// nothing" in a report that simply omitted the site.
+// TranslationResult is one site's outcome. Skipped is set when the addon bailed out by design --
+// no locale_deploy, or an unresolvable translation path -- which a report that simply omitted
+// the site would render indistinguishable from "ran and found nothing".
 type TranslationResult struct {
 	Path    string `json:"path,omitempty"`
 	Updated bool   `json:"updated"`
@@ -215,8 +199,7 @@ func (tu *TranslationsUpdater) ReportData() any {
 		return nil
 	}
 
-	// Copy rather than hand out the live map, which is mutex-guarded state the caller cannot
-	// know about.
+	// Copy: the caller has no way to know this map is mutex-guarded state.
 	out := make(map[string]TranslationResult, len(tu.results))
 	for site, result := range tu.results {
 		out[site] = result

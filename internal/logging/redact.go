@@ -1,8 +1,6 @@
-// Package logging provides a zapcore.Core wrapper that redacts known secret values (access
-// tokens, Composer auth credentials) from log output before it reaches any sink. Subprocesses
-// drupdater shells out to (Composer, Drush, git) can echo those values in their own output, most
-// often in a URL when an authenticated fetch fails; wrapping the logger means every call site is
-// covered without having to remember to sanitize each one individually.
+// Package logging wraps a zapcore.Core to redact known secret values before they reach any sink.
+// Subprocesses echo credentials back in their own output, most often in a URL after a failed
+// authenticated fetch; wrapping the logger covers every call site at once.
 package logging
 
 import (
@@ -18,10 +16,9 @@ import (
 // placeholder replaces every registered secret value wherever it appears in log output.
 const placeholder = "***"
 
-// Redactor holds the exact secret values that must never appear in log output. Redaction is
-// value-based, not pattern-based: matching "things that look like a token" both misses unusual
-// formats and mangles innocent output, whereas the exact secret values are known at startup.
-// Safe for concurrent use.
+// Redactor holds the exact secret values that must never appear in log output. Value-based, not
+// pattern-based: matching "things that look like a token" both misses unusual formats and mangles
+// innocent output, and the real values are known at startup. Safe for concurrent use.
 type Redactor struct {
 	mu       sync.RWMutex
 	secrets  map[string]struct{}
@@ -34,15 +31,12 @@ func NewRedactor() *Redactor {
 	return &Redactor{secrets: map[string]struct{}{}}
 }
 
-// Register adds values that must be redacted from all subsequent log output. Empty strings are
-// ignored, since redacting "" would replace every character in every log line. Each value's
-// URL-percent-encoded forms are registered alongside it: a token embedded in a URL (e.g. a
-// Composer repository URL) may appear encoded rather than literal.
+// Register adds values to redact from all later log output. Empty strings are ignored: redacting
+// "" would replace every character in every line.
 //
-// Both encodings are registered because Go — like the tools whose output this filters — escapes
-// a value differently depending on where in the URL it lands. A space becomes '+' in a query
-// component and "%20" in a path segment, so registering only one form leaves the value readable
-// in the other. Duplicates are collapsed by the map, so a value the two agree on costs nothing.
+// Each value's URL-encoded forms are registered too, because a token in a URL may appear encoded,
+// and both query and path escaping are used — a space is '+' in one and "%20" in the other, so
+// one form alone leaves the value readable. The map collapses duplicates.
 func (r *Redactor) Register(values ...string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -67,10 +61,9 @@ func (r *Redactor) Register(values ...string) {
 	}
 }
 
-// Redact replaces every registered secret value in s with the placeholder. It is the exported
-// counterpart of redact, for output written outside the logger (e.g. a preflight check's report,
-// printed straight to a writer rather than logged) that must get the same redaction as any other
-// place a subprocess's output can surface a leaked credential.
+// Redact replaces every registered secret value in s with the placeholder. The exported
+// counterpart of redact, for output that bypasses the logger — a preflight check's results, or
+// the run report — and must be filtered all the same.
 func (r *Redactor) Redact(s string) string {
 	return r.redact(s)
 }
@@ -106,8 +99,7 @@ func (r *Redactor) currentReplacer() *strings.Replacer {
 	for v := range r.secrets {
 		values = append(values, v)
 	}
-	// Longest first, so a secret that happens to be a substring of another registered value
-	// is still matched in full rather than being partially consumed by the shorter one.
+	// Longest first, so a secret that is a substring of another is not partially consumed.
 	sort.Slice(values, func(i, j int) bool { return len(values[i]) > len(values[j]) })
 
 	pairs := make([]string, 0, len(values)*2)
@@ -118,16 +110,15 @@ func (r *Redactor) currentReplacer() *strings.Replacer {
 	return r.replacer
 }
 
-// core wraps another zapcore.Core, rewriting the log message and any string/error field through
-// the Redactor before handing the entry on. It never logs the secret set itself.
+// core rewrites the message and any string/error field through the Redactor before handing the
+// entry on. It never logs the secret set itself.
 type core struct {
 	zapcore.Core
 	redactor *Redactor
 }
 
-// WrapCore returns a zap.Option-compatible constructor that wraps a logger's core with
-// redaction using r. Pass it to zap.WrapCore (or Config.Build) so every entry the logger emits,
-// at every level including Debug, is filtered before it reaches its sink.
+// WrapCore returns a constructor for zap.WrapCore, so every entry the logger emits — at every
+// level, Debug included — is filtered before it reaches its sink.
 func WrapCore(r *Redactor) func(zapcore.Core) zapcore.Core {
 	return func(c zapcore.Core) zapcore.Core {
 		return &core{Core: c, redactor: r}
@@ -150,8 +141,7 @@ func (c *core) Write(entry zapcore.Entry, fields []zapcore.Field) error {
 	return c.Core.Write(entry, c.redactFields(fields))
 }
 
-// redactFields returns a copy of fields with string and error values passed through the
-// redactor.
+// redactFields returns a copy of fields with string and error values redacted.
 func (c *core) redactFields(fields []zapcore.Field) []zapcore.Field {
 	out := make([]zapcore.Field, len(fields))
 	for i, f := range fields {
@@ -163,8 +153,8 @@ func (c *core) redactFields(fields []zapcore.Field) []zapcore.Field {
 				f.Interface = errors.New(c.redactor.redact(err.Error()))
 			}
 		default:
-			// Other kinds (numbers, durations, zap.Any/zap.Strings, ...) are passed through
-			// unchanged: no call site in this codebase puts subprocess output into those.
+			// Numbers, durations, zap.Any and friends pass through: no call site puts
+			// subprocess output into those.
 		}
 		out[i] = f
 	}

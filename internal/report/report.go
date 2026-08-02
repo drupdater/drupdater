@@ -1,15 +1,9 @@
 // Package report defines the machine-readable run report drupdater writes with --report.
 //
-// A run's outcome is otherwise only expressed for humans: as log lines, and as the merge request
-// description assembled from each addon's RenderTemplate. Neither is a contract anything can be
-// built on, and the merge request description only exists for runs that get far enough to open
-// one -- a --dry-run or a run that fails during composer update leaves nothing behind but a log.
-//
-// The report closes that gap. It is written on every exit path, including failures, and records
-// which phase failed and why. That is deliberately the most valuable case: "this repository is
-// failing, in this phase, for this reason" is what anything automating drupdater across more
-// than one repository needs, and it is exactly what the log-only output makes expensive to
-// obtain.
+// A run's outcome is otherwise only expressed for humans, and the merge request description only
+// exists for runs that get far enough to open one. The report is written on every exit path,
+// including failures, and records which phase failed and why -- what anything automating
+// drupdater across many repositories needs and the log makes expensive to obtain.
 package report
 
 import (
@@ -38,10 +32,8 @@ const (
 	StatusSuccess Status = "success"
 	// StatusFailed means a phase returned an error and the run stopped there.
 	StatusFailed Status = "failed"
-	// StatusNoChanges means the run worked correctly and found nothing to update. It is
-	// reported separately from success because the distinction is the whole point for a
-	// consumer watching many repositories: a repository that is already up to date needs no
-	// attention, whereas one that produced an update does.
+	// StatusNoChanges means the run worked and found nothing to update. Separate from success
+	// because a consumer watching many repositories needs no attention for this one.
 	StatusNoChanges Status = "no_changes"
 )
 
@@ -63,8 +55,7 @@ type Report struct {
 	DurationSeconds float64   `json:"duration_seconds"`
 
 	Status Status `json:"status"`
-	// FailedPhase names the phase that returned the error, empty on success. It is the field
-	// that turns a red run into an actionable one without reading the log.
+	// FailedPhase names the phase that returned the error, empty on success.
 	FailedPhase string `json:"failed_phase,omitempty"`
 	Error       string `json:"error,omitempty"`
 
@@ -78,11 +69,8 @@ type Report struct {
 	// or because it failed before publishing.
 	MergeRequest *MergeRequest `json:"merge_request"`
 
-	// MergeRequestTitle and MergeRequestDescription are the title and body the run assembled
-	// from its addons, recorded whether or not a merge request was opened with them. A
-	// --dry-run has no MergeRequest at all, and these two are then the only account of what the
-	// run would have said about itself -- which is both what a preview is for and the only way
-	// a dry run can tell a broken description template from a working one.
+	// Recorded whether or not a merge request was opened. Under --dry-run they are the only
+	// account of what the run would have said, and the only way to spot a broken template.
 	MergeRequestTitle       string `json:"merge_request_title,omitempty"`
 	MergeRequestDescription string `json:"merge_request_description,omitempty"`
 
@@ -92,10 +80,8 @@ type Report struct {
 	// composer update, or that found nothing to update.
 	Packages []PackageChange `json:"packages"`
 
-	// Phases records every phase the run entered, in order, with how long it took. Beyond
-	// locating a failure, the timings make the cost of a run measurable without separate
-	// instrumentation: the phase distribution is what says whether a run is dominated by
-	// composer install, by site installs, or by Rector.
+	// Phases records every phase the run entered, in order. The timings make a run's cost
+	// measurable without separate instrumentation.
 	Phases []Phase `json:"phases"`
 
 	// Addons holds each reporting addon's structured section, keyed by its report key. Addons
@@ -113,10 +99,9 @@ type MergeRequest struct {
 
 // AutoMerge is the outcome of asking the platform to merge the MR/PR once its pipeline passes.
 //
-// It is reported because enabling auto-merge is best-effort: a failure is logged and the run
-// still succeeds, since the branch is pushed and the MR exists by then. That makes the log the
-// only other place the outcome appears, so without this a consumer reading the report would see
-// a clean success and never learn that the MR it is waiting on will not merge itself.
+// Reported because enabling auto-merge is best-effort: a failure is logged and the run still
+// succeeds, so without this a consumer would see a clean success and never learn the MR it is
+// waiting on will not merge itself.
 type AutoMerge struct {
 	// Enabled is true when the platform accepted the request.
 	Enabled bool `json:"enabled"`
@@ -124,12 +109,8 @@ type AutoMerge struct {
 	Error string `json:"error,omitempty"`
 }
 
-// PackageChange is one dependency change made by composer update.
-//
-// It deliberately mirrors composer.PackageChange rather than reusing it: this type is part of
-// the report's published schema, so it must only change when SchemaVersion says it does. Reusing
-// the composer package's struct would let an unrelated refactor there silently rename a field
-// every consumer depends on.
+// PackageChange mirrors composer.PackageChange rather than reusing it: this type is published
+// schema, so a refactor in the composer package must not be able to rename a field here.
 type PackageChange struct {
 	// Action is one of Install, Upgrade, Downgrade, Remove.
 	Action  string `json:"action"`
@@ -147,10 +128,8 @@ type Phase struct {
 	Error           string    `json:"error,omitempty"`
 }
 
-// Reporter is the optional interface an addon implements to contribute a structured section to
-// the report. It is deliberately separate from internal.Addon: widening that interface would
-// force every addon (and its mock) to change at once, whereas addons that do not implement
-// Reporter are simply absent from the report's addons map.
+// Reporter is the optional interface an addon implements to contribute a section to the report.
+// Kept separate from internal.Addon so adding it does not force every addon and mock to change.
 type Reporter interface {
 	// ReportKey is the stable key this addon's section appears under. It should match the
 	// addon's registry name so a report reads the same way as .drupdater.yaml.
@@ -159,9 +138,8 @@ type Reporter interface {
 	ReportData() any
 }
 
-// Recorder accumulates a report over the course of a run. It is safe for concurrent use: sites
-// are updated concurrently, so addons may record from multiple goroutines even though the
-// top-level phases themselves are sequential.
+// Recorder accumulates a report over a run. Safe for concurrent use: sites update concurrently,
+// so addons may record from several goroutines even though the phases are sequential.
 type Recorder struct {
 	mu     sync.Mutex
 	report Report
@@ -174,9 +152,8 @@ func NewRecorder(version string, mode Mode, dryRun bool, repositoryURL string, b
 			SchemaVersion:    SchemaVersion,
 			DrupdaterVersion: version,
 			StartedAt:        time.Now(),
-			// Assume success and let a failing phase overwrite it, so a run that is cut short
-			// without an error (a context deadline unwinding, say) is not silently reported as
-			// having failed a phase it never entered.
+			// A failing phase overwrites this, so a run cut short without an error is not
+			// reported as having failed a phase it never entered.
 			Status:     StatusSuccess,
 			Mode:       mode,
 			DryRun:     dryRun,
@@ -188,9 +165,8 @@ func NewRecorder(version string, mode Mode, dryRun bool, repositoryURL string, b
 }
 
 // Run executes fn as a named phase, recording its duration and outcome, and returns fn's error
-// unchanged. The first failing phase sets the report's status, failed phase and error; later
-// phases do not overwrite them, because the run stops at the first failure and any subsequent
-// bookkeeping is not what a reader wants to be told went wrong.
+// unchanged. Only the first failure sets the top-level status: later bookkeeping is not what
+// went wrong.
 func (r *Recorder) Run(name string, fn func() error) error {
 	start := time.Now()
 	err := fn()
@@ -219,11 +195,9 @@ func (r *Recorder) Run(name string, fn func() error) error {
 
 // SetNoChanges records that the run found nothing to update.
 //
-// The workflow signals this by aborting the phase that would have produced the update, so the
-// phase is already on record as having ended with an error. That detail stays in Phases, which
-// is the blow-by-blow account, but the top-level status, failed phase and error are reset:
-// summarising "there was nothing to update" as a failure would have every consumer treat a
-// perfectly healthy repository as one needing attention.
+// The workflow signals this by aborting a phase, so that phase stays on record as failed in
+// Phases. The top-level status is reset, or every consumer would treat a healthy repository as
+// one needing attention.
 func (r *Recorder) SetNoChanges() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -240,8 +214,7 @@ func (r *Recorder) SetPackages(changes []PackageChange) {
 	r.report.Packages = changes
 }
 
-// SetUpdateBranch records the branch the update commits were made on. It exists even for runs
-// that never push it.
+// SetUpdateBranch records the branch the update commits were made on, even if never pushed.
 func (r *Recorder) SetUpdateBranch(branch string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -255,9 +228,9 @@ func (r *Recorder) SetMergeRequest(url string) {
 	r.report.MergeRequest = &MergeRequest{URL: SanitizeURL(url)}
 }
 
-// SetMergeRequestContent records the title and description assembled for the merge request. It
-// is deliberately independent of SetMergeRequest: the content exists as soon as it is rendered,
-// which happens before -- and, under --dry-run, without -- a merge request being created.
+// SetMergeRequestContent records the assembled title and description. Independent of
+// SetMergeRequest: the content exists once rendered, which is before -- and under --dry-run
+// without -- any merge request.
 func (r *Recorder) SetMergeRequestContent(title, description string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -265,9 +238,8 @@ func (r *Recorder) SetMergeRequestContent(title, description string) {
 	r.report.MergeRequestDescription = description
 }
 
-// SetAutoMerge records the outcome of the auto-merge request. err is nil when the platform
-// accepted it. It is a no-op when no merge request was recorded, since auto-merge is only ever
-// requested for one that exists.
+// SetAutoMerge records the outcome of the auto-merge request; err is nil when the platform
+// accepted it. A no-op when no merge request was recorded.
 func (r *Recorder) SetAutoMerge(err error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -281,9 +253,8 @@ func (r *Recorder) SetAutoMerge(err error) {
 	r.report.MergeRequest.AutoMerge = am
 }
 
-// AddAddons collects a structured section from every addon that implements Reporter. Addons that
-// do not are skipped. A nil ReportData is skipped too, so an addon that ran but had nothing to
-// say does not add an empty key.
+// AddAddons collects a section from every addon implementing Reporter. A nil ReportData is
+// skipped too, so an addon with nothing to say does not add an empty key.
 func (r *Recorder) AddAddons(addons []internal.Addon) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -316,9 +287,8 @@ func (r *Recorder) Finish() Report {
 	return r.report
 }
 
-// Check is the document "drupdater check --report" writes. It is a distinct shape from Report
-// because a preflight is not a run: there are no phases, no packages and no branch, only a list
-// of prerequisites and whether each one holds.
+// Check is the document "drupdater check --report" writes. A distinct shape from Report: a
+// preflight has no phases, packages or branch, only prerequisites and whether each holds.
 type Check struct {
 	SchemaVersion    int       `json:"schema_version"`
 	DrupdaterVersion string    `json:"drupdater_version"`
@@ -363,14 +333,12 @@ func WriteCheck(fs afero.Fs, path string, check Check, redact func(string) strin
 
 // Write serialises rep to path.
 //
-// redact is applied to the marshalled document as a whole rather than to individual fields: the
-// report must never carry a credential, and filtering the finished JSON means a value that
-// reaches it through a field nobody thought about -- an error string quoting an authenticated
-// URL, say -- is caught anyway. Pass logging.Redactor.Redact; a nil redact writes the document
-// unfiltered and is only appropriate in tests.
+// redact runs over the whole marshalled document, not per field, so a credential reaching it
+// through a field nobody thought about -- an error string quoting an authenticated URL -- is
+// caught anyway. Pass logging.Redactor.Redact; nil writes unfiltered and suits only tests.
 //
-// The write is atomic: the document is written to a temporary file in the destination directory
-// and renamed into place, so a reader polling for the report never observes a partial one.
+// The write is atomic (temp file plus rename), so a reader polling for the report never sees a
+// partial one.
 func Write(fs afero.Fs, path string, rep Report, redact func(string) string) error {
 	return writeJSON(fs, path, rep, redact)
 }
@@ -415,10 +383,8 @@ func writeJSON(fs afero.Fs, path string, doc any, redact func(string) string) er
 	return nil
 }
 
-// SanitizeURL strips any credentials embedded in a URL's userinfo, so a repository URL of the
-// form https://user:token@host/repo.git cannot carry a secret into the report. Values that do
-// not parse as a URL are returned unchanged: they are not URLs, so there is no userinfo to
-// remove, and mangling them would lose information for no gain.
+// SanitizeURL strips a URL's userinfo, so https://user:token@host/repo.git cannot carry a
+// secret into the report. Values that do not parse as a URL are returned unchanged.
 func SanitizeURL(raw string) string {
 	if raw == "" {
 		return ""
