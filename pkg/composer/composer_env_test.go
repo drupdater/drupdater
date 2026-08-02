@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 	"os/exec"
-	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -33,7 +32,7 @@ func fakeComposer(t *testing.T, env []string) {
 
 func TestComposerEnv(t *testing.T) {
 	t.Run("forces the settings drupdater depends on when they are absent", func(t *testing.T) {
-		got := composerEnv([]string{"PATH=/usr/bin"})
+		got := Env([]string{"PATH=/usr/bin"})
 
 		assert.Contains(t, got, "PATH=/usr/bin", "unrelated entries must survive")
 		assert.Contains(t, got, "COMPOSER_PROCESS_TIMEOUT=0")
@@ -41,7 +40,7 @@ func TestComposerEnv(t *testing.T) {
 	})
 
 	t.Run("overrides an inherited value, leaving exactly one entry per variable", func(t *testing.T) {
-		got := composerEnv([]string{
+		got := Env([]string{
 			"COMPOSER_PROCESS_TIMEOUT=300",
 			"COMPOSER_NO_AUDIT=0",
 			"COMPOSER_AUTH={}",
@@ -61,7 +60,7 @@ func TestComposerEnv(t *testing.T) {
 	t.Run("leaves the image's policy variables to the environment", func(t *testing.T) {
 		// These are deployment policy, not correctness: forcing them would override a developer
 		// running the binary outside the image with a composer home of their own choosing.
-		got := composerEnv([]string{
+		got := Env([]string{
 			"COMPOSER_HOME=/home/dev/.composer",
 			"COMPOSER_CACHE_DIR=/home/dev/.cache/composer",
 			"COMPOSER_ALLOW_SUPERUSER=0",
@@ -78,16 +77,16 @@ func TestComposerEnv(t *testing.T) {
 		// Including one that is a bare forced variable name: os.Environ() promises nothing about
 		// its entries containing "=", and a name on its own assigns nothing and so overrides
 		// nothing.
-		got := composerEnv([]string{"NOT_AN_ASSIGNMENT", "COMPOSER_PROCESS_TIMEOUT"})
+		got := Env([]string{"NOT_AN_ASSIGNMENT", "COMPOSER_PROCESS_TIMEOUT"})
 
 		assert.Contains(t, got, "NOT_AN_ASSIGNMENT")
 		assert.Contains(t, got, "COMPOSER_PROCESS_TIMEOUT")
 	})
 
 	t.Run("preserves the order of the entries it keeps", func(t *testing.T) {
-		got := composerEnv([]string{"A=1", "COMPOSER_NO_AUDIT=0", "B=2", "C=3"})
+		got := Env([]string{"A=1", "COMPOSER_NO_AUDIT=0", "B=2", "C=3"})
 
-		assert.Equal(t, []string{"A=1", "B=2", "C=3"}, kept(got),
+		assert.Equal(t, []string{"A=1", "B=2", "C=3"}, withoutRequired(got),
 			"removing a forced entry must not reorder the rest")
 	})
 }
@@ -101,17 +100,6 @@ func countKey(env []string, key string) int {
 		}
 	}
 	return count
-}
-
-// kept returns the entries of env that composerEnv did not append itself.
-func kept(env []string) []string {
-	var result []string
-	for _, entry := range env {
-		if !slices.Contains(requiredComposerEnv, entry) {
-			result = append(result, entry)
-		}
-	}
-	return result
 }
 
 func TestExecComposerEnvironmentReachesTheSubprocess(t *testing.T) {

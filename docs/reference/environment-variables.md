@@ -94,9 +94,14 @@ Set on **every** Composer invocation, to `0` and `1` respectively. A value inher
 the surrounding environment is replaced; everything else in the environment — including
 `COMPOSER_AUTH` — is passed through untouched.
 
+That covers the tools Drupdater runs *through* Composer as well: Drush, PHPCS/PHPCBF and
+Rector are all invoked as `composer exec -- <tool>`, which makes them subprocesses of
+Composer and so subject to the same process timeout. A `drush updatedb` on a large site
+is exactly the kind of call that outlasts the default.
+
 | Variable | Forced value | Why Drupdater requires it |
 |---|---|---|
-| `COMPOSER_PROCESS_TIMEOUT` | `0` | Composer's default caps every process it spawns at 300s. A `drupal/core` clone or a large `composer install` on a slow network exceeds that, and the run dies mid-phase with a message about a killed subprocess and no visible connection to a timeout nobody configured. |
+| `COMPOSER_PROCESS_TIMEOUT` | `0` | Composer's default caps every process it spawns at 300s. A `drupal/core` clone, a large `composer install` on a slow network, or a `drush site:install` exceeds that, and the run dies mid-phase with a message about a killed subprocess and no visible connection to a timeout nobody configured. |
 | `COMPOSER_NO_AUDIT` | `1` | Suppresses the implicit audit Composer runs after `update`, whose extra output the update parsing is not written against. Auditing is the [`composer_audit`](addons/composer-audit.md) addon's job, on its own schedule; the explicit `composer audit` that addon runs is unaffected. |
 
 These are forced in code rather than left to the image, so they hold however Drupdater was

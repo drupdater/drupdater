@@ -293,7 +293,7 @@ func TestPropertyAuditUnmarshalOrdersAbandonedByName(t *testing.T) {
 	})
 }
 
-// TestPropertyComposerEnvLeavesEverythingElseAlone states the law composerEnv has to obey for
+// TestPropertyComposerEnvLeavesEverythingElseAlone states the law Env has to obey for
 // the Dockerfile's other variables, COMPOSER_AUTH, PATH and anything else a deployment sets: it
 // forces the entries drupdater's correctness depends on and passes every other entry through
 // unchanged and in order. Forcing an environment by rebuilding it is the kind of change that
@@ -302,7 +302,7 @@ func TestPropertyComposerEnvLeavesEverythingElseAlone(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		env := rapid.SliceOfN(envEntryGen(), 0, 8).Draw(t, "env")
 
-		got := composerEnv(env)
+		got := Env(env)
 
 		// Every entry that does not assign a forced variable survives, in its original order.
 		var want []string
@@ -320,7 +320,7 @@ func TestPropertyComposerEnvLeavesEverythingElseAlone(t *testing.T) {
 		}
 
 		// Applying it again changes nothing: the result is already a valid composer environment.
-		assert.Equal(t, got, composerEnv(got))
+		assert.Equal(t, got, Env(got))
 	})
 }
 
@@ -351,7 +351,8 @@ func assignsRequiredKey(entry string) bool {
 	})
 }
 
-// withoutRequired drops the entries composerEnv appends, leaving what it carried over.
+// withoutRequired drops the entries Env appends, leaving what it carried over. Shared with the
+// example-based tests in composer_env_test.go.
 func withoutRequired(env []string) []string {
 	var result []string
 	for _, entry := range env {

@@ -36,9 +36,9 @@ func NewCLI(logger *zap.Logger) *CLI {
 }
 
 // requiredComposerEnv is the Composer configuration drupdater's own correctness depends on, as
-// KEY=VALUE entries. It is forced on every Composer invocation (see composerEnv) rather than
-// left to the Dockerfile, which sets the same values but only for runs that happen to use the
-// published image — `make build` and an installed binary get neither.
+// KEY=VALUE entries. It is forced on every Composer invocation (see Env) rather than left to
+// the Dockerfile, which sets the same values but only for runs that happen to use the published
+// image — `make build` and an installed binary get neither.
 //
 //   - COMPOSER_PROCESS_TIMEOUT: Composer's documented default of 300s applies to the processes
 //     it spawns, and a drupal/core clone or a large install on a slow network exceeds it. The
@@ -58,7 +58,7 @@ var requiredComposerEnv = []string{
 	"COMPOSER_NO_AUDIT=1",
 }
 
-// composerEnv returns env with requiredComposerEnv applied: every other entry is passed through
+// Env returns env with requiredComposerEnv applied: every other entry is passed through
 // unchanged and in order — notably COMPOSER_AUTH, which carries private registry credentials —
 // and any inherited assignment to a required variable is dropped in favour of the value
 // drupdater needs.
@@ -66,7 +66,14 @@ var requiredComposerEnv = []string{
 // Dropping rather than appending matters: os/exec resolves duplicate keys itself, so leaving the
 // inherited entry in place would make the outcome depend on that behaviour instead of on this
 // function, and would leave the losing value visible in the command's Env.
-func composerEnv(env []string) []string {
+//
+// It is exported because this package is not the only one that runs composer: drush, phpcs and
+// rector are all invoked through `composer exec`, which makes them subprocesses of composer and
+// so subject to the same process timeout. Every package that builds a composer *exec.Cmd should
+// set its Env from this:
+//
+//	command.Env = composer.Env(command.Environ())
+func Env(env []string) []string {
 	result := make([]string, 0, len(env)+len(requiredComposerEnv))
 	for _, entry := range env {
 		key, _, isAssignment := strings.Cut(entry, "=")
@@ -89,7 +96,7 @@ func (s *CLI) execComposer(ctx context.Context, dir string, args ...string) (str
 	// Environ() resolves to os.Environ() when the caller set no explicit environment, so this
 	// forces drupdater's requirements on top of whatever the deployment provides instead of
 	// replacing it.
-	command.Env = composerEnv(command.Environ())
+	command.Env = Env(command.Environ())
 
 	out, err := command.CombinedOutput()
 	output := strings.TrimSuffix(string(out), "\n")
@@ -105,7 +112,7 @@ func (s *CLI) execComposer(ctx context.Context, dir string, args ...string) (str
 func (s *CLI) execComposerJSON(ctx context.Context, dir string, args ...string) (string, error) {
 	command := execCommand(ctx, "composer", args...)
 	command.Dir = dir
-	command.Env = composerEnv(command.Environ())
+	command.Env = Env(command.Environ())
 
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout

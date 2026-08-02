@@ -5,12 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"os/exec"
 	"strings"
 
 	"github.com/maypok86/otter"
 	"go.uber.org/zap"
+
+	"github.com/drupdater/drupdater/pkg/composer"
 )
 
 var execCommand = exec.CommandContext
@@ -31,9 +32,11 @@ func NewCLI(logger *zap.Logger, cache otter.Cache[string, string]) *CLI {
 func (e *CLI) execDrush(ctx context.Context, dir string, site string, args ...string) (string, error) {
 	command := execCommand(ctx, "composer", append([]string{"exec", "--", "drush"}, args...)...)
 	command.Dir = dir
-	// System env first, then our override so SITE_NAME always wins even if
-	// the parent process has SITE_NAME set in its environment.
-	command.Env = append(os.Environ(), "SITE_NAME="+site)
+	// The composer environment first — drush runs through `composer exec`, which makes it a
+	// subprocess of composer and so subject to composer's process timeout, and `site:install`
+	// and `updatedb` both outlast its 300s default — then our override so SITE_NAME always wins
+	// even if the parent process has SITE_NAME set in its environment.
+	command.Env = append(composer.Env(command.Environ()), "SITE_NAME="+site)
 
 	out, err := command.CombinedOutput()
 	output := strings.TrimSuffix(string(out), "\n")
@@ -49,7 +52,7 @@ func (e *CLI) execDrush(ctx context.Context, dir string, site string, args ...st
 func (e *CLI) execDrushStreams(ctx context.Context, dir string, site string, args ...string) (stdout string, stderr string, err error) {
 	command := execCommand(ctx, "composer", append([]string{"exec", "--", "drush"}, args...)...)
 	command.Dir = dir
-	command.Env = append(os.Environ(), "SITE_NAME="+site)
+	command.Env = append(composer.Env(command.Environ()), "SITE_NAME="+site)
 
 	var so, se bytes.Buffer
 	command.Stdout = &so
