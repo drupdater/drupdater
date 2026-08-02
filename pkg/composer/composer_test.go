@@ -599,6 +599,49 @@ func TestRemove(t *testing.T) {
 	})
 }
 
+func TestRequire(t *testing.T) {
+	service := &CLI{logger: zap.NewNop()}
+
+	t.Run("success", func(t *testing.T) {
+		var seen []string
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+			seen = arg
+			cs := []string{"-test.run=TestHelperProcess", "--", "ok"}
+			cs = append(cs, arg...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+
+		out, err := service.Require(t.Context(), "/tmp", "--dev", "drupal/coder")
+		require.NoError(t, err)
+		assert.Equal(t, "ok", out)
+
+		// The caller's arguments have to survive in order, after the flag: composer reads
+		// "--dev" as applying to the packages that follow it.
+		assert.Equal(t, []string{"require", "--ignore-platform-reqs", "--dev", "drupal/coder"}, seen)
+	})
+
+	t.Run("error", func(t *testing.T) {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--"}
+			cs = append(cs, arg...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+
+		out, err := service.Require(t.Context(), "/tmp", "palantirnet/drupal-rector")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to require package")
+		// Deliberately empty on failure: the output is in the error, and a caller that used it
+		// anyway would be acting on the output of a command that did not run.
+		assert.Empty(t, out)
+	})
+}
+
 func TestNormalize(t *testing.T) {
 	service := &CLI{logger: zap.NewNop()}
 

@@ -106,5 +106,103 @@
         ]
       }
     }
+  },
+  {
+    "name": "multisite-patches",
+    "description": "A patch that stops applying once its package moves, so composer_patches has to report a conflict and hold the package back. The patch names no issue number, which keeps the outcome the same on every run: with one, the addon would ask drupal.org what happened to it and the answer would change over time",
+    "repository_url": "https://github.com/drupdater/test-drupal-multisite.git",
+    "branch": "patches/conflict",
+    "modes": [
+      "normal"
+    ],
+    "expect": {
+      "normal": {
+        "status": [
+          "success"
+        ],
+        "min_packages": 1,
+        "packages_match": [
+          "^drupal/core"
+        ],
+        "phases": [
+          "acquire working copy",
+          "preflight",
+          "composer install",
+          "baseline site install",
+          "update shared code",
+          "site update",
+          "render merge request"
+        ],
+        "addons": [
+          "composer_patches"
+        ]
+      }
+    }
+  },
+  {
+    "name": "multisite-shallow",
+    "description": "Cloned with --depth 1 so preflight's git-history check rejects it. Not a property of the repository, which is why this entry shares main with drupal-multisite and only sets shallow",
+    "repository_url": "https://github.com/drupdater/test-drupal-multisite.git",
+    "branch": "main",
+    "shallow": true,
+    "modes": [
+      "normal"
+    ],
+    "expect": {
+      "normal": {
+        "status": [
+          "failed"
+        ],
+        "failed_phase": "preflight",
+        "phases": [
+          "acquire working copy"
+        ]
+      }
+    }
+  },
+  {
+    "name": "multisite-unsatisfiable",
+    "description": "A root constraint no release can satisfy, so composer update fails and the run reports the phase that did the work rather than a bare non-zero exit",
+    "repository_url": "https://github.com/drupdater/test-drupal-multisite.git",
+    "branch": "broken/unsatisfiable",
+    "modes": [
+      "normal"
+    ],
+    "expect": {
+      "normal": {
+        "status": [
+          "failed"
+        ],
+        "failed_phase": "update shared code",
+        "phases": [
+          "acquire working copy",
+          "preflight",
+          "composer install",
+          "baseline site install"
+        ]
+      }
+    }
+  },
+  {
+    "name": "multisite-missing-site",
+    "description": "A third site listed in .drupdater.yaml that has no directory, so one of the concurrent baseline installs fails. The only fixture that exercises forEachSite's error handling under concurrency, and the only failure case that pays for a full composer install first",
+    "repository_url": "https://github.com/drupdater/test-drupal-multisite.git",
+    "branch": "broken/missing-site",
+    "modes": [
+      "normal"
+    ],
+    "expect": {
+      "normal": {
+        "status": [
+          "failed"
+        ],
+        "failed_phase": "baseline site install",
+        "phases": [
+          "acquire working copy",
+          "preflight",
+          "composer install"
+        ]
+      }
+    }
   }
 ]

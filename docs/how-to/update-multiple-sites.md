@@ -121,5 +121,5 @@ heading per site:
 
 [`drupdater/test-drupal-multisite`](https://github.com/drupdater/test-drupal-multisite) is
 a two-site project laid out exactly as described above, and Drupdater's integration job
-runs against it on every release. Read it if you would rather copy a working `sites.php`,
+runs against it. Read it if you would rather copy a working `sites.php`,
 `settings.php` and configuration layout than assemble one from the snippets here.
