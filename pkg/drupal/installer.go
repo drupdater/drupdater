@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/spf13/afero"
 	"gopkg.in/yaml.v3"
 
@@ -69,11 +70,10 @@ func (is *Installer) ConfigureDatabase(ctx context.Context, dir string, site str
 	siteLogger := is.logger.With(zap.String("site", site))
 	siteLogger.Debug("configuring database", zap.String("dir", dir))
 
-	webroot, err := is.composer.GetConfig(ctx, dir, "extra.drupal-scaffold.locations.web-root")
+	webroot, err := composer.WebRoot(ctx, is.composer, dir)
 	if err != nil {
 		return fmt.Errorf("failed to get Drupal web dir: %w", err)
 	}
-	webroot = strings.TrimSuffix(webroot, "/")
 
 	settingsPath := dir + "/" + webroot + "/sites/" + site + "/settings.php"
 	if existing, err := afero.ReadFile(is.fs, settingsPath); err == nil && strings.Contains(string(existing), settingsMarker) {

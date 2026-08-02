@@ -889,13 +889,29 @@ func (s *CLI) UpdateLockHash(ctx context.Context, dir string) error {
 	return err
 }
 
+// ConfigGetter is the one method WebRoot needs, so a caller's own narrow composer interface
+// satisfies it without importing this package's whole CLI.
+type ConfigGetter interface {
+	GetConfig(ctx context.Context, dir string, key string) (string, error)
+}
+
+// WebRoot returns the project's Drupal web root, relative to dir and without a trailing slash.
+// Everything Drupal — settings.php, custom modules, the config sync directory — is addressed
+// from it, so several packages need the same lookup.
+func WebRoot(ctx context.Context, cfg ConfigGetter, dir string) (string, error) {
+	webroot, err := cfg.GetConfig(ctx, dir, "extra.drupal-scaffold.locations.web-root")
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSuffix(webroot, "/"), nil
+}
+
 func (s *CLI) GetCustomCodeDirectories(ctx context.Context, dir string) ([]string, error) {
-	webroot, err := s.GetConfig(ctx, dir, "extra.drupal-scaffold.locations.web-root")
+	webroot, err := WebRoot(ctx, s, dir)
 	if err != nil {
 		s.logger.Error("failed to get Drupal web dir", zap.String("dir", dir), zap.Error(err))
 		return nil, err
 	}
-	webroot = strings.TrimSuffix(webroot, "/")
 
 	possibleDirectories := []string{webroot + "/modules/custom", webroot + "/themes/custom", webroot + "/profiles/custom"}
 	var customCodeDirectories []string

@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
-	"strings"
 
+	composerpkg "github.com/drupdater/drupdater/pkg/composer"
 	"github.com/spf13/afero"
 )
 
@@ -80,11 +80,10 @@ type ComposerConfigGetter interface {
 func CheckSiteSettings(ctx context.Context, composer ComposerConfigGetter, fs afero.Fs, workingDir string, site string) CheckResult {
 	name := fmt.Sprintf("site %q: settings.php", site)
 
-	webroot, err := composer.GetConfig(ctx, workingDir, "extra.drupal-scaffold.locations.web-root")
+	webroot, err := composerpkg.WebRoot(ctx, composer, workingDir)
 	if err != nil {
 		return CheckFailed(name, fmt.Sprintf("could not determine web root: %s", err))
 	}
-	webroot = strings.TrimSuffix(webroot, "/")
 
 	relPath := filepath.Join(webroot, "sites", site, "settings.php")
 	if _, err := fs.Stat(filepath.Join(workingDir, relPath)); err != nil {
