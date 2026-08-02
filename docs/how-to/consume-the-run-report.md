@@ -124,8 +124,13 @@ security run produce different sets. Drupdater's own fixtures split them:
 
 | Run type | Addons expected |
 |---|---|
-| `normal` | `update_hooks`, `unsupported_modules`, `code_beautifier`, `deprecations_remover`, `translations_updater` |
-| `security` | `composer_audit`, `update_hooks` |
+| `normal` | `update_hooks`, `unsupported_modules`, `composer_audit`, `code_beautifier`, `deprecations_remover`, `translations_updater` |
+| `security` | `composer_audit`, `unsupported_modules`, `update_hooks` |
+
+`composer_audit` and `unsupported_modules` appear in both because both addons run on every
+update. Each is still omitted when it has nothing to say — `composer_audit` when the run
+found no advisories at all, `unsupported_modules` when every installed module is supported —
+so expect them only for a project where you know there is something to find.
 
 Note that [`composer_diff`](../reference/addons/composer-diff.md) and
 [`composer_normalizer`](../reference/addons/composer-normalizer.md) never appear in the

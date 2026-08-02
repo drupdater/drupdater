@@ -26,7 +26,13 @@ func TestComposerAuditReportData(t *testing.T) {
 
 	ca := &ComposerAudit{
 		beforeAudit: composer.Audit{Advisories: []composer.Advisory{before, stillOpen}},
-		afterAudit:  composer.Audit{Advisories: []composer.Advisory{stillOpen}},
+		afterAudit: composer.Audit{
+			Advisories: []composer.Advisory{stillOpen},
+			Abandoned: []composer.AbandonedPackage{
+				{PackageName: "drupal/token"},
+				{PackageName: "swiftmailer/swiftmailer", Replacement: "symfony/mailer"},
+			},
+		},
 	}
 
 	assert.Equal(t, "composer_audit", ca.ReportKey())
@@ -37,6 +43,41 @@ func TestComposerAuditReportData(t *testing.T) {
 	assert.Equal(t, "CVE-1", data.Fixed[0].CVE)
 	require.Len(t, data.Remaining, 1)
 	assert.Equal(t, "CVE-2", data.Remaining[0].CVE)
+	// drupal/* is left to unsupported_modules, so only the non-Drupal package is reported here.
+	assert.Equal(t, []composer.AbandonedPackage{
+		{PackageName: "swiftmailer/swiftmailer", Replacement: "symfony/mailer"},
+	}, data.Abandoned)
+}
+
+// TestComposerAuditReportDataOnAbandonedAlone covers the case where the update resolved every
+// advisory it found: the section is still worth emitting, because the abandoned packages in it
+// are a standing finding that no update is going to clear.
+func TestComposerAuditReportDataOnAbandonedAlone(t *testing.T) {
+	ca := &ComposerAudit{
+		afterAudit: composer.Audit{
+			Abandoned: []composer.AbandonedPackage{{PackageName: "patchwork/jsqueeze"}},
+		},
+	}
+
+	data, ok := ca.ReportData().(SecurityAdvisories)
+	require.True(t, ok, "an abandoned package alone must still produce a section")
+	assert.Empty(t, data.Fixed)
+	assert.Empty(t, data.Remaining)
+	require.Len(t, data.Abandoned, 1)
+	assert.Equal(t, "patchwork/jsqueeze", data.Abandoned[0].PackageName)
+}
+
+// TestComposerAuditReportDataNilWhenOnlyDrupalPackagesAreAbandoned checks the drupal/* filter
+// applies before the "nothing to report" decision, so a run whose only finding belongs to
+// unsupported_modules does not add an empty composer_audit section.
+func TestComposerAuditReportDataNilWhenOnlyDrupalPackagesAreAbandoned(t *testing.T) {
+	ca := &ComposerAudit{
+		afterAudit: composer.Audit{
+			Abandoned: []composer.AbandonedPackage{{PackageName: "drupal/token"}},
+		},
+	}
+
+	assert.Nil(t, ca.ReportData())
 }
 
 func TestComposerAuditReportDataNilWhenNothingToReport(t *testing.T) {

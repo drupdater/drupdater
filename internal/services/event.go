@@ -149,9 +149,30 @@ func (e *PostSiteUpdateEvent) Site() string {
 	return e.site
 }
 
+// AbandonedPackage names a package whose maintainers have marked it abandoned, together with
+// the successor they suggested — empty when they suggested none.
+//
+// It mirrors composer.AbandonedPackage rather than reusing it. This type is the wire between
+// two addons, and the workflow has no business depending on how one of them happens to obtain
+// its data; a change to composer's output shape must not reach through to the other side.
+type AbandonedPackage struct {
+	Name        string
+	Replacement string
+}
+
 type PreMergeRequestCreateEvent struct {
 	event.BasicEvent
 	Title string
+	// AbandonedPackages is contributed by composer_audit and consumed by unsupported_modules,
+	// which renders both kinds of end-of-life finding as one list. An abandoned package and an
+	// unsupported module are the same thing to a reviewer — something that will get no further
+	// fixes and needs a decision — so splitting them across two sections of the same merge
+	// request would be an artefact of which addon happened to find them.
+	//
+	// This works because both addons' data is complete by the time this event fires, and the
+	// description is rendered after it. The producer subscribes at Normal and the consumer at
+	// BelowNormal, so the list is filled in before it is read.
+	AbandonedPackages []AbandonedPackage
 }
 
 // NewPreMergeRequestCreateEvent creates a new PreMergeRequestCreateEvent instance

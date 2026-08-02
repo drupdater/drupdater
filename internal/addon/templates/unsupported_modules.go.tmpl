@@ -1,9 +1,9 @@
-## ⚠️ Unsupported modules
+## ⚠️ Unsupported modules and abandoned packages
 
-The following installed modules have reached end-of-life: they have no supported upgrade path, so they will not receive further fixes. Consider planning a replacement.
+The following are no longer maintained: an unsupported module has no supported release on Drupal.org, an abandoned package has been marked as such by its maintainers. Neither will receive further fixes, including security ones, and no update will resolve it. Each needs a decision — replace it, adopt it, or accept the risk.
 
-| Module | Installed version | Recommended version |
-| ------ | ------------------ | -------------------- |
+| Name | Status | Installed version | Recommendation |
+| ---- | ------ | ----------------- | -------------- |
 {{ range . -}}
-| {{ .Name | cell }} | {{ .InstalledVersion | cell }} | {{ .RecommendedVersion | cell }} |
+| {{ .Name | cell }} | {{ .Status | cell }} | {{ if .InstalledVersion }}{{ .InstalledVersion | cell }}{{ else }}—{{ end }} | {{ .Recommendation | cell }} |
 {{ end -}}

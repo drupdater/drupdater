@@ -166,29 +166,49 @@ func TestCreateAddons(t *testing.T) {
 		}
 		addons, err := createAddons(logger, config, nil, nil, nil, nil)
 		require.NoError(t, err)
-		// 4 mandatory + code_beautifier
-		assert.Len(t, addons, 5)
+		assert.Len(t, addons, len(mandatoryAddons)+1)
 	})
 
-	t.Run("security mode adds composer_audit even when not listed", func(t *testing.T) {
-		config := internal.Config{
-			Security: true,
-			RunTypes: internal.RunTypesConfig{
-				Normal:   internal.RunTypeConfig{Addons: []string{"code_beautifier"}},
-				Security: internal.RunTypeConfig{Addons: []string{"code_beautifier"}}, // composer_audit intentionally omitted
-			},
-		}
+	t.Run("composer_audit and unsupported_modules run on a normal update", func(t *testing.T) {
+		// Both are mandatory in either mode: between them they are the project's "no longer
+		// maintained" report, and they render it as one list. A mode that ran only one of them
+		// would publish half a list.
+		config := internal.Config{RunTypes: internal.RunTypesConfig{Normal: internal.RunTypeConfig{}}}
 		addons, err := createAddons(logger, config, nil, nil, nil, nil)
 		require.NoError(t, err)
-		// 4 mandatory + composer_audit + code_beautifier
-		assert.Len(t, addons, 6)
+		assert.Len(t, addons, len(mandatoryAddons))
+		assert.Contains(t, mandatoryAddons, "composer_audit")
+		assert.Contains(t, mandatoryAddons, "unsupported_modules")
+	})
+
+	// composer_audit now runs in both modes, so --security has to reach it some other way than
+	// by its mere presence. These two pin that wiring on the one difference visible from here:
+	// only a security run relabels the merge request.
+	t.Run("security mode lets composer_audit relabel the merge request", func(t *testing.T) {
+		config := internal.Config{Security: true, RunTypes: internal.RunTypesConfig{Security: internal.RunTypeConfig{}}}
+		addons, err := createAddons(logger, config, nil, nil, nil, nil)
+		require.NoError(t, err)
+
+		evt := services.NewPreMergeRequestCreateEvent("July 2026: Drupal Maintenance Updates")
+		require.NoError(t, createDispatcher(addons).FireEvent(evt))
+		assert.Contains(t, evt.Title, "Drupal Security Updates")
+	})
+
+	t.Run("a normal run keeps the maintenance title", func(t *testing.T) {
+		config := internal.Config{RunTypes: internal.RunTypesConfig{Normal: internal.RunTypeConfig{}}}
+		addons, err := createAddons(logger, config, nil, nil, nil, nil)
+		require.NoError(t, err)
+
+		evt := services.NewPreMergeRequestCreateEvent("July 2026: Drupal Maintenance Updates")
+		require.NoError(t, createDispatcher(addons).FireEvent(evt))
+		assert.Equal(t, "July 2026: Drupal Maintenance Updates", evt.Title)
 	})
 
 	t.Run("a mandatory addon listed in the YAML is not duplicated", func(t *testing.T) {
 		config := internal.Config{RunTypes: internal.RunTypesConfig{Normal: internal.RunTypeConfig{Addons: []string{"update_hooks"}}}}
 		addons, err := createAddons(logger, config, nil, nil, nil, nil)
 		require.NoError(t, err)
-		assert.Len(t, addons, 4) // update_hooks is already mandatory
+		assert.Len(t, addons, len(mandatoryAddons)) // update_hooks is already mandatory
 	})
 
 	t.Run("an unknown addon name is an error", func(t *testing.T) {
@@ -224,13 +244,12 @@ func TestValidateAddons(t *testing.T) {
 func TestConfigurableAddons(t *testing.T) {
 	names := configurableAddons()
 
-	// Exactly the five configurable addons, sorted, and nothing mandatory.
+	// Exactly the four configurable addons, sorted, and nothing mandatory.
 	assert.Equal(t, []string{
 		"code_beautifier",
 		"composer_normalizer",
 		"deprecations_remover",
 		"translations_updater",
-		"unsupported_modules",
 	}, names)
 
 	for _, mandatory := range append(mandatoryAddons, "composer_audit") {

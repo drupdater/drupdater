@@ -410,11 +410,16 @@ type addonDeps struct {
 	composer  addon.Composer
 	drupalOrg addon.DrupalOrg
 	git       addon.Repository
+	// security marks a --security run. Only composer_audit reads it, to tell the run whose
+	// scope it dictates from the one it merely describes.
+	security bool
 }
 
 // addonRegistry maps the names used in .drupdater.yaml to their constructors.
 var addonRegistry = map[string]func(addonDeps) internal.Addon{
-	"composer_audit": func(d addonDeps) internal.Addon { return addon.NewComposerAudit(d.logger, d.composer) },
+	"composer_audit": func(d addonDeps) internal.Addon {
+		return addon.NewComposerAudit(d.logger, d.composer, d.security)
+	},
 	"code_beautifier": func(d addonDeps) internal.Addon {
 		return addon.NewCodeBeautifier(d.logger, phpcs.NewCLI(d.logger), d.composer)
 	},
@@ -433,7 +438,20 @@ var addonRegistry = map[string]func(addonDeps) internal.Addon{
 }
 
 // mandatoryAddons always run, regardless of the .drupdater.yaml addon lists.
-var mandatoryAddons = []string{"composer_allow_plugins", "composer_patches", "composer_diff", "update_hooks"}
+//
+// composer_audit and unsupported_modules are in here together, and for the same reason: between
+// them they answer "what in this project is no longer getting fixes?" — composer_audit for the
+// packages Packagist knows about, unsupported_modules for the modules Drupal.org knows about.
+// Either one alone covers half a project. They also render that answer as a single list, which
+// only works if both run on every update rather than one in each mode.
+var mandatoryAddons = []string{
+	"composer_allow_plugins",
+	"composer_patches",
+	"composer_diff",
+	"update_hooks",
+	"composer_audit",
+	"unsupported_modules",
+}
 
 // createAddons builds the addons to run: the mandatory ones plus the configurable ones listed
 // for the active mode (security or regular) in the config. An unknown addon name is an error.
@@ -445,7 +463,7 @@ func createAddons(
 	drupalOrg addon.DrupalOrg,
 	git addon.Repository,
 ) ([]internal.Addon, error) {
-	deps := addonDeps{logger: logger, drush: drush, composer: composer, drupalOrg: drupalOrg, git: git}
+	deps := addonDeps{logger: logger, drush: drush, composer: composer, drupalOrg: drupalOrg, git: git, security: config.Security}
 
 	names := config.ActiveRunType().Addons
 
@@ -466,12 +484,6 @@ func createAddons(
 
 	for _, name := range mandatoryAddons {
 		if err := build(name); err != nil {
-			return nil, err
-		}
-	}
-	// composer_audit is mandatory in security mode.
-	if config.Security {
-		if err := build("composer_audit"); err != nil {
 			return nil, err
 		}
 	}
@@ -496,10 +508,9 @@ func validateAddons(config internal.Config) error {
 }
 
 // configurableAddons returns the sorted addon names a user can set in .drupdater.yaml — every
-// registered addon except the ones that always run (mandatoryAddons and, in security mode,
-// composer_audit).
+// registered addon except the mandatoryAddons, which always run.
 func configurableAddons() []string {
-	excluded := map[string]bool{"composer_audit": true}
+	excluded := make(map[string]bool, len(mandatoryAddons))
 	for _, n := range mandatoryAddons {
 		excluded[n] = true
 	}

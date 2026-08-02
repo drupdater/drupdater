@@ -22,7 +22,7 @@ func TestNewComposerAudit(t *testing.T) {
 
 	// Execute
 	before := time.Now()
-	audit := NewComposerAudit(logger, mockComposer)
+	audit := NewComposerAudit(logger, mockComposer, true)
 	after := time.Now()
 
 	// Assert
@@ -61,7 +61,7 @@ func TestComposerAudit_PreComposerUpdateHandler_WithAdvisories(t *testing.T) {
 	// Setup
 	logger := zap.NewNop()
 	mockComposer := NewMockComposer(t)
-	audit := NewComposerAudit(logger, mockComposer)
+	audit := NewComposerAudit(logger, mockComposer, true)
 	worktree := NewMockWorktree(t)
 
 	ctx := context.Background()
@@ -102,7 +102,7 @@ func TestComposerAudit_PreComposerUpdateHandler_NoAdvisories(t *testing.T) {
 	// Setup
 	logger := zap.NewNop()
 	mockComposer := NewMockComposer(t)
-	audit := NewComposerAudit(logger, mockComposer)
+	audit := NewComposerAudit(logger, mockComposer, true)
 	worktree := NewMockWorktree(t)
 
 	ctx := context.Background()
@@ -132,7 +132,7 @@ func TestComposerAudit_PostCodeUpdateHandler(t *testing.T) {
 	logger := zap.NewNop()
 	mockComposer := NewMockComposer(t)
 	worktree := NewMockWorktree(t)
-	audit := NewComposerAudit(logger, mockComposer)
+	audit := NewComposerAudit(logger, mockComposer, true)
 
 	ctx := context.Background()
 	path := "/test/path"
@@ -236,7 +236,8 @@ func TestComposerAudit_PreMergeRequestCreateHandler(t *testing.T) {
 	// Setup
 	fixedDate := time.Date(2023, 5, 15, 12, 0, 0, 0, time.UTC)
 	audit := &ComposerAudit{
-		current: fixedDate,
+		current:  fixedDate,
+		security: true,
 	}
 
 	mockEvent := &services.PreMergeRequestCreateEvent{}
@@ -254,7 +255,7 @@ func TestComposerAudit_PreMergeRequestCreateHandler(t *testing.T) {
 func TestComposerAudit_RenderTemplate(t *testing.T) {
 	logger := zap.NewNop()
 	mockComposer := NewMockComposer(t)
-	audit := NewComposerAudit(logger, mockComposer)
+	audit := NewComposerAudit(logger, mockComposer, true)
 
 	audit.beforeAudit = composer.Audit{
 		Advisories: []composer.Advisory{
@@ -293,7 +294,7 @@ func TestComposerAudit_RenderTemplate(t *testing.T) {
 // TestComposerAudit_RenderTemplate_EscapesPipes ensures a "|" in an advisory
 // title is escaped so it can't break out of the markdown table cell.
 func TestComposerAudit_RenderTemplate_EscapesPipes(t *testing.T) {
-	audit := NewComposerAudit(zap.NewNop(), NewMockComposer(t))
+	audit := NewComposerAudit(zap.NewNop(), NewMockComposer(t), true)
 	audit.afterAudit = composer.Audit{
 		Advisories: []composer.Advisory{
 			{PackageName: "drupal/foo", CVE: "CVE-1", Title: "XSS via a|b\nsecond line"},
@@ -304,4 +305,158 @@ func TestComposerAudit_RenderTemplate_EscapesPipes(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, result, "XSS via a\\|b second line")
 	assert.NotContains(t, result, "a|b")
+}
+
+// TestComposerAudit_GetAbandonedPackages_FiltersDrupalPackages checks that drupal/* packages
+// are left to unsupported_modules, which reports them from drupal.org's own release data, so
+// one end-of-life module is not reported twice in the same merge request.
+func TestComposerAudit_GetAbandonedPackages_FiltersDrupalPackages(t *testing.T) {
+	audit := NewComposerAudit(zap.NewNop(), NewMockComposer(t), true)
+	audit.afterAudit = composer.Audit{
+		Abandoned: []composer.AbandonedPackage{
+			{PackageName: "drupal/token", Replacement: "drupal/core"},
+			{PackageName: "drupalfinder/drupal-finder", Replacement: "webflo/drupal-finder"},
+			{PackageName: "swiftmailer/swiftmailer", Replacement: "symfony/mailer"},
+		},
+	}
+
+	// drupalfinder/drupal-finder stays: only the drupal/ vendor is drupal.org's, and a prefix
+	// match on "drupal" alone would swallow unrelated vendors.
+	assert.Equal(t, []composer.AbandonedPackage{
+		{PackageName: "drupalfinder/drupal-finder", Replacement: "webflo/drupal-finder"},
+		{PackageName: "swiftmailer/swiftmailer", Replacement: "symfony/mailer"},
+	}, audit.GetAbandonedPackages())
+}
+
+// TestComposerAudit_GetAbandonedPackages_UsesTheAuditAfterTheUpdate checks the list describes
+// the code the merge request contains, not the code it started from.
+func TestComposerAudit_GetAbandonedPackages_UsesTheAuditAfterTheUpdate(t *testing.T) {
+	audit := NewComposerAudit(zap.NewNop(), NewMockComposer(t), true)
+	audit.beforeAudit = composer.Audit{
+		Abandoned: []composer.AbandonedPackage{{PackageName: "gone/away"}},
+	}
+	audit.afterAudit = composer.Audit{
+		Abandoned: []composer.AbandonedPackage{{PackageName: "still/here"}},
+	}
+
+	assert.Equal(t, []composer.AbandonedPackage{{PackageName: "still/here"}}, audit.GetAbandonedPackages())
+}
+
+// TestComposerAudit_PreComposerUpdateHandler_NormalMode checks that a normal run audits without
+// taking over the update. The scope of a maintenance update is the user's to decide, and an
+// update with no advisories to fix still has everything else to do — narrowing or aborting here
+// would turn every normal run into a security run.
+func TestComposerAudit_PreComposerUpdateHandler_NormalMode(t *testing.T) {
+	mockComposer := NewMockComposer(t)
+	audit := NewComposerAudit(zap.NewNop(), mockComposer, false)
+	worktree := NewMockWorktree(t)
+
+	ctx := context.Background()
+	path := "/test/path"
+	mockAudit := composer.Audit{
+		Advisories: []composer.Advisory{{PackageName: "drupal/core", CVE: "CVE-2023-1234"}},
+	}
+	mockComposer.EXPECT().Audit(ctx, path).Return(mockAudit, nil)
+
+	mockEvent := services.NewPreComposerUpdateEvent(ctx, path, worktree, []string{}, []string{}, false)
+
+	require.NoError(t, audit.preComposerUpdateHandler(mockEvent))
+	assert.Equal(t, mockAudit, audit.beforeAudit, "the audit still runs: it is what the security report is built from")
+	assert.Empty(t, mockEvent.PackagesToUpdate)
+	assert.False(t, mockEvent.MinimalChanges)
+}
+
+// TestComposerAudit_PreComposerUpdateHandler_NormalModeNoAdvisories checks the abort path is
+// security-only. On a normal run "no advisories" is the healthy case, not a reason to stop.
+func TestComposerAudit_PreComposerUpdateHandler_NormalModeNoAdvisories(t *testing.T) {
+	mockComposer := NewMockComposer(t)
+	audit := NewComposerAudit(zap.NewNop(), mockComposer, false)
+	worktree := NewMockWorktree(t)
+
+	ctx := context.Background()
+	path := "/test/path"
+	mockComposer.EXPECT().Audit(ctx, path).Return(composer.Audit{}, nil)
+
+	mockEvent := services.NewPreComposerUpdateEvent(ctx, path, worktree, []string{}, []string{}, false)
+
+	require.NoError(t, audit.preComposerUpdateHandler(mockEvent))
+}
+
+// TestComposerAudit_PreMergeRequestCreateHandler_NormalMode checks a normal run keeps the
+// maintenance title it was given, and still publishes its abandoned packages.
+func TestComposerAudit_PreMergeRequestCreateHandler_NormalMode(t *testing.T) {
+	audit := &ComposerAudit{current: time.Date(2023, 5, 15, 12, 0, 0, 0, time.UTC)}
+	audit.afterAudit = composer.Audit{
+		Abandoned: []composer.AbandonedPackage{{PackageName: "swiftmailer/swiftmailer", Replacement: "symfony/mailer"}},
+	}
+
+	mockEvent := &services.PreMergeRequestCreateEvent{Title: "July 2026: Drupal Maintenance Updates"}
+	mockEvent.SetName("pre-merge-request-create")
+
+	require.NoError(t, audit.preMergeRequestCreateHandler(mockEvent))
+	assert.Equal(t, "July 2026: Drupal Maintenance Updates", mockEvent.Title)
+	assert.Equal(t, []services.AbandonedPackage{
+		{Name: "swiftmailer/swiftmailer", Replacement: "symfony/mailer"},
+	}, mockEvent.AbandonedPackages)
+}
+
+// TestComposerAudit_PreMergeRequestCreateHandler_PublishesAbandonedPackages checks the handoff
+// to unsupported_modules, which renders these together with the unsupported modules.
+func TestComposerAudit_PreMergeRequestCreateHandler_PublishesAbandonedPackages(t *testing.T) {
+	audit := &ComposerAudit{security: true, current: time.Now()}
+	audit.afterAudit = composer.Audit{
+		Abandoned: []composer.AbandonedPackage{
+			{PackageName: "drupal/token"},
+			{PackageName: "patchwork/jsqueeze"},
+		},
+	}
+
+	mockEvent := &services.PreMergeRequestCreateEvent{}
+	mockEvent.SetName("pre-merge-request-create")
+
+	require.NoError(t, audit.preMergeRequestCreateHandler(mockEvent))
+	// drupal/* is filtered out before the handoff, so the merged list cannot show one
+	// end-of-life module as two rows.
+	assert.Equal(t, []services.AbandonedPackage{{Name: "patchwork/jsqueeze"}}, mockEvent.AbandonedPackages)
+}
+
+// TestComposerAudit_RenderTemplate_NothingToReport checks a run that found no advisories at all
+// contributes no section. Otherwise every routine merge request would carry a security report
+// whose only content is that there was nothing to report.
+func TestComposerAudit_RenderTemplate_NothingToReport(t *testing.T) {
+	audit := NewComposerAudit(zap.NewNop(), NewMockComposer(t), false)
+
+	result, err := audit.RenderTemplate()
+	require.NoError(t, err)
+	assert.Empty(t, result)
+}
+
+// TestComposerAudit_RenderTemplate_OmitsAbandonedPackages checks the abandoned packages are not
+// rendered here: they go to unsupported_modules, and rendering them in both places would show
+// the same finding twice.
+func TestComposerAudit_RenderTemplate_OmitsAbandonedPackages(t *testing.T) {
+	audit := NewComposerAudit(zap.NewNop(), NewMockComposer(t), true)
+	audit.afterAudit = composer.Audit{
+		Advisories: []composer.Advisory{{PackageName: "drupal/core", CVE: "CVE-1", Title: "Open"}},
+		Abandoned:  []composer.AbandonedPackage{{PackageName: "patchwork/jsqueeze"}},
+	}
+
+	result, err := audit.RenderTemplate()
+	require.NoError(t, err)
+	assert.NotContains(t, result, "patchwork/jsqueeze")
+}
+
+// TestComposerAudit_RenderTemplate_FixedOnly covers the other half of the "nothing to report"
+// guard: a run that closed every advisory it found still has something to say, and must not be
+// silenced along with the run that found none.
+func TestComposerAudit_RenderTemplate_FixedOnly(t *testing.T) {
+	audit := NewComposerAudit(zap.NewNop(), NewMockComposer(t), true)
+	audit.beforeAudit = composer.Audit{
+		Advisories: []composer.Advisory{{PackageName: "drupal/core", CVE: "CVE-1", Title: "Closed"}},
+	}
+
+	result, err := audit.RenderTemplate()
+	require.NoError(t, err)
+	assert.Contains(t, result, "CVE-1")
+	assert.Contains(t, result, "All security issues have been resolved.")
 }

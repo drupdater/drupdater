@@ -15,25 +15,32 @@ to the [run report](../run-report.md), or both.
 | [`composer_patches`](composer-patches.md) | Always | `pre-composer-update` | `composer_patches` |
 | [`composer_diff`](composer-diff.md) | Always | `post-composer-update` | — |
 | [`update_hooks`](update-hooks.md) | Always | `pre-site-update` | `update_hooks` |
-| [`composer_audit`](composer-audit.md) | Automatically in `--security` | `pre-composer-update`, `post-code-update`, `pre-merge-request-create` | `composer_audit` |
+| [`composer_audit`](composer-audit.md) | Always | `pre-composer-update`, `post-code-update`, `pre-merge-request-create` | `composer_audit` |
 | [`code_beautifier`](code-beautifier.md) | Configurable | `post-code-update` | `code_beautifier` |
 | [`deprecations_remover`](deprecations-remover.md) | Configurable | `post-code-update` | `deprecations_remover` |
 | [`translations_updater`](translations-updater.md) | Configurable | `post-site-update` | `translations_updater` |
 | [`composer_normalizer`](composer-normalizer.md) | Configurable | `post-composer-update` | — |
-| [`unsupported_modules`](unsupported-modules.md) | Configurable | `pre-site-update` | `unsupported_modules` |
+| [`unsupported_modules`](unsupported-modules.md) | Always | `pre-site-update`, `pre-merge-request-create` | `unsupported_modules` |
 
 ## Mandatory versus configurable
 
-**Four addons always run** and cannot be disabled: `composer_allow_plugins`,
-`composer_patches`, `composer_diff` and `update_hooks`. They are not optional because
-each one is either required for the update to succeed at all
-(`composer_allow_plugins`, `composer_patches`) or is the changelog the reviewer needs
-(`composer_diff`, `update_hooks`).
+**Six addons always run** and cannot be disabled:
 
-**`composer_audit` is added automatically** when `--security` is passed. It is what makes
-a security run a security run: it decides which packages get updated.
+- `composer_allow_plugins` and `composer_patches` — required for the update to succeed at
+  all.
+- `composer_diff` and `update_hooks` — the changelog the reviewer needs.
+- `composer_audit` and `unsupported_modules` — between them, the project's "no longer
+  maintained" report. `composer_audit` covers what Packagist knows (security advisories,
+  abandoned packages), `unsupported_modules` what Drupal.org knows (modules with no
+  supported release). Either alone covers half a Drupal project, and they render their
+  findings as a [single list](unsupported-modules.md#pull-request-section) — which only
+  works if both run on every update.
 
-**The remaining five are configurable** per run type in
+`composer_audit` behaves differently under `--security`: only then does it narrow the
+update to the vulnerable packages and relabel the request. On a normal run it audits and
+reports, nothing more.
+
+**The remaining four are configurable** per run type in
 [`.drupdater.yaml`](../configuration.md#run_typestypeaddons):
 
 ```yaml
@@ -44,7 +51,6 @@ run_types:
       - deprecations_remover
       - translations_updater
       - composer_normalizer
-      - unsupported_modules
   security:
     addons: []
 ```
@@ -74,8 +80,11 @@ report](../../explanation/why-a-run-report.md).
 Addons subscribing to the same event run in priority order, and for two events that order
 is deliberate rather than incidental:
 
-- On `pre-composer-update`, `composer_audit` runs at the **highest** priority because it
-  decides *what* the update is allowed to touch. Everything else reacts to that decision.
+- On `pre-composer-update`, `composer_audit` runs at the **highest** priority because on a
+  security run it decides *what* the update is allowed to touch. Everything else reacts to
+  that decision.
+- On `pre-merge-request-create`, `composer_audit` (Normal) hands its abandoned packages to
+  `unsupported_modules` (BelowNormal), which renders both kinds of finding as one list.
 - On `post-code-update`, the order is `deprecations_remover` → `code_beautifier` →
   `composer_audit`. Rector's temporary `composer.json` churn must be committed before
   PHPCBF stages anything, and the final audit must see the final code.

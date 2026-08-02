@@ -25,7 +25,7 @@ them as well.
 | `--working-dir` | string | `.` | Path to the existing checkout to update in place. Also where `.drupdater.yaml` is read from unless `--config` overrides it. |
 | `--clone` | bool | `false` | Clone the repository instead of using the existing checkout. Requires `--repository-url`. Intended for local testing. |
 | `--repository-url` | string | *(from `origin`)* | Repository URL. Required with `--clone`; otherwise derived from the checkout's `origin` remote. |
-| `--security` | bool | `false` | Only apply security updates. Selects the `run_types.security` block in `.drupdater.yaml` and adds the [`composer_audit`](../addons/composer-audit.md) addon. |
+| `--security` | bool | `false` | Only apply security updates. Selects the `run_types.security` block in `.drupdater.yaml` and lets [`composer_audit`](../addons/composer-audit.md) — which runs either way — narrow the update to the vulnerable packages. |
 | `--concurrency` | int | `GOMAXPROCS(0)` | Maximum number of sites to install and update concurrently. The default reflects the container's CPU quota, not just the host's core count. |
 | `--dry-run` | bool | `false` | Do not push the update branch or create a merge request. The branch and commits are still created locally. |
 | `--report` | string | *(disabled)* | Write a machine-readable [JSON report](../run-report.md) of the run to this path. Written on every outcome, including failures and `--dry-run`. |

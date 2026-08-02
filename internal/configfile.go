@@ -13,13 +13,16 @@ import (
 
 // defaultNormalAddons is the configurable addon set that runs in a normal update. Security
 // mode defaults to none of these: it should be a minimal, focused security fix, with only the
-// mandatory addons and the (automatically added) composer_audit running.
+// mandatory addons running.
+//
+// unsupported_modules is not here because it is mandatory now — it reports end-of-life
+// modules, which is worth knowing on a security run too, and it renders that list together
+// with composer_audit's abandoned packages.
 var defaultNormalAddons = []string{
 	"code_beautifier",
 	"deprecations_remover",
 	"translations_updater",
 	"composer_normalizer",
-	"unsupported_modules",
 }
 
 // flexTimeout captures the raw scalar of the `timeout` key so both a quoted duration
@@ -63,7 +66,7 @@ func defaultFileConfig() fileConfig {
 		RunTypes: RunTypesConfig{
 			Normal: RunTypeConfig{Addons: defaultNormalAddons},
 			// Security defaults to no configurable addons: it should be a minimal, focused
-			// fix, with only the mandatory ones and the automatic composer_audit running.
+			// fix, with only the mandatory ones running.
 			Security: RunTypeConfig{},
 		},
 	}

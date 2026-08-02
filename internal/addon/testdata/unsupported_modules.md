@@ -1,8 +1,10 @@
-## ⚠️ Unsupported modules
+## ⚠️ Unsupported modules and abandoned packages
 
-The following installed modules have reached end-of-life: they have no supported upgrade path, so they will not receive further fixes. Consider planning a replacement.
+The following are no longer maintained: an unsupported module has no supported release on Drupal.org, an abandoned package has been marked as such by its maintainers. Neither will receive further fixes, including security ones, and no update will resolve it. Each needs a decision — replace it, adopt it, or accept the risk.
 
-| Module | Installed version | Recommended version |
-| ------ | ------------------ | -------------------- |
-| module_a | 1.0.0 | None |
-| module_b | 2.3.1 | 3.0.0 |
+| Name | Status | Installed version | Recommendation |
+| ---- | ------ | ----------------- | -------------- |
+| module_a | Unsupported module | 1.0.0 | No supported release — replace it |
+| module_b | Unsupported module | 2.3.1 | Update to 3.0.0 |
+| patchwork/jsqueeze | Abandoned package | — | No replacement suggested |
+| swiftmailer/swiftmailer | Abandoned package | — | Replace with symfony/mailer |

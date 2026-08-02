@@ -28,7 +28,6 @@ run_types:            # per-run-type settings; --security picks which block appl
       - deprecations_remover     # drupal-rector deprecation removal
       - translations_updater     # interface translations
       - composer_normalizer      # normalize composer.json
-      - unsupported_modules      # report modules with no supported release
     auto_merge: false            # merge the request once its pipeline passes
   security:
     addons: []                   # minimal by default — don't interfere with the fix
@@ -99,16 +98,16 @@ otherwise `normal` applies.
 | | |
 |---|---|
 | Type | list of strings |
-| Default (`normal`) | `[code_beautifier, deprecations_remover, translations_updater, composer_normalizer, unsupported_modules]` |
+| Default (`normal`) | `[code_beautifier, deprecations_remover, translations_updater, composer_normalizer]` |
 | Default (`security`) | `[]` |
 
-The configurable addons to run. The four mandatory addons always run regardless, and are
-not valid entries here. Run [`drupdater addons`](cli/addons.md) to list valid names, or
-see the [addon reference](addons/index.md).
+The configurable addons to run. The six mandatory addons always run regardless. Naming one
+here is accepted but redundant — it changes nothing. Run [`drupdater
+addons`](cli/addons.md) to list the configurable names, or see the [addon
+reference](addons/index.md).
 
 The security default is empty on purpose: a security update should be a minimal, focused
-fix, so only the mandatory addons and the automatically-added
-[`composer_audit`](addons/composer-audit.md) run.
+fix, so only the mandatory addons run.
 
 Names in **both** blocks are validated at startup regardless of the active mode. An
 unknown name aborts the run:
@@ -189,7 +188,6 @@ run_types:
       - code_beautifier
       - deprecations_remover
       - composer_normalizer
-      - unsupported_modules
     auto_merge: false
   security:
     addons: []
@@ -205,5 +203,4 @@ run_types:
     addons:
       - translations_updater
       - composer_normalizer
-      - unsupported_modules
 ```
