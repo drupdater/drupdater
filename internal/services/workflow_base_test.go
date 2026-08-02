@@ -1820,6 +1820,41 @@ func TestStageScaffoldChanges(t *testing.T) {
 		assert.Equal(t, []string{"web/.htaccess", "web/robots.txt"}, staged)
 	})
 
+	t.Run("stages nothing outside the web root", func(t *testing.T) {
+		// Regression: staging every tracked change swept the configuration export and the
+		// translations into the shared-code commit, in the state the baseline install had left
+		// them -- core.extension.yml still carrying the installer's sqlite entry. The next run
+		// then refused to install from that configuration ("Unable to uninstall the SQLite
+		// module because: The module 'SQLite' is providing the database driver 'sqlite'"), so
+		// the update looked fine and was not reinstallable. Those trees belong to the per-site
+		// export, which commits them itself, after the sites have been updated.
+		worktree := NewMockWorktree(t)
+		worktree.EXPECT().Status().Return(git.Status{
+			"web/robots.txt":                 {Worktree: git.Modified},
+			"config/sync/core.extension.yml": {Worktree: git.Modified},
+			"config/second/system.site.yml":  {Worktree: git.Modified},
+			"translations/drupal.de.po":      {Worktree: git.Modified},
+			"webhooks/notes.md":              {Worktree: git.Modified},
+		}, nil)
+
+		var staged []string
+		worktree.EXPECT().Add(mock.Anything).RunAndReturn(func(path string) (plumbing.Hash, error) {
+			staged = append(staged, path)
+			return plumbing.ZeroHash, nil
+		})
+
+		ws := &WorkflowBaseService{
+			logger:   logger,
+			config:   internal.Config{Sites: []string{"default"}},
+			composer: newComposer("web/"),
+		}
+
+		require.NoError(t, ws.stageScaffoldChanges(context.Background(), "/project", worktree))
+		// "webhooks/" is in the list because a prefix match on "web" rather than "web/" would
+		// pull it in.
+		assert.Equal(t, []string{"web/robots.txt"}, staged)
+	})
+
 	t.Run("never stages a site's settings.php", func(t *testing.T) {
 		// The installer appends the throwaway SQLite database to it. Committing that would put
 		// test credentials and a local path into the merge request.

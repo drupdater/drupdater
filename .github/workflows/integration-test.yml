@@ -426,6 +426,12 @@ jobs:
 
           args=(--working-dir /workspace/project --report /workspace/report-second.json --dry-run)
           [ "$VERBOSE" = "true" ] && args+=(--verbose)
+          # The chown has to happen even when the run fails, so it is a trap rather than the
+          # next line: report-second.json is written on every exit path, owned by root and
+          # 0600, and set -e would otherwise skip straight past. The upload step then dies
+          # with EACCES on it and reports that instead of what actually went wrong.
+          trap 'sudo chown -R "$(id -u):$(id -g)" ./run || true' EXIT
+
           docker run --rm \
             -e DRUPALCODE_ACCESS_TOKEN \
             -v "$(pwd)/run:/workspace" \

@@ -366,6 +366,15 @@ func (ws *WorkflowBaseService) stageScaffoldChanges(ctx context.Context, path st
 
 	staged := make([]string, 0, len(candidates))
 	for _, file := range candidates {
+		// Confined to the web root, because that is the only tree drupal-scaffold writes to.
+		// Everything outside it that a run touches belongs to a later phase: the configuration
+		// export and the translations update each commit their own directories, per site, after
+		// the sites have been updated. Sweeping those in here would commit them mid-update, in
+		// the state the baseline install left them -- core.extension.yml still carrying the
+		// installer's sqlite entry, for one.
+		if !strings.HasPrefix(file, webroot+"/") {
+			continue
+		}
 		if _, skip := excluded[file]; skip {
 			continue
 		}
