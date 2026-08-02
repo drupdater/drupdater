@@ -7,7 +7,7 @@ FROM composer:2.10 AS composer
 FROM ghcr.io/mlocati/php-extension-installer:2 AS php-extension-installer
 
 # Build go binary.
-FROM golang:1.26.4-trixie AS build
+FROM golang:1.26.5-trixie AS build
 
 # Without this the images report drupdater_version "dev". Keep in step with the Makefile.
 ARG VERSION=dev
