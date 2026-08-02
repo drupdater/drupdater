@@ -17,11 +17,11 @@ import (
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/report"
 	"github.com/drupdater/drupdater/pkg/composer"
+	"github.com/drupdater/drupdater/pkg/repo"
 
 	git "github.com/go-git/go-git/v5"
 	gitConfig "github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
@@ -550,10 +550,7 @@ func (ws *WorkflowBaseService) publishWork(ctx context.Context, repository GitRe
 		RefSpecs: []gitConfig.RefSpec{
 			gitConfig.RefSpec(fmt.Sprintf("refs/heads/%s:refs/heads/%s", updateBranchName, updateBranchName)),
 		},
-		Auth: &http.BasicAuth{
-			Username: "du", // yes, this can be anything except an empty string
-			Password: ws.config.Token,
-		},
+		Auth: repo.BasicAuth(ws.config.Token),
 	})
 
 	if err != nil {

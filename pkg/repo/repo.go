@@ -49,6 +49,24 @@ type GitRepositoryService struct {
 	fs     afero.Fs
 }
 
+// BasicAuth is the credential go-git needs for an authenticated fetch, list or push.
+func BasicAuth(token string) *http.BasicAuth {
+	return &http.BasicAuth{
+		Username: "du", // yes, this can be anything except an empty string
+		Password: token,
+	}
+}
+
+// open opens the checkout at path, naming it in the error — every caller here is given the path
+// by the user or by CI, so a bad one must say which.
+func (rs *GitRepositoryService) open(path string) (*git.Repository, error) {
+	checkout, err := git.PlainOpen(path)
+	if err != nil {
+		return nil, fmt.Errorf("git open %q: %w", path, err)
+	}
+	return checkout, nil
+}
+
 func NewGitRepositoryService(logger *zap.Logger) *GitRepositoryService {
 	return &GitRepositoryService{
 		logger: logger,
@@ -74,11 +92,8 @@ func (rs *GitRepositoryService) CloneRepository(repository string, branch string
 		URL:           repository,
 		Depth:         1,
 		ReferenceName: plumbing.NewBranchReferenceName(branch),
-		Auth: &http.BasicAuth{
-			Username: "du", // yes, this can be anything except an empty string
-			Password: token,
-		},
-		Tags: git.NoTags,
+		Auth:          BasicAuth(token),
+		Tags:          git.NoTags,
 	})
 
 	if err != nil {
@@ -91,9 +106,9 @@ func (rs *GitRepositoryService) CloneRepository(repository string, branch string
 // OpenRepository opens an existing checkout instead of cloning, with the same git-user and hook
 // setup as CloneRepository so commits and pushes behave identically.
 func (rs *GitRepositoryService) OpenRepository(path string, username string, email string) (Repository, Worktree, string, error) {
-	checkout, err := git.PlainOpen(path)
+	checkout, err := rs.open(path)
 	if err != nil {
-		return nil, nil, "", fmt.Errorf("git open %q: %w", path, err)
+		return nil, nil, "", err
 	}
 	return rs.prepareCheckout(checkout, username, email)
 }
@@ -102,9 +117,9 @@ func (rs *GitRepositoryService) OpenRepository(path string, username string, ema
 // repository without being told. Embedded credentials (GitLab CI puts a token here) are
 // stripped.
 func (rs *GitRepositoryService) GetRemoteURL(path string) (string, error) {
-	checkout, err := git.PlainOpen(path)
+	checkout, err := rs.open(path)
 	if err != nil {
-		return "", fmt.Errorf("git open %q: %w", path, err)
+		return "", err
 	}
 	remote, err := checkout.Remote("origin")
 	if err != nil {
@@ -124,9 +139,9 @@ func (rs *GitRepositoryService) GetRemoteURL(path string) (string, error) {
 // GetCurrentBranch returns HEAD's branch, or "" when detached (the usual CI state) — callers
 // fall back to CI environment variables then.
 func (rs *GitRepositoryService) GetCurrentBranch(path string) (string, error) {
-	checkout, err := git.PlainOpen(path)
+	checkout, err := rs.open(path)
 	if err != nil {
-		return "", fmt.Errorf("git open %q: %w", path, err)
+		return "", err
 	}
 	head, err := checkout.Head()
 	if err != nil {
@@ -142,9 +157,9 @@ func (rs *GitRepositoryService) GetCurrentBranch(path string) (string, error) {
 // checkout commits fine but fails the later push with "object not found": the remote needs an
 // ancestry the clone does not have.
 func (rs *GitRepositoryService) IsShallowClone(path string) (bool, error) {
-	checkout, err := git.PlainOpen(path)
+	checkout, err := rs.open(path)
 	if err != nil {
-		return false, fmt.Errorf("git open %q: %w", path, err)
+		return false, err
 	}
 	shallow, err := checkout.Storer.Shallow()
 	if err != nil {
@@ -219,12 +234,7 @@ func (rs *GitRepositoryService) BranchExists(repository Repository, branch strin
 		return false, fmt.Errorf("failed to get origin remote: %w", err)
 	}
 
-	refs, err := remote.List(&git.ListOptions{
-		Auth: &http.BasicAuth{
-			Username: "du", // yes, this can be anything except an empty string
-			Password: token,
-		},
-	})
+	refs, err := remote.List(&git.ListOptions{Auth: BasicAuth(token)})
 	if err != nil {
 		return false, fmt.Errorf("failed to list remote refs: %w", err)
 	}
