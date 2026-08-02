@@ -245,12 +245,47 @@ func (ws *WorkflowBaseService) runPhases(
 		return err
 	}
 
+	// Assemble the merge request's title and description. This is a phase of its own, ahead of
+	// publish, because it has to happen under --dry-run as well: the description is assembled
+	// from every addon's RenderTemplate and is the run's only human-readable account of itself.
+	// Rendered only when publishing, a broken template would be invisible to every dry run and
+	// would surface in a real run only after the branch had already been pushed.
+	var mrTitle, mrDescription string
+	if err := rec.Run("render merge request", func() error {
+		var renderErr error
+		mrTitle, mrDescription, renderErr = ws.renderMergeRequest(addons)
+		return renderErr
+	}); err != nil {
+		return err
+	}
+	rec.SetMergeRequestContent(mrTitle, mrDescription)
+
 	if !ws.config.DryRun {
 		return rec.Run("publish", func() error {
-			return ws.publishWork(ctx, repository, updateBranchName, addons, rec)
+			return ws.publishWork(ctx, repository, updateBranchName, mrTitle, mrDescription, rec)
 		})
 	}
 	return nil
+}
+
+// renderMergeRequest produces the title and description for the run's merge request.
+//
+// The title starts as the maintenance-update default and is offered to the addons through
+// pre-merge-request-create, which is how a security run gets re-labelled by composer_audit. The
+// event fires here rather than in publishWork so that the title a dry run reports is the one a
+// real run would have used.
+func (ws *WorkflowBaseService) renderMergeRequest(addons []internal.Addon) (string, string, error) {
+	e := NewPreMergeRequestCreateEvent(fmt.Sprintf("%s: Drupal Maintenance Updates", ws.current.Format("January 2006")))
+	if err := ws.dispatcher.FireEvent(e); err != nil {
+		return "", "", fmt.Errorf("failed to fire event: %w", err)
+	}
+
+	description, err := ws.GenerateDescription(TemplateData{Addons: addons}, "dependency_update.go.tmpl")
+	if err != nil {
+		return "", "", fmt.Errorf("failed to generate description: %w", err)
+	}
+
+	return e.Title, description, nil
 }
 
 // captureOriginalHead returns the checkout's current HEAD in checkout mode, or nil in clone mode
@@ -533,7 +568,7 @@ func toReportPackages(changes []composer.PackageChange) []report.PackageChange {
 	return out
 }
 
-func (ws *WorkflowBaseService) publishWork(ctx context.Context, repository GitRepository, updateBranchName string, addons []internal.Addon, rec *report.Recorder) error {
+func (ws *WorkflowBaseService) publishWork(ctx context.Context, repository GitRepository, updateBranchName, title, description string, rec *report.Recorder) error {
 	err := repository.Push(&git.PushOptions{
 		RemoteName: "origin",
 		RefSpecs: []gitConfig.RefSpec{
@@ -549,25 +584,7 @@ func (ws *WorkflowBaseService) publishWork(ctx context.Context, repository GitRe
 		return fmt.Errorf("failed to push changes: %w", err)
 	}
 
-	title := fmt.Sprintf("%s: Drupal Maintenance Updates", ws.current.Format("January 2006"))
-
-	data := TemplateData{
-		Addons: addons,
-	}
-
-	// Generate description and create MR
-	description, err := ws.GenerateDescription(data, "dependency_update.go.tmpl")
-	if err != nil {
-		return fmt.Errorf("failed to generate description: %w", err)
-	}
-
-	e := NewPreMergeRequestCreateEvent(title)
-	err = ws.dispatcher.FireEvent(e)
-	if err != nil {
-		return fmt.Errorf("failed to fire event: %w", err)
-	}
-
-	mr, err := ws.platform.CreateMergeRequest(ctx, e.Title, description, updateBranchName, ws.config.Branch)
+	mr, err := ws.platform.CreateMergeRequest(ctx, title, description, updateBranchName, ws.config.Branch)
 	if err != nil {
 		if deleteErr := ws.platform.DeleteBranch(ctx, updateBranchName); deleteErr != nil {
 			ws.logger.Warn("failed to delete remote branch after MR creation failure",

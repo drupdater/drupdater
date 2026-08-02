@@ -210,7 +210,7 @@
   color: var(--md-accent-fg-color);
 }
 
-/* The seven phases, as a numbered strip. */
+/* The run phases, as a numbered strip. */
 .md-typeset ol.dr-steps {
   display: grid;
   gap: 0.7rem;

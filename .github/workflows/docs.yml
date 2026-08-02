@@ -16,6 +16,7 @@ on:
       # changes the published site even though it is not under docs/.
       - "internal/addon/testdata/**"
       - ".github/assert-report.jq"
+      - ".github/assert-lock-matches-report.jq"
       - ".github/workflows/docs.yml"
   workflow_dispatch:
 

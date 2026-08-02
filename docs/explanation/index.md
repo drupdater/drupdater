@@ -10,7 +10,7 @@ the behaviour makes sense rather than looking arbitrary.
 
     ---
 
-    The seven phases, what each one produces, and why "nothing to update" is a success
+    The eight phases, what each one produces, and why "nothing to update" is a success
     rather than a failure.
 
 -   **[The addon architecture](addon-architecture.md)**
