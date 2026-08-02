@@ -36,8 +36,13 @@ func NewRedactor() *Redactor {
 
 // Register adds values that must be redacted from all subsequent log output. Empty strings are
 // ignored, since redacting "" would replace every character in every log line. Each value's
-// URL-percent-encoded form is registered alongside it: a token embedded in a URL (e.g. a
+// URL-percent-encoded forms are registered alongside it: a token embedded in a URL (e.g. a
 // Composer repository URL) may appear encoded rather than literal.
+//
+// Both encodings are registered because Go — like the tools whose output this filters — escapes
+// a value differently depending on where in the URL it lands. A space becomes '+' in a query
+// component and "%20" in a path segment, so registering only one form leaves the value readable
+// in the other. Duplicates are collapsed by the map, so a value the two agree on costs nothing.
 func (r *Redactor) Register(values ...string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -55,6 +60,7 @@ func (r *Redactor) Register(values ...string) {
 	for _, v := range values {
 		add(v)
 		add(url.QueryEscape(v))
+		add(url.PathEscape(v))
 	}
 	if changed {
 		r.replacer = nil // rebuilt lazily by redact on next use
