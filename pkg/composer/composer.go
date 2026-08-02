@@ -75,36 +75,21 @@ func Env(env []string) []string {
 	return append(result, requiredComposerEnv...)
 }
 
+// command returns the runner for a composer invocation in dir. Built per call so a test that
+// swaps execCommand after the CLI was constructed still diverts the subprocess.
+func (s *CLI) command(dir string) Command {
+	return Command{New: execCommand, Logger: s.logger, Dir: dir}
+}
+
 func (s *CLI) execComposer(ctx context.Context, dir string, args ...string) (string, error) {
-	command := execCommand(ctx, "composer", args...)
-	command.Dir = dir
-	// Environ() falls back to os.Environ(), so this layers on the deployment's environment
-	// instead of replacing it.
-	command.Env = Env(command.Environ())
-
-	out, err := command.CombinedOutput()
-	output := strings.TrimSuffix(string(out), "\n")
-	s.logger.Debug(command.String() + "\n" + output)
-
-	return output, err
+	return s.command(dir).Combined(ctx, args...)
 }
 
 // execComposerJSON returns stdout only. Commands whose output is parsed as JSON must use this:
 // composer's stderr notices would otherwise corrupt the payload. stderr still reaches the log.
 func (s *CLI) execComposerJSON(ctx context.Context, dir string, args ...string) (string, error) {
-	command := execCommand(ctx, "composer", args...)
-	command.Dir = dir
-	command.Env = Env(command.Environ())
-
-	var stdout, stderr bytes.Buffer
-	command.Stdout = &stdout
-	command.Stderr = &stderr
-	err := command.Run()
-
-	output := strings.TrimSuffix(stdout.String(), "\n")
-	s.logger.Debug(command.String() + "\nstdout: " + output + "\nstderr: " + strings.TrimSuffix(stderr.String(), "\n"))
-
-	return output, err
+	stdout, _, err := s.command(dir).Split(ctx, args...)
+	return stdout, err
 }
 
 type PackageChange struct {

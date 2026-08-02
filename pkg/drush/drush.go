@@ -1,7 +1,6 @@
 package drush
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -28,39 +27,30 @@ func NewCLI(logger *zap.Logger, cache otter.Cache[string, string]) *CLI {
 	}
 }
 
+// command returns the runner for a drush invocation on site. drush runs through `composer exec`
+// and inherits composer's process timeout, which `site:install` and `updatedb` both outlast;
+// SITE_NAME comes after that environment so it wins over any value the parent process set.
+func (e *CLI) command(dir string, site string) composer.Command {
+	return composer.Command{
+		New:      execCommand,
+		Logger:   e.logger,
+		Dir:      dir,
+		ExtraEnv: []string{"SITE_NAME=" + site},
+	}
+}
+
+func drushArgs(args []string) []string {
+	return append([]string{"exec", "--", "drush"}, args...)
+}
+
 func (e *CLI) execDrush(ctx context.Context, dir string, site string, args ...string) (string, error) {
-	command := execCommand(ctx, "composer", append([]string{"exec", "--", "drush"}, args...)...)
-	command.Dir = dir
-	// The composer environment first: drush runs through `composer exec` and inherits its
-	// process timeout, which `site:install` and `updatedb` both outlast. Then SITE_NAME, so it
-	// wins over any value the parent process already set.
-	command.Env = append(composer.Env(command.Environ()), "SITE_NAME="+site)
-
-	out, err := command.CombinedOutput()
-	output := strings.TrimSuffix(string(out), "\n")
-
-	e.logger.Debug(command.String() + "\n" + output)
-
-	return output, err
+	return e.command(dir, site).Combined(ctx, drushArgs(args)...)
 }
 
 // execDrushStreams keeps stdout and stderr apart. Commands whose stdout is parsed as JSON must
 // use this: drush's stderr notices would otherwise corrupt the payload.
 func (e *CLI) execDrushStreams(ctx context.Context, dir string, site string, args ...string) (stdout string, stderr string, err error) {
-	command := execCommand(ctx, "composer", append([]string{"exec", "--", "drush"}, args...)...)
-	command.Dir = dir
-	command.Env = append(composer.Env(command.Environ()), "SITE_NAME="+site)
-
-	var so, se bytes.Buffer
-	command.Stdout = &so
-	command.Stderr = &se
-	err = command.Run()
-
-	stdout = strings.TrimSuffix(so.String(), "\n")
-	stderr = strings.TrimSuffix(se.String(), "\n")
-	e.logger.Debug(command.String() + "\nstdout: " + stdout + "\nstderr: " + stderr)
-
-	return stdout, stderr, err
+	return e.command(dir, site).Split(ctx, drushArgs(args)...)
 }
 
 func (e *CLI) InstallSite(ctx context.Context, dir string, site string) error {

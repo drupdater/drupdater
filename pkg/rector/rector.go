@@ -1,12 +1,10 @@
 package rector
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"os/exec"
-	"strings"
 
 	"go.uber.org/zap"
 
@@ -25,23 +23,10 @@ func NewCLI(logger *zap.Logger) *CLI {
 	}
 }
 
-// execComposerJSON returns stdout only: rector's --debug output and PHP notices go to stderr
-// and would corrupt the JSON report.
-func (s *CLI) execComposerJSON(ctx context.Context, dir string, args ...string) (string, error) {
-	command := execCommand(ctx, "composer", args...)
-	command.Dir = dir
-	// rector runs through `composer exec` and inherits composer's process timeout.
-	command.Env = composer.Env(command.Environ())
-
-	var stdout, stderr bytes.Buffer
-	command.Stdout = &stdout
-	command.Stderr = &stderr
-	err := command.Run()
-
-	output := strings.TrimSuffix(stdout.String(), "\n")
-	s.logger.Debug(command.String() + "\nstdout: " + output + "\nstderr: " + strings.TrimSuffix(stderr.String(), "\n"))
-
-	return output, err
+// command returns the runner for a rector invocation. rector runs through `composer exec` and
+// inherits composer's process timeout.
+func (s *CLI) command(dir string) composer.Command {
+	return composer.Command{New: execCommand, Logger: s.logger, Dir: dir}
 }
 
 type ReturnOutput struct {
@@ -81,7 +66,9 @@ func (s *CLI) Run(ctx context.Context, dir string, customCodeDirectories []strin
 	args := []string{"exec", "--", "rector", "process", "--config=/opt/drupdater/rector.php", "--no-progress-bar", "--no-diffs", "--debug", "--output-format=json"}
 	args = append(args, customCodeDirectories...)
 
-	out, err := s.execComposerJSON(ctx, dir, args...)
+	// Split, not combined: rector's --debug output and PHP notices go to stderr and would
+	// corrupt the JSON report.
+	out, _, err := s.command(dir).Split(ctx, args...)
 
 	if err != nil {
 		return ReturnOutput{}, fmt.Errorf("failed to run composer command: %w", err)
