@@ -110,6 +110,34 @@ func TestRecorderMergeRequestIsNilWhenNoneWasCreated(t *testing.T) {
 	assert.Nil(t, rep.MergeRequest)
 }
 
+// The rendered title and description are recorded on their own, without a merge request: a
+// --dry-run renders both and opens nothing, and they are then the run's only readable summary.
+func TestRecorderMergeRequestContentIsIndependentOfTheMergeRequest(t *testing.T) {
+	rec := newTestRecorder()
+	rec.SetMergeRequestContent("July 2026: Drupal Maintenance Updates", "## Dependency updates\n")
+
+	rep := rec.Finish()
+	assert.Equal(t, "July 2026: Drupal Maintenance Updates", rep.MergeRequestTitle)
+	assert.Equal(t, "## Dependency updates\n", rep.MergeRequestDescription)
+	assert.Nil(t, rep.MergeRequest, "content is recorded even though nothing was opened")
+}
+
+// Both keys are omitted when nothing was rendered -- a run that failed before the description
+// was assembled must not claim an empty one.
+func TestMergeRequestContentOmittedFromJSONWhenNotRendered(t *testing.T) {
+	encoded, err := json.Marshal(newTestRecorder().Finish())
+	require.NoError(t, err)
+	assert.NotContains(t, string(encoded), "merge_request_title")
+	assert.NotContains(t, string(encoded), "merge_request_description")
+
+	rec := newTestRecorder()
+	rec.SetMergeRequestContent("a title", "a description")
+	encoded, err = json.Marshal(rec.Finish())
+	require.NoError(t, err)
+	assert.Contains(t, string(encoded), `"merge_request_title":"a title"`)
+	assert.Contains(t, string(encoded), `"merge_request_description":"a description"`)
+}
+
 func TestRecorderAutoMergeOutcome(t *testing.T) {
 	t.Run("absent until requested", func(t *testing.T) {
 		rec := newTestRecorder()

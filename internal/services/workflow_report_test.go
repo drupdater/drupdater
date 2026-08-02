@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/codehosting"
@@ -28,6 +29,10 @@ type reportHarness struct {
 	composer    *MockComposer
 	drush       *MockDrush
 	worktree    *MockWorktree
+
+	// addons are handed to StartUpdate and registered with the run's event manager, the same
+	// way cmd/root.go wires the real ones up. Empty for the runs that do not care.
+	addons []internal.Addon
 
 	got *report.Report
 }
@@ -89,16 +94,27 @@ func (h *reportHarness) expectFullRun(t *testing.T) {
 		Return([]composer.PackageChange{{Action: "Upgrade", Package: "drupal/core", From: "9.0.0", To: "9.1.0"}}, nil).Maybe()
 }
 
+// withAddons registers addons with the run, so a test can stand in for the real ones where the
+// workflow reads back what an addon contributed.
+func (h *reportHarness) withAddons(addons ...internal.Addon) {
+	h.addons = addons
+}
+
 func (h *reportHarness) run(t *testing.T) error {
 	t.Helper()
 
+	dispatcher := event.NewManager("")
+	for _, addon := range h.addons {
+		dispatcher.AddSubscriber(addon)
+	}
+
 	svc := NewWorkflowBaseService(
 		zap.NewNop(), h.config, h.drush, h.vcsProvider, h.repoSvc, h.installer, h.composer,
-		event.NewManager(""),
+		dispatcher,
 		WithReportSink(func(rep report.Report) { h.got = &rep }),
 	)
 
-	return svc.StartUpdate(context.Background(), nil)
+	return svc.StartUpdate(context.Background(), h.addons)
 }
 
 func TestReportWrittenOnSuccessfulRun(t *testing.T) {
@@ -157,6 +173,9 @@ func TestReportWrittenOnDryRun(t *testing.T) {
 	assert.True(t, h.got.DryRun)
 	assert.Nil(t, h.got.MergeRequest)
 	assert.NotContains(t, phaseNames(h.got.Phases), "publish")
+	// With no addon renaming it, the title is the maintenance-update default, dated by month.
+	assert.Contains(t, h.got.MergeRequestTitle, ": Drupal Maintenance Updates")
+	assert.Contains(t, h.got.MergeRequestTitle, time.Now().Format("January 2006"))
 }
 
 // The most valuable case: a run that fails partway leaves a report naming the phase that failed.
@@ -228,6 +247,127 @@ func TestRunWithoutReportSinkIsUnaffected(t *testing.T) {
 
 	require.NoError(t, svc.StartUpdate(context.Background(), nil))
 	assert.Nil(t, h.got)
+}
+
+// mergeRequestAddon stands in for a real addon at the two points the merge request is assembled:
+// it renames the title through pre-merge-request-create, the way composer_audit re-labels a
+// security run, and contributes a section to the description.
+type mergeRequestAddon struct {
+	title   string
+	section string
+	// err makes the pre-merge-request-create handler fail, standing in for an addon that cannot
+	// produce its part of the merge request. renderErr does the same one step later, when the
+	// description template asks the addon for its section.
+	err       error
+	renderErr error
+}
+
+func (a *mergeRequestAddon) SubscribedEvents() map[string]any {
+	return map[string]any{
+		"pre-merge-request-create": event.ListenerItem{
+			Priority: event.Normal,
+			Listener: event.ListenerFunc(func(e event.Event) error {
+				if a.err != nil {
+					return a.err
+				}
+				e.(*PreMergeRequestCreateEvent).Title = a.title
+
+				return nil
+			}),
+		},
+	}
+}
+
+func (a *mergeRequestAddon) RenderTemplate() (string, error) { return a.section, a.renderErr }
+
+var _ internal.Addon = (*mergeRequestAddon)(nil)
+
+// A --dry-run opens no merge request, but it does assemble one. Recording the title and
+// description is what lets a dry run be reviewed at all -- and what makes a broken description
+// template visible before a real run has pushed anything.
+func TestReportRecordsMergeRequestContentOnDryRun(t *testing.T) {
+	h := newReportHarness(t, true)
+	h.expectFullRun(t)
+	h.withAddons(&mergeRequestAddon{
+		title:   "2026-07-25: Drupal Security Updates",
+		section: "## Security Report\n",
+	})
+
+	require.NoError(t, h.run(t))
+
+	require.NotNil(t, h.got)
+	assert.Equal(t, "2026-07-25: Drupal Security Updates", h.got.MergeRequestTitle,
+		"the title an addon set must be the one the dry run reports")
+	assert.Contains(t, h.got.MergeRequestDescription, "## Security Report")
+	assert.Contains(t, phaseNames(h.got.Phases), "render merge request")
+	assert.NotContains(t, phaseNames(h.got.Phases), "publish")
+	assert.Nil(t, h.got.MergeRequest)
+}
+
+// The reported content has to be the published content, not a second rendering of it: a report
+// that showed something other than what the reviewer sees on the merge request would be worse
+// than no report at all.
+func TestReportedMergeRequestContentIsWhatWasPublished(t *testing.T) {
+	h := newReportHarness(t, false)
+	h.expectFullRun(t)
+	h.withAddons(&mergeRequestAddon{title: "custom title", section: "## Section\n"})
+	h.repository.EXPECT().Push(mock.Anything).Return(nil)
+
+	var publishedTitle, publishedDescription string
+	h.vcsProvider.EXPECT().CreateMergeRequest(anyCtx, mock.Anything, mock.Anything, mock.Anything, "main").
+		RunAndReturn(func(_ context.Context, title, description, _, _ string) (codehosting.MergeRequest, error) {
+			publishedTitle, publishedDescription = title, description
+
+			return codehosting.MergeRequest{URL: "https://example.com/mr/1"}, nil
+		})
+
+	require.NoError(t, h.run(t))
+
+	require.NotNil(t, h.got)
+	assert.Equal(t, "custom title", publishedTitle)
+	assert.Contains(t, publishedDescription, "## Section")
+	assert.Equal(t, publishedTitle, h.got.MergeRequestTitle)
+	assert.Equal(t, publishedDescription, h.got.MergeRequestDescription)
+}
+
+// Assembling the merge request is a phase like any other, so a failure there is attributed
+// rather than surfacing as an unexplained error at the end of a run. Both halves can fail: the
+// event that settles the title, and the template that renders the description.
+func TestReportNamesTheRenderPhaseWhenAssemblyFails(t *testing.T) {
+	t.Run("the title event fails", func(t *testing.T) {
+		titleErr := errors.New("addon could not produce a title")
+		h := newReportHarness(t, true)
+		h.expectFullRun(t)
+		h.withAddons(&mergeRequestAddon{err: titleErr})
+
+		err := h.run(t)
+
+		// Wrapped, not replaced: a caller matching on its own sentinel error still can.
+		require.ErrorIs(t, err, titleErr)
+		require.NotNil(t, h.got)
+		assert.Equal(t, report.StatusFailed, h.got.Status)
+		assert.Equal(t, "render merge request", h.got.FailedPhase)
+		assert.Contains(t, h.got.Error, "failed to fire event")
+		assert.Contains(t, h.got.Error, "addon could not produce a title")
+		assert.Empty(t, h.got.MergeRequestTitle)
+		assert.Empty(t, h.got.MergeRequestDescription)
+	})
+
+	t.Run("an addon cannot render its section", func(t *testing.T) {
+		renderErr := errors.New("template exploded")
+		h := newReportHarness(t, true)
+		h.expectFullRun(t)
+		h.withAddons(&mergeRequestAddon{title: "a title", renderErr: renderErr})
+
+		err := h.run(t)
+
+		require.ErrorIs(t, err, renderErr)
+		require.NotNil(t, h.got)
+		assert.Equal(t, report.StatusFailed, h.got.Status)
+		assert.Equal(t, "render merge request", h.got.FailedPhase)
+		assert.Contains(t, h.got.Error, "failed to generate description")
+		assert.Empty(t, h.got.MergeRequestDescription)
+	})
 }
 
 func phaseNames(phases []report.Phase) []string {

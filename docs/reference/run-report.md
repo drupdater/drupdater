@@ -31,6 +31,8 @@ drupdater --dry-run --report ./drupdater-report.json
     "url": "https://github.com/org/site/pull/42",
     "auto_merge": { "enabled": true }
   },
+  "merge_request_title": "July 2026: Drupal Security Updates",
+  "merge_request_description": "This automated merge request by Drupdater …",
   "sites": ["default"],
   "packages": [
     { "action": "Upgrade", "package": "drupal/core", "from": "10.1.8", "to": "10.2.0" }
@@ -64,6 +66,8 @@ drupdater --dry-run --report ./drupdater-report.json
 | `base_branch` | string | The branch the request targets |
 | `update_branch` | string | The branch created, omitted if the run never got that far |
 | `merge_request` | object or `null` | `null` when none was created — a dry run, or a failure |
+| `merge_request_title` | string | The rendered title, present even when no request was opened |
+| `merge_request_description` | string | The rendered description, likewise — see [merge request content](#merge-request-content) |
 | `sites` | list of strings | The configured sites |
 | `packages` | list of objects | Every dependency change |
 | `phases` | list of objects | Every phase with its duration and outcome |
@@ -99,6 +103,21 @@ with an `error` while the run itself still reports `success` — which is exactl
 field exists rather than only a log line. See [Enable
 auto-merge](../how-to/enable-auto-merge.md).
 
+### Merge request content
+
+`merge_request_title` and `merge_request_description` hold the title and body assembled
+from the addons. They are recorded **independently of `merge_request`**: a `--dry-run`
+renders both and opens nothing, so they are the only readable account that run leaves
+behind.
+
+```bash
+# Preview what the merge request would say, without opening one
+drupdater "$TOKEN" --dry-run --report ./report.json
+jq -r '.merge_request_description' ./report.json
+```
+
+Both are absent from a run that failed before the `render merge request` phase.
+
 ### `packages`
 
 ```json
@@ -124,6 +143,7 @@ Adds `error` when `ok` is `false`. The phase names, in order:
 | `baseline site install` | Installing each site at the old code |
 | `update shared code` | `composer update`, addon events, commits, branch creation |
 | `site update` | Update hooks and configuration export per site |
+| `render merge request` | Assembling the title and description from the addons — runs under `--dry-run` too |
 | `publish` | Push and open the request — absent under `--dry-run` |
 
 Recording durations here makes the cost of a run measurable without separate

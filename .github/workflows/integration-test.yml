@@ -175,7 +175,10 @@ jobs:
     needs: [plan, build]
     name: ${{ matrix.fixture }} / ${{ matrix.mode }}
     runs-on: ubuntu-latest
-    timeout-minutes: 75
+    # Generous because the normal-mode legs run drupdater a second time to check
+    # the update is idempotent, and that second run installs the site again
+    # before it gets as far as composer update.
+    timeout-minutes: 120
     strategy:
       # One fixture or mode failing must not hide the state of the others.
       fail-fast: false
@@ -185,11 +188,13 @@ jobs:
       TARGET_URL: ${{ matrix.repository_url }}
       TARGET_BRANCH: ${{ matrix.branch }}
     steps:
-      # Just the assertion script -- the job otherwise has no use for the source.
-      - name: Checkout assertion script
+      # Just the assertion scripts -- the job otherwise has no use for the source.
+      - name: Checkout assertion scripts
         uses: actions/checkout@v7
         with:
-          sparse-checkout: .github/assert-report.jq
+          sparse-checkout: |
+            .github/assert-report.jq
+            .github/assert-lock-matches-report.jq
           sparse-checkout-cone-mode: false
 
       - name: Download image
@@ -258,9 +263,17 @@ jobs:
       # The report is written on every exit path, so this runs even when the
       # container failed -- a failed run's report is the one worth reading.
       - name: Summarise and verify run report
+        id: report
         if: always()
         env:
           EXPECT: ${{ matrix.expect }}
+          # Asserted to appear nowhere in the report. Redaction is a documented
+          # promise about a file that gets archived and attached to tickets, and
+          # this is the only place it is checked against a real run's errors and
+          # URLs rather than against strings a unit test made up.
+          DRUPDATER_ASSERT_SECRETS: |
+            ${{ secrets.DRUPDATER_TEST_TOKEN }}
+            ${{ secrets.DRUPALCODE_ACCESS_TOKEN }}
         run: |
           # The container runs as root and the report is written 0600, so both jq
           # and upload-artifact get EACCES until the runner owns it back.
@@ -280,14 +293,153 @@ jobs:
           # exists") and a run reports success even when an addon logged and
           # swallowed its own failure, so neither exit status nor .status alone is
           # a verdict. Assert what this fixture is actually meant to produce.
+          # Hand the outcome to the steps below: everything that inspects the
+          # working copy only makes sense for a run that produced one.
+          {
+            echo "status=$(jq -r '.status' ./run/report.json)"
+            echo "update_branch=$(jq -r '.update_branch // ""' ./run/report.json)"
+          } >> "$GITHUB_OUTPUT"
           jq -e -r --argjson expect "$EXPECT" -f .github/assert-report.jq \
             ./run/report.json | tee -a "$GITHUB_STEP_SUMMARY"
+
+      # Everything above reads the report, which is drupdater's own account of
+      # the run. The steps below read the repository it left behind, which is
+      # what a reviewer would actually get -- the two disagreeing is the failure
+      # mode a report cannot catch on its own.
+      - name: Verify the working copy
+        if: always() && steps.report.outputs.status == 'success'
+        env:
+          UPDATE_BRANCH: ${{ steps.report.outputs.update_branch }}
+        run: |
+          set -euo pipefail
+          cd ./run/project
+          echo "### Working copy" >> "$GITHUB_STEP_SUMMARY"
+
+          # The run ends on the branch it created, and the report names it. A
+          # mismatch means the report is describing a branch that is not there.
+          current="$(git rev-parse --abbrev-ref HEAD)"
+          if [ "$current" != "$UPDATE_BRANCH" ]; then
+            echo "::error::checkout is on $current, report says $UPDATE_BRANCH"
+            exit 1
+          fi
+
+          # The update has to be additive: the base branch is left where it was,
+          # and the update branch descends from it.
+          if ! git merge-base --is-ancestor "origin/$TARGET_BRANCH" HEAD; then
+            echo "::error::$UPDATE_BRANCH does not descend from origin/$TARGET_BRANCH"
+            exit 1
+          fi
+          if [ "$(git rev-parse "$TARGET_BRANCH")" != "$(git rev-parse "origin/$TARGET_BRANCH")" ]; then
+            echo "::error::the local $TARGET_BRANCH branch was moved"
+            exit 1
+          fi
+
+          commits="$(git rev-list --count "origin/$TARGET_BRANCH..HEAD")"
+          if [ "$commits" -lt 1 ]; then
+            echo "::error::a successful run left no commits on $UPDATE_BRANCH"
+            exit 1
+          fi
+          echo "$commits commits on \`$UPDATE_BRANCH\`:" >> "$GITHUB_STEP_SUMMARY"
+          git log --oneline "origin/$TARGET_BRANCH..HEAD" >> "$GITHUB_STEP_SUMMARY"
+
+          # Addons commit as they go, so a finished run leaves nothing behind:
+          # an uncommitted change is work that would never reach the merge
+          # request. settings.php is the one exception -- ConfigureDatabase
+          # appends the test database to it on purpose, and it is gitignored in
+          # most projects anyway -- so it is excluded rather than tolerated
+          # wholesale. Untracked files are out of scope: vendor/ and the site's
+          # generated files legitimately sit in the checkout.
+          dirty="$(git status --porcelain --untracked-files=no \
+                   | grep -v 'sites/[^/]*/settings\.php$' || true)"
+          if [ -n "$dirty" ]; then
+            echo "::error::uncommitted changes left behind"
+            echo "$dirty"
+            exit 1
+          fi
+
+      - name: Verify the report against composer.lock
+        if: always() && steps.report.outputs.status == 'success'
+        run: |
+          set -euo pipefail
+          # The report's package list is parsed out of composer's console
+          # output. Diffing the lock the run committed against the one it
+          # started from is the independent check on that parsing -- and on
+          # everything built from it, the merge request's dependency table
+          # included.
+          git -C ./run/project show "origin/$TARGET_BRANCH:composer.lock" > /tmp/base-composer.lock
+          jq -n -e -r \
+            --slurpfile before /tmp/base-composer.lock \
+            --slurpfile after ./run/project/composer.lock \
+            --slurpfile report ./run/report.json \
+            -f .github/assert-lock-matches-report.jq | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Verify composer.json and composer.lock are usable
+        if: always() && steps.report.outputs.status == 'success'
+        run: |
+          set -euo pipefail
+          # A lock that does not match composer.json, or one that cannot be
+          # resolved for the target platform, makes the merge request useless
+          # however good the changelog looks. composer is in the image, so this
+          # runs against exactly the version the update itself used.
+          #
+          # --no-check-publish drops the rules about publishable packages
+          # (name, description, license); a site is not a library. The lock
+          # check is deliberately kept.
+          docker run --rm -v "$(pwd)/run:/workspace" -w /workspace/project \
+            --entrypoint composer drupdater:test \
+            validate --no-check-publish --no-interaction | tee -a "$GITHUB_STEP_SUMMARY"
+          docker run --rm -v "$(pwd)/run:/workspace" -w /workspace/project \
+            --entrypoint composer drupdater:test \
+            install --dry-run --no-scripts --no-interaction \
+            | tail -20 | tee -a "$GITHUB_STEP_SUMMARY"
+
+      # Running drupdater on its own output must find nothing left to do. It is
+      # the one assertion that covers the addons that only ever write files:
+      # a normaliser, PHPCBF or Rector rule that rewrites the same code
+      # differently on every pass produces an endless stream of merge requests,
+      # and no single run can tell that it did.
+      #
+      # Only the normal-mode leg: the second run exercises the same code path in
+      # either mode, and it is not cheap -- it installs the site again before it
+      # can get as far as composer update.
+      - name: Re-run to prove the update is idempotent
+        if: steps.report.outputs.status == 'success' && matrix.mode == 'normal'
+        env:
+          REPO_TOKEN: ${{ secrets.DRUPDATER_TEST_TOKEN }}
+          DRUPALCODE_ACCESS_TOKEN: ${{ secrets.DRUPALCODE_ACCESS_TOKEN }}
+          UPDATE_BRANCH: ${{ steps.report.outputs.update_branch }}
+          VERBOSE: ${{ needs.plan.outputs.verbose }}
+        run: |
+          set -euo pipefail
+          # Move the base branch onto the update, the way merging the request
+          # would, and run against that. Re-running on the update branch itself
+          # would abort with "branch already exists" and prove nothing.
+          git -C ./run/project checkout "$TARGET_BRANCH"
+          git -C ./run/project merge --ff-only "$UPDATE_BRANCH"
+
+          args=(--working-dir /workspace/project --report /workspace/report-second.json --dry-run)
+          [ "$VERBOSE" = "true" ] && args+=(--verbose)
+          docker run --rm \
+            -e DRUPALCODE_ACCESS_TOKEN \
+            -v "$(pwd)/run:/workspace" \
+            drupdater:test "$REPO_TOKEN" "${args[@]}"
+
+          sudo chown -R "$(id -u):$(id -g)" ./run || true
+          echo "### Second run (idempotency)" >> "$GITHUB_STEP_SUMMARY"
+          # Anything other than no_changes means the first run left work behind:
+          # read .packages in the second report to see what moved the second
+          # time round.
+          jq -e -r --argjson expect '{"status": ["no_changes"]}' \
+            -f .github/assert-report.jq ./run/report-second.json \
+            | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Upload run report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: drupdater-report-${{ matrix.fixture }}-${{ matrix.mode }}
-          path: ./run/report.json
+          # report-second.json only exists for the legs that run the idempotency
+          # check, so the pattern is a glob rather than two named files.
+          path: ./run/report*.json
           if-no-files-found: error
           retention-days: 30

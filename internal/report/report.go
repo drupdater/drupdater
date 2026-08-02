@@ -78,6 +78,14 @@ type Report struct {
 	// or because it failed before publishing.
 	MergeRequest *MergeRequest `json:"merge_request"`
 
+	// MergeRequestTitle and MergeRequestDescription are the title and body the run assembled
+	// from its addons, recorded whether or not a merge request was opened with them. A
+	// --dry-run has no MergeRequest at all, and these two are then the only account of what the
+	// run would have said about itself -- which is both what a preview is for and the only way
+	// a dry run can tell a broken description template from a working one.
+	MergeRequestTitle       string `json:"merge_request_title,omitempty"`
+	MergeRequestDescription string `json:"merge_request_description,omitempty"`
+
 	Sites []string `json:"sites"`
 
 	// Packages lists every dependency change composer made. Empty for a run that failed before
@@ -245,6 +253,16 @@ func (r *Recorder) SetMergeRequest(url string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.report.MergeRequest = &MergeRequest{URL: SanitizeURL(url)}
+}
+
+// SetMergeRequestContent records the title and description assembled for the merge request. It
+// is deliberately independent of SetMergeRequest: the content exists as soon as it is rendered,
+// which happens before -- and, under --dry-run, without -- a merge request being created.
+func (r *Recorder) SetMergeRequestContent(title, description string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.report.MergeRequestTitle = title
+	r.report.MergeRequestDescription = description
 }
 
 // SetAutoMerge records the outcome of the auto-merge request. err is nil when the platform

@@ -38,6 +38,9 @@ jq -r 'select(.status == "failed") | "\(.failed_phase): \(.error)"' report.json
 # Which addons reported anything?
 jq -r '.addons | keys[]' report.json
 
+# What would the merge request say? (works on a --dry-run, which opens none)
+jq -r '.merge_request_description' report.json
+
 # Which security advisories are still open?
 jq -r '.addons.composer_audit.remaining[]? | "\(.cve // .advisoryId) \(.packageName)"' report.json
 
@@ -69,9 +72,14 @@ esac
 ## Assert on a run in CI
 
 Drupdater's own integration tests use a jq script for this, and it is directly reusable.
-It asserts on status, a minimum package count, that named phases are present **and
-succeeded**, that named addons reported something, and that the schema version is the one
-you wrote your consumer against:
+
+It checks two different things. The `$expect` fields are what *your* project expects —
+status, a minimum package count, named phases present **and** succeeded, named addons that
+reported something, packages that had to move, actions that must not appear. Everything
+after them is the report's own internal consistency and is always on: package changes have
+a shape, phases are ordered and unique, a `success` has no failed phase, a `--dry-run` has
+no merge request, an advisory is not both fixed and remaining, and an addon that reported
+data also rendered its section into the description.
 
 ```jq title=".github/assert-report.jq"
 --8<-- ".github/assert-report.jq"
@@ -83,11 +91,22 @@ Use it like this:
 EXPECT='{
   "status": ["success", "no_changes"],
   "phases": ["composer install", "baseline site install", "update shared code"],
-  "addons": ["update_hooks", "code_beautifier"]
+  "addons": ["update_hooks", "code_beautifier"],
+  "packages_match": ["^drupal/core"],
+  "forbid_actions": ["Downgrade"],
+  "audit_fixed_min": 1
 }'
+
+# Optional: assert no credential reached the document
+export DRUPDATER_ASSERT_SECRETS="$DRUPDATER_TOKEN"
 
 jq -e --argjson expect "$EXPECT" -f .github/assert-report.jq report.json
 ```
+
+`packages_match` and `audit_fixed_min` are the two worth adding early. A package count
+alone is satisfied by any unrelated transitive bump, and "`composer_audit` reported
+something" is satisfied by a security run that closed no advisory at all and only listed
+the ones still open.
 
 On failure it prints every problem at once and exits non-zero:
 
@@ -111,6 +130,29 @@ security run produce different sets. Drupdater's own fixtures split them:
 Note that [`composer_diff`](../reference/addons/composer-diff.md) and
 [`composer_normalizer`](../reference/addons/composer-normalizer.md) never appear in the
 report at all — do not assert on them.
+
+### Cross-check the report against `composer.lock`
+
+`packages` is parsed out of composer's console output, not read back from the lock. If you
+want a second opinion that does not share that assumption, diff the lock the run committed
+against the one it started from and compare:
+
+```bash
+git show "origin/main:composer.lock" > /tmp/base-composer.lock
+
+jq -n -e -r \
+  --slurpfile before /tmp/base-composer.lock \
+  --slurpfile after composer.lock \
+  --slurpfile report report.json \
+  -f .github/assert-lock-matches-report.jq
+```
+
+It fails in both directions: a lock change the report does not mention, and a reported
+change the lock does not show — the second being the one a reviewer would act on.
+
+```jq title=".github/assert-lock-matches-report.jq"
+--8<-- ".github/assert-lock-matches-report.jq"
+```
 
 ## Collect the report as a CI artifact
 

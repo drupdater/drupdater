@@ -86,7 +86,7 @@ INFO  exporting configuration {"site": "default"}
 INFO  update finished
 ```
 
-The log does not announce the seven phases — those are recorded in the report, with their
+The log does not announce the eight phases — those are recorded in the report, with their
 durations, which you will read in the next step.
 
 Nothing is pushed and no request is created: that is the `publish` phase, and `--dry-run`
@@ -164,6 +164,13 @@ jq '.addons.update_hooks' drupdater-report.json
 Those are the database update hooks that would run on deploy — exactly the information a
 reviewer needs.
 
+The same report also holds the pull request this run *would* have opened, description and
+all, even though `--dry-run` opened nothing:
+
+```bash
+jq -r '.merge_request_title, .merge_request_description' drupdater-report.json
+```
+
 !!! note "`no_changes` is not a failure"
 
     If `status` is `no_changes`, the run worked and found nothing to update. It exits `0`
@@ -209,7 +216,7 @@ already gone — checkout-mode runs remove them.
 - `drupdater check` validates a project in about a second, and `--full` proves the site
   installs.
 - A checkout-mode `--dry-run` is completely safe and needs no credentials.
-- The run works through seven phases, and the report records each with its duration.
+- The run works through eight phases, and the report records each with its duration.
 - The report distinguishes `success`, `no_changes` and `failed`.
 - Update branches are content-addressed, so identical updates cannot duplicate.
 

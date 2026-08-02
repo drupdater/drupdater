@@ -45,7 +45,7 @@ Verify with `make docs-build` (runs `mkdocs build --strict`, which fails on brok
 Some pages embed files from the repo via `pymdownx.snippets`, so they cannot drift:
 
 - `internal/addon/testdata/*.md` → the "pull request section" examples on addon pages
-- `.github/assert-report.jq` → `docs/how-to/consume-the-run-report.md`
+- `.github/assert-report.jq`, `.github/assert-lock-matches-report.jq` → `docs/how-to/consume-the-run-report.md`
 
 Changing a golden file changes the published example. `internal/addon/testdata/composer_diff.md` is a `Dummy Table` placeholder and is deliberately *not* embedded — that page hand-writes its example.
 
@@ -90,7 +90,7 @@ Where things live. For *how they work*, read `docs/explanation/` rather than dup
 |---|---|
 | `main.go` → `cmd/root.go` | Cobra commands, flag parsing, service construction, `addonRegistry`, `mandatoryAddons` |
 | `cmd/check.go` | The `check` command and its cheap/full check tiers |
-| `internal/services/workflow_base.go` | `StartUpdate` and the seven phases |
+| `internal/services/workflow_base.go` | `StartUpdate` and the eight phases |
 | `internal/services/event.go` | The six workflow events and `AbortError` |
 | `internal/services/preflight.go` | Checks shared between `check` and the run's own `preflight` phase |
 | `internal/addon/` | The ten addons |

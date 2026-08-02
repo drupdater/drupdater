@@ -26,7 +26,7 @@ other one is disabled" — because none of them ever depended on another being t
 | `post-code-update` | After `composer.json`/`.lock` are committed | — |
 | `pre-site-update` | Before each site's update hooks | — (carries the site name) |
 | `post-site-update` | After each site's hooks, before config export | — (carries the site name) |
-| `pre-merge-request-create` | Before the request is opened | `Title` |
+| `pre-merge-request-create` | While the request is rendered — under `--dry-run` too | `Title` |
 
 All but the last carry the run context, the working directory path and the git worktree,
 so an addon can read files and stage changes without being handed a service.

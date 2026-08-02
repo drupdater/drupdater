@@ -12,7 +12,7 @@ flowchart LR
     D --> E[Open PR / MR<br/>with changelog]
 ```
 
-## The seven phases
+## The eight phases
 
 Phases run linearly. Their names are exactly the strings that appear in the [run
 report](../reference/run-report.md)'s `phases` list.
@@ -81,12 +81,22 @@ The commit step is serialised across sites even though the rest is concurrent. A
 share one worktree and one git index, and `drush config:export` shells out to git itself —
 so concurrent commits would race on the index.
 
-### 7. `publish`
+### 7. `render merge request`
+
+Fire **`pre-merge-request-create`** (where a security run retitles the request) and
+assemble the description from every addon's template.
+
+This is a phase of its own, ahead of `publish`, so that it happens under `--dry-run` too.
+The description is the run's only human-readable account of itself, and both title and
+description are recorded in the [run report](../reference/run-report.md#merge-request-content)
+whether or not a request is opened — so a dry run can be reviewed, and a broken template
+fails there instead of surfacing on a real run that has already pushed.
+
+### 8. `publish`
 
 **Skipped entirely under `--dry-run`.**
 
-Push the branch, generate the description from every addon's template, fire
-**`pre-merge-request-create`** (where a security run retitles the request), and create it.
+Push the branch and create the request with the title and description rendered in phase 7.
 
 If creating the request fails after the push succeeded, the just-pushed remote branch is
 deleted on a best-effort basis — otherwise a failed run would leave an orphan branch that
