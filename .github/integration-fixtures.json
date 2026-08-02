@@ -59,5 +59,64 @@
         ]
       }
     }
+  },
+  {
+    "name": "drupal-multisite",
+    "description": "Two sites sharing one codebase, so the per-site phases run concurrently against separate config trees",
+    "repository_url": "https://github.com/drupdater/test-drupal-multisite.git",
+    "branch": "main",
+    "expect": {
+      "normal": {
+        "status": [
+          "success"
+        ],
+        "min_packages": 1,
+        "packages_match": [
+          "^drupal/core"
+        ],
+        "forbid_actions": [
+          "Downgrade"
+        ],
+        "phases": [
+          "acquire working copy",
+          "preflight",
+          "composer install",
+          "baseline site install",
+          "update shared code",
+          "site update",
+          "render merge request"
+        ],
+        "addons": [
+          "update_hooks",
+          "unsupported_modules",
+          "composer_audit",
+          "translations_updater"
+        ]
+      },
+      "security": {
+        "status": [
+          "success"
+        ],
+        "min_packages": 1,
+        "audit_fixed_min": 1,
+        "forbid_actions": [
+          "Downgrade"
+        ],
+        "phases": [
+          "acquire working copy",
+          "preflight",
+          "composer install",
+          "baseline site install",
+          "update shared code",
+          "site update",
+          "render merge request"
+        ],
+        "addons": [
+          "composer_audit",
+          "unsupported_modules",
+          "update_hooks"
+        ]
+      }
+    }
   }
 ]
