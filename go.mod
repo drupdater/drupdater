@@ -3,7 +3,7 @@ module github.com/drupdater/drupdater
 go 1.26.4
 
 require (
-	github.com/go-git/go-git/v5 v5.19.1
+	github.com/go-git/go-git/v5 v5.19.2
 	github.com/google/go-github/v68 v68.0.0
 	github.com/gookit/event v1.2.0
 	github.com/maypok86/otter v1.2.4
