@@ -204,6 +204,59 @@ func TestUpdatePropagatesFailure(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to update dependencies")
 }
 
+func TestUpdateDeduplicatesTheTwoOperationSections(t *testing.T) {
+	// composer reports a version change twice -- once resolving the lock, once installing it --
+	// in identical wording, so a naive scan reports every upgrade and downgrade double. That
+	// reaches the run report's .packages and the merge request's dependency table, where a
+	// reviewer sees each package listed twice.
+	//
+	// Installs are worded differently per section ("Locking" vs "Installing") and only the
+	// second form is matched, so they must still arrive exactly once.
+	stubComposerOutput(t, `Loading composer repositories with package information
+Updating dependencies
+Lock file operations: 1 install, 2 updates, 1 removal
+  - Upgrading drupal/core (11.3.9 => 11.4.4)
+  - Downgrading justinrainbow/json-schema (6.10.0 => 6.8.2)
+  - Locking symfony/runtime (v7.4.14)
+  - Removing marc-mabe/php-enum (v4.7.2)
+Writing lock file
+Installing dependencies from lock file (including require-dev)
+Package operations: 1 install, 2 updates, 1 removal
+  - Upgrading drupal/core (11.3.9 => 11.4.4)
+  - Downgrading justinrainbow/json-schema (6.10.0 => 6.8.2)
+  - Installing symfony/runtime (v7.4.14)
+  - Removing marc-mabe/php-enum (v4.7.2)
+Generating autoload files`)
+
+	service := &CLI{logger: zap.NewNop()}
+	changes, err := service.Update(t.Context(), "/tmp", nil, nil, false, false)
+	require.NoError(t, err)
+
+	assert.Equal(t, []PackageChange{
+		{Action: "Upgrade", Package: "drupal/core", From: "11.3.9", To: "11.4.4"},
+		{Action: "Downgrade", Package: "justinrainbow/json-schema", From: "6.10.0", To: "6.8.2"},
+		{Action: "Remove", Package: "marc-mabe/php-enum", From: "v4.7.2"},
+		{Action: "Install", Package: "symfony/runtime", To: "v7.4.14"},
+	}, changes)
+}
+
+func TestUpdateKeepsDistinctChangesToTheSamePackage(t *testing.T) {
+	// Dedup keys on the whole change, not the package name: a repeat is only dropped when every
+	// field matches, so a package genuinely reported with different versions still comes through.
+	stubComposerOutput(t, `Package operations: 0 installs, 2 updates, 0 removals
+  - Upgrading drupal/core (11.3.9 => 11.4.4)
+  - Upgrading drupal/core (11.4.4 => 11.4.5)`)
+
+	service := &CLI{logger: zap.NewNop()}
+	changes, err := service.Update(t.Context(), "/tmp", nil, nil, false, false)
+	require.NoError(t, err)
+
+	assert.Equal(t, []PackageChange{
+		{Action: "Upgrade", Package: "drupal/core", From: "11.3.9", To: "11.4.4"},
+		{Action: "Upgrade", Package: "drupal/core", From: "11.4.4", To: "11.4.5"},
+	}, changes)
+}
+
 func TestUpdateBuildsArgs(t *testing.T) {
 	// The flags that shape a run are assembled here, so assert they reach composer: package
 	// filters, --with pins, --minimal-changes, and --dry-run vs --bump-after-update.

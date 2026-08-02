@@ -46,6 +46,7 @@ func TestStartUpdate(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	worktree.EXPECT().Checkout(workBranchCheckout).Return(nil)
 
 	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil)
@@ -118,6 +119,7 @@ func TestStartUpdatePublishUsesLiveContext(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	worktree.EXPECT().Checkout(workBranchCheckout).Return(nil)
 
 	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil)
@@ -186,6 +188,7 @@ func TestStartUpdateSiteFailureDoesNotPublish(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	worktree.EXPECT().Checkout(workBranchCheckout).Return(nil)
 
 	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil)
@@ -391,6 +394,7 @@ func TestStartUpdateBranchAlreadyExists(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	// updateSharedCode checks out a dedicated work branch before doing any work.
 	worktree.EXPECT().Checkout(mock.Anything).Return(nil).Maybe()
 
@@ -456,6 +460,7 @@ func TestStartUpdateLocalBranchAlreadyExists(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	worktree.EXPECT().Checkout(mock.Anything).Return(nil).Maybe()
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
@@ -512,6 +517,7 @@ func TestStartUpdateLocalBranchLookupError(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	worktree.EXPECT().Checkout(mock.Anything).Return(nil).Maybe()
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
@@ -564,6 +570,7 @@ func TestStartUpdateWithDryRun(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	worktree.EXPECT().Checkout(workBranchCheckout).Return(nil)
 
 	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil)
@@ -628,6 +635,7 @@ func TestStartUpdateCheckoutDryRunWithoutPlatform(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	worktree.EXPECT().Checkout(workBranchCheckout).Return(nil)
 
 	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil)
@@ -696,6 +704,7 @@ func TestPublishWorkDeletesBranchOnMRFailure(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	worktree.EXPECT().Checkout(workBranchCheckout).Return(nil)
 
 	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil)
@@ -757,6 +766,7 @@ func TestPublishWorkLogsWarningWhenDeleteBranchFails(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	worktree.EXPECT().Checkout(workBranchCheckout).Return(nil)
 
 	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil)
@@ -820,6 +830,7 @@ func TestPublishWorkPushFails(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	worktree.EXPECT().Checkout(workBranchCheckout).Return(nil)
 
 	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil)
@@ -877,6 +888,7 @@ func TestStartUpdateGetLockHashError(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	// updateSharedCode checks out a dedicated work branch before doing any work.
 	worktree.EXPECT().Checkout(mock.Anything).Return(nil).Maybe()
 
@@ -925,6 +937,7 @@ func TestStartUpdateBranchExistsError(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	// updateSharedCode checks out a dedicated work branch before doing any work.
 	worktree.EXPECT().Checkout(mock.Anything).Return(nil).Maybe()
 
@@ -975,6 +988,7 @@ func TestStartUpdateConfigResaveError(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	worktree.EXPECT().Checkout(workBranchCheckout).Return(nil)
 
 	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil)
@@ -1027,6 +1041,7 @@ func TestStartUpdateExportConfigurationError(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	worktree.EXPECT().Checkout(workBranchCheckout).Return(nil)
 
 	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil)
@@ -1081,6 +1096,7 @@ func TestStartUpdateWithAutoMerge(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	worktree.EXPECT().Checkout(workBranchCheckout).Return(nil)
 
 	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil)
@@ -1145,6 +1161,7 @@ func TestStartUpdateAutoMergeError(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	worktree.EXPECT().Checkout(workBranchCheckout).Return(nil)
 
 	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil)
@@ -1208,6 +1225,7 @@ func TestStartUpdateAutoMergeSkippedWhenDisabled(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	worktree.EXPECT().Checkout(workBranchCheckout).Return(nil)
 
 	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil)
@@ -1331,6 +1349,7 @@ func TestStartUpdateUsesExistingCheckout(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	worktree.EXPECT().Checkout(workBranchCheckout).Return(nil)
 
 	installer.EXPECT().Install(anyCtx, checkout, "site1").Return(nil)
@@ -1497,6 +1516,7 @@ func TestStartUpdateDoesNotRestoreCheckoutOnSuccess(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	// Only the work-branch/final-branch checkouts happen; no restore checkout on success.
 	worktree.EXPECT().Checkout(mock.Anything).Return(nil).Twice()
 
@@ -1761,3 +1781,186 @@ var workBranchCheckout = mock.MatchedBy(func(opts *git.CheckoutOptions) bool {
 		(strings.HasPrefix(opts.Branch.Short(), "drupdater-work-") ||
 			strings.HasPrefix(opts.Branch.Short(), "update-"))
 })
+
+func TestStageScaffoldChanges(t *testing.T) {
+	logger := zap.NewNop()
+
+	newComposer := func(webroot string) *MockComposer {
+		c := NewMockComposer(t)
+		c.EXPECT().GetConfig(mock.Anything, "/project", "extra.drupal-scaffold.locations.web-root").
+			Return(webroot, nil).Maybe()
+		return c
+	}
+
+	t.Run("stages tracked changes and leaves untracked files alone", func(t *testing.T) {
+		// A core update rewrites the scaffolded files; vendor/ is untracked and belongs to nobody.
+		worktree := NewMockWorktree(t)
+		worktree.EXPECT().Status().Return(git.Status{
+			"web/.htaccess":       {Worktree: git.Modified},
+			"web/robots.txt":      {Worktree: git.Modified},
+			"web/core/foo.php":    {Worktree: git.Untracked},
+			"vendor/autoload.php": {Worktree: git.Untracked},
+			"README.md":           {Worktree: git.Unmodified},
+		}, nil)
+
+		var staged []string
+		worktree.EXPECT().Add(mock.Anything).RunAndReturn(func(path string) (plumbing.Hash, error) {
+			staged = append(staged, path)
+			return plumbing.ZeroHash, nil
+		})
+
+		ws := &WorkflowBaseService{
+			logger:   logger,
+			config:   internal.Config{Sites: []string{"default"}},
+			composer: newComposer("web/"),
+		}
+
+		require.NoError(t, ws.stageScaffoldChanges(context.Background(), "/project", worktree))
+		// Sorted, so the commit a run produces does not depend on map iteration order.
+		assert.Equal(t, []string{"web/.htaccess", "web/robots.txt"}, staged)
+	})
+
+	t.Run("stages nothing outside the web root", func(t *testing.T) {
+		// Regression: staging every tracked change swept the configuration export and the
+		// translations into the shared-code commit, in the state the baseline install had left
+		// them -- core.extension.yml still carrying the installer's sqlite entry. The next run
+		// then refused to install from that configuration ("Unable to uninstall the SQLite
+		// module because: The module 'SQLite' is providing the database driver 'sqlite'"), so
+		// the update looked fine and was not reinstallable. Those trees belong to the per-site
+		// export, which commits them itself, after the sites have been updated.
+		worktree := NewMockWorktree(t)
+		worktree.EXPECT().Status().Return(git.Status{
+			"web/robots.txt":                 {Worktree: git.Modified},
+			"config/sync/core.extension.yml": {Worktree: git.Modified},
+			"config/second/system.site.yml":  {Worktree: git.Modified},
+			"translations/drupal.de.po":      {Worktree: git.Modified},
+			"webhooks/notes.md":              {Worktree: git.Modified},
+		}, nil)
+
+		var staged []string
+		worktree.EXPECT().Add(mock.Anything).RunAndReturn(func(path string) (plumbing.Hash, error) {
+			staged = append(staged, path)
+			return plumbing.ZeroHash, nil
+		})
+
+		ws := &WorkflowBaseService{
+			logger:   logger,
+			config:   internal.Config{Sites: []string{"default"}},
+			composer: newComposer("web/"),
+		}
+
+		require.NoError(t, ws.stageScaffoldChanges(context.Background(), "/project", worktree))
+		// "webhooks/" is in the list because a prefix match on "web" rather than "web/" would
+		// pull it in.
+		assert.Equal(t, []string{"web/robots.txt"}, staged)
+	})
+
+	t.Run("never stages a site's settings.php", func(t *testing.T) {
+		// The installer appends the throwaway SQLite database to it. Committing that would put
+		// test credentials and a local path into the merge request.
+		worktree := NewMockWorktree(t)
+		worktree.EXPECT().Status().Return(git.Status{
+			"web/sites/default/settings.php": {Worktree: git.Modified},
+			"web/sites/second/settings.php":  {Worktree: git.Modified},
+			"web/robots.txt":                 {Worktree: git.Modified},
+		}, nil)
+
+		var staged []string
+		worktree.EXPECT().Add(mock.Anything).RunAndReturn(func(path string) (plumbing.Hash, error) {
+			staged = append(staged, path)
+			return plumbing.ZeroHash, nil
+		})
+
+		ws := &WorkflowBaseService{
+			logger:   logger,
+			config:   internal.Config{Sites: []string{"default", "second"}},
+			composer: newComposer("web/"),
+		}
+
+		require.NoError(t, ws.stageScaffoldChanges(context.Background(), "/project", worktree))
+		assert.Equal(t, []string{"web/robots.txt"}, staged)
+	})
+
+	t.Run("propagates a status failure", func(t *testing.T) {
+		worktree := NewMockWorktree(t)
+		worktree.EXPECT().Status().Return(nil, errors.New("boom"))
+
+		ws := &WorkflowBaseService{logger: logger, composer: newComposer("web/")}
+
+		err := ws.stageScaffoldChanges(context.Background(), "/project", worktree)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to read worktree status")
+	})
+
+	t.Run("propagates a web root failure", func(t *testing.T) {
+		worktree := NewMockWorktree(t)
+		worktree.EXPECT().Status().Return(git.Status{"web/robots.txt": {Worktree: git.Modified}}, nil)
+
+		composerCLI := NewMockComposer(t)
+		composerCLI.EXPECT().GetConfig(mock.Anything, "/project", "extra.drupal-scaffold.locations.web-root").
+			Return("", errors.New("no web root"))
+
+		ws := &WorkflowBaseService{logger: logger, composer: composerCLI}
+
+		err := ws.stageScaffoldChanges(context.Background(), "/project", worktree)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to determine web root")
+	})
+
+	t.Run("propagates a staging failure", func(t *testing.T) {
+		worktree := NewMockWorktree(t)
+		worktree.EXPECT().Status().Return(git.Status{"web/robots.txt": {Worktree: git.Modified}}, nil)
+		worktree.EXPECT().Add("web/robots.txt").Return(plumbing.ZeroHash, errors.New("locked"))
+
+		ws := &WorkflowBaseService{logger: logger, composer: newComposer("web/")}
+
+		err := ws.stageScaffoldChanges(context.Background(), "/project", worktree)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to stage web/robots.txt")
+	})
+}
+
+func TestStartUpdateFailsWhenScaffoldChangesCannotBeStaged(t *testing.T) {
+	// Staging what the update rewrote is part of producing the commit, not a nicety: if it
+	// fails, the run must fail rather than push a branch missing the scaffold changes.
+	logger := zap.NewNop()
+	installer := NewMockInstaller(t)
+	repositoryService := NewMockRepository(t)
+	vcsProvider := NewMockPlatform(t)
+	repository := NewMockGitRepository(t)
+	mockComposer := NewMockComposer(t)
+	expectVersionLookup(mockComposer)
+	drush := NewMockDrush(t)
+
+	config := internal.Config{
+		RepositoryURL: "https://example.com/repo.git",
+		Branch:        "main",
+		Token:         "token",
+		Clone:         true,
+		Sites:         []string{"site1"},
+	}
+
+	worktree := NewMockWorktree(t)
+	worktree.EXPECT().Checkout(workBranchCheckout).Return(nil)
+	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(nil, assert.AnError)
+
+	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil)
+
+	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").
+		Return(repository, worktree, "/tmp", nil)
+	repositoryService.EXPECT().IsShallowClone("/tmp").Return(false, nil)
+	repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound).Maybe()
+	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
+
+	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, "/tmp").Return("", nil)
+	mockComposer.EXPECT().Install(anyCtx, "/tmp").Return(nil)
+	mockComposer.EXPECT().Update(anyCtx, "/tmp", mock.Anything, mock.Anything, false, false).
+		Return([]composer.PackageChange{{Package: "drupal/core", From: "9.0.0", To: "9.1.0"}}, nil)
+
+	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
+	err := workflowService.StartUpdate(context.Background(), nil)
+
+	require.ErrorIs(t, err, assert.AnError)
+	assert.Contains(t, err.Error(), "failed to read worktree status")
+}

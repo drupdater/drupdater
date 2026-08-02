@@ -377,20 +377,27 @@ jobs:
         if: always() && steps.report.outputs.status == 'success'
         run: |
           set -euo pipefail
-          # A lock that does not match composer.json, or one that cannot be
-          # resolved for the target platform, makes the merge request useless
-          # however good the changelog looks. composer is in the image, so this
-          # runs against exactly the version the update itself used.
+          # A lock that does not match composer.json, or one that is internally
+          # inconsistent, makes the merge request useless however good the
+          # changelog looks. composer is in the image, so this runs against
+          # exactly the version the update itself used.
           #
           # --no-check-publish drops the rules about publishable packages
           # (name, description, license); a site is not a library. The lock
           # check is deliberately kept.
+          #
+          # --ignore-platform-reqs because drupdater passes it on every composer
+          # call it makes (pkg/composer/composer.go), so a lock it produced can
+          # legitimately require an extension this image does not carry --
+          # drupal/ai_provider_amazeeio wants ext-pgsql. Without the flag this
+          # step asserts a stronger property than drupdater ever promises, and
+          # fails on the runtime's extension set rather than on the update.
           docker run --rm -v "$(pwd)/run:/workspace" -w /workspace/project \
             --entrypoint composer drupdater:test \
             validate --no-check-publish --no-interaction | tee -a "$GITHUB_STEP_SUMMARY"
           docker run --rm -v "$(pwd)/run:/workspace" -w /workspace/project \
             --entrypoint composer drupdater:test \
-            install --dry-run --no-scripts --no-interaction \
+            install --dry-run --no-scripts --no-interaction --ignore-platform-reqs \
             | tail -20 | tee -a "$GITHUB_STEP_SUMMARY"
 
       # Running drupdater on its own output must find nothing left to do. It is
@@ -419,6 +426,12 @@ jobs:
 
           args=(--working-dir /workspace/project --report /workspace/report-second.json --dry-run)
           [ "$VERBOSE" = "true" ] && args+=(--verbose)
+          # The chown has to happen even when the run fails, so it is a trap rather than the
+          # next line: report-second.json is written on every exit path, owned by root and
+          # 0600, and set -e would otherwise skip straight past. The upload step then dies
+          # with EACCES on it and reports that instead of what actually went wrong.
+          trap 'sudo chown -R "$(id -u):$(id -g)" ./run || true' EXIT
+
           docker run --rm \
             -e DRUPALCODE_ACCESS_TOKEN \
             -v "$(pwd)/run:/workspace" \

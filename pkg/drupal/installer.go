@@ -76,8 +76,27 @@ func (is *Installer) ConfigureDatabase(ctx context.Context, dir string, site str
 	}
 
 	settingsPath := dir + "/" + webroot + "/sites/" + site + "/settings.php"
+
+	// Ensured on every call, ahead of the marker check below, because the two states are
+	// independent. settings.php survives a run -- it is deliberately never committed -- while
+	// core.extension.yml comes back from git whenever the working copy is reused, and the
+	// configuration export writes it without sqlite (config_exclude_modules sees to that). A
+	// second run in the same directory therefore finds the marker set and the module entry gone,
+	// and Drupal refuses to install: "Unable to uninstall the SQLite module because: The module
+	// 'SQLite' is providing the database driver 'sqlite'".
+	isSqliteEnabled, _ := is.isSqliteModuleEnabled(ctx, dir, site)
+	if !isSqliteEnabled {
+		siteLogger.Debug("enabling sqlite module")
+		if err := is.addSqliteModule(ctx, dir, site); err != nil {
+			return fmt.Errorf("failed to enable sqlite module: %w", err)
+		}
+	}
+
+	// The marker guards only the append: without it a repeated call stacks a second $databases
+	// block onto the file. config_exclude_modules is part of that append, so it is already there
+	// from the first call.
 	if existing, err := afero.ReadFile(is.fs, settingsPath); err == nil && strings.Contains(string(existing), settingsMarker) {
-		siteLogger.Debug("database already configured, skipping", zap.String("path", settingsPath))
+		siteLogger.Debug("settings already configured, skipping", zap.String("path", settingsPath))
 		return nil
 	}
 
@@ -98,12 +117,7 @@ $settings['file_private_path'] = '` + privatesDir + `';
 $settings['hash_salt'] = 'changeme';
 `
 
-	isSqliteEnabled, _ := is.isSqliteModuleEnabled(ctx, dir, site)
 	if !isSqliteEnabled {
-		siteLogger.Debug("enabling sqlite module")
-		if err := is.addSqliteModule(ctx, dir, site); err != nil {
-			return fmt.Errorf("failed to enable sqlite module: %w", err)
-		}
 		settings += `
 if (isset($settings['config_exclude_modules'])) {
 	$settings['config_exclude_modules'][] = 'sqlite';

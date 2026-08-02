@@ -94,7 +94,7 @@ var hasPHPCSPathDefinitions = func(path string) (bool, error) {
 	return len(ruleset.Files) > 0, nil
 }
 
-func (cb *CodeBeautifier) postCodeUpdateHandler(e event.Event) error { //nolint:cyclop
+func (cb *CodeBeautifier) postCodeUpdateHandler(e event.Event) (err error) { //nolint:cyclop
 	event := e.(*services.PostCodeUpdateEvent)
 	cb.logger.Info("updating coding styles")
 
@@ -122,6 +122,15 @@ func (cb *CodeBeautifier) postCodeUpdateHandler(e event.Event) error { //nolint:
 		if err := cb.InstallCoder(event.Context(), event.Path(), event.Worktree()); err != nil {
 			return err
 		}
+		// Deferred rather than called at the end: every path below returns early -- nothing
+		// fixable, nothing staged, phpcs failing -- and a coder left behind is a dev dependency
+		// the project never asked for, committed into the update branch and absent from the run
+		// report's package list, which is exactly what the lock-versus-report check catches.
+		defer func() {
+			if removeErr := cb.removeCoder(event.Context(), event.Path(), event.Worktree()); removeErr != nil && err == nil {
+				err = removeErr
+			}
+		}()
 	}
 
 	codingStyleUpdateResult, err := cb.phpcs.Run(event.Context(), event.Path())
@@ -280,4 +289,29 @@ func (cb *CodeBeautifier) InstallCoder(ctx context.Context, path string, worktre
 	}
 
 	return nil
+}
+
+// removeCoder undoes InstallCoder. Removing it rarely restores composer.lock byte-for-byte, so
+// the remainder is committed here rather than left for another listener's AddGlob("composer.*")
+// to sweep into its own commit.
+func (cb *CodeBeautifier) removeCoder(ctx context.Context, path string, worktree Worktree) error {
+	cb.logger.Debug("removing drupal/coder")
+	// --dev because InstallCoder required it there. Without the flag composer refuses with
+	// "could not be found in require but it is present in require-dev" and fails the run.
+	if _, err := cb.composer.Remove(ctx, path, "--dev", "drupal/coder"); err != nil {
+		return err
+	}
+
+	if err := worktree.AddGlob("composer.*"); err != nil {
+		return fmt.Errorf("failed to add file to commit: %w", err)
+	}
+	staged, err := stagedAnyOf(worktree, []string{"composer.json", "composer.lock"})
+	if err != nil {
+		return err
+	}
+	if !staged {
+		return nil
+	}
+	_, err = worktree.Commit("Remove temporary drupal/coder installation", &git.CommitOptions{})
+	return err
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/drupdater/drupdater/internal/codehosting"
 	"github.com/drupdater/drupdater/internal/report"
 	"github.com/drupdater/drupdater/pkg/composer"
+	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/gookit/event"
 	"github.com/stretchr/testify/assert"
@@ -88,6 +89,7 @@ func (h *reportHarness) expectFullRun(t *testing.T) {
 
 	h.worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil).Maybe()
 	h.worktree.EXPECT().AddGlob(mock.Anything).Return(nil).Maybe()
+	h.worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	h.worktree.EXPECT().Checkout(mock.Anything).Return(nil).Maybe()
 
 	h.installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil).Maybe()
