@@ -972,6 +972,13 @@ func TestHelperProcess(*testing.T) {
 		os.Exit(1)
 	}
 
+	// Lets a test assert on what the subprocess actually received, rather than on the Env slice
+	// the caller assembled for it.
+	if name := os.Getenv("GO_HELPER_PROCESS_PRINT_ENV"); name != "" {
+		fmt.Fprintln(os.Stdout, os.Getenv(name))
+		os.Exit(0)
+	}
+
 	fmt.Fprintf(os.Stdout, "%v\n", os.Args[3])
 	os.Exit(0)
 }
