@@ -9,6 +9,8 @@ import (
 	"strings"
 
 	"go.uber.org/zap"
+
+	"github.com/drupdater/drupdater/pkg/composer"
 )
 
 var execCommand = exec.CommandContext
@@ -29,6 +31,9 @@ func NewCLI(logger *zap.Logger) *CLI {
 func (s *CLI) execComposerJSON(ctx context.Context, dir string, args ...string) (string, error) {
 	command := execCommand(ctx, "composer", args...)
 	command.Dir = dir
+	// rector runs through `composer exec`, which makes it a subprocess of composer and so
+	// subject to composer's process timeout.
+	command.Env = composer.Env(command.Environ())
 
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout

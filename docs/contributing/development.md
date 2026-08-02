@@ -65,6 +65,21 @@ no token needed:
 go run . --working-dir /path/to/a/drupal/checkout --dry-run --verbose
 ```
 
+### Running outside the image
+
+`make build`, `go run`, and a binary a CI job downloaded all invoke whatever `composer`,
+`php` and `git` are on `PATH`, against whatever Composer configuration your environment
+provides. That is supported: the two Composer settings the tool's own correctness depends
+on (`COMPOSER_PROCESS_TIMEOUT`, `COMPOSER_NO_AUDIT`) are forced by `composer.Env` on every
+invocation rather than inherited from the image — including the `composer exec` calls that
+`pkg/drush`, `pkg/phpcs` and `pkg/rector` make. The image's remaining Composer variables
+are deployment policy and need no local equivalent — see [environment
+variables](../reference/environment-variables.md#set-by-drupdater).
+
+What the image does give you is a known-good PHP with the required extensions and the
+helper plugins installed globally. If a run fails locally in a way it does not in CI,
+check that first.
+
 ## Enforced on commit
 
 A pre-commit hook runs two gates. Read its output rather than assuming it passed.
