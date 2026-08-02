@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -118,50 +119,53 @@ func (s *CLI) Update(ctx context.Context, dir string, packages []string, package
 		return changes, fmt.Errorf("failed to update dependencies: %w, output: %s, arg: %v", err, out, args)
 	}
 
-	// "+" and "~" are in the class so build-metadata versions (1.0.0+21AF26D3) still match.
-	const version = `[\w.\-+~]+`
-	upgradeRegex := regexp.MustCompile(`- Upgrading ([\w\-/]+) \((` + version + `) => (` + version + `)\)`)
-	downgradingRegex := regexp.MustCompile(`- Downgrading ([\w\-/]+) \((` + version + `) => (` + version + `)\)`)
-	removeRegex := regexp.MustCompile(`- Removing ([\w\-/]+) \((` + version + `)\)`)
-	installRegex := regexp.MustCompile(`- Installing ([\w\-/]+) \((` + version + `)\)`)
-
-	for _, match := range upgradeRegex.FindAllStringSubmatch(out, -1) {
-		changes = append(changes, PackageChange{
-			Action:  "Upgrade",
-			Package: match[1],
-			From:    match[2],
-			To:      match[3],
-		})
-	}
-
-	for _, match := range downgradingRegex.FindAllStringSubmatch(out, -1) {
-		changes = append(changes, PackageChange{
-			Action:  "Downgrade",
-			Package: match[1],
-			From:    match[2],
-			To:      match[3],
-		})
-	}
-
-	for _, match := range removeRegex.FindAllStringSubmatch(out, -1) {
-		changes = append(changes, PackageChange{
-			Action:  "Remove",
-			Package: match[1],
-			From:    match[2],
-			To:      "",
-		})
-	}
-
-	for _, match := range installRegex.FindAllStringSubmatch(out, -1) {
-		changes = append(changes, PackageChange{
-			Action:  "Install",
-			Package: match[1],
-			From:    "",
-			To:      match[2],
-		})
+	// Grouped by action rather than scanned line by line, so the result stays ordered by action
+	// however composer interleaved its output.
+	for _, pattern := range packageChangePatterns {
+		for _, match := range pattern.re.FindAllStringSubmatch(out, -1) {
+			change := PackageChange{Action: pattern.action, Package: match[1]}
+			if pattern.twoVersions {
+				change.From, change.To = match[2], match[3]
+			} else if pattern.isRemoval {
+				change.From = match[2]
+			} else {
+				change.To = match[2]
+			}
+			changes = append(changes, change)
+		}
 	}
 
 	return changes, nil
+}
+
+// packageChangePatterns matches composer update's report of what it did, one entry per action.
+//
+// The order is the order the changes come back in, which the merge request description and the
+// report both carry, so it is part of what a consumer sees.
+var packageChangePatterns = []struct {
+	action string
+	re     *regexp.Regexp
+	// twoVersions marks the "(from => to)" form. Otherwise the single captured version is To,
+	// unless isRemoval says the package is going away and it is therefore From.
+	twoVersions bool
+	isRemoval   bool
+}{
+	{action: "Upgrade", re: twoVersionRegex("Upgrading"), twoVersions: true},
+	{action: "Downgrade", re: twoVersionRegex("Downgrading"), twoVersions: true},
+	{action: "Remove", re: oneVersionRegex("Removing"), isRemoval: true},
+	{action: "Install", re: oneVersionRegex("Installing")},
+}
+
+// versionPattern includes "+" and "~" in the class so build-metadata versions (1.0.0+21AF26D3)
+// still match.
+const versionPattern = `[\w.\-+~]+`
+
+func twoVersionRegex(verb string) *regexp.Regexp {
+	return regexp.MustCompile(`- ` + verb + ` ([\w\-/]+) \((` + versionPattern + `) => (` + versionPattern + `)\)`)
+}
+
+func oneVersionRegex(verb string) *regexp.Regexp {
+	return regexp.MustCompile(`- ` + verb + ` ([\w\-/]+) \((` + versionPattern + `)\)`)
 }
 
 func (s *CLI) Install(ctx context.Context, dir string) error {
@@ -272,25 +276,23 @@ func flattenAdvisories(advisoriesData any) ([]Advisory, error) {
 
 	var advisories []Advisory
 	for _, value := range advMap {
+		var items []any
 		switch v := value.(type) {
 		case []any: // Simple advisory list
-			for _, item := range v {
-				var adv Advisory
-				itemBytes, _ := json.Marshal(item)
-				if err := json.Unmarshal(itemBytes, &adv); err != nil {
-					return nil, err
-				}
-				advisories = append(advisories, adv)
-			}
+			items = v
 		case map[string]any: // Nested map (e.g., drupal/core)
-			for _, nestedItem := range v {
-				var adv Advisory
-				nestedBytes, _ := json.Marshal(nestedItem)
-				if err := json.Unmarshal(nestedBytes, &adv); err != nil {
-					return nil, err
-				}
-				advisories = append(advisories, adv)
+			items = slices.Collect(maps.Values(v))
+		default:
+			continue
+		}
+
+		for _, item := range items {
+			var adv Advisory
+			itemBytes, _ := json.Marshal(item)
+			if err := json.Unmarshal(itemBytes, &adv); err != nil {
+				return nil, err
 			}
+			advisories = append(advisories, adv)
 		}
 	}
 
@@ -736,35 +738,10 @@ type patchTestConfig struct {
 	Patches map[string]map[string]string `json:"patches"`
 }
 
+// CheckIfPatchApplies reports whether a single patch still applies to packageName at
+// packageVersion.
 func (s *CLI) CheckIfPatchApplies(ctx context.Context, projectDir string, packageName string, packageVersion string, patchPath string) (bool, error) {
-
-	s.initOnce.Do(s.initTempDir)
-	if s.initErr != nil {
-		return false, s.initErr
-	}
-	if err := s.resetScratchProject(projectDir); err != nil {
-		return false, err
-	}
-
-	// Marshalled rather than formatted, so special characters in the arguments stay escaped.
-	patchConfig := patchTestConfig{
-		Patches: map[string]map[string]string{
-			packageName: {
-				packageVersion: patchPath,
-			},
-		},
-	}
-	patchesJSONBytes, err := json.Marshal(patchConfig)
-	if err != nil {
-		return false, fmt.Errorf("failed to marshal patch config: %w", err)
-	}
-	patchesJSON := string(patchesJSONBytes)
-
-	if err := afero.WriteFile(s.fs, s.tempDir+"/composer.patches.json", []byte(patchesJSON), 0644); err != nil {
-		return false, err
-	}
-
-	return s.requireIntoScratch(ctx, packageName, packageVersion)
+	return s.CheckIfPatchesApply(ctx, projectDir, packageName, packageVersion, []string{patchPath})
 }
 
 // requireIntoScratch installs the package under test and classifies the outcome: true when the
@@ -808,14 +785,7 @@ func unresolvableReason(out string) (string, bool) {
 		return "", false
 	}
 
-	for _, candidate := range []struct{ pattern, reason string }{
-		{"could not find package", "not available from any configured repository"},
-		{"could not find a matching version", "not available from any configured repository"},
-		{"could not be found", "not available from any configured repository"},
-		{"invalid credentials", "repository authentication failed"},
-		{"authentication required", "repository authentication failed"},
-		{"could not be downloaded", "a required download failed"},
-	} {
+	for _, candidate := range unresolvablePatterns {
 		if strings.Contains(lower, candidate.pattern) {
 			return candidate.reason, true
 		}
@@ -823,6 +793,18 @@ func unresolvableReason(out string) (string, bool) {
 	return "", false
 }
 
+var unresolvablePatterns = []struct{ pattern, reason string }{
+	{"could not find package", "not available from any configured repository"},
+	{"could not find a matching version", "not available from any configured repository"},
+	{"could not be found", "not available from any configured repository"},
+	{"invalid credentials", "repository authentication failed"},
+	{"authentication required", "repository authentication failed"},
+	{"could not be downloaded", "a required download failed"},
+}
+
+// CheckIfPatchesApply reports whether patchPaths all apply together to packageName at
+// packageVersion. The keys are zero-padded indexes: composer-patches v1 treats them as free-text
+// descriptions, but applies them in key order, so the caller's order must survive JSON encoding.
 func (s *CLI) CheckIfPatchesApply(ctx context.Context, projectDir string, packageName string, packageVersion string, patchPaths []string) (bool, error) {
 	s.initOnce.Do(s.initTempDir)
 	if s.initErr != nil {
@@ -837,6 +819,7 @@ func (s *CLI) CheckIfPatchesApply(ctx context.Context, projectDir string, packag
 		patchMap[fmt.Sprintf("%010d", i)] = p
 	}
 
+	// Marshalled rather than formatted, so special characters in the arguments stay escaped.
 	patchesJSONBytes, err := json.Marshal(patchTestConfig{
 		Patches: map[string]map[string]string{packageName: patchMap},
 	})
@@ -851,6 +834,10 @@ func (s *CLI) CheckIfPatchesApply(ctx context.Context, projectDir string, packag
 	return s.requireIntoScratch(ctx, packageName, packageVersion)
 }
 
+// dependsRegex matches a row of `composer depends`. The version token matches any non-space
+// run, so dev-main and 1.0.0-beta1 are captured too.
+var dependsRegex = regexp.MustCompile(`(?m)^(\S+)\s+\S+\s+requires\b`)
+
 func (s *CLI) GetInstalledPlugins(ctx context.Context, dir string) (map[string]any, error) {
 
 	out, err := s.execComposer(ctx, dir, "depends", "composer-plugin-api", "--locked")
@@ -858,10 +845,8 @@ func (s *CLI) GetInstalledPlugins(ctx context.Context, dir string) (map[string]a
 		return nil, err
 	}
 
-	// The version token matches any non-space run, so dev-main and 1.0.0-beta1 are captured too.
 	var packages = make(map[string]any)
-	reg := regexp.MustCompile(`(?m)^(\S+)\s+\S+\s+requires\b`)
-	matches := reg.FindAllStringSubmatch(out, -1)
+	matches := dependsRegex.FindAllStringSubmatch(out, -1)
 
 	for _, match := range matches {
 		if len(match) > 1 {
