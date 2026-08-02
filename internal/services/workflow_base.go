@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"text/template"
@@ -319,6 +320,66 @@ func (ws *WorkflowBaseService) acquireWorkingCopy(username, email string) (GitRe
 	return ws.repository.OpenRepository(ws.config.WorkingDir, username, email)
 }
 
+// stageScaffoldChanges stages what the dependency update rewrote outside composer.*.
+//
+// drupal-scaffold owns files in the web root -- .htaccess, robots.txt, index.php, update.php --
+// and a core update rewrites them. They are not covered by the composer.* glob, so without this
+// the run ends with a dirty working tree and the merge request omits changes the project is
+// expected to carry.
+//
+// Only paths git already tracks are staged. Untracked ones are left alone on purpose: vendor/,
+// web/core and the site's generated files legitimately sit in the checkout and belong to nobody.
+//
+// Each site's settings.php is excluded even though it is tracked and modified: the installer
+// appends the throwaway SQLite database to it (pkg/drupal/installer.go), and committing that
+// would put test credentials and a local path into the merge request.
+func (ws *WorkflowBaseService) stageScaffoldChanges(ctx context.Context, path string, worktree Worktree) error {
+	status, err := worktree.Status()
+	if err != nil {
+		return fmt.Errorf("failed to read worktree status: %w", err)
+	}
+
+	// Sorted so the staging order does not depend on map iteration, keeping a run's commit
+	// reproducible.
+	candidates := make([]string, 0, len(status))
+	for file, fileStatus := range status {
+		if fileStatus.Worktree == git.Untracked || fileStatus.Worktree == git.Unmodified {
+			continue
+		}
+		candidates = append(candidates, file)
+	}
+	if len(candidates) == 0 {
+		return nil
+	}
+	slices.Sort(candidates)
+
+	// Only looked up once there is something to stage: an update that rewrote nothing outside
+	// composer.* has no reason to shell out to composer again.
+	webroot, err := composer.WebRoot(ctx, ws.composer, path)
+	if err != nil {
+		return fmt.Errorf("failed to determine web root: %w", err)
+	}
+	excluded := make(map[string]struct{}, len(ws.config.Sites))
+	for _, site := range ws.config.Sites {
+		excluded[filepath.Join(webroot, "sites", site, "settings.php")] = struct{}{}
+	}
+
+	staged := make([]string, 0, len(candidates))
+	for _, file := range candidates {
+		if _, skip := excluded[file]; skip {
+			continue
+		}
+		if _, err := worktree.Add(file); err != nil {
+			return fmt.Errorf("failed to stage %s: %w", file, err)
+		}
+		staged = append(staged, file)
+	}
+	if len(staged) > 0 {
+		ws.logger.Info("staged scaffold changes", zap.Strings("files", staged))
+	}
+	return nil
+}
+
 // forEachSite runs fn for every configured site concurrently, bounded by config.Concurrency
 // (or GOMAXPROCS(0), which reflects the container's CPU quota, when unset), and cancels the
 // rest on the first error.
@@ -417,6 +478,9 @@ func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context, repository 
 
 	if err := worktree.AddGlob("composer.*"); err != nil {
 		return "", fmt.Errorf("failed to add composer.* files: %w", err)
+	}
+	if err := ws.stageScaffoldChanges(ctx, path, worktree); err != nil {
+		return "", err
 	}
 	if _, err := worktree.Commit("Update composer.json and composer.lock", &git.CommitOptions{}); err != nil {
 		return "", fmt.Errorf("failed to commit composer.json and composer.lock: %w", err)

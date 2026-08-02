@@ -456,15 +456,47 @@ func TestCodingStyles(t *testing.T) {
 		composer := NewMockComposer(t)
 		composer.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/coder").Return(false, nil)
 		composer.EXPECT().Require(anyCtx, "/tmp", []string{"--dev", "drupal/coder"}).Return("", nil)
+		// Coder was installed only to run phpcs, so it has to go again -- even on this path,
+		// where there was nothing to fix. Left behind, it reaches the merge request as a dev
+		// dependency the project never asked for and that no report mentions.
+		composer.EXPECT().Remove(anyCtx, "/tmp", []string{"drupal/coder"}).Return("", nil)
 
 		worktree.EXPECT().AddGlob("composer.*").Return(nil)
 		worktree.EXPECT().Commit("Install drupal/coder", &git.CommitOptions{}).Return(plumbing.NewHash(""), nil)
+		worktree.EXPECT().Status().Return(git.Status{
+			"composer.lock": {Staging: git.Modified},
+		}, nil).Once()
+		worktree.EXPECT().Commit("Remove temporary drupal/coder installation", &git.CommitOptions{}).
+			Return(plumbing.NewHash(""), nil)
 
 		updateCodingStyles := NewCodeBeautifier(logger, runner, composer)
 		postCodeUpdate := services.NewPostCodeUpdateEvent(t.Context(), "/tmp", worktree)
 		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
 		require.NoError(t, err)
 		runner.AssertExpectations(t)
+		composer.AssertExpectations(t)
+	})
+
+	t.Run("Coder that was already installed is left alone", func(t *testing.T) {
+		// The project depends on coder itself. Removing it would be drupdater uninstalling a
+		// dependency the project chose, so IsPackageInstalled is what gates the whole cycle.
+		fileExists = func(_ string) bool { return true }
+		oldFn := hasPHPCSPathDefinitions
+		hasPHPCSPathDefinitions = func(_ string) (bool, error) { return true, nil }
+		defer func() { hasPHPCSPathDefinitions = oldFn }()
+
+		runner := NewMockPHPCS(t)
+		runner.EXPECT().Run(anyCtx, "/tmp").Return(phpcs.ReturnOutput{
+			Totals: phpcs.ReturnOutputTotals{Fixable: 0},
+			Files:  map[string]phpcs.ReturnOutputFile{},
+		}, nil)
+
+		composer := NewMockComposer(t)
+		composer.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/coder").Return(true, nil)
+
+		updateCodingStyles := NewCodeBeautifier(logger, runner, composer)
+		postCodeUpdate := services.NewPostCodeUpdateEvent(t.Context(), "/tmp", worktree)
+		require.NoError(t, updateCodingStyles.postCodeUpdateHandler(postCodeUpdate))
 		composer.AssertExpectations(t)
 	})
 

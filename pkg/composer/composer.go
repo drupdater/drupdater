@@ -156,6 +156,13 @@ func (s *CLI) Update(ctx context.Context, dir string, packages []string, package
 
 	// Grouped by action rather than scanned line by line, so the result stays ordered by action
 	// however composer interleaved its output.
+	//
+	// Deduplicated because composer reports a version change twice: once resolving the lock
+	// ("Lock file operations") and again installing it ("Package operations"), in identical
+	// wording. Installs differ between the two ("Locking" vs "Installing") and only the second is
+	// matched, so nothing is lost by keeping the first of each. One update produces at most one
+	// operation per package, so an exact repeat is always the same operation seen twice.
+	seen := make(map[PackageChange]struct{})
 	for _, pattern := range packageChangePatterns {
 		for _, match := range pattern.re.FindAllStringSubmatch(out, -1) {
 			change := PackageChange{Action: pattern.action, Package: match[1]}
@@ -165,6 +172,10 @@ func (s *CLI) Update(ctx context.Context, dir string, packages []string, package
 			if pattern.to > 0 {
 				change.To = match[pattern.to]
 			}
+			if _, ok := seen[change]; ok {
+				continue
+			}
+			seen[change] = struct{}{}
 			changes = append(changes, change)
 		}
 	}
