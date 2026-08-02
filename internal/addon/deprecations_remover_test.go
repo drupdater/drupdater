@@ -16,6 +16,27 @@ import (
 	"go.uber.org/zap"
 )
 
+// TestRecordFixes_DoesNotSortRectorsOutputInPlace pins that recordFixes only reads the value it
+// is handed. It sorts each file's rules, and doing that on the slice inside rector's own output
+// would reorder data the caller still owns — and hand two fixes for the same file one shared
+// backing array.
+func TestRecordFixes_DoesNotSortRectorsOutputInPlace(t *testing.T) {
+	output := rector.ReturnOutput{
+		ChangedFiles: []string{"web/modules/custom/a.php"},
+		FileDiffs: []rector.ReturnOutputFillDiff{
+			{File: "web/modules/custom/a.php", AppliedRectors: []string{"ZRector", "ARector"}},
+		},
+	}
+
+	dr := &DeprecationsRemover{}
+	dr.recordFixes(output)
+
+	assert.Equal(t, []string{"ZRector", "ARector"}, output.FileDiffs[0].AppliedRectors,
+		"rector's own output was reordered")
+	assert.Equal(t, []string{"ARector", "ZRector"}, dr.fixes[0].AppliedRectors,
+		"the report section is still sorted")
+}
+
 func TestDeprecationsRemover_SubscribedEvents(t *testing.T) {
 	dr := &DeprecationsRemover{}
 	events := dr.SubscribedEvents()

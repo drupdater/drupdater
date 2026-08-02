@@ -3,6 +3,7 @@ package addon
 import (
 	"fmt"
 	"slices"
+	"strconv"
 	"time"
 
 	"github.com/drupdater/drupdater/internal"
@@ -138,6 +139,12 @@ func (ca *ComposerAudit) GetFixedAdvisories() []composer.Advisory {
 
 // advisoryKey returns a stable identity for an advisory that does not collapse distinct
 // advisories which happen to lack a CVE.
+//
+// The last fallback quotes both halves rather than joining them on a separator. A plain
+// separator is only unambiguous while neither field contains it, and an advisory title is free
+// text — "Access bypass | SA-CONTRIB" is an ordinary thing for one to say. Two different
+// advisories sharing a key here means one of them is reported as fixed while it is still open,
+// in a security update.
 func advisoryKey(a composer.Advisory) string {
 	if a.CVE != "" {
 		return "cve:" + a.CVE
@@ -145,7 +152,7 @@ func advisoryKey(a composer.Advisory) string {
 	if a.AdvisoryID != "" {
 		return "id:" + a.AdvisoryID
 	}
-	return "pkg:" + a.PackageName + "|" + a.Title
+	return "pkg:" + strconv.Quote(a.PackageName) + strconv.Quote(a.Title)
 }
 
 func (ca *ComposerAudit) preMergeRequestCreateHandler(e event.Event) error {

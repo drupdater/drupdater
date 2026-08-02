@@ -163,7 +163,17 @@ func TestAdvisoryKey(t *testing.T) {
 	// CVE takes precedence; without it the advisory ID is used; without either, package+title.
 	assert.Equal(t, "cve:CVE-1", advisoryKey(composer.Advisory{CVE: "CVE-1", AdvisoryID: "A1"}))
 	assert.Equal(t, "id:A1", advisoryKey(composer.Advisory{AdvisoryID: "A1", PackageName: "drupal/foo"}))
-	assert.Equal(t, "pkg:drupal/foo|Title", advisoryKey(composer.Advisory{PackageName: "drupal/foo", Title: "Title"}))
+	assert.Equal(t, `pkg:"drupal/foo""Title"`, advisoryKey(composer.Advisory{PackageName: "drupal/foo", Title: "Title"}))
+}
+
+// TestAdvisoryKey_SeparatorInTitle covers the fallback's ambiguity. An advisory title is free
+// text, so joining package and title on a separator lets two different advisories share a key —
+// and a shared key means the second one is reported as fixed while it is still open.
+func TestAdvisoryKey_SeparatorInTitle(t *testing.T) {
+	split := composer.Advisory{PackageName: "drupal/foo|Access", Title: "bypass"}
+	other := composer.Advisory{PackageName: "drupal/foo", Title: "Access|bypass"}
+
+	assert.NotEqual(t, advisoryKey(split), advisoryKey(other))
 }
 
 func TestComposerAudit_GetFixedAdvisories_NoCVEAdvisoriesDoNotCollide(t *testing.T) {

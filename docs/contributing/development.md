@@ -17,6 +17,7 @@ make build
 ```bash
 make build          # build the binary (injects the version via -ldflags)
 make test           # go test -v ./...
+make test-property  # only the property tests, with far more generated cases
 make mutate         # mutation testing over the whole module (mutago)
 make lint           # golangci-lint + hadolint on the Dockerfile
 make fmt            # go fmt ./...
@@ -121,8 +122,11 @@ That takes 25–35 minutes — the module produces roughly 3000 mutants and each
 tests for its package. To iterate on one package, pass it directly:
 
 ```bash
-go tool mutago --config mutago.yaml --coverage ./pkg/phpcs
+RAPID_NOFAILFILE=1 go tool mutago --config mutago.yaml --coverage ./pkg/phpcs
 ```
+
+(`RAPID_NOFAILFILE=1` keeps the property tests from littering `testdata/rapid` — see
+[Property-based testing](#property-based-testing) below. `make mutate` sets it for you.)
 
 Each survivor prints as `ESCAPED <file>:<line> (<mutator>)` with a diff of the change that
 went unnoticed. Read it as a question: *which assertion would have caught this?*
@@ -194,6 +198,88 @@ buf := make([]byte, 0, 64)
 Use the narrowest form that works — name the specific mutator rather than `*` — and add a
 comment saying *why* the mutation is equivalent. If you cannot articulate the reason, the
 mutant is probably telling you about a missing assertion.
+
+## Property-based testing
+
+Mutation testing asks whether a test would notice if the code changed. Property-based testing
+asks the other half of the question: whether what the test asserts is true for every input, or
+only for the one somebody typed. An example test says *`SanitizeURL` removes the password from
+this URL*. A property says *`SanitizeURL` removes the password from **any** URL*, and then goes
+looking for a URL where it does not.
+
+The tool is [rapid](https://github.com/flyingmutant/rapid). It generates inputs, and when one
+fails it shrinks the counterexample to the smallest input that still fails before reporting it.
+
+```bash
+make test                    # properties run with the rest of the suite, 100 cases each
+make test-property           # only the properties, 10 000 cases each
+go test ./internal/logging -run TestProperty -rapid.checks=1000000   # one package, hard
+```
+
+Every `-rapid.*` flag has a `RAPID_*` environment variable twin, and across `./...` the variable
+is the one to use: rapid registers its flags only in test binaries that import it, so
+`-rapid.checks` makes `go test ./...` fail on every package that has no property tests.
+`make test-property` sets `RAPID_CHECKS` for that reason.
+
+### The convention
+
+- Properties live in `<subject>_property_test.go`, next to the ordinary `<subject>_test.go`.
+- Every property is named `TestProperty…`. That prefix is not decoration: `make test-property`
+  selects on it, so a property named anything else silently drops out of the deep run.
+- Generators stay local to the file that uses them. They are type-specific, and a shared package
+  of them would couple the test files together for no gain.
+- **A property must not re-implement the function.** If the expected value is computed the same
+  way the code computes it, the test passes by construction. State a law instead — idempotent,
+  order-independent, leaks nothing, round-trips — or compare against a *rule* that is simpler
+  than the implementation.
+
+### Reproducing a failure
+
+Every run uses a **fresh random seed**, so the suite explores new inputs each time and a
+property that passes once is not proven. When one fails, rapid prints how to get it back and
+writes a `.fail` file next to the test:
+
+```text
+To reproduce, specify -run="TestPropertyRedactCoversURLEncodedForms"
+  -rapid.failfile="testdata/rapid/…/…-20260801210044-6470.fail" (or -rapid.seed=11040429362938902097)
+```
+
+Commit that file. rapid replays every `.fail` file it finds before generating anything new, so a
+counterexample found once is checked forever after — the property-test equivalent of adding a
+regression case. Delete it only when the property itself was wrong.
+
+!!! warning "Run mutation testing with `RAPID_NOFAILFILE=1`"
+
+    A mutation run rewrites the source thousands of times, and every mutant a property kills
+    leaves a `.fail` file behind — hundreds of them, none of which says anything about the real
+    code, all of which would then be replayed by the next ordinary test run. `make mutate` sets
+    `RAPID_NOFAILFILE=1` for exactly that reason. Set it yourself when invoking `mutago`
+    directly:
+
+    ```bash
+    RAPID_NOFAILFILE=1 go tool mutago --config mutago.yaml --coverage ./internal/logging
+    ```
+
+    If you find `testdata/rapid` full of files after a mutation run, delete them — the ones
+    worth keeping came from a plain `go test`.
+
+### Properties and the mutation gate
+
+The mutation gate is blocking and the seed is random, which do not mix: a mutant killed only
+because that run happened to generate the right input would pass on one pull request and fail on
+the next. So when a property finds a real bug, fix the code **and** add an ordinary test naming
+the concrete counterexample. The property is the net; the example test is what reliably kills
+the mutant. Both fixes in `internal/logging` and `internal/addon` are written that way.
+
+Keep properties cheap for the same reason — mutation testing re-runs the suite once per mutant,
+so a property that takes a second at 100 cases costs an hour across the module.
+
+### When not to write one
+
+A function with two branches and no interesting input space is a table test, not a property.
+`ActiveRunType` and `tokenRequired` are covered better by listing their cases than by generating
+them. Properties earn their keep where the input space is large and the promise is absolute:
+parsers, path handling, ordering, serialisation, and anything that must never leak a credential.
 
 ## Mocks
 
