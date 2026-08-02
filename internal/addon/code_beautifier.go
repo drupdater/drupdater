@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"text/template"
 
@@ -50,14 +50,23 @@ func (cb *CodeBeautifier) RenderTemplate() (string, error) {
 	return "", nil
 }
 
-// fileExists reports whether path has a phpcs.xml or phpcs.xml.dist.
-var fileExists = func(path string) bool {
-	if _, err := os.Stat(filepath.Join(path, "phpcs.xml")); os.IsNotExist(err) {
-		if _, err := os.Stat(filepath.Join(path, "phpcs.xml.dist")); os.IsNotExist(err) {
-			return false
+// phpcsConfigPath returns the project's phpcs config file. found is true when a candidate is
+// present — or when stat failed for a reason other than absence, which is not this function's
+// call to interpret: a config that exists but cannot be read must not read as "no config".
+func phpcsConfigPath(path string) (configPath string, found bool) {
+	for _, name := range []string{"phpcs.xml", "phpcs.xml.dist"} {
+		candidate := filepath.Join(path, name)
+		if _, err := os.Stat(candidate); !os.IsNotExist(err) {
+			return candidate, true
 		}
 	}
-	return true
+	return "", false
+}
+
+// fileExists reports whether path has a phpcs.xml or phpcs.xml.dist.
+var fileExists = func(path string) bool {
+	_, found := phpcsConfigPath(path)
+	return found
 }
 
 type phpcsRuleset struct {
@@ -67,12 +76,8 @@ type phpcsRuleset struct {
 
 // hasPHPCSPathDefinitions reports whether the config declares any <file> path.
 var hasPHPCSPathDefinitions = func(path string) (bool, error) {
-	var configPath string
-	if _, err := os.Stat(filepath.Join(path, "phpcs.xml")); err == nil {
-		configPath = filepath.Join(path, "phpcs.xml")
-	} else if _, err := os.Stat(filepath.Join(path, "phpcs.xml.dist")); err == nil {
-		configPath = filepath.Join(path, "phpcs.xml.dist")
-	} else {
+	configPath, found := phpcsConfigPath(path)
+	if !found {
 		return false, nil
 	}
 
@@ -165,7 +170,7 @@ func (cb *CodeBeautifier) postCodeUpdateHandler(e event.Event) error { //nolint:
 		return err
 	}
 
-	sort.Strings(addedFiles)
+	slices.Sort(addedFiles)
 	cb.fixedFiles = addedFiles
 	cb.fixable = codingStyleUpdateResult.Totals.Fixable
 	return nil

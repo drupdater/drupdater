@@ -17,11 +17,11 @@ import (
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/report"
 	"github.com/drupdater/drupdater/pkg/composer"
+	"github.com/drupdater/drupdater/pkg/repo"
 
 	git "github.com/go-git/go-git/v5"
 	gitConfig "github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
@@ -346,8 +346,14 @@ func (ws *WorkflowBaseService) cleanup(path string) {
 		}
 		return
 	}
-	parent := filepath.Dir(path)
-	for _, site := range ws.config.Sites {
+	CleanupSiteArtifacts(filepath.Dir(path), ws.config.Sites)
+}
+
+// CleanupSiteArtifacts removes the SQLite databases and private files a site install writes
+// beside the checkout, given the directory the checkout sits in. Shared with "drupdater check
+// --full", which performs the same installs and owes the same cleanup.
+func CleanupSiteArtifacts(parent string, sites []string) {
+	for _, site := range sites {
 		os.Remove(filepath.Join(parent, site+".sqlite"))
 		// Only the per-site directory, never the whole "private" tree: that is a standard Drupal
 		// layout and can hold real project data this run does not own.
@@ -544,10 +550,7 @@ func (ws *WorkflowBaseService) publishWork(ctx context.Context, repository GitRe
 		RefSpecs: []gitConfig.RefSpec{
 			gitConfig.RefSpec(fmt.Sprintf("refs/heads/%s:refs/heads/%s", updateBranchName, updateBranchName)),
 		},
-		Auth: &http.BasicAuth{
-			Username: "du", // yes, this can be anything except an empty string
-			Password: ws.config.Token,
-		},
+		Auth: repo.BasicAuth(ws.config.Token),
 	})
 
 	if err != nil {
@@ -583,8 +586,14 @@ func (ws *WorkflowBaseService) publishWork(ctx context.Context, repository GitRe
 	return nil
 }
 
+// descriptionTemplates parses the embedded merge request templates once. The FS is compiled in,
+// so the result — success or failure — is the same on every call.
+var descriptionTemplates = sync.OnceValues(func() (*template.Template, error) {
+	return template.ParseFS(templates, "templates/*.go.tmpl")
+})
+
 func (ws *WorkflowBaseService) GenerateDescription(data any, filename string) (string, error) {
-	tmpl, err := template.ParseFS(templates, "templates/*.go.tmpl")
+	tmpl, err := descriptionTemplates()
 	if err != nil {
 		return "", fmt.Errorf("failed to parse template: %w", err)
 	}

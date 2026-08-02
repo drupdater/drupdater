@@ -1,11 +1,9 @@
 package phpcs
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"os/exec"
-	"strings"
 
 	"go.uber.org/zap"
 
@@ -24,35 +22,10 @@ func NewCLI(logger *zap.Logger) *CLI {
 	}
 }
 
-func (s *CLI) execComposer(ctx context.Context, dir string, args ...string) (string, error) {
-	command := execCommand(ctx, "composer", args...)
-	command.Dir = dir
-	// phpcs runs through `composer exec` and inherits composer's process timeout.
-	command.Env = composer.Env(command.Environ())
-
-	out, err := command.CombinedOutput()
-	output := strings.TrimSuffix(string(out), "\n")
-
-	s.logger.Debug(command.String() + "\n" + output)
-
-	return output, err
-}
-
-// execComposerJSON returns stdout only, so PHP notices on stderr can't corrupt the JSON report.
-func (s *CLI) execComposerJSON(ctx context.Context, dir string, args ...string) (string, error) {
-	command := execCommand(ctx, "composer", args...)
-	command.Dir = dir
-	command.Env = composer.Env(command.Environ())
-
-	var stdout, stderr bytes.Buffer
-	command.Stdout = &stdout
-	command.Stderr = &stderr
-	err := command.Run()
-
-	output := strings.TrimSuffix(stdout.String(), "\n")
-	s.logger.Debug(command.String() + "\nstdout: " + output + "\nstderr: " + strings.TrimSuffix(stderr.String(), "\n"))
-
-	return output, err
+// command returns the runner for a phpcs invocation. phpcs runs through `composer exec` and
+// inherits composer's process timeout.
+func (s *CLI) command(dir string) composer.Command {
+	return composer.Command{New: execCommand, Logger: s.logger, Dir: dir}
 }
 
 type ReturnOutput struct {
@@ -81,8 +54,10 @@ type ReturnOutputTotals struct {
 	Fixable  int `json:"fixable"`
 }
 
+// Run reports the violations. Split, not combined: a PHP notice on stderr would corrupt the
+// JSON report.
 func (s *CLI) Run(ctx context.Context, dir string) (ReturnOutput, error) {
-	out, err := s.execComposerJSON(ctx, dir, "exec", "--", "phpcs", "--report=json", "-q", "--runtime-set", "ignore_errors_on_exit", "1", "--runtime-set", "ignore_warnings_on_exit", "1")
+	out, _, err := s.command(dir).Split(ctx, "exec", "--", "phpcs", "--report=json", "-q", "--runtime-set", "ignore_errors_on_exit", "1", "--runtime-set", "ignore_warnings_on_exit", "1")
 	if err != nil {
 		return ReturnOutput{}, err
 	}
@@ -95,6 +70,6 @@ func (s *CLI) Run(ctx context.Context, dir string) (ReturnOutput, error) {
 }
 
 func (s *CLI) RunCBF(ctx context.Context, dir string) error {
-	_, err := s.execComposer(ctx, dir, "exec", "--", "phpcbf")
+	_, err := s.command(dir).Combined(ctx, "exec", "--", "phpcbf")
 	return err
 }

@@ -32,6 +32,11 @@ func (e *BasicAddonEvent) Worktree() Worktree {
 	return e.worktree
 }
 
+// newBasicAddonEvent builds the context every addon event carries.
+func newBasicAddonEvent(ctx context.Context, path string, worktree Worktree) BasicAddonEvent {
+	return BasicAddonEvent{ctx: ctx, path: path, worktree: worktree}
+}
+
 type PreComposerUpdateEvent struct {
 	event.BasicEvent
 	BasicAddonEvent
@@ -42,11 +47,7 @@ type PreComposerUpdateEvent struct {
 
 func NewPreComposerUpdateEvent(ctx context.Context, path string, worktree Worktree, packagesToUpdate []string, packagesToKeep []string, minimalChanges bool) *PreComposerUpdateEvent {
 	evt := &PreComposerUpdateEvent{
-		BasicAddonEvent: BasicAddonEvent{
-			ctx:      ctx,
-			path:     path,
-			worktree: worktree,
-		},
+		BasicAddonEvent:  newBasicAddonEvent(ctx, path, worktree),
 		PackagesToUpdate: packagesToUpdate,
 		PackagesToKeep:   packagesToKeep,
 		MinimalChanges:   minimalChanges,
@@ -62,10 +63,7 @@ type PostComposerUpdateEvent struct {
 
 func NewPostComposerUpdateEvent(ctx context.Context, path string, worktree Worktree) *PostComposerUpdateEvent {
 	evt := &PostComposerUpdateEvent{
-		BasicAddonEvent: BasicAddonEvent{
-			ctx:      ctx,
-			path:     path,
-			worktree: worktree},
+		BasicAddonEvent: newBasicAddonEvent(ctx, path, worktree),
 	}
 	evt.SetName("post-composer-update")
 	return evt
@@ -78,11 +76,7 @@ type PostCodeUpdateEvent struct {
 
 func NewPostCodeUpdateEvent(ctx context.Context, path string, worktree Worktree) *PostCodeUpdateEvent {
 	evt := &PostCodeUpdateEvent{
-		BasicAddonEvent: BasicAddonEvent{
-			ctx:      ctx,
-			path:     path,
-			worktree: worktree,
-		},
+		BasicAddonEvent: newBasicAddonEvent(ctx, path, worktree),
 	}
 	evt.SetName("post-code-update")
 	return evt
@@ -96,12 +90,8 @@ type PreSiteUpdateEvent struct {
 
 func NewPreSiteUpdateEvent(ctx context.Context, path string, worktree Worktree, site string) *PreSiteUpdateEvent {
 	evt := &PreSiteUpdateEvent{
-		BasicAddonEvent: BasicAddonEvent{
-			ctx:      ctx,
-			path:     path,
-			worktree: worktree,
-		},
-		site: site,
+		BasicAddonEvent: newBasicAddonEvent(ctx, path, worktree),
+		site:            site,
 	}
 	evt.SetName("pre-site-update")
 	return evt
@@ -119,12 +109,8 @@ type PostSiteUpdateEvent struct {
 
 func NewPostSiteUpdateEvent(ctx context.Context, path string, worktree Worktree, site string) *PostSiteUpdateEvent {
 	evt := &PostSiteUpdateEvent{
-		BasicAddonEvent: BasicAddonEvent{
-			ctx:      ctx,
-			path:     path,
-			worktree: worktree,
-		},
-		site: site,
+		BasicAddonEvent: newBasicAddonEvent(ctx, path, worktree),
+		site:            site,
 	}
 	evt.SetName("post-site-update")
 	return evt

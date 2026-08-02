@@ -107,11 +107,15 @@ func (ca *ComposerAudit) preComposerUpdateHandler(e event.Event) error {
 		return nil
 	}
 
+	// Deduplicated in first-seen order: several advisories often name one package, and the list
+	// becomes composer update's package arguments.
 	packagesToUpdate := make([]string, 0)
+	seen := make(map[string]bool, len(ca.beforeAudit.Advisories))
 	for _, advisory := range ca.beforeAudit.Advisories {
-		if slices.Contains(packagesToUpdate, advisory.PackageName) {
+		if seen[advisory.PackageName] {
 			continue
 		}
+		seen[advisory.PackageName] = true
 		packagesToUpdate = append(packagesToUpdate, advisory.PackageName)
 	}
 

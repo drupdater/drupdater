@@ -1,7 +1,9 @@
 package addon
 
 import (
-	"sort"
+	"maps"
+	"slices"
+	"strings"
 
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/drush"
@@ -71,14 +73,11 @@ func (uh *UpdateHooks) ReportData() any {
 		return nil
 	}
 
-	// Copy: the caller has no way to know this map is mutex-guarded state.
+	// Copy: the caller has no way to know this map is mutex-guarded state. Deep, because the
+	// per-site maps are guarded too.
 	out := make(map[string]map[string]drush.UpdateHook, len(uh.hooks))
 	for site, hooks := range uh.hooks {
-		siteHooks := make(map[string]drush.UpdateHook, len(hooks))
-		for name, hook := range hooks {
-			siteHooks[name] = hook
-		}
-		out[site] = siteHooks
+		out[site] = maps.Clone(hooks)
 	}
 
 	return out
@@ -99,11 +98,8 @@ func (um *UnsupportedModules) ReportData() any {
 		return nil
 	}
 
-	modules := make([]drush.UnsupportedModule, 0, len(um.modules))
-	for _, module := range um.modules {
-		modules = append(modules, module)
-	}
-	sort.Slice(modules, func(i, j int) bool { return modules[i].Name < modules[j].Name })
+	modules := slices.Collect(maps.Values(um.modules))
+	slices.SortFunc(modules, func(a, b drush.UnsupportedModule) int { return strings.Compare(a.Name, b.Name) })
 
 	return modules
 }
@@ -200,9 +196,5 @@ func (tu *TranslationsUpdater) ReportData() any {
 	}
 
 	// Copy: the caller has no way to know this map is mutex-guarded state.
-	out := make(map[string]TranslationResult, len(tu.results))
-	for site, result := range tu.results {
-		out[site] = result
-	}
-	return out
+	return maps.Clone(tu.results)
 }

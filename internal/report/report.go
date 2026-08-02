@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"net/url"
 	"path/filepath"
+	"slices"
 	"sync"
 	"time"
 
@@ -308,19 +309,11 @@ type CheckResult struct {
 
 // NewCheck assembles the check document from the results the command produced.
 func NewCheck(version string, results []CheckResult) Check {
-	ok := true
-	for _, r := range results {
-		if !r.OK {
-			ok = false
-			break
-		}
-	}
-
 	return Check{
 		SchemaVersion:    SchemaVersion,
 		DrupdaterVersion: version,
 		CheckedAt:        time.Now(),
-		OK:               ok,
+		OK:               !slices.ContainsFunc(results, func(r CheckResult) bool { return !r.OK }),
 		Results:          results,
 	}
 }

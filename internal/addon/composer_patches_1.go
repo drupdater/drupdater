@@ -215,6 +215,30 @@ func isRemotePatch(patchPath string) bool {
 	return err == nil && (u.Scheme == "http" || u.Scheme == "https")
 }
 
+// resolvePatchPath makes a patch reference absolute for the patch-test project, which runs from
+// a temp directory where a project-relative path points nowhere. A remote patch is already
+// absolute.
+//
+// Must go through isRemotePatch: url.ParseRequestURI accepts "/patches/x.diff", which would pass
+// through unprefixed, fail to resolve, and pin the package on a conflict that never happened.
+func resolvePatchPath(projectDir string, patchPath string) string {
+	if isRemotePatch(patchPath) {
+		return patchPath
+	}
+	return projectDir + "/" + patchPath
+}
+
+// conflict records a package held back at its current version because a patch no longer applies.
+func conflict(op composer.PackageChange, patchPath string, description string) ConflictPatch {
+	return ConflictPatch{
+		Package:          op.Package,
+		FixedVersion:     op.From,
+		NewVersion:       op.To,
+		PatchPath:        patchPath,
+		PatchDescription: description,
+	}
+}
+
 // dropPatchFile removes a patch's file from the worktree. A remote patch has no file, which is
 // not an error. Every removal goes through here so a URL never reaches worktree.Remove, which
 // would fail and read as "the patch could not be dropped".
@@ -338,13 +362,7 @@ func (h *ComposerPatches1) processSinglePatch(ctx context.Context, path string, 
 		patches[op.Package][description] = patchPath
 	}
 
-	absolutePath := patchPath
-	externalPatch := isRemotePatch(patchPath)
-	if !externalPatch {
-		absolutePath = path + "/" + patchPath
-	}
-
-	ok, err := h.composer.CheckIfPatchApplies(ctx, path, op.Package, op.To, absolutePath)
+	ok, err := h.composer.CheckIfPatchApplies(ctx, path, op.Package, op.To, resolvePatchPath(path, patchPath))
 	if err != nil {
 		// The check could not run at all, usually because the package was unobtainable. An
 		// unverifiable patch is not a stale one: pinning here would hold the package back on
@@ -362,7 +380,7 @@ func (h *ComposerPatches1) processSinglePatch(ctx context.Context, path string, 
 
 	if !issueNumberExists {
 		h.logger.Info("patch does not apply, keeping current package version", zap.String("package", op.Package), zap.String("version", op.From), zap.String("patch", patchPath))
-		updates.Conflicts = append(updates.Conflicts, ConflictPatch{Package: op.Package, FixedVersion: op.From, PatchPath: patchPath, NewVersion: op.To, PatchDescription: description})
+		updates.Conflicts = append(updates.Conflicts, conflict(op, patchPath, description))
 		return
 	}
 
@@ -370,7 +388,7 @@ func (h *ComposerPatches1) processSinglePatch(ctx context.Context, path string, 
 	// only configured when DRUPALCODE_ACCESS_TOKEN is set. Without it, keep the current version.
 	if h.gitlab == nil {
 		h.logger.Info("patch does not apply and no drupalcode client is configured, keeping current package version", zap.String("package", op.Package), zap.String("version", op.From), zap.String("patch", patchPath))
-		updates.Conflicts = append(updates.Conflicts, ConflictPatch{Package: op.Package, FixedVersion: op.From, PatchPath: patchPath, NewVersion: op.To, PatchDescription: description})
+		updates.Conflicts = append(updates.Conflicts, conflict(op, patchPath, description))
 		return
 	}
 
@@ -420,21 +438,14 @@ func (h *ComposerPatches1) processSinglePatch(ctx context.Context, path string, 
 		updates.Updated = append(updates.Updated, UpdatedPatch{Package: op.Package, PreviousPatchPath: patchPath, NewPatchPath: fullNewPath, PatchDescription: description})
 	} else {
 		h.logger.Info("merge request does not apply, keeping current package version", zap.String("package", op.Package), zap.String("version", op.To), zap.String("patch", path+"/"+newPatchDir))
-		updates.Conflicts = append(updates.Conflicts, ConflictPatch{Package: op.Package, FixedVersion: op.From, PatchPath: patchPath, NewVersion: op.To, PatchDescription: description})
+		updates.Conflicts = append(updates.Conflicts, conflict(op, patchPath, description))
 	}
 }
 
 func (h *ComposerPatches1) validateCombinedPatches(ctx context.Context, path string, op composer.PackageChange, patches map[string]map[string]string, updates *PatchUpdates) {
 	patchPaths := make([]string, 0, len(patches[op.Package]))
 	for _, patchPath := range patches[op.Package] {
-		// Resolve local paths against the project, as processSinglePatch does. Must use
-		// isRemotePatch: url.ParseRequestURI accepts "/patches/x.diff", which would pass
-		// through unprefixed, fail to resolve, and pin the package on a false conflict.
-		absolutePath := patchPath
-		if !isRemotePatch(patchPath) {
-			absolutePath = path + "/" + patchPath
-		}
-		patchPaths = append(patchPaths, absolutePath)
+		patchPaths = append(patchPaths, resolvePatchPath(path, patchPath))
 	}
 
 	ok, err := h.composer.CheckIfPatchesApply(ctx, path, op.Package, op.To, patchPaths)
@@ -446,12 +457,8 @@ func (h *ComposerPatches1) validateCombinedPatches(ctx context.Context, path str
 	if !ok {
 		h.logger.Info("patches do not apply together, keeping current package version",
 			zap.String("package", op.Package), zap.String("version", op.To))
-		updates.Conflicts = append(updates.Conflicts, ConflictPatch{
-			Package:          op.Package,
-			FixedVersion:     op.From,
-			NewVersion:       op.To,
-			PatchDescription: "Multiple patches do not apply together",
-		})
+		// No single patch to name: the package is held back because the set as a whole failed.
+		updates.Conflicts = append(updates.Conflicts, conflict(op, "", "Multiple patches do not apply together"))
 	} else {
 		h.logger.Debug("patches apply together", zap.String("package", op.Package), zap.String("version", op.To), zap.Any("patch", patchPaths))
 
@@ -481,13 +488,14 @@ func (h *ComposerPatches1) fetchForkMergeRequests(projectMachineName string, for
 	return mergeRequests, nil
 }
 
+var unsafeFileNameChars = regexp.MustCompile(`[^a-zA-Z0-9\-_.]`)
+
 // cleanURLString turns an issue title into a safe file name component: lower-cased, spaces to
 // underscores, everything outside [a-z0-9-_.] stripped, so it can hold no path separator.
 func (h *ComposerPatches1) cleanURLString(s string) string {
 	s = strings.ToLower(s)
 	s = strings.ReplaceAll(s, " ", "_")
-	re := regexp.MustCompile(`[^a-zA-Z0-9\-_.]`)
-	return re.ReplaceAllString(s, "")
+	return unsafeFileNameChars.ReplaceAllString(s, "")
 }
 
 func (h *ComposerPatches1) downloadFile(ctx context.Context, url, folder string, file string) error {
