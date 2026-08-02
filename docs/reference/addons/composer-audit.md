@@ -41,6 +41,41 @@ matching on CVE, then advisory ID, then package plus title. The result is the `f
 It runs at a **below-normal** priority on `post-code-update`, so it sees the final code —
 after Rector and PHPCBF have finished.
 
+### After the code update — abandoned packages
+
+`composer audit` reports more than advisories: its JSON output also lists the packages whose
+maintainers have marked them abandoned, together with the replacement they suggested when
+there is one. The same command is already being run, so this costs nothing extra, and it
+covers ground nothing else does — [`unsupported_modules`](unsupported-modules.md) reads
+drupal.org, so it sees `drupal/*` and nothing else, while a Drupal project's lock file is full
+of ordinary PHP libraries.
+
+The list is taken from the audit **after** the update, like the remaining advisories, so it
+describes the code the pull request actually contains.
+
+!!! info "`drupal/*` packages are excluded"
+
+    A module can be both abandoned on Packagist and unsupported on drupal.org. Those are one
+    finding, not two, so `drupal/*` packages are left out here and reported by
+    [`unsupported_modules`](unsupported-modules.md), which has drupal.org's own release data
+    and can name a recommended version. Only the `drupal/` vendor is filtered — an unrelated
+    vendor such as `drupalfinder/` is still reported.
+
+!!! tip "Silencing it"
+
+    drupdater does not pass `--abandoned`, so Composer applies the project's own
+    [`audit.abandoned`](https://getcomposer.org/doc/06-config.md#abandoned) setting. Setting
+    it to `ignore` in the project's `composer.json` makes Composer report no abandoned
+    packages, and drupdater then has none to show:
+
+    ```bash
+    composer config audit.abandoned ignore
+    ```
+
+    That also silences Composer's own audit failures for abandoned packages, everywhere. There
+    is no drupdater-side switch for this — the project's Composer configuration is the single
+    place it is decided.
+
 ### Before the pull request — retitling
 
 Rewrites the request title from the default monthly form to:
@@ -75,7 +110,17 @@ would just be a normal update with a different pull request title.
           "reportedAt": "2026-07-01T00:00:00+00:00"
         }
       ],
-      "remaining": []
+      "remaining": [],
+      "abandoned": [
+        {
+          "packageName": "patchwork/jsqueeze",
+          "replacement": ""
+        },
+        {
+          "packageName": "swiftmailer/swiftmailer",
+          "replacement": "symfony/mailer"
+        }
+      ]
     }
   }
 }
@@ -84,6 +129,10 @@ would just be a normal update with a different pull request title.
 `remaining` lists advisories the update could not resolve — usually because the fix
 requires a major version bump, or because a [patch conflict](composer-patches.md) held the
 package back.
+
+`abandoned` lists the abandoned packages, sorted by name so two reports of an unchanged
+project are byte-identical. `replacement` is the successor the maintainers suggested, and is
+`""` when they suggested none.
 
 ## Pull request section
 

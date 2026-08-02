@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -255,5 +256,39 @@ func TestPropertyAuditUnmarshalToleratesAMissingAdvisoriesKey(t *testing.T) {
 		var audit Audit
 		require.NoError(t, json.Unmarshal([]byte("{"+strings.Join(pairs, ",")+"}"), &audit))
 		assert.Empty(t, audit.Advisories)
+	})
+}
+
+// TestPropertyAuditUnmarshalOrdersAbandonedByName states that the abandoned list does not
+// depend on the order composer happened to emit its keys in. It is built by ranging over a Go
+// map, whose iteration order is randomised per run, so without the sort the same audit output
+// would render a different merge request description and a different report on every run — and
+// a consumer diffing two reports of an unchanged site would see phantom changes.
+func TestPropertyAuditUnmarshalOrdersAbandonedByName(t *testing.T) {
+	rapid.Check(t, func(t *rapid.T) {
+		names := rapid.SliceOfNDistinct(jsonKeyGen(), 0, 6, rapid.ID).Draw(t, "names")
+
+		entries := make([]string, 0, len(names))
+		want := make([]AbandonedPackage, 0, len(names))
+		for _, name := range names {
+			// Composer writes null when the maintainers suggested no successor.
+			if rapid.Bool().Draw(t, "hasReplacement-"+name) {
+				replacement := jsonKeyGen().Draw(t, "replacement-"+name)
+				entries = append(entries, fmt.Sprintf("%q:%q", name, replacement))
+				want = append(want, AbandonedPackage{PackageName: name, Replacement: replacement})
+				continue
+			}
+			entries = append(entries, fmt.Sprintf("%q:null", name))
+			want = append(want, AbandonedPackage{PackageName: name})
+		}
+		slices.SortFunc(want, func(a, b AbandonedPackage) int {
+			return strings.Compare(a.PackageName, b.PackageName)
+		})
+
+		var audit Audit
+		require.NoError(t, json.Unmarshal([]byte(fmt.Sprintf(`{"abandoned":{%s}}`, strings.Join(entries, ","))), &audit))
+
+		// Equal, not ElementsMatch: the order is the property under test.
+		assert.Equal(t, want, audit.Abandoned)
 	})
 }

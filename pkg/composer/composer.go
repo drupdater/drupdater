@@ -167,6 +167,15 @@ func (s *CLI) Remove(ctx context.Context, dir string, packages ...string) (strin
 	return out, nil
 }
 
+// Audit runs `composer audit` and returns both halves of its JSON output: the security
+// advisories and the packages their maintainers have marked abandoned.
+//
+// --abandoned is deliberately not passed. Composer already includes the `abandoned` object in
+// its JSON output under both of the modes that report at all (`report` and the default `fail`,
+// which differ only in the exit code — and the exit code is ignored here), and omitting the
+// flag is what lets a project's own `audit.abandoned: ignore` setting take effect: composer
+// then emits an empty list and the packages that project has already dismissed stay dismissed
+// instead of resurfacing in every merge request.
 func (s *CLI) Audit(ctx context.Context, dir string) (Audit, error) {
 	var composerAudit Audit
 	out, err := s.execComposerJSON(ctx, dir, "audit", "--format=json", "--locked", "--no-plugins")
@@ -204,12 +213,22 @@ type Advisory struct {
 // AdvisoriesMap represents the advisories mapping where keys are package names.
 type AdvisoriesMap map[string]json.RawMessage
 
-// Audit represents the flattened list of advisories.
-type Audit struct {
-	Advisories []Advisory `json:"advisories"`
+// AbandonedPackage is a package whose maintainers have marked it abandoned, as reported by
+// `composer audit`. Replacement is the successor they suggested, and is empty when they
+// suggested none — which composer expresses as a JSON null.
+type AbandonedPackage struct {
+	PackageName string `json:"packageName"`
+	Replacement string `json:"replacement"`
 }
 
-// UnmarshalJSON flattens nested advisories into a single list.
+// Audit represents the flattened list of advisories and abandoned packages.
+type Audit struct {
+	Advisories []Advisory         `json:"advisories"`
+	Abandoned  []AbandonedPackage `json:"abandoned"`
+}
+
+// UnmarshalJSON flattens nested advisories into a single list and the abandoned object into a
+// sorted list.
 func (c *Audit) UnmarshalJSON(data []byte) error {
 	// Temporary map to parse nested structure
 	var raw map[string]any
@@ -217,41 +236,91 @@ func (c *Audit) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	// Extract advisories field
-	advisoriesData, exists := raw["advisories"]
-	if !exists {
-		return nil
+	advisories, err := flattenAdvisories(raw["advisories"])
+	if err != nil {
+		return err
 	}
 
-	// Flatten advisories
+	c.Advisories = advisories
+	c.Abandoned = flattenAbandoned(raw["abandoned"])
+	return nil
+}
+
+// flattenAdvisories turns composer audit's `advisories` object into a single list. Composer
+// keys it by package name and then emits that package's advisories either as a list or as a
+// keyed map (drupal/core is one that does the latter), so both shapes have to flatten into the
+// same list or an advisory silently disappears from a security report. A missing key, or a
+// value of any other shape, means there is nothing to report.
+func flattenAdvisories(advisoriesData any) ([]Advisory, error) {
+	advMap, ok := advisoriesData.(map[string]any)
+	// Equivalent mutant: a failed type assertion leaves advMap nil and ranging over a nil map
+	// yields nothing, so emptying this branch produces the same (nil, nil). The guard stays
+	// because it states the intent rather than relying on that.
+	// mutator-disable-next-line branch/if
+	if !ok {
+		return nil, nil
+	}
+
 	var advisories []Advisory
-	if advMap, ok := advisoriesData.(map[string]any); ok {
-		for _, value := range advMap {
-			switch v := value.(type) {
-			case []any: // Simple advisory list
-				for _, item := range v {
-					var adv Advisory
-					itemBytes, _ := json.Marshal(item)
-					if err := json.Unmarshal(itemBytes, &adv); err != nil {
-						return err
-					}
-					advisories = append(advisories, adv)
+	for _, value := range advMap {
+		switch v := value.(type) {
+		case []any: // Simple advisory list
+			for _, item := range v {
+				var adv Advisory
+				itemBytes, _ := json.Marshal(item)
+				if err := json.Unmarshal(itemBytes, &adv); err != nil {
+					return nil, err
 				}
-			case map[string]any: // Nested map (e.g., drupal/core)
-				for _, nestedItem := range v {
-					var adv Advisory
-					nestedBytes, _ := json.Marshal(nestedItem)
-					if err := json.Unmarshal(nestedBytes, &adv); err != nil {
-						return err
-					}
-					advisories = append(advisories, adv)
+				advisories = append(advisories, adv)
+			}
+		case map[string]any: // Nested map (e.g., drupal/core)
+			for _, nestedItem := range v {
+				var adv Advisory
+				nestedBytes, _ := json.Marshal(nestedItem)
+				if err := json.Unmarshal(nestedBytes, &adv); err != nil {
+					return nil, err
 				}
+				advisories = append(advisories, adv)
 			}
 		}
 	}
 
-	c.Advisories = advisories
-	return nil
+	return advisories, nil
+}
+
+// flattenAbandoned turns composer audit's `abandoned` object into a sorted list.
+//
+// Composer keys the object by package name, with the maintainer's suggested replacement as the
+// value or JSON null when they suggested none. When there is nothing to report — no abandoned
+// package installed, or the project set `audit.abandoned: ignore` — it emits an empty JSON
+// *array* instead of an empty object, so that shape has to read as "none" rather than as an
+// error. Anything else unrecognised is treated the same way: this list is supplementary
+// information, and no shape of it is worth failing a security run over.
+//
+// The result is sorted because map iteration order is random, and both the report and the
+// merge request description have to come out byte-identical for unchanged input.
+func flattenAbandoned(abandonedData any) []AbandonedPackage {
+	entries, ok := abandonedData.(map[string]any)
+	if !ok {
+		return nil
+	}
+
+	abandoned := make([]AbandonedPackage, 0, len(entries))
+	for name, replacement := range entries {
+		pkg := AbandonedPackage{PackageName: name}
+		// Anything that is not a string (null, and defensively any other type) means the
+		// maintainers named no successor.
+		if suggestion, ok := replacement.(string); ok {
+			pkg.Replacement = suggestion
+		}
+		abandoned = append(abandoned, pkg)
+	}
+
+	slices.SortFunc(abandoned, func(a, b AbandonedPackage) int {
+		return strings.Compare(a.PackageName, b.PackageName)
+	})
+
+	return abandoned
 }
 
 // platformRequirementConstraint describes the unmet constraint for a failed/missing row of

@@ -359,6 +359,46 @@ func TestAuditUnmarshalShapes(t *testing.T) {
 		require.NoError(t, a.UnmarshalJSON([]byte(`{"advisories":{"drupal/core":"unexpected"}}`)))
 		assert.Empty(t, a.Advisories)
 	})
+
+	t.Run("abandoned packages are captured with their suggested replacement", func(t *testing.T) {
+		var a Audit
+		require.NoError(t, a.UnmarshalJSON([]byte(
+			`{"abandoned":{"swiftmailer/swiftmailer":"symfony/mailer","patchwork/jsqueeze":null}}`)))
+		assert.Equal(t, []AbandonedPackage{
+			{PackageName: "patchwork/jsqueeze"},
+			{PackageName: "swiftmailer/swiftmailer", Replacement: "symfony/mailer"},
+		}, a.Abandoned)
+	})
+
+	t.Run("an empty abandoned array yields no abandoned packages", func(t *testing.T) {
+		// The shape composer emits both when nothing is abandoned and when the project set
+		// `audit.abandoned: ignore` — it must read as "none", not as a parse failure.
+		var a Audit
+		require.NoError(t, a.UnmarshalJSON([]byte(`{"abandoned":[]}`)))
+		assert.Empty(t, a.Abandoned)
+	})
+
+	t.Run("no abandoned key yields no abandoned packages", func(t *testing.T) {
+		var a Audit
+		require.NoError(t, a.UnmarshalJSON([]byte(`{"advisories":{}}`)))
+		assert.Empty(t, a.Abandoned)
+	})
+
+	t.Run("an abandoned value of an unexpected type means no replacement", func(t *testing.T) {
+		var a Audit
+		require.NoError(t, a.UnmarshalJSON([]byte(`{"abandoned":{"foo/bar":42}}`)))
+		assert.Equal(t, []AbandonedPackage{{PackageName: "foo/bar"}}, a.Abandoned)
+	})
+
+	t.Run("advisories and abandoned are captured from the same payload", func(t *testing.T) {
+		// The parser used to stop at the advisories key; a payload carrying both has to yield
+		// both.
+		var a Audit
+		require.NoError(t, a.UnmarshalJSON([]byte(
+			`{"advisories":{"twig/twig":[{"advisoryId":"PKSA-1"}]},"abandoned":{"foo/bar":"baz/qux"}}`)))
+		assert.Len(t, a.Advisories, 1)
+		assert.Len(t, a.Abandoned, 1)
+	})
 }
 
 func TestCheckIfPatchAppliesInitError(t *testing.T) {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/drupdater/drupdater/internal"
@@ -14,10 +15,12 @@ import (
 	"go.uber.org/zap"
 )
 
-// SecurityReport contains information about security advisories before and after updates.
+// SecurityReport contains information about security advisories before and after updates,
+// plus the abandoned packages the same audit reported.
 type SecurityReport struct {
 	FixedAdvisories       []composer.Advisory
 	AfterUpdateAdvisories []composer.Advisory
+	AbandonedPackages     []composer.AbandonedPackage
 }
 
 // ComposerAudit handles security auditing for Drupal sites.
@@ -66,6 +69,7 @@ func (ca *ComposerAudit) RenderTemplate() (string, error) {
 	return ca.Render("security_report.go.tmpl", SecurityReport{
 		FixedAdvisories:       ca.GetFixedAdvisories(),
 		AfterUpdateAdvisories: ca.afterAudit.Advisories,
+		AbandonedPackages:     ca.GetAbandonedPackages(),
 	})
 }
 
@@ -113,9 +117,31 @@ func (ca *ComposerAudit) postCodeUpdateHandler(e event.Event) error {
 	ca.logger.Info("security advisories",
 		zap.Int("fixed", len(ca.GetFixedAdvisories())),
 		zap.Int("unresolved", len(ca.afterAudit.Advisories)),
+		zap.Int("abandoned", len(ca.GetAbandonedPackages())),
 	)
 
 	return nil
+}
+
+// GetAbandonedPackages returns the packages composer reported as abandoned, taken from the
+// audit run after the update so the list describes the code the merge request actually
+// contains — the same reason the remaining advisories come from that run. A package that was
+// abandoned before and is no longer abandoned after is simply absent, which is the right
+// answer: unlike an advisory, there is nothing for the update to take credit for.
+//
+// drupal/* packages are left out. unsupported_modules already reports those, from drupal.org's
+// own release data, which knows whether a module is supported regardless of what the Packagist
+// mirror says. Listing them in both places would show one problem twice, in two sections of the
+// same merge request, as though they were separate findings.
+func (ca *ComposerAudit) GetAbandonedPackages() []composer.AbandonedPackage {
+	abandoned := make([]composer.AbandonedPackage, 0, len(ca.afterAudit.Abandoned))
+	for _, pkg := range ca.afterAudit.Abandoned {
+		if strings.HasPrefix(pkg.PackageName, "drupal/") {
+			continue
+		}
+		abandoned = append(abandoned, pkg)
+	}
+	return abandoned
 }
 
 // GetFixedAdvisories returns the list of security advisories that were fixed by the update:

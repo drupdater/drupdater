@@ -230,6 +230,9 @@ func TestRunComposerAudit(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Nil(t, audit.Advisories)
+		// composer emits an empty JSON array rather than an empty object when it has no
+		// abandoned package to report.
+		assert.Nil(t, audit.Abandoned)
 	})
 
 	t.Run("Some vulnerabilities", func(t *testing.T) {
@@ -260,6 +263,7 @@ func TestRunComposerAudit(t *testing.T) {
 	   	        ]
 	   	    },
 	   	    "abandoned": {
+	   	        "swiftmailer/swiftmailer": "symfony/mailer",
 	   	        "j7mbo/twitter-api-php": null
 	   	    }
 	   	}`
@@ -295,6 +299,13 @@ func TestRunComposerAudit(t *testing.T) {
 				Title:            "Missing output escaping for the null coalesce operator",
 			},
 		}, audit.Advisories)
+
+		// Sorted by package name, not in composer's declaration order, so the report and the
+		// merge request description are byte-identical for unchanged input.
+		assert.Equal(t, []AbandonedPackage{
+			{PackageName: "j7mbo/twitter-api-php"},
+			{PackageName: "swiftmailer/swiftmailer", Replacement: "symfony/mailer"},
+		}, audit.Abandoned)
 	})
 }
 

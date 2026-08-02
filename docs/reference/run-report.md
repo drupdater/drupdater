@@ -42,7 +42,7 @@ drupdater --dry-run --report ./drupdater-report.json
     { "name": "baseline site install", "started_at": "…", "duration_seconds": 121.9, "ok": true }
   ],
   "addons": {
-    "composer_audit": { "fixed": [], "remaining": [] },
+    "composer_audit": { "fixed": [], "remaining": [], "abandoned": [] },
     "update_hooks": { "default": {} }
   }
 }
@@ -160,7 +160,7 @@ configured.
 
 | Key | Shape |
 |---|---|
-| [`composer_audit`](addons/composer-audit.md) | `{ fixed: [...], remaining: [...] }` |
+| [`composer_audit`](addons/composer-audit.md) | `{ fixed: [...], remaining: [...], abandoned: [...] }`, abandoned sorted by name |
 | [`update_hooks`](addons/update-hooks.md) | `{ <site>: { <hook>: {...} } }` |
 | [`unsupported_modules`](addons/unsupported-modules.md) | `[ {...} ]`, sorted by name |
 | [`composer_patches`](addons/composer-patches.md) | `{ removed: [...], updated: [...], conflicts: [...] }` |

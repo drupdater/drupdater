@@ -25,12 +25,17 @@ otherwise complete update.
 ## Why it exists
 
 An unsupported module is a different problem from a vulnerable one. There is no update to
-apply, so [`composer_audit`](composer-audit.md) will never flag it and no amount of
-running Drupdater will fix it. It needs a human decision: replace the module, adopt it,
-or accept the risk.
+apply, so [`composer_audit`](composer-audit.md) will never raise an advisory for it and no
+amount of running Drupdater will fix it. It needs a human decision: replace the module, adopt
+it, or accept the risk.
 
 Surfacing it in the routine update pull request is the cheapest possible way to keep that
 decision from being forgotten for a year.
+
+`composer_audit` reports the same *kind* of finding for non-Drupal packages, from Composer's
+[abandoned package](composer-audit.md#after-the-code-update-abandoned-packages) list. The two
+do not overlap: that list excludes `drupal/*`, because this addon has drupal.org's own release
+data and can name a recommended version, which Packagist's abandonment flag cannot.
 
 ## Report section
 

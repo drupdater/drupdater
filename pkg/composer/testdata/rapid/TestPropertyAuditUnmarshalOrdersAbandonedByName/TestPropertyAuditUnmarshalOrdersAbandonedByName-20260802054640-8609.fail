@@ -1,0 +1,259 @@
+# 2026/08/02 05:46:40.366691 [TestPropertyAuditUnmarshalOrdersAbandonedByName] [rapid] draw names: []string{"ewv7.1-bac2", "x", "q.m-j1", "g-g89", "b05-", "p-"}
+# 2026/08/02 05:46:40.366701 [TestPropertyAuditUnmarshalOrdersAbandonedByName] [rapid] draw hasReplacement-ewv7.1-bac2: false
+# 2026/08/02 05:46:40.366703 [TestPropertyAuditUnmarshalOrdersAbandonedByName] [rapid] draw hasReplacement-x: true
+# 2026/08/02 05:46:40.366708 [TestPropertyAuditUnmarshalOrdersAbandonedByName] [rapid] draw replacement-x: "j45380."
+# 2026/08/02 05:46:40.366709 [TestPropertyAuditUnmarshalOrdersAbandonedByName] [rapid] draw hasReplacement-q.m-j1: false
+# 2026/08/02 05:46:40.366710 [TestPropertyAuditUnmarshalOrdersAbandonedByName] [rapid] draw hasReplacement-g-g89: true
+# 2026/08/02 05:46:40.366713 [TestPropertyAuditUnmarshalOrdersAbandonedByName] [rapid] draw replacement-g-g89: "c"
+# 2026/08/02 05:46:40.366714 [TestPropertyAuditUnmarshalOrdersAbandonedByName] [rapid] draw hasReplacement-b05-: true
+# 2026/08/02 05:46:40.366716 [TestPropertyAuditUnmarshalOrdersAbandonedByName] [rapid] draw replacement-b05-: "c14"
+# 2026/08/02 05:46:40.366717 [TestPropertyAuditUnmarshalOrdersAbandonedByName] [rapid] draw hasReplacement-p-: true
+# 2026/08/02 05:46:40.366720 [TestPropertyAuditUnmarshalOrdersAbandonedByName] [rapid] draw replacement-p-: "g.-.0"
+# 2026/08/02 05:46:40.366874 [TestPropertyAuditUnmarshalOrdersAbandonedByName] 
+# 	Error Trace:	/home/user/drupdater/pkg/composer/composer_property_test.go:292
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:458
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:467
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:292
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:207
+# 	            				/home/user/drupdater/pkg/composer/composer_property_test.go:268
+# 	            				/root/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.26.4.linux-amd64/src/runtime/asm_amd64.s:1771
+# 	Error:      	Not equal: 
+# 	            	expected: []composer.AbandonedPackage{composer.AbandonedPackage{PackageName:"b05-", Replacement:"c14"}, composer.AbandonedPackage{PackageName:"ewv7.1-bac2", Replacement:""}, composer.AbandonedPackage{PackageName:"g-g89", Replacement:"c"}, composer.AbandonedPackage{PackageName:"p-", Replacement:"g.-.0"}, composer.AbandonedPackage{PackageName:"q.m-j1", Replacement:""}, composer.AbandonedPackage{PackageName:"x", Replacement:"j45380."}}
+# 	            	actual  : []composer.AbandonedPackage{composer.AbandonedPackage{PackageName:"b05-", Replacement:""}, composer.AbandonedPackage{PackageName:"ewv7.1-bac2", Replacement:""}, composer.AbandonedPackage{PackageName:"g-g89", Replacement:""}, composer.AbandonedPackage{PackageName:"p-", Replacement:""}, composer.AbandonedPackage{PackageName:"q.m-j1", Replacement:""}, composer.AbandonedPackage{PackageName:"x", Replacement:""}}
+# 	            	
+# 	            	Diff:
+# 	            	--- Expected
+# 	            	+++ Actual
+# 	            	@@ -3,3 +3,3 @@
+# 	            	   PackageName: (string) (len=4) "b05-",
+# 	            	-  Replacement: (string) (len=3) "c14"
+# 	            	+  Replacement: (string) ""
+# 	            	  },
+# 	            	@@ -11,3 +11,3 @@
+# 	            	   PackageName: (string) (len=5) "g-g89",
+# 	            	-  Replacement: (string) (len=1) "c"
+# 	            	+  Replacement: (string) ""
+# 	            	  },
+# 	            	@@ -15,3 +15,3 @@
+# 	            	   PackageName: (string) (len=2) "p-",
+# 	            	-  Replacement: (string) (len=5) "g.-.0"
+# 	            	+  Replacement: (string) ""
+# 	            	  },
+# 	            	@@ -23,3 +23,3 @@
+# 	            	   PackageName: (string) (len=1) "x",
+# 	            	-  Replacement: (string) (len=7) "j45380."
+# 	            	+  Replacement: (string) ""
+# 	            	  }
+# 	Test:       	TestPropertyAuditUnmarshalOrdersAbandonedByName
+# 
+v0.4.8#6496309481077640538
+0xebcb9afe308f0
+0x0
+0x82ef7b6bdf454
+0x4
+0x1433270dc78c27
+0x0
+0x18fce1e6e2c5e6
+0x3f
+0x29
+0x30
+0x23
+0x12be3a66ce9d07
+0x0
+0x1f1120281697d1
+0x2c
+0x22
+0xe28d7e0bbd0ba
+0x0
+0x172a7a3c7a99a5
+0x27
+0x3f
+0x37
+0x2a
+0x2e
+0x27
+0x37
+0x9
+0x1821fe665ae926
+0x0
+0x1b718d21e5e3b3
+0x1
+0xdbeb909001bf5
+0x0
+0x3e06b9797edb4
+0x3
+0x1d893d0ec155dd
+0x0
+0x38e1134c3566
+0x0
+0x10b398f80b21c8
+0x0
+0xb2ad57933b962
+0xe
+0x15b58a4352cca2
+0x0
+0xdc486f45e479a
+0xd
+0xfc7f0e115641d
+0x0
+0x10eaabb6205a02
+0xf
+0x1b426c35a4f8bf
+0x0
+0x13c0fb43b5ef78
+0x4
+0xea85b212321c2
+0x91fac9f5fc5e8
+0x0
+0x1bc61095cc0abc
+0x17
+0x4740debf8302d
+0x15f7b86ac1c2a9
+0x0
+0x145ecf65fceb9a
+0x10
+0xa0fea6af47899
+0x0
+0x4b38c0cc3cf03
+0x1
+0x121920125a7d93
+0x0
+0x1aaac1b6389d96
+0x35
+0x19
+0x1a99c17a9b7ede
+0x0
+0x1dd0c672893f85
+0x0
+0x127566edf7e9cd
+0x0
+0x15921ce18dc2dc
+0x3a
+0x2a
+0x16
+0x14958e75629796
+0x0
+0x15cb74b82c719c
+0x3f
+0x3
+0xe1f2bc7cac9d
+0x17e675776a0305
+0x0
+0x10ad58f2e6d871
+0x6
+0x1260a2ed23911c
+0x0
+0xc356e855138c8
+0x0
+0x13fe6c0835535b
+0x0
+0x13e6a54f56cfc0
+0x30
+0x13
+0x759b70a954da7
+0x0
+0xf017d490cab2f
+0xa
+0x13f1d154172453
+0x0
+0x1d90f7970a9a35
+0xb
+0x2a5a2cb16168f
+0x1eb482592accf1
+0x0
+0x5bc725fcfc73b
+0x1
+0x13aaf0b85a115b
+0x0
+0x1333689e34e084
+0x2
+0xfb844a04d0375
+0x0
+0xe26491c7054d4
+0x7
+0xc639d915b4918
+0x0
+0x34f758bae80c
+0x0
+0x44f725a438d53
+0x1d6ce4b05d23c0
+0x0
+0x1c65ceefe5dc50
+0x1d
+0xf
+0x5878fbd18a2b6
+0x0
+0x40d74e2c437a7
+0x0
+0x3e1c533f2da52
+0x13d76880f38e35
+0x0
+0x1
+0x0
+0xc1e246731b63e
+0x9
+0x1281dfe53bed6f
+0x0
+0xd04fe447b083b
+0x6
+0xbc5c8e4baba2c
+0x0
+0x884141916a0a1
+0x7
+0x964edc25fff36
+0x0
+0xa614ae49771e5
+0x5
+0x9eeb50d049b9b
+0x0
+0x9e914fc690450
+0xa
+0xf047818e75a98
+0x0
+0x71e148c0b51d4
+0x2
+0x1727daf83992e3
+0x0
+0xf42bf515b9252
+0x1
+0x4cfb2344d71ae
+0x0
+0x1
+0x0
+0x622be03b9b64d
+0x2
+0x37f5d27385087
+0x1
+0x0
+0x3938fe32e59ba
+0x2
+0x7b1137c4c4115
+0x0
+0x802e323d1b748
+0x3
+0xc504cacda5b97
+0x0
+0x12c9f3716ed046
+0x6
+0x5eed78abef15
+0x1
+0x0
+0x180417b3635f45
+0x6
+0xdef6cfc49a118
+0x0
+0x2e0a42bd6d15a
+0x1
+0x1efb7dfe9fd085
+0x0
+0x195f8e803b49
+0x0
+0x1b31eaa10e8928
+0x0
+0x5e1ad171cab
+0x1
+0x149cf1504ffc04
+0x0
+0x13cc7893ec3a9e
+0x2
+0x157fe1cd30987

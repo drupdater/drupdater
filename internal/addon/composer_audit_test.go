@@ -279,6 +279,10 @@ func TestComposerAudit_RenderTemplate(t *testing.T) {
 				Title:       "Still unresolved",
 			},
 		},
+		Abandoned: []composer.AbandonedPackage{
+			{PackageName: "patchwork/jsqueeze"},
+			{PackageName: "swiftmailer/swiftmailer", Replacement: "symfony/mailer"},
+		},
 	}
 
 	fixture, err := os.ReadFile("testdata/composer_audit.md")
@@ -304,4 +308,69 @@ func TestComposerAudit_RenderTemplate_EscapesPipes(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, result, "XSS via a\\|b second line")
 	assert.NotContains(t, result, "a|b")
+}
+
+// TestComposerAudit_GetAbandonedPackages_FiltersDrupalPackages checks that drupal/* packages
+// are left to unsupported_modules, which reports them from drupal.org's own release data, so
+// one end-of-life module is not reported twice in the same merge request.
+func TestComposerAudit_GetAbandonedPackages_FiltersDrupalPackages(t *testing.T) {
+	audit := NewComposerAudit(zap.NewNop(), NewMockComposer(t))
+	audit.afterAudit = composer.Audit{
+		Abandoned: []composer.AbandonedPackage{
+			{PackageName: "drupal/token", Replacement: "drupal/core"},
+			{PackageName: "drupalfinder/drupal-finder", Replacement: "webflo/drupal-finder"},
+			{PackageName: "swiftmailer/swiftmailer", Replacement: "symfony/mailer"},
+		},
+	}
+
+	// drupalfinder/drupal-finder stays: only the drupal/ vendor is drupal.org's, and a prefix
+	// match on "drupal" alone would swallow unrelated vendors.
+	assert.Equal(t, []composer.AbandonedPackage{
+		{PackageName: "drupalfinder/drupal-finder", Replacement: "webflo/drupal-finder"},
+		{PackageName: "swiftmailer/swiftmailer", Replacement: "symfony/mailer"},
+	}, audit.GetAbandonedPackages())
+}
+
+// TestComposerAudit_GetAbandonedPackages_UsesTheAuditAfterTheUpdate checks the list describes
+// the code the merge request contains, not the code it started from.
+func TestComposerAudit_GetAbandonedPackages_UsesTheAuditAfterTheUpdate(t *testing.T) {
+	audit := NewComposerAudit(zap.NewNop(), NewMockComposer(t))
+	audit.beforeAudit = composer.Audit{
+		Abandoned: []composer.AbandonedPackage{{PackageName: "gone/away"}},
+	}
+	audit.afterAudit = composer.Audit{
+		Abandoned: []composer.AbandonedPackage{{PackageName: "still/here"}},
+	}
+
+	assert.Equal(t, []composer.AbandonedPackage{{PackageName: "still/here"}}, audit.GetAbandonedPackages())
+}
+
+// TestComposerAudit_RenderTemplate_NoAbandonedPackages checks the merge request stays silent
+// about abandonment when there is none to report.
+func TestComposerAudit_RenderTemplate_NoAbandonedPackages(t *testing.T) {
+	audit := NewComposerAudit(zap.NewNop(), NewMockComposer(t))
+	audit.afterAudit = composer.Audit{
+		Advisories: []composer.Advisory{{PackageName: "drupal/core", CVE: "CVE-1", Title: "Open"}},
+	}
+
+	result, err := audit.RenderTemplate()
+	require.NoError(t, err)
+	assert.NotContains(t, result, "abandoned")
+	assert.NotContains(t, result, "<details>")
+}
+
+// TestComposerAudit_RenderTemplate_EscapesAbandonedCodeSpans ensures a backtick in a
+// maintainer-supplied replacement suggestion — free text from a third-party package — cannot
+// close the inline code span and inject markdown into the description.
+func TestComposerAudit_RenderTemplate_EscapesAbandonedCodeSpans(t *testing.T) {
+	audit := NewComposerAudit(zap.NewNop(), NewMockComposer(t))
+	audit.afterAudit = composer.Audit{
+		Abandoned: []composer.AbandonedPackage{
+			{PackageName: "evil/package", Replacement: "` <script>alert(1)</script>\nsecond line"},
+		},
+	}
+
+	result, err := audit.RenderTemplate()
+	require.NoError(t, err)
+	assert.Contains(t, result, "use `' <script>alert(1)</script> second line` instead")
 }

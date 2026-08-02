@@ -11,3 +11,14 @@ The security report shows fixed and unfixed security vulnerabilities. {{ if .Aft
 | ⛔     | {{ .CVE | cell }} | {{ .Title | cell }} | {{ .Severity | cell }} | {{ .PackageName | cell }} |
 {{ end -}}
 {{ end -}}
+{{ if .AbandonedPackages }}
+<details>
+<summary>📦 {{ len .AbandonedPackages }} abandoned package{{ if gt (len .AbandonedPackages) 1 }}s{{ end }}</summary>
+
+Their maintainers no longer support them, so they will not receive further fixes — including security fixes. This is not something this update caused or can resolve; plan a replacement.
+
+{{ range .AbandonedPackages -}}
+- `{{ .PackageName | code }}` — {{ if .Replacement }}use `{{ .Replacement | code }}` instead{{ else }}no replacement suggested{{ end }}
+{{ end }}
+</details>
+{{ end -}}

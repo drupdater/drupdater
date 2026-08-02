@@ -40,23 +40,32 @@ import (
 // SecurityAdvisories is the composer_audit section: which advisories the update resolved and
 // which are still open afterwards. The remaining advisories are the more actionable half — they
 // are what a fleet-wide exposure view is built from.
+//
+// Abandoned is the other thing `composer audit` reports and the same run is already paying for:
+// packages their maintainers have marked abandoned, with the suggested replacement when there
+// is one. It is not an advisory — abandonment is a standing condition, not something this
+// update changed — but it is the same shape of finding as an unsupported module, on the
+// non-Drupal packages unsupported_modules cannot see.
 type SecurityAdvisories struct {
-	Fixed     []composer.Advisory `json:"fixed"`
-	Remaining []composer.Advisory `json:"remaining"`
+	Fixed     []composer.Advisory         `json:"fixed"`
+	Remaining []composer.Advisory         `json:"remaining"`
+	Abandoned []composer.AbandonedPackage `json:"abandoned"`
 }
 
 // ReportKey implements report.Reporter.
 func (ca *ComposerAudit) ReportKey() string { return "composer_audit" }
 
-// ReportData implements report.Reporter.
+// ReportData implements report.Reporter. The abandoned packages are already sorted by name
+// when composer's output is parsed, so this section stays byte-stable across runs.
 func (ca *ComposerAudit) ReportData() any {
 	fixed := ca.GetFixedAdvisories()
 	remaining := ca.afterAudit.Advisories
-	if len(fixed) == 0 && len(remaining) == 0 {
+	abandoned := ca.GetAbandonedPackages()
+	if len(fixed) == 0 && len(remaining) == 0 && len(abandoned) == 0 {
 		return nil
 	}
 
-	return SecurityAdvisories{Fixed: fixed, Remaining: remaining}
+	return SecurityAdvisories{Fixed: fixed, Remaining: remaining, Abandoned: abandoned}
 }
 
 // --- update_hooks ---
