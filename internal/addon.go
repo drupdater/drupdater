@@ -5,6 +5,7 @@ import (
 	"embed"
 	"fmt"
 	"strings"
+	"sync"
 	"text/template"
 
 	"github.com/gookit/event"
@@ -27,10 +28,16 @@ type Addon interface {
 type BasicAddon struct {
 }
 
-func (ba *BasicAddon) Render(name string, data any) (string, error) {
-	tmpl, err := template.New("").Funcs(template.FuncMap{
+// addonTemplates parses the embedded section templates once. The FS is compiled in, so the
+// result — success or failure — is the same on every call.
+var addonTemplates = sync.OnceValues(func() (*template.Template, error) {
+	return template.New("").Funcs(template.FuncMap{
 		"cell": cellReplacer.Replace,
 	}).ParseFS(templates, "addon/templates/*.go.tmpl")
+})
+
+func (ba *BasicAddon) Render(name string, data any) (string, error) {
+	tmpl, err := addonTemplates()
 	if err != nil {
 		return "", fmt.Errorf("failed to parse template: %w", err)
 	}

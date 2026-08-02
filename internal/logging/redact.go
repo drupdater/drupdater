@@ -5,8 +5,9 @@ package logging
 
 import (
 	"errors"
+	"maps"
 	"net/url"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 
@@ -95,12 +96,9 @@ func (r *Redactor) currentReplacer() *strings.Replacer {
 		return nil
 	}
 
-	values := make([]string, 0, len(r.secrets))
-	for v := range r.secrets {
-		values = append(values, v)
-	}
+	values := slices.Collect(maps.Keys(r.secrets))
 	// Longest first, so a secret that is a substring of another is not partially consumed.
-	sort.Slice(values, func(i, j int) bool { return len(values[i]) > len(values[j]) })
+	slices.SortFunc(values, func(a, b string) int { return len(b) - len(a) })
 
 	pairs := make([]string, 0, len(values)*2)
 	for _, v := range values {

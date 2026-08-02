@@ -124,12 +124,11 @@ func (s *CLI) Update(ctx context.Context, dir string, packages []string, package
 	for _, pattern := range packageChangePatterns {
 		for _, match := range pattern.re.FindAllStringSubmatch(out, -1) {
 			change := PackageChange{Action: pattern.action, Package: match[1]}
-			if pattern.twoVersions {
-				change.From, change.To = match[2], match[3]
-			} else if pattern.isRemoval {
-				change.From = match[2]
-			} else {
-				change.To = match[2]
+			if pattern.from > 0 {
+				change.From = match[pattern.from]
+			}
+			if pattern.to > 0 {
+				change.To = match[pattern.to]
 			}
 			changes = append(changes, change)
 		}
@@ -145,15 +144,15 @@ func (s *CLI) Update(ctx context.Context, dir string, packages []string, package
 var packageChangePatterns = []struct {
 	action string
 	re     *regexp.Regexp
-	// twoVersions marks the "(from => to)" form. Otherwise the single captured version is To,
-	// unless isRemoval says the package is going away and it is therefore From.
-	twoVersions bool
-	isRemoval   bool
+	// from and to are the capture groups holding those versions; 0 means the action has none.
+	// A removal reports only the version going away, an install only the one arriving.
+	from int
+	to   int
 }{
-	{action: "Upgrade", re: twoVersionRegex("Upgrading"), twoVersions: true},
-	{action: "Downgrade", re: twoVersionRegex("Downgrading"), twoVersions: true},
-	{action: "Remove", re: oneVersionRegex("Removing"), isRemoval: true},
-	{action: "Install", re: oneVersionRegex("Installing")},
+	{action: "Upgrade", re: twoVersionRegex("Upgrading"), from: 2, to: 3},
+	{action: "Downgrade", re: twoVersionRegex("Downgrading"), from: 2, to: 3},
+	{action: "Remove", re: oneVersionRegex("Removing"), from: 2},
+	{action: "Install", re: oneVersionRegex("Installing"), to: 2},
 }
 
 // versionPattern includes "+" and "~" in the class so build-metadata versions (1.0.0+21AF26D3)

@@ -6,13 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"runtime"
-	"sort"
+	"slices"
 	"strings"
 	"syscall"
 
@@ -469,18 +470,8 @@ func validateAddons(config internal.Config) error {
 // configurableAddons returns the sorted addon names settable in .drupdater.yaml: every
 // registered addon except the mandatory ones.
 func configurableAddons() []string {
-	excluded := make(map[string]bool, len(mandatoryAddons))
-	for _, n := range mandatoryAddons {
-		excluded[n] = true
-	}
-	names := make([]string, 0, len(addonRegistry))
-	for n := range addonRegistry {
-		if !excluded[n] {
-			names = append(names, n)
-		}
-	}
-	sort.Strings(names)
-	return names
+	names := slices.Sorted(maps.Keys(addonRegistry))
+	return slices.DeleteFunc(names, func(n string) bool { return slices.Contains(mandatoryAddons, n) })
 }
 
 // addonsCmd lists the addon names that can be set in .drupdater.yaml.

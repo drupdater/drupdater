@@ -586,8 +586,14 @@ func (ws *WorkflowBaseService) publishWork(ctx context.Context, repository GitRe
 	return nil
 }
 
+// descriptionTemplates parses the embedded merge request templates once. The FS is compiled in,
+// so the result — success or failure — is the same on every call.
+var descriptionTemplates = sync.OnceValues(func() (*template.Template, error) {
+	return template.ParseFS(templates, "templates/*.go.tmpl")
+})
+
 func (ws *WorkflowBaseService) GenerateDescription(data any, filename string) (string, error) {
-	tmpl, err := template.ParseFS(templates, "templates/*.go.tmpl")
+	tmpl, err := descriptionTemplates()
 	if err != nil {
 		return "", fmt.Errorf("failed to parse template: %w", err)
 	}

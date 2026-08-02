@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"text/template"
 
@@ -170,7 +170,7 @@ func (cb *CodeBeautifier) postCodeUpdateHandler(e event.Event) error { //nolint:
 		return err
 	}
 
-	sort.Strings(addedFiles)
+	slices.Sort(addedFiles)
 	cb.fixedFiles = addedFiles
 	cb.fixable = codingStyleUpdateResult.Totals.Fixable
 	return nil
