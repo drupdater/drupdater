@@ -320,16 +320,24 @@ jobs:
             ${{ secrets.DRUPDATER_TEST_TOKEN }}
             ${{ secrets.DRUPALCODE_ACCESS_TOKEN }}
         run: |
+          # pipefail is load-bearing here, not decoration. Without it this step's verdict was
+          # `jq -e ... | tee`, whose exit status is tee's -- always 0 -- so assert-report.jq
+          # could never fail a leg. Every run before this only ever proved the container
+          # exited 0, which is precisely what that script exists to stop being the standard.
+          set -euo pipefail
           # The container runs as root and the report is written 0600, so both jq
           # and upload-artifact get EACCES until the runner owns it back.
           sudo chown -R "$(id -u):$(id -g)" ./run || true
           test -f ./run/report.json || { echo "::error::no run report was written"; exit 1; }
           echo "### ${{ matrix.fixture }} / ${{ matrix.mode }}" >> "$GITHUB_STEP_SUMMARY"
+          # The // [] guards matter now that pipefail is on: a run that died before recording
+          # anything would otherwise fail this step on "Cannot iterate over null" and hide the
+          # real reason behind a jq error.
           jq -r '
             "status=\(.status)  mode=\(.mode)  dry_run=\(.dry_run)",
             "failed_phase=\(.failed_phase // "-")  error=\(.error // "-")",
-            "packages=\(.packages | length)",
-            "phases:", (.phases[] | "  \(.name): ok=\(.ok) \(.duration_seconds)s \(.error // "")"),
+            "packages=\((.packages // []) | length)",
+            "phases:", ((.phases // [])[] | "  \(.name): ok=\(.ok) \(.duration_seconds)s \(.error // "")"),
             "addons:",
             ((.addons // {}) | to_entries[]
              | "  \(.key): \(.value | tojson | if length > 400 then .[0:400] + " ..." else . end)")
@@ -344,8 +352,14 @@ jobs:
             echo "status=$(jq -r '.status' ./run/report.json)"
             echo "update_branch=$(jq -r '.update_branch // ""' ./run/report.json)"
           } >> "$GITHUB_OUTPUT"
+          # Captured rather than piped into tee, which is what swallowed the exit status, and
+          # with stderr folded in: halt_error writes the "report assertions failed" list there,
+          # so the piped version reached the raw log but never the summary anyone opens.
+          assert_status=0
           jq -e -r --argjson expect "$EXPECT" -f .github/assert-report.jq \
-            ./run/report.json | tee -a "$GITHUB_STEP_SUMMARY"
+            ./run/report.json > /tmp/assert-report.out 2>&1 || assert_status=$?
+          tee -a "$GITHUB_STEP_SUMMARY" < /tmp/assert-report.out
+          exit "$assert_status"
 
       # Everything above reads the report, which is drupdater's own account of
       # the run. The steps below read the repository it left behind, which is
