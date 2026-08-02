@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/drupdater/drupdater/internal/services"
@@ -460,7 +461,7 @@ func TestCodingStyles(t *testing.T) {
 		// Coder was installed only to run phpcs, so it has to go again -- even on this path,
 		// where there was nothing to fix. Left behind, it reaches the merge request as a dev
 		// dependency the project never asked for and that no report mentions.
-		composer.EXPECT().Remove(anyCtx, "/tmp", []string{"drupal/coder"}).Return("", nil)
+		composer.EXPECT().Remove(anyCtx, "/tmp", []string{"--dev", "drupal/coder"}).Return("", nil)
 
 		worktree.EXPECT().AddGlob("composer.*").Return(nil)
 		worktree.EXPECT().Commit("Install drupal/coder", &git.CommitOptions{}).Return(plumbing.NewHash(""), nil)
@@ -695,7 +696,7 @@ func TestRemoveCoder(t *testing.T) {
 
 	t.Run("commits the leftover lock diff", func(t *testing.T) {
 		composer := NewMockComposer(t)
-		composer.EXPECT().Remove(anyCtx, "/tmp", []string{"drupal/coder"}).Return("", nil)
+		composer.EXPECT().Remove(anyCtx, "/tmp", []string{"--dev", "drupal/coder"}).Return("", nil)
 
 		worktree := NewMockWorktree(t)
 		worktree.EXPECT().AddGlob("composer.*").Return(nil)
@@ -711,7 +712,7 @@ func TestRemoveCoder(t *testing.T) {
 		// go-git rejects an empty commit, so a removal that happened to leave composer.json and
 		// composer.lock byte-for-byte identical must not try to make one.
 		composer := NewMockComposer(t)
-		composer.EXPECT().Remove(anyCtx, "/tmp", []string{"drupal/coder"}).Return("", nil)
+		composer.EXPECT().Remove(anyCtx, "/tmp", []string{"--dev", "drupal/coder"}).Return("", nil)
 
 		worktree := NewMockWorktree(t)
 		worktree.EXPECT().AddGlob("composer.*").Return(nil)
@@ -723,7 +724,7 @@ func TestRemoveCoder(t *testing.T) {
 
 	t.Run("propagates a removal failure", func(t *testing.T) {
 		composer := NewMockComposer(t)
-		composer.EXPECT().Remove(anyCtx, "/tmp", []string{"drupal/coder"}).Return("", assert.AnError)
+		composer.EXPECT().Remove(anyCtx, "/tmp", []string{"--dev", "drupal/coder"}).Return("", assert.AnError)
 
 		cb := NewCodeBeautifier(logger, nil, composer)
 		require.ErrorIs(t, cb.removeCoder(context.Background(), "/tmp", NewMockWorktree(t)), assert.AnError)
@@ -731,7 +732,7 @@ func TestRemoveCoder(t *testing.T) {
 
 	t.Run("propagates a staging failure", func(t *testing.T) {
 		composer := NewMockComposer(t)
-		composer.EXPECT().Remove(anyCtx, "/tmp", []string{"drupal/coder"}).Return("", nil)
+		composer.EXPECT().Remove(anyCtx, "/tmp", []string{"--dev", "drupal/coder"}).Return("", nil)
 
 		worktree := NewMockWorktree(t)
 		worktree.EXPECT().AddGlob("composer.*").Return(assert.AnError)
@@ -744,7 +745,7 @@ func TestRemoveCoder(t *testing.T) {
 
 	t.Run("propagates a status failure", func(t *testing.T) {
 		composer := NewMockComposer(t)
-		composer.EXPECT().Remove(anyCtx, "/tmp", []string{"drupal/coder"}).Return("", nil)
+		composer.EXPECT().Remove(anyCtx, "/tmp", []string{"--dev", "drupal/coder"}).Return("", nil)
 
 		worktree := NewMockWorktree(t)
 		worktree.EXPECT().AddGlob("composer.*").Return(nil)
@@ -756,7 +757,7 @@ func TestRemoveCoder(t *testing.T) {
 
 	t.Run("propagates a commit failure", func(t *testing.T) {
 		composer := NewMockComposer(t)
-		composer.EXPECT().Remove(anyCtx, "/tmp", []string{"drupal/coder"}).Return("", nil)
+		composer.EXPECT().Remove(anyCtx, "/tmp", []string{"--dev", "drupal/coder"}).Return("", nil)
 
 		worktree := NewMockWorktree(t)
 		worktree.EXPECT().AddGlob("composer.*").Return(nil)
@@ -788,7 +789,7 @@ func TestCoderRemovalErrorDoesNotMaskTheRealFailure(t *testing.T) {
 	composer := NewMockComposer(t)
 	composer.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/coder").Return(false, nil)
 	composer.EXPECT().Require(anyCtx, "/tmp", []string{"--dev", "drupal/coder"}).Return("", nil)
-	composer.EXPECT().Remove(anyCtx, "/tmp", []string{"drupal/coder"}).Return("", assert.AnError)
+	composer.EXPECT().Remove(anyCtx, "/tmp", []string{"--dev", "drupal/coder"}).Return("", assert.AnError)
 
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().AddGlob("composer.*").Return(nil)
@@ -820,7 +821,7 @@ func TestCoderRemovalFailureSurfacesOnAnOtherwiseCleanRun(t *testing.T) {
 	composer := NewMockComposer(t)
 	composer.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/coder").Return(false, nil)
 	composer.EXPECT().Require(anyCtx, "/tmp", []string{"--dev", "drupal/coder"}).Return("", nil)
-	composer.EXPECT().Remove(anyCtx, "/tmp", []string{"drupal/coder"}).Return("", assert.AnError)
+	composer.EXPECT().Remove(anyCtx, "/tmp", []string{"--dev", "drupal/coder"}).Return("", assert.AnError)
 
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().AddGlob("composer.*").Return(nil)
@@ -830,4 +831,57 @@ func TestCoderRemovalFailureSurfacesOnAnOtherwiseCleanRun(t *testing.T) {
 	err := cb.postCodeUpdateHandler(services.NewPostCodeUpdateEvent(t.Context(), "/tmp", worktree))
 
 	require.ErrorIs(t, err, assert.AnError)
+}
+
+func TestCoderIsRemovedFromTheSectionItWasInstalledInto(t *testing.T) {
+	// Install and removal must name the same dependency section. composer rejects the mismatch
+	// outright -- "drupal/coder could not be found in require but it is present in require-dev"
+	// -- and the whole run fails in post-code-update.
+	//
+	// Asserting the two calls against each other rather than against a hard-coded flag: a mock
+	// that simply echoes back whatever the code passes will happily agree with a wrong flag, and
+	// did, until an integration run caught it.
+	logger := zap.NewNop()
+
+	fileExists = func(_ string) bool { return true }
+	oldFn := hasPHPCSPathDefinitions
+	hasPHPCSPathDefinitions = func(_ string) (bool, error) { return true, nil }
+	defer func() { hasPHPCSPathDefinitions = oldFn }()
+
+	runner := NewMockPHPCS(t)
+	runner.EXPECT().Run(anyCtx, "/tmp").Return(phpcs.ReturnOutput{
+		Totals: phpcs.ReturnOutputTotals{Fixable: 0},
+		Files:  map[string]phpcs.ReturnOutputFile{},
+	}, nil)
+
+	var requireArgs, removeArgs []string
+	composer := NewMockComposer(t)
+	composer.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/coder").Return(false, nil)
+	composer.EXPECT().Require(anyCtx, "/tmp", mock.Anything).
+		RunAndReturn(func(_ context.Context, _ string, args ...string) (string, error) {
+			requireArgs = args
+			return "", nil
+		})
+	composer.EXPECT().Remove(anyCtx, "/tmp", mock.Anything).
+		RunAndReturn(func(_ context.Context, _ string, args ...string) (string, error) {
+			removeArgs = args
+			return "", nil
+		})
+
+	worktree := NewMockWorktree(t)
+	worktree.EXPECT().AddGlob("composer.*").Return(nil)
+	worktree.EXPECT().Commit("Install drupal/coder", &git.CommitOptions{}).Return(plumbing.NewHash(""), nil)
+	worktree.EXPECT().Status().Return(git.Status{"composer.lock": {Staging: git.Modified}}, nil)
+	worktree.EXPECT().Commit("Remove temporary drupal/coder installation", &git.CommitOptions{}).
+		Return(plumbing.NewHash(""), nil)
+
+	cb := NewCodeBeautifier(logger, runner, composer)
+	require.NoError(t, cb.postCodeUpdateHandler(services.NewPostCodeUpdateEvent(t.Context(), "/tmp", worktree)))
+
+	assert.Contains(t, requireArgs, "drupal/coder")
+	assert.Contains(t, removeArgs, "drupal/coder")
+	assert.Equal(t,
+		slices.Contains(requireArgs, "--dev"), slices.Contains(removeArgs, "--dev"),
+		"coder must be removed from the same section it was installed into: require=%v remove=%v",
+		requireArgs, removeArgs)
 }

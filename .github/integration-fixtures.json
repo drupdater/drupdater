@@ -13,9 +13,6 @@
         "packages_match": [
           "^drupal/core"
         ],
-        "forbid_actions": [
-          "Downgrade"
-        ],
         "phases": [
           "acquire working copy",
           "preflight",
@@ -40,9 +37,6 @@
         ],
         "min_packages": 1,
         "audit_fixed_min": 1,
-        "forbid_actions": [
-          "Downgrade"
-        ],
         "phases": [
           "acquire working copy",
           "preflight",

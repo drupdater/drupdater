@@ -296,7 +296,9 @@ func (cb *CodeBeautifier) InstallCoder(ctx context.Context, path string, worktre
 // to sweep into its own commit.
 func (cb *CodeBeautifier) removeCoder(ctx context.Context, path string, worktree Worktree) error {
 	cb.logger.Debug("removing drupal/coder")
-	if _, err := cb.composer.Remove(ctx, path, "drupal/coder"); err != nil {
+	// --dev because InstallCoder required it there. Without the flag composer refuses with
+	// "could not be found in require but it is present in require-dev" and fails the run.
+	if _, err := cb.composer.Remove(ctx, path, "--dev", "drupal/coder"); err != nil {
 		return err
 	}
 
