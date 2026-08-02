@@ -1,7 +1,8 @@
 package addon
 
 import (
-	"sort"
+	"cmp"
+	"slices"
 
 	"github.com/drupdater/drupdater/internal/services"
 	"github.com/drupdater/drupdater/pkg/rector"
@@ -135,11 +136,14 @@ func (dr *DeprecationsRemover) recordFixes(result rector.ReturnOutput) {
 
 	fixes := make([]DeprecationFix, 0, len(result.ChangedFiles))
 	for _, file := range result.ChangedFiles {
-		applied := rectorsByFile[file]
-		sort.Strings(applied)
+		// Cloned before sorting. Sorting in place would reorder the caller's own
+		// rector.ReturnOutput, and a file listed twice in ChangedFiles would hand two fixes the
+		// same backing array, so appending to one would show up in the other.
+		applied := slices.Clone(rectorsByFile[file])
+		slices.Sort(applied)
 		fixes = append(fixes, DeprecationFix{File: file, AppliedRectors: applied})
 	}
 	// Sorted so two runs over unchanged code produce byte-identical sections.
-	sort.Slice(fixes, func(i, j int) bool { return fixes[i].File < fixes[j].File })
+	slices.SortFunc(fixes, func(a, b DeprecationFix) int { return cmp.Compare(a.File, b.File) })
 	dr.fixes = fixes
 }
