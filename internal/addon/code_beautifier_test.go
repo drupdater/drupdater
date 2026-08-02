@@ -2,6 +2,7 @@ package addon
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -687,4 +688,146 @@ func TestCodingStyles(t *testing.T) {
 		composer.AssertExpectations(t)
 	})
 
+}
+
+func TestRemoveCoder(t *testing.T) {
+	logger := zap.NewNop()
+
+	t.Run("commits the leftover lock diff", func(t *testing.T) {
+		composer := NewMockComposer(t)
+		composer.EXPECT().Remove(anyCtx, "/tmp", []string{"drupal/coder"}).Return("", nil)
+
+		worktree := NewMockWorktree(t)
+		worktree.EXPECT().AddGlob("composer.*").Return(nil)
+		worktree.EXPECT().Status().Return(git.Status{"composer.lock": {Staging: git.Modified}}, nil)
+		worktree.EXPECT().Commit("Remove temporary drupal/coder installation", &git.CommitOptions{}).
+			Return(plumbing.NewHash(""), nil)
+
+		cb := NewCodeBeautifier(logger, nil, composer)
+		require.NoError(t, cb.removeCoder(context.Background(), "/tmp", worktree))
+	})
+
+	t.Run("commits nothing when the removal restored the lock", func(t *testing.T) {
+		// go-git rejects an empty commit, so a removal that happened to leave composer.json and
+		// composer.lock byte-for-byte identical must not try to make one.
+		composer := NewMockComposer(t)
+		composer.EXPECT().Remove(anyCtx, "/tmp", []string{"drupal/coder"}).Return("", nil)
+
+		worktree := NewMockWorktree(t)
+		worktree.EXPECT().AddGlob("composer.*").Return(nil)
+		worktree.EXPECT().Status().Return(git.Status{"composer.lock": {Staging: git.Unmodified}}, nil)
+
+		cb := NewCodeBeautifier(logger, nil, composer)
+		require.NoError(t, cb.removeCoder(context.Background(), "/tmp", worktree))
+	})
+
+	t.Run("propagates a removal failure", func(t *testing.T) {
+		composer := NewMockComposer(t)
+		composer.EXPECT().Remove(anyCtx, "/tmp", []string{"drupal/coder"}).Return("", assert.AnError)
+
+		cb := NewCodeBeautifier(logger, nil, composer)
+		require.ErrorIs(t, cb.removeCoder(context.Background(), "/tmp", NewMockWorktree(t)), assert.AnError)
+	})
+
+	t.Run("propagates a staging failure", func(t *testing.T) {
+		composer := NewMockComposer(t)
+		composer.EXPECT().Remove(anyCtx, "/tmp", []string{"drupal/coder"}).Return("", nil)
+
+		worktree := NewMockWorktree(t)
+		worktree.EXPECT().AddGlob("composer.*").Return(assert.AnError)
+
+		cb := NewCodeBeautifier(logger, nil, composer)
+		err := cb.removeCoder(context.Background(), "/tmp", worktree)
+		require.ErrorIs(t, err, assert.AnError)
+		assert.Contains(t, err.Error(), "failed to add file to commit")
+	})
+
+	t.Run("propagates a status failure", func(t *testing.T) {
+		composer := NewMockComposer(t)
+		composer.EXPECT().Remove(anyCtx, "/tmp", []string{"drupal/coder"}).Return("", nil)
+
+		worktree := NewMockWorktree(t)
+		worktree.EXPECT().AddGlob("composer.*").Return(nil)
+		worktree.EXPECT().Status().Return(nil, assert.AnError)
+
+		cb := NewCodeBeautifier(logger, nil, composer)
+		require.ErrorIs(t, cb.removeCoder(context.Background(), "/tmp", worktree), assert.AnError)
+	})
+
+	t.Run("propagates a commit failure", func(t *testing.T) {
+		composer := NewMockComposer(t)
+		composer.EXPECT().Remove(anyCtx, "/tmp", []string{"drupal/coder"}).Return("", nil)
+
+		worktree := NewMockWorktree(t)
+		worktree.EXPECT().AddGlob("composer.*").Return(nil)
+		worktree.EXPECT().Status().Return(git.Status{"composer.json": {Staging: git.Modified}}, nil)
+		worktree.EXPECT().Commit("Remove temporary drupal/coder installation", &git.CommitOptions{}).
+			Return(plumbing.ZeroHash, assert.AnError)
+
+		cb := NewCodeBeautifier(logger, nil, composer)
+		require.ErrorIs(t, cb.removeCoder(context.Background(), "/tmp", worktree), assert.AnError)
+	})
+}
+
+func TestCoderRemovalErrorDoesNotMaskTheRealFailure(t *testing.T) {
+	// The deferred cleanup reports its own failure only when the handler was otherwise fine.
+	// Letting it overwrite a live error would replace "phpcs blew up" with "could not uninstall
+	// coder", and the run report would name the wrong cause.
+	logger := zap.NewNop()
+
+	fileExists = func(_ string) bool { return true }
+	oldFn := hasPHPCSPathDefinitions
+	hasPHPCSPathDefinitions = func(_ string) (bool, error) { return true, nil }
+	defer func() { hasPHPCSPathDefinitions = oldFn }()
+
+	phpcsErr := errors.New("phpcs exploded")
+
+	runner := NewMockPHPCS(t)
+	runner.EXPECT().Run(anyCtx, "/tmp").Return(phpcs.ReturnOutput{}, phpcsErr)
+
+	composer := NewMockComposer(t)
+	composer.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/coder").Return(false, nil)
+	composer.EXPECT().Require(anyCtx, "/tmp", []string{"--dev", "drupal/coder"}).Return("", nil)
+	composer.EXPECT().Remove(anyCtx, "/tmp", []string{"drupal/coder"}).Return("", assert.AnError)
+
+	worktree := NewMockWorktree(t)
+	worktree.EXPECT().AddGlob("composer.*").Return(nil)
+	worktree.EXPECT().Commit("Install drupal/coder", &git.CommitOptions{}).Return(plumbing.NewHash(""), nil)
+
+	cb := NewCodeBeautifier(logger, runner, composer)
+	err := cb.postCodeUpdateHandler(services.NewPostCodeUpdateEvent(t.Context(), "/tmp", worktree))
+
+	require.ErrorIs(t, err, phpcsErr)
+	require.NotErrorIs(t, err, assert.AnError)
+}
+
+func TestCoderRemovalFailureSurfacesOnAnOtherwiseCleanRun(t *testing.T) {
+	// The mirror image: nothing else went wrong, so the cleanup failure is the run's failure.
+	// Swallowing it would leave coder in the committed lock with the run still reported green.
+	logger := zap.NewNop()
+
+	fileExists = func(_ string) bool { return true }
+	oldFn := hasPHPCSPathDefinitions
+	hasPHPCSPathDefinitions = func(_ string) (bool, error) { return true, nil }
+	defer func() { hasPHPCSPathDefinitions = oldFn }()
+
+	runner := NewMockPHPCS(t)
+	runner.EXPECT().Run(anyCtx, "/tmp").Return(phpcs.ReturnOutput{
+		Totals: phpcs.ReturnOutputTotals{Fixable: 0},
+		Files:  map[string]phpcs.ReturnOutputFile{},
+	}, nil)
+
+	composer := NewMockComposer(t)
+	composer.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/coder").Return(false, nil)
+	composer.EXPECT().Require(anyCtx, "/tmp", []string{"--dev", "drupal/coder"}).Return("", nil)
+	composer.EXPECT().Remove(anyCtx, "/tmp", []string{"drupal/coder"}).Return("", assert.AnError)
+
+	worktree := NewMockWorktree(t)
+	worktree.EXPECT().AddGlob("composer.*").Return(nil)
+	worktree.EXPECT().Commit("Install drupal/coder", &git.CommitOptions{}).Return(plumbing.NewHash(""), nil)
+
+	cb := NewCodeBeautifier(logger, runner, composer)
+	err := cb.postCodeUpdateHandler(services.NewPostCodeUpdateEvent(t.Context(), "/tmp", worktree))
+
+	require.ErrorIs(t, err, assert.AnError)
 }

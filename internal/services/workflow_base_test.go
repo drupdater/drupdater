@@ -1884,3 +1884,48 @@ func TestStageScaffoldChanges(t *testing.T) {
 		assert.Contains(t, err.Error(), "failed to stage web/robots.txt")
 	})
 }
+
+func TestStartUpdateFailsWhenScaffoldChangesCannotBeStaged(t *testing.T) {
+	// Staging what the update rewrote is part of producing the commit, not a nicety: if it
+	// fails, the run must fail rather than push a branch missing the scaffold changes.
+	logger := zap.NewNop()
+	installer := NewMockInstaller(t)
+	repositoryService := NewMockRepository(t)
+	vcsProvider := NewMockPlatform(t)
+	repository := NewMockGitRepository(t)
+	mockComposer := NewMockComposer(t)
+	expectVersionLookup(mockComposer)
+	drush := NewMockDrush(t)
+
+	config := internal.Config{
+		RepositoryURL: "https://example.com/repo.git",
+		Branch:        "main",
+		Token:         "token",
+		Clone:         true,
+		Sites:         []string{"site1"},
+	}
+
+	worktree := NewMockWorktree(t)
+	worktree.EXPECT().Checkout(workBranchCheckout).Return(nil)
+	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(nil, assert.AnError)
+
+	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil)
+
+	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").
+		Return(repository, worktree, "/tmp", nil)
+	repositoryService.EXPECT().IsShallowClone("/tmp").Return(false, nil)
+	repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound).Maybe()
+	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
+
+	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, "/tmp").Return("", nil)
+	mockComposer.EXPECT().Install(anyCtx, "/tmp").Return(nil)
+	mockComposer.EXPECT().Update(anyCtx, "/tmp", mock.Anything, mock.Anything, false, false).
+		Return([]composer.PackageChange{{Package: "drupal/core", From: "9.0.0", To: "9.1.0"}}, nil)
+
+	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
+	err := workflowService.StartUpdate(context.Background(), nil)
+
+	require.ErrorIs(t, err, assert.AnError)
+	assert.Contains(t, err.Error(), "failed to read worktree status")
+}
