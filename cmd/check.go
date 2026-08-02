@@ -77,7 +77,8 @@ Exits non-zero if any check fails, so it can gate a pipeline.`,
 
 		printCheckResults(cmd.OutOrStdout(), results, redactor)
 
-		writeCheckReport(logger, redactor, config.ReportPath, results)
+		writeCheckReport(logger, redactor, config.ReportPath,
+			services.LookupToolVersions(ctx, logger, composerCLI), results)
 
 		if anyCheckFailed(results) {
 			return errors.New("preflight check failed")
@@ -122,12 +123,12 @@ func runCheapChecks(
 // writeCheckReport writes the preflight result to path, or nothing without --report. A preflight
 // has no phases, packages or branch, hence its own document shape. As with a run's report, a
 // write failure is logged and swallowed: the verdict matters more than the file describing it.
-func writeCheckReport(logger *zap.Logger, redactor *logging.Redactor, path string, results []services.CheckResult) {
+func writeCheckReport(logger *zap.Logger, redactor *logging.Redactor, path string, tools report.ToolVersions, results []services.CheckResult) {
 	if path == "" {
 		return
 	}
 
-	check := report.NewCheck(internal.Version, toReportCheckResults(results))
+	check := report.NewCheck(internal.Version, tools, toReportCheckResults(results))
 	if err := report.WriteCheck(afero.NewOsFs(), path, check, redactor.Redact); err != nil {
 		logger.Warn("failed to write check report", zap.String("path", path), zap.Error(err))
 		return

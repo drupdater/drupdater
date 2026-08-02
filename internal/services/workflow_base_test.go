@@ -1,11 +1,11 @@
 package services
 
 import (
-	"strings"
 	"context"
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -30,6 +30,7 @@ func TestStartUpdate(t *testing.T) {
 	vcsProvider := NewMockPlatform(t)
 	repository := NewMockGitRepository(t)
 	mockComposer := NewMockComposer(t)
+	expectVersionLookup(mockComposer)
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
@@ -101,6 +102,7 @@ func TestStartUpdatePublishUsesLiveContext(t *testing.T) {
 	vcsProvider := NewMockPlatform(t)
 	repository := NewMockGitRepository(t)
 	mockComposer := NewMockComposer(t)
+	expectVersionLookup(mockComposer)
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
@@ -167,6 +169,7 @@ func TestStartUpdateSiteFailureDoesNotPublish(t *testing.T) {
 	vcsProvider := NewMockPlatform(t)
 	repository := NewMockGitRepository(t)
 	mockComposer := NewMockComposer(t)
+	expectVersionLookup(mockComposer)
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
@@ -225,6 +228,7 @@ func TestStartUpdateTimeout(t *testing.T) {
 	vcsProvider := NewMockPlatform(t)
 	repository := NewMockGitRepository(t)
 	mockComposer := NewMockComposer(t)
+	expectVersionLookup(mockComposer)
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
@@ -272,6 +276,7 @@ func TestStartUpdatePlatformReqsFail(t *testing.T) {
 	vcsProvider := NewMockPlatform(t)
 	repository := NewMockGitRepository(t)
 	mockComposer := NewMockComposer(t)
+	expectVersionLookup(mockComposer)
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
@@ -312,6 +317,7 @@ func TestStartUpdateNoChanges(t *testing.T) {
 	vcsProvider := NewMockPlatform(t)
 	repository := NewMockGitRepository(t)
 	mockComposer := NewMockComposer(t)
+	expectVersionLookup(mockComposer)
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
@@ -369,6 +375,7 @@ func TestStartUpdateBranchAlreadyExists(t *testing.T) {
 	vcsProvider := NewMockPlatform(t)
 	repository := NewMockGitRepository(t)
 	mockComposer := NewMockComposer(t)
+	expectVersionLookup(mockComposer)
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
@@ -433,6 +440,7 @@ func TestStartUpdateLocalBranchAlreadyExists(t *testing.T) {
 	vcsProvider := NewMockPlatform(t)
 	repository := NewMockGitRepository(t)
 	mockComposer := NewMockComposer(t)
+	expectVersionLookup(mockComposer)
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
@@ -488,6 +496,7 @@ func TestStartUpdateLocalBranchLookupError(t *testing.T) {
 	vcsProvider := NewMockPlatform(t)
 	repository := NewMockGitRepository(t)
 	mockComposer := NewMockComposer(t)
+	expectVersionLookup(mockComposer)
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
@@ -539,6 +548,7 @@ func TestStartUpdateWithDryRun(t *testing.T) {
 	vcsProvider := NewMockPlatform(t)
 	repository := NewMockGitRepository(t)
 	mockComposer := NewMockComposer(t)
+	expectVersionLookup(mockComposer)
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
@@ -604,6 +614,7 @@ func TestStartUpdateCheckoutDryRunWithoutPlatform(t *testing.T) {
 	repositoryService := NewMockRepository(t)
 	repository := NewMockGitRepository(t)
 	mockComposer := NewMockComposer(t)
+	expectVersionLookup(mockComposer)
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
@@ -669,6 +680,7 @@ func TestPublishWorkDeletesBranchOnMRFailure(t *testing.T) {
 	vcsProvider := NewMockPlatform(t)
 	repository := NewMockGitRepository(t)
 	mockComposer := NewMockComposer(t)
+	expectVersionLookup(mockComposer)
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
@@ -729,6 +741,7 @@ func TestPublishWorkLogsWarningWhenDeleteBranchFails(t *testing.T) {
 	vcsProvider := NewMockPlatform(t)
 	repository := NewMockGitRepository(t)
 	mockComposer := NewMockComposer(t)
+	expectVersionLookup(mockComposer)
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
@@ -791,6 +804,7 @@ func TestPublishWorkPushFails(t *testing.T) {
 	vcsProvider := NewMockPlatform(t)
 	repository := NewMockGitRepository(t)
 	mockComposer := NewMockComposer(t)
+	expectVersionLookup(mockComposer)
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
@@ -847,6 +861,7 @@ func TestStartUpdateGetLockHashError(t *testing.T) {
 	vcsProvider := NewMockPlatform(t)
 	repository := NewMockGitRepository(t)
 	mockComposer := NewMockComposer(t)
+	expectVersionLookup(mockComposer)
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
@@ -894,6 +909,7 @@ func TestStartUpdateBranchExistsError(t *testing.T) {
 	vcsProvider := NewMockPlatform(t)
 	repository := NewMockGitRepository(t)
 	mockComposer := NewMockComposer(t)
+	expectVersionLookup(mockComposer)
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
@@ -943,6 +959,7 @@ func TestStartUpdateConfigResaveError(t *testing.T) {
 	vcsProvider := NewMockPlatform(t)
 	repository := NewMockGitRepository(t)
 	mockComposer := NewMockComposer(t)
+	expectVersionLookup(mockComposer)
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
@@ -994,6 +1011,7 @@ func TestStartUpdateExportConfigurationError(t *testing.T) {
 	vcsProvider := NewMockPlatform(t)
 	repository := NewMockGitRepository(t)
 	mockComposer := NewMockComposer(t)
+	expectVersionLookup(mockComposer)
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
@@ -1046,6 +1064,7 @@ func TestStartUpdateWithAutoMerge(t *testing.T) {
 	vcsProvider := NewMockPlatform(t)
 	repository := NewMockGitRepository(t)
 	mockComposer := NewMockComposer(t)
+	expectVersionLookup(mockComposer)
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
@@ -1109,6 +1128,7 @@ func TestStartUpdateAutoMergeError(t *testing.T) {
 	vcsProvider := NewMockPlatform(t)
 	repository := NewMockGitRepository(t)
 	mockComposer := NewMockComposer(t)
+	expectVersionLookup(mockComposer)
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
@@ -1171,6 +1191,7 @@ func TestStartUpdateAutoMergeSkippedWhenDisabled(t *testing.T) {
 	vcsProvider := NewMockPlatform(t)
 	repository := NewMockGitRepository(t)
 	mockComposer := NewMockComposer(t)
+	expectVersionLookup(mockComposer)
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
@@ -1239,6 +1260,7 @@ func TestStartUpdateFireEventError(t *testing.T) {
 	vcsProvider := NewMockPlatform(t)
 	repository := NewMockGitRepository(t)
 	mockComposer := NewMockComposer(t)
+	expectVersionLookup(mockComposer)
 	drush := NewMockDrush(t)
 	dispatcher := NewMockEventDispatcher(t)
 	ctx := context.Background()
@@ -1293,6 +1315,7 @@ func TestStartUpdateUsesExistingCheckout(t *testing.T) {
 	vcsProvider := NewMockPlatform(t)
 	repository := NewMockGitRepository(t)
 	mockComposer := NewMockComposer(t)
+	expectVersionLookup(mockComposer)
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
@@ -1355,6 +1378,7 @@ func TestStartUpdateWorkBranchCheckoutError(t *testing.T) {
 	vcsProvider := NewMockPlatform(t)
 	repository := NewMockGitRepository(t)
 	mockComposer := NewMockComposer(t)
+	expectVersionLookup(mockComposer)
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
@@ -1396,6 +1420,7 @@ func TestStartUpdateRestoresCheckoutOnFailureInCheckoutMode(t *testing.T) {
 	repositoryService := NewMockRepository(t)
 	repository := NewMockGitRepository(t)
 	mockComposer := NewMockComposer(t)
+	expectVersionLookup(mockComposer)
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
@@ -1457,6 +1482,7 @@ func TestStartUpdateDoesNotRestoreCheckoutOnSuccess(t *testing.T) {
 	vcsProvider := NewMockPlatform(t)
 	repository := NewMockGitRepository(t)
 	mockComposer := NewMockComposer(t)
+	expectVersionLookup(mockComposer)
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
@@ -1717,6 +1743,12 @@ func TestEnsureUpdateBranchAvailable(t *testing.T) {
 // a call site that stops propagating the context altogether, which would silently disable
 // cancellation and the run timeout for everything below it.
 var anyCtx = mock.MatchedBy(func(ctx context.Context) bool { return ctx != nil })
+
+// expectVersionLookup declares the version call every run makes. What the versions end up as is
+// workflow_report_test.go's subject, not these runs'.
+func expectVersionLookup(composerMock *MockComposer) {
+	composerMock.EXPECT().Version(anyCtx).Return(composer.Versions{Composer: "2.10.2", PHP: "8.3.14"}, nil)
+}
 
 // workBranchCheckout pins the options of every branch drupdater creates.
 //

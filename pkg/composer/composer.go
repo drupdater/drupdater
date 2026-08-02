@@ -93,6 +93,41 @@ func (s *CLI) execComposerJSON(ctx context.Context, dir string, args ...string) 
 	return stdout, err
 }
 
+// Versions are the tool versions a run's outcome depends on: composer because drupdater wraps
+// it, PHP because the image is built per PHP version.
+type Versions struct {
+	Composer string
+	PHP      string
+}
+
+// composer --version prints its own version on stdout and PHP's on stderr, so both are scraped
+// out of the merged output.
+var (
+	composerVersionRe = regexp.MustCompile(`(?m)^Composer version (\S+)`)
+	phpVersionRe      = regexp.MustCompile(`(?m)^PHP version (\S+)`)
+)
+
+// Version reports the composer and PHP versions in play. Not tied to a project, hence no dir.
+func (s *CLI) Version(ctx context.Context) (Versions, error) {
+	out, err := s.command("").Combined(ctx, "--version", "--no-ansi")
+	if err != nil {
+		return Versions{}, fmt.Errorf("failed to determine composer version: %w, output: %s", err, out)
+	}
+
+	match := composerVersionRe.FindStringSubmatch(out)
+	if match == nil {
+		return Versions{}, fmt.Errorf("failed to parse composer version from output: %s", out)
+	}
+	versions := Versions{Composer: match[1]}
+
+	// Composer only started reporting the PHP version in 2.5, so its absence is not an error.
+	if phpMatch := phpVersionRe.FindStringSubmatch(out); phpMatch != nil {
+		versions.PHP = phpMatch[1]
+	}
+
+	return versions, nil
+}
+
 type PackageChange struct {
 	Action  string // Install, Upgrade, Remove, Downgrade
 	Package string

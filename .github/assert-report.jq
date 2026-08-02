@@ -128,6 +128,12 @@ def secrets: (env.DRUPDATER_ASSERT_SECRETS // "") | split("\n") | map(select(len
     then "schema_version: got \($r.schema_version), want 1 -- the report contract changed"
     else empty end ),
 
+  # An empty composer_version means the lookup broke silently, leaving the next upstream
+  # composer regression unattributable -- which is the whole reason the field exists.
+  ( if (($r.composer_version // "") | length) == 0
+    then "composer_version: empty -- the version lookup failed or was dropped"
+    else empty end ),
+
   # Package changes: shape first, because a malformed entry makes every other
   # statement about .packages meaningless.
   ( $packages[]

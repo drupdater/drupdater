@@ -309,6 +309,74 @@ func TestRunComposerAudit(t *testing.T) {
 	})
 }
 
+func TestVersion(t *testing.T) {
+	service := &CLI{logger: zap.NewNop()}
+
+	// The helper writes everything to stdout. Real composer splits the two lines across stdout
+	// and stderr, which Version merges anyway, so the parser sees the same thing.
+	fakeComposer := func(t *testing.T, output string, args *[]string) {
+		t.Helper()
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+			if args != nil {
+				*args = arg
+			}
+			cs := []string{"-test.run=TestHelperProcess", "--", output}
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		t.Cleanup(func() { execCommand = exec.CommandContext })
+	}
+
+	t.Run("reports both versions", func(t *testing.T) {
+		// Prefixed with the root notices every published image provokes: the versions have to
+		// be found among them, not on the first line.
+		var args []string
+		fakeComposer(t, `Do not run Composer as root/super user! See https://getcomposer.org/root for details
+Composer version 2.10.2 2026-07-14 09:12:33
+PHP version 8.3.14 (/usr/local/bin/php)
+Run the "diagnose" command to get more detailed diagnostics output.`, &args)
+
+		versions, err := service.Version(t.Context())
+
+		require.NoError(t, err)
+		assert.Equal(t, Versions{Composer: "2.10.2", PHP: "8.3.14"}, versions)
+		assert.Equal(t, []string{"--version", "--no-ansi"}, args)
+	})
+
+	t.Run("tolerates a composer too old to report the PHP version", func(t *testing.T) {
+		fakeComposer(t, "Composer version 2.4.4 2022-10-27 14:39:29", nil)
+
+		versions, err := service.Version(t.Context())
+
+		require.NoError(t, err)
+		assert.Equal(t, Versions{Composer: "2.4.4"}, versions)
+	})
+
+	t.Run("errors when the output names no version", func(t *testing.T) {
+		fakeComposer(t, "PHP Warning: something went sideways", nil)
+
+		_, err := service.Version(t.Context())
+
+		require.ErrorContains(t, err, "failed to parse composer version")
+	})
+
+	t.Run("errors when composer fails", func(t *testing.T) {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := append([]string{"-test.run=TestHelperProcess", "--"}, arg...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		t.Cleanup(func() { execCommand = exec.CommandContext })
+
+		versions, err := service.Version(t.Context())
+
+		require.ErrorContains(t, err, "failed to determine composer version")
+		assert.Equal(t, Versions{}, versions)
+	})
+}
+
 func TestGetComposerLockHash(t *testing.T) {
 	data := `{
 	   		"content-hash": "d3d29b1f6a1d8f2c3b9b8e1e4f5f9e3e"

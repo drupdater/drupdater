@@ -64,11 +64,23 @@ When a new PHP release arrives, or an old one reaches end of life:
 
 The `Dockerfile` takes `PHP_VERSION` as a build argument, so no change is needed there.
 
-## Known gap: images report `dev`
+## The version inside the image
 
-The `Makefile` injects the version via `-ldflags`, but the `Dockerfile`'s build stage does
-not. Binaries inside published images therefore report `drupdater_version: "dev"` in the
-[run report](../reference/run-report.md).
+The `Dockerfile`'s build stage takes a `VERSION` build argument and injects it via
+`-ldflags`, the same way the `Makefile` does. `.github/workflows/docker-image.yml` passes
+the tag being built, so a released image reports it as `drupdater_version` in the [run
+report](../reference/run-report.md). An image built anywhere else — the integration test
+job, a local `make docker-build` — reports `"dev"`, which is correct: it is not a release.
 
-This is a real bug rather than a design decision. Until it is fixed, the image tag is the
-only reliable way to know which version is running.
+## Bumping Composer
+
+The `Dockerfile` pins Composer to a minor (`FROM composer:2.10`), because Composer is what
+a run mostly *is* and its defaults change between minors. Dependabot proposes the bump like
+any other dependency, and the [integration
+tests](https://github.com/drupdater/drupdater/actions) run against it before it ships —
+which is the whole point of the pin.
+
+Treat a Composer minor bump as **user-visible**: it can change whether `composer update`
+succeeds on a given project. The [run
+report](../reference/run-report.md#composer_version-and-php_version) records the version
+every run used, so a regression traced back to one is attributable.

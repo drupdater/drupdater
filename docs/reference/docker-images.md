@@ -80,7 +80,13 @@ Built on `php:<version>-cli-trixie`, with:
   unlimited.
 - **System packages** — `git`, `unzip`, `patch`, `sqlite3`. SQLite is what the baseline
   site installs run on.
-- **Composer 2**, plus two globally-required plugins:
+- **Composer**, pinned to a **minor** (`composer:2.10`) rather than to a floating `2`.
+  Composer is the largest single influence on what a run does, and its defaults change
+  between minors — `config.audit` giving way to `config.policy`, say — so a minor bump is a
+  deliberate commit that CI runs against rather than something that arrives in a published
+  image unannounced. Patch releases, where fixes live, still flow in. Every report names the
+  [Composer version](run-report.md#composer_version-and-php_version) that produced it.
+- Plus two globally-required Composer plugins:
   [`mglaman/composer-drupal-lenient`](https://github.com/mglaman/composer-drupal-lenient)
   and [`ion-bazan/composer-diff`](https://github.com/IonBazan/composer-diff), both
   pre-allow-listed.
@@ -90,11 +96,9 @@ Built on `php:<version>-cli-trixie`, with:
 The Composer environment is tuned for unattended runs; see [environment
 variables](environment-variables.md#set-inside-the-docker-image) for the values and why.
 
-!!! note "Images report `dev` as their version"
-
-    The version string is injected via `-ldflags`, which the `Makefile` does but the
-    `Dockerfile` does not. The [run report](run-report.md)'s `drupdater_version` field
-    therefore reads `"dev"` in every published image. Rely on the image tag you pinned.
+The image build takes a `VERSION` build argument, which the release workflow sets to the
+tag being built, so the [run report](run-report.md)'s `drupdater_version` field names the
+release the image came from.
 
 ## Volumes and the working directory
 

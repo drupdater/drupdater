@@ -34,6 +34,11 @@ type reportHarness struct {
 	// way cmd/root.go wires the real ones up. Empty for the runs that do not care.
 	addons []internal.Addon
 
+	// What the version lookup returns. Fields, so a test can make it fail after the harness has
+	// wired the expectation up.
+	versions    composer.Versions
+	versionsErr error
+
 	got *report.Report
 }
 
@@ -61,8 +66,12 @@ func newReportHarness(t *testing.T, dryRun bool) *reportHarness {
 		composer:    NewMockComposer(t),
 		drush:       NewMockDrush(t),
 		worktree:    NewMockWorktree(t),
+
+		versions: composer.Versions{Composer: "2.10.2", PHP: "8.3.14"},
 	}
 
+	h.composer.EXPECT().Version(anyCtx).
+		RunAndReturn(func(context.Context) (composer.Versions, error) { return h.versions, h.versionsErr }).Maybe()
 	h.vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail").Maybe()
 	h.repoSvc.EXPECT().CloneRepository(h.config.RepositoryURL, h.config.Branch, h.config.Token, "user", "mail").
 		Return(h.repository, h.worktree, "/tmp", nil).Maybe()
@@ -141,6 +150,38 @@ func TestReportWrittenOnSuccessfulRun(t *testing.T) {
 	assert.Contains(t, phaseNames(h.got.Phases), "publish")
 	assert.Equal(t, report.ModeNormal, h.got.Mode)
 	assert.Equal(t, internal.Version, h.got.DrupdaterVersion)
+}
+
+// Composer decides what a run does, so the report has to name the version that produced it.
+func TestReportRecordsTheToolVersions(t *testing.T) {
+	h := newReportHarness(t, false)
+	h.expectFullRun(t)
+	h.repository.EXPECT().Push(mock.Anything).Return(nil)
+	h.vcsProvider.EXPECT().CreateMergeRequest(anyCtx, mock.Anything, mock.Anything, mock.Anything, "main").
+		Return(codehosting.MergeRequest{}, nil)
+
+	require.NoError(t, h.run(t))
+
+	require.NotNil(t, h.got)
+	assert.Equal(t, "2.10.2", h.got.ComposerVersion)
+	assert.Equal(t, "8.3.14", h.got.PHPVersion)
+}
+
+// One subprocess for a field no update depends on must never be what stops a run.
+func TestUnreadableToolVersionsDoNotFailTheRun(t *testing.T) {
+	h := newReportHarness(t, false)
+	h.versionsErr = errors.New("composer: command not found")
+	h.expectFullRun(t)
+	h.repository.EXPECT().Push(mock.Anything).Return(nil)
+	h.vcsProvider.EXPECT().CreateMergeRequest(anyCtx, mock.Anything, mock.Anything, mock.Anything, "main").
+		Return(codehosting.MergeRequest{}, nil)
+
+	require.NoError(t, h.run(t))
+
+	require.NotNil(t, h.got)
+	assert.Equal(t, report.StatusSuccess, h.got.Status)
+	assert.Empty(t, h.got.ComposerVersion)
+	assert.Empty(t, h.got.PHPVersion)
 }
 
 // The credential embedded in the repository URL must not reach the report, independently of the
