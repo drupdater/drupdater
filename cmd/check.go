@@ -23,9 +23,8 @@ import (
 	"go.uber.org/zap"
 )
 
-// checkFull selects the --full tier of "drupdater check": on top of the free checks, it clones
-// the repository and runs composer install plus a real site install for each configured site,
-// proving the site actually installs from its exported configuration.
+// checkFull selects the --full tier: on top of the free checks it clones the repository and runs
+// composer install plus a real site install, proving each site installs from its exported config.
 var checkFull bool
 
 var checkCmd = &cobra.Command{
@@ -54,8 +53,7 @@ Exits non-zero if any check fails, so it can gate a pipeline.`,
 			return err
 		}
 
-		// Unlike a real run, a token is never required here: it only sharpens one check (whether
-		// the given token authenticates to the VCS host) and its absence just skips that check.
+		// A token is never required here: without one, the VCS authentication check is skipped.
 		token := checkToken(args)
 		redactor.Register(token)
 
@@ -87,19 +85,17 @@ Exits non-zero if any check fails, so it can gate a pipeline.`,
 	},
 }
 
-// cheapChecksComposer is what runCheapChecks needs from Composer: the union of
-// services.PlatformReqsChecker and services.ComposerConfigGetter. Kept narrow (rather than
-// requiring the full services.Composer) so tests can supply a small fake instead of the whole
-// interface; the real *composer.CLI passed from RunE satisfies it as-is.
+// cheapChecksComposer is the union of services.PlatformReqsChecker and
+// services.ComposerConfigGetter. Kept narrow so tests can supply a small fake; the real
+// *composer.CLI satisfies it as-is.
 type cheapChecksComposer interface {
 	services.PlatformReqsChecker
 	services.ComposerConfigGetter
 }
 
-// runCheapChecks runs every check that's free to compute: no composer install, no site install,
-// no network beyond one optional read-only VCS API call (see checkVCS). It's split out of RunE
-// so the orchestration and its branching can be unit tested against fakes, without needing the
-// real composer/drush/git binaries CI doesn't install.
+// runCheapChecks runs every check that's free: no composer install, no site install, no network
+// beyond one optional read-only VCS call (see checkVCS). Split out of RunE so its branching can
+// be tested against fakes, without the composer/drush/git binaries CI doesn't install.
 func runCheapChecks(
 	ctx context.Context,
 	logger *zap.Logger,
@@ -122,13 +118,9 @@ func runCheapChecks(
 	return results
 }
 
-// writeCheckReport writes the preflight result to path, doing nothing when --report was not
-// given. --report is a persistent flag, so it applies to "check" as well as to a real run; a
-// preflight has no phases, packages or branch, so it gets its own document shape (report.Check)
-// rather than a run report with most of its fields left empty.
-//
-// As with a run's report, a write failure is logged and swallowed: the check's own verdict, and
-// the exit status carrying it, matter more than the file describing it.
+// writeCheckReport writes the preflight result to path, or nothing without --report. A preflight
+// has no phases, packages or branch, hence its own document shape. As with a run's report, a
+// write failure is logged and swallowed: the verdict matters more than the file describing it.
 func writeCheckReport(logger *zap.Logger, redactor *logging.Redactor, path string, results []services.CheckResult) {
 	if path == "" {
 		return
@@ -143,8 +135,7 @@ func writeCheckReport(logger *zap.Logger, redactor *logging.Redactor, path strin
 }
 
 // toReportCheckResults converts the services results into the report's own schema type, for the
-// same reason report.PackageChange mirrors composer.PackageChange: the report is a published
-// contract and must not change shape because an internal type was refactored.
+// same reason report.PackageChange mirrors composer.PackageChange.
 func toReportCheckResults(results []services.CheckResult) []report.CheckResult {
 	out := make([]report.CheckResult, 0, len(results))
 	for _, r := range results {
@@ -154,9 +145,8 @@ func toReportCheckResults(results []services.CheckResult) []report.CheckResult {
 	return out
 }
 
-// checkToken resolves the access token the same way the real run does (positional argument,
-// falling back to DRUPDATER_TOKEN), but never errors when neither is set: check works fine
-// without one, it just can't verify that a given token authenticates.
+// checkToken resolves the token the way a real run does, but never errors when neither source is
+// set: check works without one, it just can't verify authentication.
 func checkToken(args []string) string {
 	if len(args) == 1 && args[0] != "" {
 		return args[0]
@@ -182,17 +172,15 @@ func checkConfigAndAddons(path string, cfg *internal.Config) []services.CheckRes
 	return append(results, services.CheckResult{Name: "addon names resolve", OK: true})
 }
 
-// newVcsProvider resolves a repository URL and token to a VCS platform. It is a variable so the
-// token check can be tested without reaching GitHub or GitLab: the real factory builds a live
-// API client, and calling GetUser on it would make a network request.
+// newVcsProvider resolves a repository URL and token to a VCS platform. A variable so the token
+// check can be tested without GetUser making a real network request.
 var newVcsProvider = func(repositoryURL string, token string, logger *zap.Logger) (codehosting.Platform, error) {
 	return codehosting.NewDefaultVcsProviderFactory().Create(repositoryURL, token, logger)
 }
 
-// checkVCS reports whether the repository URL routes to a known VCS provider (GitHub or
-// GitLab) and, when a token is given, whether it authenticates. resolveErr is the error (if
-// any) from deriving the repository URL out of the checkout, surfaced here since that's the
-// only check it would otherwise silently fail.
+// checkVCS reports whether the repository URL routes to a known provider and, with a token,
+// whether it authenticates. resolveErr comes from deriving the URL out of the checkout, and is
+// surfaced here because this is the only check it would otherwise silently fail.
 func checkVCS(ctx context.Context, logger *zap.Logger, repositoryURL string, token string, resolveErr error) []services.CheckResult {
 	const name = "repository host recognized (GitHub/GitLab)"
 
@@ -237,13 +225,10 @@ type siteInstaller interface {
 	Install(ctx context.Context, dir string, site string) error
 }
 
-// fullCheckDeps are the external tools the --full tier drives. They are constructors rather
-// than ready-made values so the tier keeps its original ordering: composer is only built once
-// the clone succeeded, and the installer only once composer install succeeded.
-//
-// Grouping them here is what makes the tier's control flow testable -- which failure aborts,
-// which are collected per site, what gets cleaned up -- without performing a real clone, a
-// real composer install and a real site install, which together are most of a run's cost.
+// fullCheckDeps are the external tools the --full tier drives. Constructors rather than values,
+// so the tier keeps its ordering: composer is built only once the clone succeeded, the installer
+// only once composer install did. Grouping them here makes the tier's control flow testable
+// without a real clone, install and site install.
 type fullCheckDeps struct {
 	clone        func(repositoryURL string, branch string, token string) (string, error)
 	newComposer  func() fullCheckComposer
@@ -270,9 +255,8 @@ var newFullCheckDeps = func(logger *zap.Logger) fullCheckDeps {
 	}
 }
 
-// runFullChecks is the --full tier: it clones the repository to a scratch directory (never the
-// live working copy, so the check has no side effects on it) and proves each configured site
-// installs from its exported configuration.
+// runFullChecks is the --full tier: it clones to a scratch directory, never the live working
+// copy, and proves each configured site installs from its exported configuration.
 func runFullChecks(ctx context.Context, logger *zap.Logger, cfg internal.Config, token string) []services.CheckResult {
 	if cfg.RepositoryURL == "" {
 		return []services.CheckResult{{
@@ -332,10 +316,9 @@ func cleanupFullCheckArtifacts(path string, sites []string) {
 	os.Remove(filepath.Join(parent, "private"))
 }
 
-// printCheckResults writes results to w, redacting each detail message through redactor first: a
-// failed check's Detail can carry a subprocess's raw output (e.g. Composer's error after a failed
-// authenticated fetch), which is exactly where a credential embedded in a URL would otherwise
-// leak straight to stdout, bypassing the logger's own redaction entirely.
+// printCheckResults writes results to w, redacting each detail first: a failed check's Detail
+// can carry raw subprocess output, which would otherwise leak a credential straight to stdout,
+// bypassing the logger's redaction entirely.
 func printCheckResults(w io.Writer, results []services.CheckResult, redactor *logging.Redactor) {
 	for _, r := range results {
 		mark := "✓"

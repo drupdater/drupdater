@@ -12,18 +12,16 @@ import (
 	"go.uber.org/zap"
 )
 
-// DeprecationsRemover handles the removal of deprecated code using Rector
 type DeprecationsRemover struct {
 	logger   *zap.Logger
 	rector   Rector
 	composer Composer
 
-	// Which rector rules rewrote which files, for the report. Written once from the
-	// single post-code-update event, read after the run.
+	// Which rules rewrote which files, for the report. Written once from the single
+	// post-code-update event, read after the run.
 	fixes []DeprecationFix
 }
 
-// NewDeprecationsRemover creates a new deprecations remover instance
 func NewDeprecationsRemover(logger *zap.Logger, rector Rector, composer Composer) *DeprecationsRemover {
 	return &DeprecationsRemover{
 		logger:   logger,
@@ -32,14 +30,11 @@ func NewDeprecationsRemover(logger *zap.Logger, rector Rector, composer Composer
 	}
 }
 
-// SubscribedEvents returns the events this addon listens to
 func (dr *DeprecationsRemover) SubscribedEvents() map[string]any {
 	return map[string]any{
-		// Above Normal: this handler temporarily requires palantirnet/drupal-rector (see below),
-		// and code_beautifier's own "post-code-update" listener (Normal) may commit composer.*
-		// via AddGlob if it installs drupal/coder — it must never run in between the require and
-		// the cleanup this handler does before returning, or it would sweep up an unrelated,
-		// half-finished composer.json/composer.lock diff into its own commit.
+		// Above Normal: this handler temporarily requires palantirnet/drupal-rector, and
+		// code_beautifier (Normal) may commit composer.* via AddGlob. Running in between would
+		// sweep this handler's half-finished composer diff into that commit.
 		"post-code-update": event.ListenerItem{
 			Priority: event.AboveNormal,
 			Listener: event.ListenerFunc(dr.postCodeUpdateHandler),
@@ -47,7 +42,6 @@ func (dr *DeprecationsRemover) SubscribedEvents() map[string]any {
 	}
 }
 
-// RenderTemplate returns the rendered template for this addon
 func (dr *DeprecationsRemover) RenderTemplate() (string, error) {
 	return "", nil
 }
@@ -57,7 +51,6 @@ func (dr *DeprecationsRemover) postCodeUpdateHandler(e event.Event) error {
 
 	dr.logger.Info("removing deprecations")
 
-	// Check if rector is installed.
 	installed, _ := dr.composer.IsPackageInstalled(evt.Context(), evt.Path(), "palantirnet/drupal-rector")
 	if !installed {
 		dr.logger.Debug("rector is not installed, installing")
@@ -81,10 +74,8 @@ func (dr *DeprecationsRemover) postCodeUpdateHandler(e event.Event) error {
 		if _, err := dr.composer.Remove(evt.Context(), evt.Path(), "palantirnet/drupal-rector"); err != nil {
 			return err
 		}
-		// Commit whatever composer.json/composer.lock diff remains from temporarily requiring
-		// rector (a version-solving pass rarely restores the lock file byte-for-byte). Doing this
-		// here, rather than leaving the files dirty, means no other "post-code-update" listener's
-		// own worktree.AddGlob("composer.*") can ever sweep this unrelated diff into its commit.
+		// Removing rector rarely restores composer.lock byte-for-byte. Commit the remainder here
+		// so no other listener's AddGlob("composer.*") sweeps this diff into its own commit.
 		if err := dr.commitTemporaryRectorCleanup(evt.Worktree()); err != nil {
 			return err
 		}
@@ -126,8 +117,8 @@ func (dr *DeprecationsRemover) commitTemporaryRectorCleanup(worktree Worktree) e
 	return err
 }
 
-// recordFixes captures what rector rewrote, so the report can say which rules fired on which
-// files rather than only that "some deprecations were removed".
+// recordFixes captures which rules fired on which files, so the report says more than "some
+// deprecations were removed".
 func (dr *DeprecationsRemover) recordFixes(result rector.ReturnOutput) {
 	rectorsByFile := make(map[string][]string, len(result.FileDiffs))
 	for _, diff := range result.FileDiffs {
@@ -136,9 +127,8 @@ func (dr *DeprecationsRemover) recordFixes(result rector.ReturnOutput) {
 
 	fixes := make([]DeprecationFix, 0, len(result.ChangedFiles))
 	for _, file := range result.ChangedFiles {
-		// Cloned before sorting. Sorting in place would reorder the caller's own
-		// rector.ReturnOutput, and a file listed twice in ChangedFiles would hand two fixes the
-		// same backing array, so appending to one would show up in the other.
+		// Cloned before sorting: in place would reorder the caller's rector.ReturnOutput, and a
+		// file listed twice would leave two fixes sharing one backing array.
 		applied := slices.Clone(rectorsByFile[file])
 		slices.Sort(applied)
 		fixes = append(fixes, DeprecationFix{File: file, AppliedRectors: applied})

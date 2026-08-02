@@ -18,19 +18,17 @@ import (
 	"go.uber.org/zap"
 )
 
-// CodeBeautifier handles PHP code style formatting and fixes
 type CodeBeautifier struct {
 	logger   *zap.Logger
 	phpcs    PHPCS
 	composer Composer
 
-	// What the run actually fixed, for the report. Written once from the single
-	// post-code-update event, read after the run.
+	// What the run fixed, for the report. Written once from the single post-code-update
+	// event, read after the run.
 	fixedFiles []string
 	fixable    int
 }
 
-// NewCodeBeautifier creates a new code beautifier instance
 func NewCodeBeautifier(logger *zap.Logger, phpcs PHPCS, composer Composer) *CodeBeautifier {
 	return &CodeBeautifier{
 		logger:   logger,
@@ -39,7 +37,6 @@ func NewCodeBeautifier(logger *zap.Logger, phpcs PHPCS, composer Composer) *Code
 	}
 }
 
-// SubscribedEvents returns the events this addon listens to
 func (cb *CodeBeautifier) SubscribedEvents() map[string]any {
 	return map[string]any{
 		"post-code-update": event.ListenerItem{
@@ -49,12 +46,11 @@ func (cb *CodeBeautifier) SubscribedEvents() map[string]any {
 	}
 }
 
-// RenderTemplate returns the rendered template for this addon
 func (cb *CodeBeautifier) RenderTemplate() (string, error) {
 	return "", nil
 }
 
-// fileExists checks if phpcs.xml or phpcs.xml.dist exists in the given path
+// fileExists reports whether path has a phpcs.xml or phpcs.xml.dist.
 var fileExists = func(path string) bool {
 	if _, err := os.Stat(filepath.Join(path, "phpcs.xml")); os.IsNotExist(err) {
 		if _, err := os.Stat(filepath.Join(path, "phpcs.xml.dist")); os.IsNotExist(err) {
@@ -69,7 +65,7 @@ type phpcsRuleset struct {
 	Files   []string `xml:"file"`
 }
 
-// hasPHPCSPathDefinitions checks if phpcs.xml or phpcs.xml.dist contains <file> path definitions
+// hasPHPCSPathDefinitions reports whether the config declares any <file> path.
 var hasPHPCSPathDefinitions = func(path string) (bool, error) {
 	var configPath string
 	if _, err := os.Stat(filepath.Join(path, "phpcs.xml")); err == nil {
@@ -153,12 +149,9 @@ func (cb *CodeBeautifier) postCodeUpdateHandler(e event.Event) error { //nolint:
 		addedFiles = append(addedFiles, relativePath)
 	}
 
-	// phpcbf may not have changed anything on disk (some "fixable" issues aren't actually
-	// auto-fixable, and RunCBF errors are only logged), which would make an empty commit that
-	// go-git rejects. Only commit when something this handler added is actually staged — checked
-	// against just those paths, not the whole index, so a same-event listener's own uncommitted
-	// change (e.g. deprecations_remover's composer.* diff, if it were ever left dangling) can
-	// never get swept into this commit.
+	// phpcbf may have changed nothing — not every "fixable" issue is, and RunCBF errors are
+	// only logged — which would make an empty commit go-git rejects. Checked against just this
+	// handler's own paths, so another listener's dangling change is never swept in.
 	staged, err := stagedAnyOf(event.Worktree(), addedFiles)
 	if err != nil {
 		return fmt.Errorf("failed to check worktree status: %w", err)
@@ -209,7 +202,6 @@ var phpcsTemplateStr = `<?xml version="1.0" encoding="UTF-8"?>
 </ruleset>
 `
 
-// CreatePHPCSConfig generates a phpcs.xml configuration file
 func (cb *CodeBeautifier) CreatePHPCSConfig(ctx context.Context, path string, worktree Worktree) (bool, error) {
 	cb.logger.Debug("no phpcs.xml or phpcs.xml.dist file found, creating phpcs.xml")
 
@@ -239,10 +231,8 @@ func (cb *CodeBeautifier) CreatePHPCSConfig(ctx context.Context, path string, wo
 		return false, nil
 	}
 
-	// Render before touching the filesystem. Creating the file up front would leave an empty
-	// phpcs.xml behind on any early return above, and the next run would then see that file,
-	// try to parse it for <file> definitions, and fail the whole run on the resulting XML
-	// syntax error.
+	// Render before touching the filesystem: an early return above would otherwise leave an
+	// empty phpcs.xml behind, and the next run fails parsing it for <file> definitions.
 	var rendered bytes.Buffer
 	if err := tmpl.Execute(&rendered, data); err != nil {
 		return false, fmt.Errorf("failed to execute phpcs template: %w", err)
@@ -271,7 +261,6 @@ func (cb *CodeBeautifier) CreatePHPCSConfig(ctx context.Context, path string, wo
 	return true, nil
 }
 
-// InstallCoder installs the drupal/coder package
 func (cb *CodeBeautifier) InstallCoder(ctx context.Context, path string, worktree Worktree) error {
 	cb.logger.Debug("drupal/coder is not installed, installing")
 	if _, err := cb.composer.Require(ctx, path, "--dev", "drupal/coder"); err != nil {

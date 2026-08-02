@@ -24,7 +24,6 @@ import (
 )
 
 func TestStartUpdate(t *testing.T) {
-	// Setup
 	logger := zap.NewNop()
 	installer := NewMockInstaller(t)
 	repositoryService := NewMockRepository(t)
@@ -43,7 +42,6 @@ func TestStartUpdate(t *testing.T) {
 		DryRun:        false,
 	}
 
-	// Configure mock expectations
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
@@ -80,11 +78,9 @@ func TestStartUpdate(t *testing.T) {
 	mockComposer.EXPECT().Install(anyCtx, "/tmp").Return(nil)
 	mockComposer.EXPECT().GetLockHash("/tmp").Return("dummy-hash", nil)
 
-	// Execute
 	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
 	err = workflowService.StartUpdate(ctx, nil)
 
-	// Assert
 	require.NoError(t, err)
 	installer.AssertExpectations(t)
 	repositoryService.AssertExpectations(t)
@@ -211,7 +207,6 @@ func TestStartUpdateSiteFailureDoesNotPublish(t *testing.T) {
 	updateErr := errors.New("drush updatedb crashed")
 	drush.EXPECT().UpdateSite(anyCtx, "/tmp", "site1").Return(updateErr)
 
-	// Execute
 	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
 	err := workflowService.StartUpdate(ctx, nil)
 
@@ -259,7 +254,6 @@ func TestStartUpdateTimeout(t *testing.T) {
 		return nil, ctx.Err()
 	}).Maybe()
 
-	// Execute
 	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
 	err := workflowService.StartUpdate(ctx, nil)
 
@@ -301,7 +295,6 @@ func TestStartUpdatePlatformReqsFail(t *testing.T) {
 	mockComposer.EXPECT().Install(anyCtx, "/tmp").Return(nil).Maybe()
 	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil).Maybe()
 
-	// Execute
 	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
 	err := workflowService.StartUpdate(ctx, nil)
 
@@ -313,7 +306,6 @@ func TestStartUpdatePlatformReqsFail(t *testing.T) {
 }
 
 func TestStartUpdateNoChanges(t *testing.T) {
-	// Setup
 	logger := zap.NewNop()
 	installer := NewMockInstaller(t)
 	repositoryService := NewMockRepository(t)
@@ -356,7 +348,6 @@ func TestStartUpdateNoChanges(t *testing.T) {
 	drush.EXPECT().ExportConfiguration(anyCtx, "/tmp", "site1").Return(nil).Maybe()
 	drush.EXPECT().ConfigResave(anyCtx, "/tmp", "site1").Return(nil).Maybe()
 
-	// Execute
 	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
 	err := workflowService.StartUpdate(ctx, nil)
 
@@ -372,7 +363,6 @@ func TestStartUpdateNoChanges(t *testing.T) {
 }
 
 func TestStartUpdateBranchAlreadyExists(t *testing.T) {
-	// Setup
 	logger := zap.NewNop()
 	installer := NewMockInstaller(t)
 	repositoryService := NewMockRepository(t)
@@ -421,7 +411,6 @@ func TestStartUpdateBranchAlreadyExists(t *testing.T) {
 	drush.EXPECT().ExportConfiguration(anyCtx, "/tmp", "site1").Return(nil).Maybe()
 	drush.EXPECT().ConfigResave(anyCtx, "/tmp", "site1").Return(nil).Maybe()
 
-	// Execute
 	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
 	err := workflowService.StartUpdate(ctx, nil)
 
@@ -544,7 +533,6 @@ func TestStartUpdateLocalBranchLookupError(t *testing.T) {
 }
 
 func TestStartUpdateWithDryRun(t *testing.T) {
-	// Setup
 	logger := zap.NewNop()
 	installer := NewMockInstaller(t)
 	repositoryService := NewMockRepository(t)
@@ -563,7 +551,6 @@ func TestStartUpdateWithDryRun(t *testing.T) {
 		DryRun:        true,
 	}
 
-	// Configure mock expectations
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
@@ -593,11 +580,9 @@ func TestStartUpdateWithDryRun(t *testing.T) {
 	mockComposer.EXPECT().Install(anyCtx, "/tmp").Return(nil)
 	mockComposer.EXPECT().GetLockHash("/tmp").Return("dummy-hash", nil)
 
-	// Execute
 	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
 	err := workflowService.StartUpdate(ctx, nil)
 
-	// Assert
 	require.NoError(t, err)
 	installer.AssertExpectations(t)
 	repositoryService.AssertExpectations(t)

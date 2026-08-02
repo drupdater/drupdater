@@ -16,16 +16,13 @@ import (
 
 // TestNewComposerAudit tests the constructor
 func TestNewComposerAudit(t *testing.T) {
-	// Setup
 	logger := zap.NewNop()
 	mockComposer := NewMockComposer(t)
 
-	// Execute
 	before := time.Now()
 	audit := NewComposerAudit(logger, mockComposer, true)
 	after := time.Now()
 
-	// Assert
 	assert.NotNil(t, audit)
 	assert.Equal(t, logger, audit.logger)
 	assert.Equal(t, mockComposer, audit.composer)
@@ -35,13 +32,10 @@ func TestNewComposerAudit(t *testing.T) {
 
 // TestComposerAudit_SubscribedEvents tests the event subscription
 func TestComposerAudit_SubscribedEvents(t *testing.T) {
-	// Setup
 	audit := &ComposerAudit{}
 
-	// Execute
 	events := audit.SubscribedEvents()
 
-	// Assert
 	assert.Contains(t, events, "pre-composer-update")
 	assert.Contains(t, events, "post-code-update")
 	assert.Contains(t, events, "pre-merge-request-create")
@@ -58,7 +52,6 @@ func TestComposerAudit_SubscribedEvents(t *testing.T) {
 
 // TestComposerAudit_PreComposerUpdateHandler_WithAdvisories tests handling security advisories
 func TestComposerAudit_PreComposerUpdateHandler_WithAdvisories(t *testing.T) {
-	// Setup
 	logger := zap.NewNop()
 	mockComposer := NewMockComposer(t)
 	audit := NewComposerAudit(logger, mockComposer, true)
@@ -86,10 +79,8 @@ func TestComposerAudit_PreComposerUpdateHandler_WithAdvisories(t *testing.T) {
 
 	mockComposer.EXPECT().Audit(ctx, path).Return(mockAudit, nil)
 
-	// Execute
 	err := audit.preComposerUpdateHandler(mockEvent)
 
-	// Assert
 	require.NoError(t, err)
 	assert.Equal(t, mockAudit, audit.beforeAudit)
 	assert.Equal(t, []string{"drupal/core", "other/package", "drupal/core-recommended", "drupal/core-composer-scaffold"}, mockEvent.PackagesToUpdate)
@@ -99,7 +90,6 @@ func TestComposerAudit_PreComposerUpdateHandler_WithAdvisories(t *testing.T) {
 
 // TestComposerAudit_PreComposerUpdateHandler_NoAdvisories tests when no security advisories are found
 func TestComposerAudit_PreComposerUpdateHandler_NoAdvisories(t *testing.T) {
-	// Setup
 	logger := zap.NewNop()
 	mockComposer := NewMockComposer(t)
 	audit := NewComposerAudit(logger, mockComposer, true)
@@ -116,10 +106,8 @@ func TestComposerAudit_PreComposerUpdateHandler_NoAdvisories(t *testing.T) {
 
 	mockComposer.EXPECT().Audit(ctx, path).Return(mockAudit, nil)
 
-	// Execute
 	err := audit.preComposerUpdateHandler(mockEvent)
 
-	// Assert
 	require.ErrorAs(t, err, &services.AbortError{})
 	assert.Equal(t, "No security advisories found", err.Error())
 	assert.Equal(t, mockAudit, audit.beforeAudit)
@@ -128,7 +116,6 @@ func TestComposerAudit_PreComposerUpdateHandler_NoAdvisories(t *testing.T) {
 
 // TestComposerAudit_PostCodeUpdateHandler tests the post-code-update handler
 func TestComposerAudit_PostCodeUpdateHandler(t *testing.T) {
-	// Setup
 	logger := zap.NewNop()
 	mockComposer := NewMockComposer(t)
 	worktree := NewMockWorktree(t)
@@ -151,10 +138,8 @@ func TestComposerAudit_PostCodeUpdateHandler(t *testing.T) {
 
 	mockComposer.EXPECT().Audit(ctx, path).Return(mockAudit, nil)
 
-	// Execute
 	err := audit.postCodeUpdateHandler(mockEvent)
 
-	// Assert
 	require.NoError(t, err)
 	assert.Equal(t, mockAudit, audit.afterAudit)
 }
@@ -194,7 +179,6 @@ func TestComposerAudit_GetFixedAdvisories_NoCVEAdvisoriesDoNotCollide(t *testing
 
 // TestComposerAudit_GetFixedAdvisories tests the method that compares before/after advisories
 func TestComposerAudit_GetFixedAdvisories(t *testing.T) {
-	// Setup
 	audit := &ComposerAudit{}
 
 	audit.beforeAudit = composer.Audit{
@@ -222,10 +206,8 @@ func TestComposerAudit_GetFixedAdvisories(t *testing.T) {
 		},
 	}
 
-	// Execute
 	fixed := audit.GetFixedAdvisories()
 
-	// Assert
 	assert.Len(t, fixed, 1)
 	assert.Equal(t, "CVE-2023-1234", fixed[0].CVE)
 	assert.Equal(t, "drupal/core", fixed[0].PackageName)
@@ -233,7 +215,6 @@ func TestComposerAudit_GetFixedAdvisories(t *testing.T) {
 
 // TestComposerAudit_PreMergeRequestCreateHandler tests the merge request title generation
 func TestComposerAudit_PreMergeRequestCreateHandler(t *testing.T) {
-	// Setup
 	fixedDate := time.Date(2023, 5, 15, 12, 0, 0, 0, time.UTC)
 	audit := &ComposerAudit{
 		current:  fixedDate,
@@ -243,10 +224,8 @@ func TestComposerAudit_PreMergeRequestCreateHandler(t *testing.T) {
 	mockEvent := &services.PreMergeRequestCreateEvent{}
 	mockEvent.SetName("pre-merge-request-create")
 
-	// Execute
 	err := audit.preMergeRequestCreateHandler(mockEvent)
 
-	// Assert
 	require.NoError(t, err)
 	assert.Equal(t, "2023-05-15: Drupal Security Updates", mockEvent.Title)
 }

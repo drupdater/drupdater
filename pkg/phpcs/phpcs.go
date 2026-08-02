@@ -27,8 +27,7 @@ func NewCLI(logger *zap.Logger) *CLI {
 func (s *CLI) execComposer(ctx context.Context, dir string, args ...string) (string, error) {
 	command := execCommand(ctx, "composer", args...)
 	command.Dir = dir
-	// phpcs runs through `composer exec`, which makes it a subprocess of composer and so
-	// subject to composer's process timeout.
+	// phpcs runs through `composer exec` and inherits composer's process timeout.
 	command.Env = composer.Env(command.Environ())
 
 	out, err := command.CombinedOutput()
@@ -39,8 +38,7 @@ func (s *CLI) execComposer(ctx context.Context, dir string, args ...string) (str
 	return output, err
 }
 
-// execComposerJSON runs composer and returns only stdout, so PHP notices or warnings written
-// to stderr can't corrupt the JSON report.
+// execComposerJSON returns stdout only, so PHP notices on stderr can't corrupt the JSON report.
 func (s *CLI) execComposerJSON(ctx context.Context, dir string, args ...string) (string, error) {
 	command := execCommand(ctx, "composer", args...)
 	command.Dir = dir

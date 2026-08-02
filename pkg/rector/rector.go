@@ -25,14 +25,12 @@ func NewCLI(logger *zap.Logger) *CLI {
 	}
 }
 
-// execComposerJSON runs composer and returns only stdout. rector's JSON report must be read
-// from stdout alone: the --debug output and any PHP notices go to stderr and would otherwise
-// corrupt the JSON.
+// execComposerJSON returns stdout only: rector's --debug output and PHP notices go to stderr
+// and would corrupt the JSON report.
 func (s *CLI) execComposerJSON(ctx context.Context, dir string, args ...string) (string, error) {
 	command := execCommand(ctx, "composer", args...)
 	command.Dir = dir
-	// rector runs through `composer exec`, which makes it a subprocess of composer and so
-	// subject to composer's process timeout.
+	// rector runs through `composer exec` and inherits composer's process timeout.
 	command.Env = composer.Env(command.Environ())
 
 	var stdout, stderr bytes.Buffer
@@ -67,12 +65,10 @@ func (s *CLI) Run(ctx context.Context, dir string, customCodeDirectories []strin
 	if len(customCodeDirectories) == 0 {
 		s.logger.Debug("no custom code directories found")
 		return ReturnOutput{
-			// Known equivalent mutant: dropping this field yields ReturnOutputTotals{}, which is
-			// exactly what the explicit zeros produce, so no test can tell the two apart. It is
-			// left un-suppressed on purpose -- the annotation keys off the enclosing literal's
-			// position, so silencing it would also silence the FileDiffs and ChangedFiles
-			// mutants below, and those are real and killed. The zeros are spelled out because
-			// this is the documented "nothing to do" result.
+			// Known equivalent mutant: dropping this yields the same ReturnOutputTotals{}. Left
+			// un-suppressed because the annotation keys off the enclosing literal and would
+			// also silence the real FileDiffs and ChangedFiles mutants. The zeros are spelled
+			// out because this is the documented "nothing to do" result.
 			Totals: ReturnOutputTotals{
 				ChangedFiles: 0,
 				Errors:       0,

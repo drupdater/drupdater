@@ -10,7 +10,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// Gitlab implements the Platform interface for GitLab repositories.
 type Gitlab struct {
 	client        *gitlab.Client
 	projectPath   string
@@ -18,7 +17,6 @@ type Gitlab struct {
 	retryInterval time.Duration
 }
 
-// newGitlab creates a new GitLab client for the given host and "group/project" path.
 func newGitlab(host string, path string, token string, logger *zap.Logger) (*Gitlab, error) {
 	if host == "" {
 		return nil, fmt.Errorf("could not determine GitLab host from repository URL")
@@ -37,7 +35,6 @@ func newGitlab(host string, path string, token string, logger *zap.Logger) (*Git
 	}, nil
 }
 
-// CreateMergeRequest creates a merge request on GitLab.
 func (g *Gitlab) CreateMergeRequest(ctx context.Context, title string, description string, sourceBranch string, targetBranch string) (MergeRequest, error) {
 	mr, _, err := g.client.MergeRequests.CreateMergeRequest(g.projectPath, &gitlab.CreateMergeRequestOptions{
 		SourceBranch: &sourceBranch,
@@ -66,9 +63,9 @@ func (g *Gitlab) DeleteBranch(ctx context.Context, branch string) error {
 }
 
 // Attempt budgets for EnableAutoMerge. GitLab computes mergeability asynchronously, so the
-// status right after MR creation is usually still pending; the accept call can also lose a
-// race with that computation and answer 405. Both waits are bounded so a run can't hang —
-// worst case is (maxMergeStatusChecks + maxAcceptAttempts - 2) * retryInterval.
+// status right after MR creation is usually pending and the accept call can lose the race and
+// answer 405. Bounded so a run can't hang: (maxMergeStatusChecks + maxAcceptAttempts - 2) *
+// retryInterval.
 const (
 	maxMergeStatusChecks = 7
 	maxAcceptAttempts    = 4
@@ -83,11 +80,9 @@ const (
 //	unchecked          Git has not yet tested if a valid merge is possible
 //	approvals_syncing  the merge request's approvals are syncing
 //
-// Every other value is a settled answer and is safe to act on — including ci_must_pass and
-// ci_still_running, which are precisely the states auto-merge exists for: the MR is not
-// mergeable *yet*, and GitLab should merge it once the pipeline goes green. Waiting for
-// "mergeable" instead would defeat the feature, because a pipeline-gated MR only reports
-// "mergeable" once it could already be merged outright.
+// Every other value is settled and safe to act on, including ci_must_pass and ci_still_running
+// — the states auto-merge exists for. Waiting for "mergeable" would defeat the feature: a
+// pipeline-gated MR only reports it once it could already be merged outright.
 var pendingMergeStatuses = map[string]bool{
 	"preparing":         true,
 	"checking":          true,
@@ -95,10 +90,8 @@ var pendingMergeStatuses = map[string]bool{
 	"approvals_syncing": true,
 }
 
-// EnableAutoMerge sets the MR to merge automatically once its pipeline succeeds. It first
-// waits for GitLab to settle the merge status (at most maxMergeStatusChecks polls), then
-// accepts with auto_merge. GitLab decides from there whether to queue the merge or perform
-// it immediately, so an MR with no pipeline is merged straight away.
+// EnableAutoMerge waits for GitLab to settle the merge status, then accepts with auto_merge.
+// GitLab decides from there whether to queue the merge, so an MR with no pipeline merges now.
 func (g *Gitlab) EnableAutoMerge(ctx context.Context, mr MergeRequest) error {
 	status, err := g.waitForSettledMergeStatus(ctx, mr.ID)
 	if err != nil {
@@ -107,9 +100,8 @@ func (g *Gitlab) EnableAutoMerge(ctx context.Context, mr MergeRequest) error {
 	return g.acceptWithAutoMerge(ctx, mr.ID, status)
 }
 
-// waitForSettledMergeStatus polls the MR until detailed_merge_status is no longer one of the
-// pending values, and returns that settled status. It deliberately does not require a
-// mergeable status: see pendingMergeStatuses.
+// waitForSettledMergeStatus polls until detailed_merge_status is no longer pending, and returns
+// it. Deliberately does not require a mergeable status: see pendingMergeStatuses.
 func (g *Gitlab) waitForSettledMergeStatus(ctx context.Context, iid int64) (string, error) {
 	for i := 0; i < maxMergeStatusChecks; i++ {
 		if i > 0 {
@@ -130,11 +122,9 @@ func (g *Gitlab) waitForSettledMergeStatus(ctx context.Context, iid int64) (stri
 	return "", fmt.Errorf("could not set auto merge for MR %d: merge status was still pending after %d checks", iid, maxMergeStatusChecks)
 }
 
-// acceptWithAutoMerge accepts the MR with auto_merge set. GitLab documents HTTP 405 on this
-// endpoint as "the merge request cannot merge" — a draft, a conflict, or missing approvals all
-// land there — but it can also appear briefly right after the merge status settles, so the call
-// is retried up to maxAcceptAttempts times in total. status is the settled
-// detailed_merge_status and is reported on failure, since it usually names the real blocker.
+// acceptWithAutoMerge accepts the MR with auto_merge set. GitLab's 405 here means "cannot
+// merge" — a draft, a conflict, missing approvals — but also appears briefly just after the
+// status settles, hence the retries. status is reported on failure: it names the real blocker.
 func (g *Gitlab) acceptWithAutoMerge(ctx context.Context, iid int64, status string) error {
 	autoMerge := true
 	removeSourceBranch := true

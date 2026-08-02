@@ -15,14 +15,11 @@ import (
 )
 
 func TestNewUpdateHooks(t *testing.T) {
-	// Setup
 	logger := zap.NewNop()
 	mockDrush := NewMockDrush(t)
 
-	// Execute
 	updateHooks := NewUpdateHooks(logger, mockDrush)
 
-	// Assert
 	assert.NotNil(t, updateHooks)
 	assert.Equal(t, logger, updateHooks.logger)
 	assert.Equal(t, mockDrush, updateHooks.drush)
@@ -31,19 +28,15 @@ func TestNewUpdateHooks(t *testing.T) {
 }
 
 func TestUpdateHooks_SubscribedEvents(t *testing.T) {
-	// Setup
 	updateHooks := &UpdateHooks{}
 
-	// Execute
 	events := updateHooks.SubscribedEvents()
 
-	// Assert
 	assert.Contains(t, events, "pre-site-update")
 	assert.IsType(t, event.ListenerItem{}, events["pre-site-update"])
 }
 
 func TestUpdateHooks_RenderTemplate(t *testing.T) {
-	// Setup
 	fixture, err := os.ReadFile("testdata/update_hooks.md")
 	require.NoError(t, err)
 	expected := string(fixture)
@@ -62,16 +55,13 @@ func TestUpdateHooks_RenderTemplate(t *testing.T) {
 	ap := NewUpdateHooks(logger, mockDrush)
 	ap.hooks = hooks
 
-	// Execute
 	result, err := ap.RenderTemplate()
 
-	// Assert
 	require.NoError(t, err)
 	assert.Equal(t, expected, result)
 }
 
 func TestUpdateHooks_RenderTemplate_Empty(t *testing.T) {
-	// Setup
 	logger := zap.NewNop()
 	mockDrush := NewMockDrush(t)
 	hooks := UpdateHooksPerSite{}
@@ -79,16 +69,13 @@ func TestUpdateHooks_RenderTemplate_Empty(t *testing.T) {
 	ap := NewUpdateHooks(logger, mockDrush)
 	ap.hooks = hooks
 
-	// Execute
 	result, err := ap.RenderTemplate()
 
-	// Assert
 	require.NoError(t, err)
 	assert.Empty(t, result)
 }
 
 func TestUpdateHooks_PreSiteUpdateHandler_Success(t *testing.T) {
-	// Setup
 	logger := zap.NewNop()
 	mockDrush := NewMockDrush(t)
 	updateHooks := NewUpdateHooks(logger, mockDrush)
@@ -108,17 +95,14 @@ func TestUpdateHooks_PreSiteUpdateHandler_Success(t *testing.T) {
 
 	mockDrush.EXPECT().GetUpdateHooks(ctx, testPath, testSite).Return(mockHooks, nil)
 
-	// Execute
 	err := updateHooks.preSiteUpdateHandler(mockEvent)
 
-	// Assert
 	require.NoError(t, err)
 	assert.Contains(t, updateHooks.hooks, testSite)
 	assert.Equal(t, mockHooks, updateHooks.hooks[testSite])
 }
 
 func TestUpdateHooks_PreSiteUpdateHandler_NoHooks(t *testing.T) {
-	// Setup
 	logger := zap.NewNop()
 	mockDrush := NewMockDrush(t)
 	updateHooks := NewUpdateHooks(logger, mockDrush)
@@ -133,16 +117,13 @@ func TestUpdateHooks_PreSiteUpdateHandler_NoHooks(t *testing.T) {
 
 	mockDrush.EXPECT().GetUpdateHooks(ctx, testPath, testSite).Return(emptyHooks, nil)
 
-	// Execute
 	err := updateHooks.preSiteUpdateHandler(mockEvent)
 
-	// Assert
 	require.NoError(t, err)
 	assert.NotContains(t, updateHooks.hooks, testSite)
 }
 
 func TestUpdateHooks_PreSiteUpdateHandler_Error(t *testing.T) {
-	// Setup
 	logger := zap.NewNop()
 	mockDrush := NewMockDrush(t)
 	updateHooks := NewUpdateHooks(logger, mockDrush)
@@ -157,10 +138,8 @@ func TestUpdateHooks_PreSiteUpdateHandler_Error(t *testing.T) {
 
 	mockDrush.EXPECT().GetUpdateHooks(ctx, testPath, testSite).Return(nil, expectedError)
 
-	// Execute
 	err := updateHooks.preSiteUpdateHandler(mockEvent)
 
-	// Assert
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to get update hooks")
 }

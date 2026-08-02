@@ -42,14 +42,11 @@ func TestUpdateTranslationsEventHandlerWithoutLocaleDeploy(t *testing.T) {
 	path := "/tmp"
 	ctx := context.Background()
 
-	// Configure mock expectations
 	mockDrush.EXPECT().IsModuleEnabled(anyCtx, "/tmp", "example.com", "locale_deploy").Return(false, nil)
 
-	// Execute
 	event := services.NewPostSiteUpdateEvent(ctx, path, worktree, "example.com")
 	err := handler.postSiteUpdateHandler(event)
 
-	// Assert
 	require.NoError(t, err)
 	// The recorded result is what reaches the run report. Without it, "skipped because
 	// locale_deploy is off" and "ran and changed nothing" are indistinguishable to a reader.
@@ -70,7 +67,6 @@ func TestUpdateTranslationsEventHandlerWithLocaleDeploy(t *testing.T) {
 	path := "/tmp"
 	ctx := context.Background()
 
-	// Configure mock expectations
 	mockDrush.EXPECT().IsModuleEnabled(anyCtx, "/tmp", "example.com", "locale_deploy").Return(true, nil)
 	mockDrush.EXPECT().LocalizeTranslations(anyCtx, "/tmp", "example.com").Return(nil)
 	mockDrush.EXPECT().GetTranslationPath(anyCtx, "/tmp", "example.com", true).Return("translations", nil)
@@ -81,11 +77,9 @@ func TestUpdateTranslationsEventHandlerWithLocaleDeploy(t *testing.T) {
 	worktree.EXPECT().Commit("Update translations", &git.CommitOptions{}).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().Status().Return(git.Status{}, nil)
 
-	// Execute
 	event := services.NewPostSiteUpdateEvent(ctx, path, worktree, "example.com")
 	err := handler.postSiteUpdateHandler(event)
 
-	// Assert
 	require.NoError(t, err)
 	assert.Equal(t, map[string]TranslationResult{
 		"example.com": {Path: "translations", Updated: true},
@@ -112,11 +106,9 @@ func TestUpdateTranslationsEventHandlerSkipsWhenTranslationPathUnavailable(t *te
 	mockDrush.EXPECT().LocalizeTranslations(anyCtx, "/tmp", "example.com").Return(nil)
 	mockDrush.EXPECT().GetTranslationPath(anyCtx, "/tmp", "example.com", true).Return("", assert.AnError)
 
-	// Execute
 	event := services.NewPostSiteUpdateEvent(ctx, path, worktree, "example.com")
 	err := handler.postSiteUpdateHandler(event)
 
-	// Assert
 	require.NoError(t, err)
 	// The skip reason carries the underlying error, so the report says why translations were
 	// left alone rather than silently omitting the site.

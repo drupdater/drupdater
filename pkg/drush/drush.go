@@ -16,7 +16,6 @@ import (
 
 var execCommand = exec.CommandContext
 
-// CLI is the default implementation of CommandExecutor
 type CLI struct {
 	logger *zap.Logger
 	cache  otter.Cache[string, string]
@@ -32,10 +31,9 @@ func NewCLI(logger *zap.Logger, cache otter.Cache[string, string]) *CLI {
 func (e *CLI) execDrush(ctx context.Context, dir string, site string, args ...string) (string, error) {
 	command := execCommand(ctx, "composer", append([]string{"exec", "--", "drush"}, args...)...)
 	command.Dir = dir
-	// The composer environment first — drush runs through `composer exec`, which makes it a
-	// subprocess of composer and so subject to composer's process timeout, and `site:install`
-	// and `updatedb` both outlast its 300s default — then our override so SITE_NAME always wins
-	// even if the parent process has SITE_NAME set in its environment.
+	// The composer environment first: drush runs through `composer exec` and inherits its
+	// process timeout, which `site:install` and `updatedb` both outlast. Then SITE_NAME, so it
+	// wins over any value the parent process already set.
 	command.Env = append(composer.Env(command.Environ()), "SITE_NAME="+site)
 
 	out, err := command.CombinedOutput()
@@ -46,9 +44,8 @@ func (e *CLI) execDrush(ctx context.Context, dir string, site string, args ...st
 	return output, err
 }
 
-// execDrushStreams runs drush and returns stdout and stderr separately. Commands whose stdout
-// is parsed as JSON must use this: drush writes notices to stderr, and folding them into stdout
-// (as CombinedOutput does) would corrupt the JSON.
+// execDrushStreams keeps stdout and stderr apart. Commands whose stdout is parsed as JSON must
+// use this: drush's stderr notices would otherwise corrupt the payload.
 func (e *CLI) execDrushStreams(ctx context.Context, dir string, site string, args ...string) (stdout string, stderr string, err error) {
 	command := execCommand(ctx, "composer", append([]string{"exec", "--", "drush"}, args...)...)
 	command.Dir = dir
@@ -106,10 +103,8 @@ func (e *CLI) ConfigResave(ctx context.Context, dir string, site string) error {
 	return err
 }
 
-// IsModuleEnabled uses execDrushStreams, not execDrush: the latter merges stdout and stderr, and
-// any notice drush writes to stderr (a contrib module deprecation warning, for instance) would
-// get folded into the compared value, breaking the exact-match check below and reporting an
-// enabled module as not enabled.
+// IsModuleEnabled uses execDrushStreams: a merged stderr notice would be folded into the
+// compared value and report an enabled module as disabled.
 func (e *CLI) IsModuleEnabled(ctx context.Context, dir string, site string, module string) (bool, error) {
 	stdout, stderr, err := e.execDrushStreams(ctx, dir, site, "pm:list", "--status=enabled", "--field=name", "--filter="+module)
 	if err != nil {
@@ -133,11 +128,9 @@ func (e *CLI) GetTranslationPath(ctx context.Context, dir string, site string, r
 	if err != nil {
 		return "", err
 	}
-	// An empty result must never reach a caller that passes it to git: an empty path given to
-	// go-git's Worktree.Add stages the entire working tree, not "nothing". realpath() returns
-	// false (printed as nothing) when the target doesn't exist on disk, regardless of whether
-	// translation.path is configured — the usual reason here is that nothing has been localized
-	// into this site's translation directory yet, so it was never created.
+	// An empty result must never reach git: an empty path makes go-git's Worktree.Add stage the
+	// entire working tree. realpath() prints nothing when the target is absent, which here
+	// usually means nothing has been localized yet, so the directory was never created.
 	if strings.TrimSpace(translationPath) == "" {
 		return "", fmt.Errorf("translation path for site %s does not resolve to an existing directory", site)
 	}
@@ -157,18 +150,16 @@ type UpdateHook struct {
 	Type        string `json:"type"`
 }
 
-// UnsupportedModule describes an installed module that has reached end-of-life according to
-// Drupal's update status service: no supported release exists, so it is not going to receive
-// further fixes.
+// UnsupportedModule is an installed module with no supported release, per Drupal's update
+// status service — no further fixes are coming.
 type UnsupportedModule struct {
 	Name               string `json:"name"`
 	InstalledVersion   string `json:"installed_version"`
 	RecommendedVersion string `json:"recommended_version"`
 }
 
-// GetUnsupportedModules returns the installed modules whose update status is NOT_SUPPORTED. It
-// relies on the bundled unsupported-modules.php script, which itself returns an empty result
-// when the Drupal update module is not enabled.
+// GetUnsupportedModules returns the installed modules whose update status is NOT_SUPPORTED, via
+// the bundled unsupported-modules.php, which yields nothing when the update module is off.
 func (e *CLI) GetUnsupportedModules(ctx context.Context, dir string, site string) ([]UnsupportedModule, error) {
 	stdout, stderr, err := e.execDrushStreams(ctx, dir, site, "php:script", "/opt/drupdater/unsupported-modules.php")
 	if err != nil {
@@ -193,8 +184,8 @@ func (e *CLI) GetUpdateHooks(ctx context.Context, dir string, site string) (map[
 		return nil, err
 	}
 
-	// "No database updates required" is a drush notice; depending on the version it lands on
-	// stdout or stderr. An empty stdout means the same thing (nothing to parse).
+	// "No database updates required" lands on stdout or stderr depending on the drush version.
+	// An empty stdout means the same thing.
 	if strings.Contains(stdout, "No database updates required") ||
 		strings.Contains(stderr, "No database updates required") ||
 		strings.TrimSpace(stdout) == "" {

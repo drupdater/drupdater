@@ -49,19 +49,15 @@ type WorkflowBaseService struct {
 	// commits via git itself, so the staging/commit steps must not overlap.
 	siteCommitMu sync.Mutex
 
-	// reportSink receives the run report when the run ends, on every exit path. nil when
-	// --report was not given, in which case no report is assembled beyond the in-memory
-	// bookkeeping the recorder does anyway.
+	// reportSink receives the run report on every exit path. nil when --report was not given.
 	reportSink func(report.Report)
 }
 
-// Option configures a WorkflowBaseService. Options are variadic so adding one does not disturb
-// existing call sites.
+// Option configures a WorkflowBaseService. Variadic so adding one does not disturb call sites.
 type Option func(*WorkflowBaseService)
 
-// WithReportSink makes the run hand its finished report to sink. The sink is called exactly
-// once per run, after every other deferred cleanup has had its say, including when the run
-// fails.
+// WithReportSink hands the finished report to sink, exactly once per run and after every other
+// deferred cleanup, including when the run fails.
 func WithReportSink(sink func(report.Report)) Option {
 	return func(ws *WorkflowBaseService) {
 		ws.reportSink = sink
@@ -106,14 +102,10 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []interna
 	}
 	rec := report.NewRecorder(internal.Version, mode, ws.config.DryRun, ws.config.RepositoryURL, ws.config.Branch, ws.config.Sites)
 
-	// Emit the report from its own defer, registered before anything that can fail, so that
-	// "written on every exit path" holds literally — including a clone or checkout that never
-	// gets far enough for there to be a working copy to clean up. Being registered first also
-	// makes it run last, so the report describes the run after every other teardown has had its
-	// say.
+	// Registered before anything that can fail, so "written on every exit path" holds literally,
+	// and therefore run last, so the report describes the run after every other teardown.
 	//
-	// An AbortError is not a failure — it is the workflow's way of saying there was nothing to
-	// do — so it is recorded as such rather than as an error the reader should act on.
+	// An AbortError means there was nothing to do, not that the run failed.
 	defer func() {
 		if ws.reportSink == nil {
 			return
@@ -141,13 +133,10 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []interna
 		username, email = ws.platform.GetUser(ctx)
 	}
 
-	// Acquire a single working directory: the existing checkout (default, CI) or a fresh
-	// clone (--clone, for local testing). Old and new code live in this one directory
-	// sequentially: install the baseline site, then composer update, then run update hooks.
-	//
-	// Recorded as a phase like every other step: a bad token, an unreachable host or an
-	// unreadable checkout fails here, and that is one of the most common ways a run fails in
-	// practice — exactly what the report exists to name.
+	// One working directory for the whole run: the existing checkout (default, CI) or a fresh
+	// clone (--clone). Old and new code live here in sequence — baseline install, composer
+	// update, update hooks. Recorded as a phase because a bad token or unreachable host fails
+	// here, one of the most common ways a run fails.
 	var (
 		repository GitRepository
 		worktree   Worktree
@@ -176,9 +165,8 @@ func (ws *WorkflowBaseService) StartUpdate(ctx context.Context, addons []interna
 	return ws.runPhases(ctx, rec, repository, worktree, path, addons)
 }
 
-// runPhases executes the update itself, one recorded phase at a time. It is separate from
-// StartUpdate so that the run's setup and teardown (timeout, working copy, checkout restore,
-// report emission) stay readable next to each other rather than being buried under the phases.
+// runPhases executes the update itself, one recorded phase at a time. Separate from StartUpdate
+// so the run's setup and teardown stay readable next to each other.
 func (ws *WorkflowBaseService) runPhases(
 	ctx context.Context,
 	rec *report.Recorder,
@@ -187,10 +175,9 @@ func (ws *WorkflowBaseService) runPhases(
 	path string,
 	addons []internal.Addon,
 ) error {
-	// Fail fast on cheap, structural prerequisites shared with "drupdater check" instead of
-	// discovering them mid-run: a shallow checkout only fails much later, with a cryptic
-	// "object not found" when the update branch is pushed. Extension requirements are
-	// deliberately not checked here (see CheckPlatformReqs).
+	// Fail fast on the structural prerequisites "drupdater check" shares: a shallow checkout
+	// otherwise fails much later with a cryptic "object not found" on push. Extension
+	// requirements are deliberately not checked here (see CheckPlatformReqs).
 	if err := rec.Run("preflight", func() error {
 		if result := CheckGitHistoryComplete(ws.repository, path); !result.OK {
 			return fmt.Errorf("%s: %s", result.Name, result.Detail)
@@ -245,11 +232,9 @@ func (ws *WorkflowBaseService) runPhases(
 		return err
 	}
 
-	// Assemble the merge request's title and description. This is a phase of its own, ahead of
-	// publish, because it has to happen under --dry-run as well: the description is assembled
-	// from every addon's RenderTemplate and is the run's only human-readable account of itself.
-	// Rendered only when publishing, a broken template would be invisible to every dry run and
-	// would surface in a real run only after the branch had already been pushed.
+	// Its own phase, ahead of publish, because it must happen under --dry-run too. Rendered
+	// only when publishing, a broken template would be invisible to every dry run and surface
+	// in a real run only after the branch had been pushed.
 	var mrTitle, mrDescription string
 	if err := rec.Run("render merge request", func() error {
 		var renderErr error
@@ -271,9 +256,8 @@ func (ws *WorkflowBaseService) runPhases(
 // renderMergeRequest produces the title and description for the run's merge request.
 //
 // The title starts as the maintenance-update default and is offered to the addons through
-// pre-merge-request-create, which is how a security run gets re-labelled by composer_audit. The
-// event fires here rather than in publishWork so that the title a dry run reports is the one a
-// real run would have used.
+// pre-merge-request-create — how composer_audit re-labels a security run. The event fires here
+// rather than in publishWork so a dry run reports the title a real run would have used.
 func (ws *WorkflowBaseService) renderMergeRequest(addons []internal.Addon) (string, string, error) {
 	e := NewPreMergeRequestCreateEvent(fmt.Sprintf("%s: Drupal Maintenance Updates", ws.current.Format("January 2006")))
 	if err := ws.dispatcher.FireEvent(e); err != nil {
@@ -288,15 +272,12 @@ func (ws *WorkflowBaseService) renderMergeRequest(addons []internal.Addon) (stri
 	return e.Title, description, nil
 }
 
-// captureOriginalHead returns the checkout's current HEAD in checkout mode, or nil in clone mode
-// (a clone's whole temp directory is discarded by cleanup regardless, so there is nothing to
-// restore there) or if HEAD could not be read. It is used by StartUpdate to put a checkout-mode
-// run's working directory back exactly where it found it if the run does not complete
-// successfully — otherwise a failed or aborted run leaves the checkout on drupdater's own
-// throwaway work branch, with composer.json's allow-plugins possibly still left at true by
-// composer_allow_plugins' own pre-composer-update handler and never reverted. Best-effort: a
-// failure to read HEAD only means the restore is skipped, not that the run itself aborts over
-// what is otherwise a safety net.
+// captureOriginalHead returns the checkout's current HEAD, so StartUpdate can put a failed run's
+// working directory back where it found it — otherwise the checkout is left on drupdater's
+// throwaway work branch with allow-plugins possibly still set to true.
+//
+// nil in clone mode (cleanup discards the whole temp directory anyway) or if HEAD is unreadable:
+// this is a safety net, not something to abort a run over.
 func (ws *WorkflowBaseService) captureOriginalHead(repository GitRepository) *plumbing.Reference {
 	if ws.config.Clone {
 		return nil
@@ -358,9 +339,8 @@ func (ws *WorkflowBaseService) forEachSite(ctx context.Context, fn func(context.
 // checkout.
 func (ws *WorkflowBaseService) cleanup(path string) {
 	if ws.config.Clone {
-		// Remove only this run's clone directory, not the shared per-URL parent, so a
-		// concurrent run of the same repository isn't wiped out. The clone always lives in a
-		// unique sub-directory of the temp dir; guard against removing the temp dir itself.
+		// Only this run's clone directory, not the shared per-URL parent, so a concurrent run of
+		// the same repository isn't wiped out. The Rel guard keeps the temp dir itself safe.
 		if rel, err := filepath.Rel(os.TempDir(), path); err == nil && rel != "." && !strings.HasPrefix(rel, "..") {
 			os.RemoveAll(path)
 		}
@@ -369,26 +349,23 @@ func (ws *WorkflowBaseService) cleanup(path string) {
 	parent := filepath.Dir(path)
 	for _, site := range ws.config.Sites {
 		os.Remove(filepath.Join(parent, site+".sqlite"))
-		// Remove only the per-site directory the installer created, never the whole "private"
-		// tree: a private files directory next to the checkout is a standard Drupal layout, so
-		// that parent can hold real project data this run does not own.
+		// Only the per-site directory, never the whole "private" tree: that is a standard Drupal
+		// layout and can hold real project data this run does not own.
 		os.RemoveAll(filepath.Join(parent, "private", site))
 	}
-	// Drop the parent too, but only if removing the per-site directories left it empty —
-	// os.Remove refuses a non-empty directory, which is exactly the guard we want here.
+	// Drops the parent only if it is now empty — os.Remove refuses a non-empty directory.
 	os.Remove(filepath.Join(parent, "private"))
 }
 
 func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context, repository GitRepository, worktree Worktree, path string, rec *report.Recorder) (string, error) {
 	ws.logger.Info("updating dependencies")
 
-	// Do all of the update work on a dedicated branch. In checkout mode the run operates on the
-	// branch the user (or CI) has checked out, and the addons commit as they go; without this,
-	// an abort ("branch already exists") or a mid-run failure would leave those commits — and a
-	// modified composer.json — on that branch. The final, hash-named branch is branched from
-	// this one once the composer.lock hash is known.
-	// Flat name, not "drupdater/work-<ts>": a target repo with a branch literally named
-	// "drupdater" would make refs/heads/drupdater a file, blocking any nested drupdater/* ref.
+	// A dedicated branch, because in checkout mode the addons commit as they go: without it, an
+	// abort or mid-run failure would strand those commits on the user's own branch. The final,
+	// hash-named branch is cut from this one once the composer.lock hash is known.
+	//
+	// Flat name, not "drupdater/work-<ts>": a repo with a branch named "drupdater" makes
+	// refs/heads/drupdater a file, blocking any nested drupdater/* ref.
 	workBranch := fmt.Sprintf("drupdater-work-%d", ws.current.UnixNano())
 	if err := worktree.Checkout(&git.CheckoutOptions{
 		Branch: plumbing.NewBranchReferenceName(workBranch),
@@ -412,7 +389,6 @@ func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context, repository 
 		return "", AbortError{Msg: "no changes detected"}
 	}
 
-	// Summarise the dependency changes for the run log.
 	byAction := map[string]int{}
 	for _, c := range changes {
 		byAction[c.Action]++
@@ -442,7 +418,6 @@ func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context, repository 
 		return "", fmt.Errorf("failed to fire event: %w", err)
 	}
 
-	// Get composer lock hash for branch name
 	composerLockHash, err := ws.composer.GetLockHash(path)
 	if err != nil {
 		return "", err
@@ -470,11 +445,9 @@ func (ws *WorkflowBaseService) updateSharedCode(ctx context.Context, repository 
 // ensureUpdateBranchAvailable returns an AbortError if updateBranchName is already taken, locally
 // or on the remote, and a plain error if either check itself fails.
 //
-// The local check runs first: a local ref by this name can be left over from a prior
-// checkout-mode run of the same code-content hash that got this far before failing (see
-// restoreOriginalCheckout — it puts the checkout's HEAD back, but never deletes local branches
-// drupdater created). Without it, the Create:true checkout that follows this call would fail on
-// go-git's raw "a branch named ... already exists" instead of the same clean AbortError a remote
+// The local check runs first: a prior failed run of the same content hash leaves its branch
+// behind (restoreOriginalCheckout restores HEAD but deletes nothing). Without it the Create:true
+// checkout below fails on go-git's raw message instead of the clean AbortError a remote
 // collision gets.
 func (ws *WorkflowBaseService) ensureUpdateBranchAvailable(repository GitRepository, updateBranchName string) error {
 	if _, err := repository.Reference(plumbing.NewBranchReferenceName(updateBranchName), false); err == nil {
@@ -483,11 +456,9 @@ func (ws *WorkflowBaseService) ensureUpdateBranchAvailable(repository GitReposit
 		return fmt.Errorf("failed to check for a local %s branch: %w", updateBranchName, err)
 	}
 
-	// The remote half only matters when the branch is going to be pushed. A --dry-run never
-	// pushes, and reaching the remote here would break the one case that is documented as
-	// needing no token at all: a checkout-mode dry run. Worse than needing one, it fails
-	// outright without it — go-git sends an empty password rather than no credential, which
-	// the host rejects even for a public repository.
+	// The remote half only matters for a branch that will be pushed, and reaching the remote
+	// would break the one documented token-free case, a checkout-mode dry run: go-git sends an
+	// empty password rather than no credential, which hosts reject even for a public repository.
 	if ws.config.DryRun {
 		return nil
 	}
@@ -524,9 +495,8 @@ func (ws *WorkflowBaseService) updateSite(ctx context.Context, path string, work
 
 	}
 
-	// The remaining steps stage and commit into the shared working tree (the post-site-update
-	// addons via go-git, and drush config:export via git directly), so run them one site at a
-	// time even though the sites themselves are updated concurrently.
+	// The remaining steps commit into the shared working tree, so they run one site at a time
+	// even though the sites themselves are updated concurrently.
 	return ws.commitSiteChanges(ctx, path, worktree, site)
 }
 
@@ -549,8 +519,8 @@ func (ws *WorkflowBaseService) commitSiteChanges(ctx context.Context, path strin
 	return nil
 }
 
-// toReportPackages converts composer's package changes into the report's own schema type. The
-// two are kept separate deliberately — see report.PackageChange.
+// toReportPackages converts composer's package changes into the report's own schema type, kept
+// separate deliberately — see report.PackageChange.
 func toReportPackages(changes []composer.PackageChange) []report.PackageChange {
 	if len(changes) == 0 {
 		return nil
@@ -597,13 +567,9 @@ func (ws *WorkflowBaseService) publishWork(ctx context.Context, repository GitRe
 	ws.logger.Info("merge request created", zap.String("url", mr.URL))
 	rec.SetMergeRequest(mr.URL)
 
-	// Auto-merge is a convenience on top of work that has already succeeded: the branch is
-	// pushed and the MR exists. Failing the run here (repository forbids auto-merge, token
-	// lacks the scope, platform hiccup) would report a red job for a perfectly good MR, so
-	// the error is logged and the run still succeeds. The MR is deliberately left in place.
-	//
-	// It is recorded either way, because a warning in the log is easy to miss and the report
-	// would otherwise show a clean success for a run whose MR will never merge itself.
+	// Best-effort: the branch is pushed and the MR exists by now, so failing here would report a
+	// red job for a perfectly good MR. Recorded either way, since a logged warning is easy to
+	// miss and the report would otherwise show a clean success for an MR that will never merge.
 	if ws.config.ActiveRunType().AutoMerge {
 		err := ws.platform.EnableAutoMerge(ctx, mr)
 		rec.SetAutoMerge(err)

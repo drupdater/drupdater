@@ -176,9 +176,8 @@ func (h *ComposerPatches1) updatePatches(ctx context.Context, path string, workt
 	for _, op := range operations {
 		switch op.Action {
 		case "Upgrade", "Downgrade":
-			// processSinglePatch mutates patches[op.Package] (it deletes the current key and
-			// may insert a rewritten "Issue #..." key). Snapshot the entries first so a newly
-			// inserted key isn't visited again in the same pass, which would double-process it.
+			// processSinglePatch mutates patches[op.Package], so snapshot first: a key it
+			// inserts must not be visited again in the same pass.
 			for _, e := range snapshotPatches(patches[op.Package]) {
 				h.processSinglePatch(ctx, path, worktree, op, e.description, e.patchPath, patches, &updates)
 			}
@@ -209,18 +208,16 @@ func snapshotPatches(m map[string]string) []patchEntry {
 	return entries
 }
 
-// isRemotePatch reports whether a patch reference is a remote (http/https) URL. A bare
-// absolute path such as "/patches/x.diff" is a local file, not remote, so scheme is checked
-// explicitly rather than relying on url.ParseRequestURI (which accepts absolute paths too).
+// isRemotePatch reports whether a patch reference is an http/https URL. The scheme is checked
+// explicitly because url.ParseRequestURI also accepts a local path like "/patches/x.diff".
 func isRemotePatch(patchPath string) bool {
 	u, err := url.Parse(patchPath)
 	return err == nil && (u.Scheme == "http" || u.Scheme == "https")
 }
 
-// dropPatchFile removes a patch's file from the worktree. A remote patch has no file in the
-// repository — its "path" is a URL — so there is nothing to remove and that is not an error.
-// Every removal path goes through here so a URL is never handed to worktree.Remove, which
-// would fail and leave the caller thinking the patch could not be dropped.
+// dropPatchFile removes a patch's file from the worktree. A remote patch has no file, which is
+// not an error. Every removal goes through here so a URL never reaches worktree.Remove, which
+// would fail and read as "the patch could not be dropped".
 func (h *ComposerPatches1) dropPatchFile(worktree Worktree, patchPath string) error {
 	if isRemotePatch(patchPath) {
 		return nil
@@ -229,11 +226,10 @@ func (h *ComposerPatches1) dropPatchFile(worktree Worktree, patchPath string) er
 	return err
 }
 
-// removeDependencyProvidedPatches drops root patches whose patch file is already applied
-// by an installed dependency for the same package. composer-patches collects patches from
-// every package, so keeping the root copy makes it apply the same file twice (the second
-// fails). Only remote (URL) patches are considered: local paths are package-relative, so a
-// matching string across packages would not be the same file.
+// removeDependencyProvidedPatches drops root patches an installed dependency already applies to
+// the same package: composer-patches would otherwise apply the same file twice, and the second
+// fails. Only remote patches count — a local path is package-relative, so matching strings in
+// two packages are not the same file.
 func (h *ComposerPatches1) removeDependencyProvidedPatches(ctx context.Context, path string, patches map[string]map[string]string) []RemovedPatch {
 	depPatches, err := h.composer.GetDependencyPatches(ctx, path)
 	if err != nil {
@@ -323,9 +319,8 @@ func (h *ComposerPatches1) processSinglePatch(ctx context.Context, path string, 
 			} else if len(commits) != 0 {
 				h.logger.Debug("issue is fixed", zap.String("issue", issue.ID))
 				if err := h.dropPatchFile(worktree, patchPath); err != nil {
-					// The entry was deleted from the map above. Put it back: a patch whose file
-					// could not be removed must stay declared rather than disappear from
-					// composer.json without ever being reported in the merge request.
+					// Restore the entry deleted above: a patch whose file could not be removed
+					// must stay declared rather than vanish from composer.json unreported.
 					h.logger.Error("failed to remove patch", zap.String("patch", patchPath), zap.Error(err))
 					patches[op.Package][description] = patchPath
 					return
@@ -351,10 +346,9 @@ func (h *ComposerPatches1) processSinglePatch(ctx context.Context, path string, 
 
 	ok, err := h.composer.CheckIfPatchApplies(ctx, path, op.Package, op.To, absolutePath)
 	if err != nil {
-		// The check could not be carried out — most often because the package could not be
-		// obtained at all. Leave the package alone rather than recording a conflict: an
-		// unverifiable patch is not a known-stale one, and pinning on this path would hold the
-		// package back on every run while blaming a patch conflict that never happened.
+		// The check could not run at all, usually because the package was unobtainable. An
+		// unverifiable patch is not a stale one: pinning here would hold the package back on
+		// every run and blame a conflict that never happened.
 		h.logger.Warn("could not check whether the patch still applies, leaving the package unpinned",
 			zap.String("package", op.Package), zap.String("patch", patchPath), zap.Error(err))
 		return
@@ -433,10 +427,9 @@ func (h *ComposerPatches1) processSinglePatch(ctx context.Context, path string, 
 func (h *ComposerPatches1) validateCombinedPatches(ctx context.Context, path string, op composer.PackageChange, patches map[string]map[string]string, updates *PatchUpdates) {
 	patchPaths := make([]string, 0, len(patches[op.Package]))
 	for _, patchPath := range patches[op.Package] {
-		// Resolve local paths against the project, exactly as processSinglePatch does. This
-		// must use isRemotePatch, not url.ParseRequestURI: the latter accepts a bare absolute
-		// path like "/patches/x.diff", which would then be passed through unprefixed, fail to
-		// resolve, and report a false patch conflict that needlessly pins the package.
+		// Resolve local paths against the project, as processSinglePatch does. Must use
+		// isRemotePatch: url.ParseRequestURI accepts "/patches/x.diff", which would pass
+		// through unprefixed, fail to resolve, and pin the package on a false conflict.
 		absolutePath := patchPath
 		if !isRemotePatch(patchPath) {
 			absolutePath = path + "/" + patchPath
@@ -488,9 +481,8 @@ func (h *ComposerPatches1) fetchForkMergeRequests(projectMachineName string, for
 	return mergeRequests, nil
 }
 
-// cleanURLString turns an issue title into a safe file name component: lower-cased, spaces
-// mapped to underscores, and anything outside [a-z0-9-_.] stripped so the result can never
-// contain a path separator or other characters that would break os.Create.
+// cleanURLString turns an issue title into a safe file name component: lower-cased, spaces to
+// underscores, everything outside [a-z0-9-_.] stripped, so it can hold no path separator.
 func (h *ComposerPatches1) cleanURLString(s string) string {
 	s = strings.ToLower(s)
 	s = strings.ReplaceAll(s, " ", "_")
