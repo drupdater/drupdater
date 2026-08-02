@@ -306,12 +306,7 @@ func runFullChecks(ctx context.Context, logger *zap.Logger, cfg internal.Config,
 func cleanupFullCheckArtifacts(path string, sites []string) {
 	defer os.RemoveAll(path)
 
-	parent := filepath.Dir(path)
-	for _, site := range sites {
-		os.Remove(filepath.Join(parent, site+".sqlite"))
-		os.RemoveAll(filepath.Join(parent, "private", site))
-	}
-	os.Remove(filepath.Join(parent, "private"))
+	services.CleanupSiteArtifacts(filepath.Dir(path), sites)
 }
 
 // printCheckResults writes results to w, redacting each detail first: a failed check's Detail

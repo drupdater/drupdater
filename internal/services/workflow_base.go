@@ -346,8 +346,14 @@ func (ws *WorkflowBaseService) cleanup(path string) {
 		}
 		return
 	}
-	parent := filepath.Dir(path)
-	for _, site := range ws.config.Sites {
+	CleanupSiteArtifacts(filepath.Dir(path), ws.config.Sites)
+}
+
+// CleanupSiteArtifacts removes the SQLite databases and private files a site install writes
+// beside the checkout, given the directory the checkout sits in. Shared with "drupdater check
+// --full", which performs the same installs and owes the same cleanup.
+func CleanupSiteArtifacts(parent string, sites []string) {
+	for _, site := range sites {
 		os.Remove(filepath.Join(parent, site+".sqlite"))
 		// Only the per-site directory, never the whole "private" tree: that is a standard Drupal
 		// layout and can hold real project data this run does not own.
