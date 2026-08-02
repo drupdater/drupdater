@@ -161,10 +161,10 @@
     }
   },
   {
-    "name": "multisite-unsatisfiable",
-    "description": "A root constraint no release can satisfy, so composer update fails and the run reports the phase that did the work rather than a bare non-zero exit",
+    "name": "multisite-lock-conflict",
+    "description": "A root constraint the locked version does not satisfy, so composer install refuses before any site is touched. Not the same as a merely stale lock, which composer only warns about",
     "repository_url": "https://github.com/drupdater/test-drupal-multisite.git",
-    "branch": "broken/unsatisfiable",
+    "branch": "broken/lock-conflict",
     "modes": [
       "normal"
     ],
@@ -173,12 +173,10 @@
         "status": [
           "failed"
         ],
-        "failed_phase": "update shared code",
+        "failed_phase": "composer install",
         "phases": [
           "acquire working copy",
-          "preflight",
-          "composer install",
-          "baseline site install"
+          "preflight"
         ]
       }
     }

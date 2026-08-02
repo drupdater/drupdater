@@ -323,11 +323,16 @@ Adding one is appending an entry — the workflow needs no edit.
 | `drupal-multisite` | Two sites over one codebase, so the per-site phases run concurrently against separate configuration trees |
 | `multisite-patches` | A patch that stops applying when its package moves, so `composer_patches` has to report a conflict |
 | `multisite-shallow` | Preflight rejecting a `--depth 1` checkout |
-| `multisite-unsatisfiable` | A root constraint nothing can satisfy, so `composer update` fails |
+| `multisite-lock-conflict` | A root constraint the locked version does not satisfy, so `composer install` refuses |
 | `multisite-missing-site` | A configured site with no directory, so one of the concurrent baseline installs fails |
 
 The last four exist because assertions that only ever see a successful run cannot catch a
 regression that makes Drupdater fail in the wrong place, or report a failure as a success.
+
+No fixture covers a failure in `update shared code`. `composer install` validates the lock
+against `composer.json`, so almost any breakage of the latter is caught one phase earlier; a
+failure that first appears during the update needs a lock that agrees with `composer.json` but
+cannot be resolved forward, which depends on upstream state no fixture can pin down.
 
 An entry may narrow `modes` (default: both `normal` and `security`) and set `shallow`. A fixture
 whose `expect.status` contains `failed` is a **failure fixture**: Drupdater is expected to exit
