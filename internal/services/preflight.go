@@ -18,11 +18,13 @@ type CheckResult struct {
 	Detail string
 }
 
-func checkOK(name string) CheckResult {
+// CheckOK reports a passing check.
+func CheckOK(name string) CheckResult {
 	return CheckResult{Name: name, OK: true}
 }
 
-func checkFailed(name string, detail string) CheckResult {
+// CheckFailed reports a failing check, with detail explaining why.
+func CheckFailed(name string, detail string) CheckResult {
 	return CheckResult{Name: name, OK: false, Detail: detail}
 }
 
@@ -40,12 +42,12 @@ func CheckGitHistoryComplete(repository ShallowCloneChecker, workingDir string) 
 
 	shallow, err := repository.IsShallowClone(workingDir)
 	if err != nil {
-		return checkFailed(name, fmt.Sprintf("could not determine clone depth: %s", err))
+		return CheckFailed(name, fmt.Sprintf("could not determine clone depth: %s", err))
 	}
 	if shallow {
-		return checkFailed(name, `shallow checkout detected: fetch full history (set "fetch-depth: 0" in GitHub Actions, or GIT_DEPTH: "0" in GitLab CI)`)
+		return CheckFailed(name, `shallow checkout detected: fetch full history (set "fetch-depth: 0" in GitHub Actions, or GIT_DEPTH: "0" in GitLab CI)`)
 	}
-	return checkOK(name)
+	return CheckOK(name)
 }
 
 // PlatformReqsChecker is all CheckPlatformRequirements needs, narrow for the same reason as
@@ -61,9 +63,9 @@ func CheckPlatformRequirements(ctx context.Context, composer PlatformReqsChecker
 
 	out, err := composer.CheckPlatformReqs(ctx, workingDir)
 	if err != nil {
-		return checkFailed(name, out)
+		return CheckFailed(name, out)
 	}
-	return checkOK(name)
+	return CheckOK(name)
 }
 
 // ComposerConfigGetter is all CheckSiteSettings needs, narrow for the same reason as
@@ -80,13 +82,13 @@ func CheckSiteSettings(ctx context.Context, composer ComposerConfigGetter, fs af
 
 	webroot, err := composer.GetConfig(ctx, workingDir, "extra.drupal-scaffold.locations.web-root")
 	if err != nil {
-		return checkFailed(name, fmt.Sprintf("could not determine web root: %s", err))
+		return CheckFailed(name, fmt.Sprintf("could not determine web root: %s", err))
 	}
 	webroot = strings.TrimSuffix(webroot, "/")
 
 	relPath := filepath.Join(webroot, "sites", site, "settings.php")
 	if _, err := fs.Stat(filepath.Join(workingDir, relPath)); err != nil {
-		return checkFailed(name, fmt.Sprintf("not found at %s", relPath))
+		return CheckFailed(name, fmt.Sprintf("not found at %s", relPath))
 	}
-	return checkOK(name)
+	return CheckOK(name)
 }

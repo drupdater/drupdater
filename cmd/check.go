@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/drupdater/drupdater/internal"
@@ -158,18 +159,18 @@ func checkToken(args []string) string {
 // It also fills cfg.Sites (and the rest of the file config) for the checks that follow.
 func checkConfigAndAddons(path string, cfg *internal.Config) []services.CheckResult {
 	if _, err := internal.LoadConfigFile(path, cfg); err != nil {
-		return []services.CheckResult{{Name: ".drupdater.yaml valid", OK: false, Detail: err.Error()}}
+		return []services.CheckResult{services.CheckFailed(".drupdater.yaml valid", err.Error())}
 	}
 
-	results := []services.CheckResult{{
-		Name: fmt.Sprintf(".drupdater.yaml valid (sites: %s)", strings.Join(cfg.Sites, ", ")),
-		OK:   true,
-	}}
+	results := []services.CheckResult{
+		services.CheckOK(fmt.Sprintf(".drupdater.yaml valid (sites: %s)", strings.Join(cfg.Sites, ", "))),
+	}
 
+	const addonsName = "addon names resolve"
 	if err := validateAddons(*cfg); err != nil {
-		return append(results, services.CheckResult{Name: "addon names resolve", OK: false, Detail: err.Error()})
+		return append(results, services.CheckFailed(addonsName, err.Error()))
 	}
-	return append(results, services.CheckResult{Name: "addon names resolve", OK: true})
+	return append(results, services.CheckOK(addonsName))
 }
 
 // newVcsProvider resolves a repository URL and token to a VCS platform. A variable so the token
@@ -189,13 +190,13 @@ func checkVCS(ctx context.Context, logger *zap.Logger, repositoryURL string, tok
 		if resolveErr != nil {
 			detail = resolveErr.Error()
 		}
-		return []services.CheckResult{{Name: name, OK: false, Detail: detail}}
+		return []services.CheckResult{services.CheckFailed(name, detail)}
 	}
 	if err := codehosting.ValidateRepositoryURL(repositoryURL); err != nil {
-		return []services.CheckResult{{Name: name, OK: false, Detail: err.Error()}}
+		return []services.CheckResult{services.CheckFailed(name, err.Error())}
 	}
 
-	results := []services.CheckResult{{Name: name, OK: true}}
+	results := []services.CheckResult{services.CheckOK(name)}
 	if token == "" {
 		return results
 	}
@@ -203,13 +204,13 @@ func checkVCS(ctx context.Context, logger *zap.Logger, repositoryURL string, tok
 	const tokenCheckName = "token authenticates"
 	platform, err := newVcsProvider(repositoryURL, token, logger)
 	if err != nil {
-		return append(results, services.CheckResult{Name: tokenCheckName, OK: false, Detail: err.Error()})
+		return append(results, services.CheckFailed(tokenCheckName, err.Error()))
 	}
 	userName, email := platform.GetUser(ctx)
 	if userName == "" && email == "" {
-		return append(results, services.CheckResult{Name: tokenCheckName, OK: false, Detail: "did not authenticate, or lacks API access"})
+		return append(results, services.CheckFailed(tokenCheckName, "did not authenticate, or lacks API access"))
 	}
-	return append(results, services.CheckResult{Name: tokenCheckName, OK: true})
+	return append(results, services.CheckOK(tokenCheckName))
 }
 
 // fullCheckComposer is what the --full tier needs from composer: the install it performs, the
@@ -259,12 +260,9 @@ var newFullCheckDeps = func(logger *zap.Logger) fullCheckDeps {
 // copy, and proves each configured site installs from its exported configuration.
 func runFullChecks(ctx context.Context, logger *zap.Logger, cfg internal.Config, token string) []services.CheckResult {
 	if cfg.RepositoryURL == "" {
-		return []services.CheckResult{{
-			Name: "sites install from configuration",
-			OK:   false,
-			Detail: "no repository URL to clone (pass --repository-url or run inside a checkout " +
-				"with an origin remote)",
-		}}
+		return []services.CheckResult{services.CheckFailed("sites install from configuration",
+			"no repository URL to clone (pass --repository-url or run inside a checkout "+
+				"with an origin remote)")}
 	}
 	branch := cfg.Branch
 	if branch == "" {
@@ -275,7 +273,7 @@ func runFullChecks(ctx context.Context, logger *zap.Logger, cfg internal.Config,
 
 	path, err := deps.clone(cfg.RepositoryURL, branch, token)
 	if err != nil {
-		return []services.CheckResult{{Name: "clone for full check", OK: false, Detail: err.Error()}}
+		return []services.CheckResult{services.CheckFailed("clone for full check", err.Error())}
 	}
 	defer cleanupFullCheckArtifacts(path, cfg.Sites)
 
@@ -283,22 +281,22 @@ func runFullChecks(ctx context.Context, logger *zap.Logger, cfg internal.Config,
 	defer composerCLI.Cleanup()
 
 	if err := composerCLI.Install(ctx, path); err != nil {
-		return []services.CheckResult{{Name: "composer install", OK: false, Detail: err.Error()}}
+		return []services.CheckResult{services.CheckFailed("composer install", err.Error())}
 	}
-	results := []services.CheckResult{{Name: "composer install", OK: true}}
+	results := []services.CheckResult{services.CheckOK("composer install")}
 
 	installer, err := deps.newInstaller(composerCLI)
 	if err != nil {
-		return append(results, services.CheckResult{Name: "drush site-install --existing-config", OK: false, Detail: err.Error()})
+		return append(results, services.CheckFailed("drush site-install --existing-config", err.Error()))
 	}
 
 	for _, site := range cfg.Sites {
 		name := fmt.Sprintf("site %q installs from configuration", site)
 		if err := installer.Install(ctx, path, site); err != nil {
-			results = append(results, services.CheckResult{Name: name, OK: false, Detail: err.Error()})
+			results = append(results, services.CheckFailed(name, err.Error()))
 			continue
 		}
-		results = append(results, services.CheckResult{Name: name, OK: true})
+		results = append(results, services.CheckOK(name))
 	}
 	return results
 }
@@ -334,12 +332,7 @@ func printCheckResults(w io.Writer, results []services.CheckResult, redactor *lo
 }
 
 func anyCheckFailed(results []services.CheckResult) bool {
-	for _, r := range results {
-		if !r.OK {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(results, func(r services.CheckResult) bool { return !r.OK })
 }
 
 func init() {
