@@ -28,6 +28,7 @@
         "addons": [
           "update_hooks",
           "unsupported_modules",
+          "composer_audit",
           "code_beautifier",
           "deprecations_remover",
           "translations_updater"
@@ -53,6 +54,7 @@
         ],
         "addons": [
           "composer_audit",
+          "unsupported_modules",
           "update_hooks"
         ]
       }

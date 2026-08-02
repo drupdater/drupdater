@@ -56,8 +56,8 @@ The centre of the run:
 
 1. Create and check out a throwaway work branch, `drupdater-work-<timestamp>`.
 2. Fire **`pre-composer-update`**. Addons mutate the event to steer what follows —
-   [`composer_audit`](../reference/addons/composer-audit.md) restricts the update to
-   vulnerable packages; [`composer_patches`](../reference/addons/composer-patches.md) pins
+   [`composer_audit`](../reference/addons/composer-audit.md) restricts a `--security` run to
+   the vulnerable packages; [`composer_patches`](../reference/addons/composer-patches.md) pins
    packages whose patches cannot be made to apply.
 3. Run `composer update` with those constraints. **If nothing changed, the run aborts
    here** — reported as `no_changes`, exit `0`.

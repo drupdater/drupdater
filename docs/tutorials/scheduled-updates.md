@@ -29,7 +29,6 @@ run_types:
       - deprecations_remover
       - translations_updater
       - composer_normalizer
-      - unsupported_modules
     auto_merge: false
   security:
     addons: []

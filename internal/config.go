@@ -41,8 +41,8 @@ type RunTypesConfig struct {
 // RunTypeConfig is what a single run type configures.
 type RunTypeConfig struct {
 	// Addons lists the configurable addons to run. Mandatory addons
-	// (composer_allow_plugins, composer_patches, composer_diff, update_hooks) always run and
-	// are not listed here, nor is composer_audit, which is added automatically in security mode.
+	// (composer_allow_plugins, composer_patches, composer_diff, update_hooks, composer_audit,
+	// unsupported_modules) always run and are not listed here.
 	Addons []string `yaml:"addons"`
 
 	// AutoMerge asks the platform to merge the MR/PR once its pipeline passes.

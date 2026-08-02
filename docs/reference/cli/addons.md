@@ -16,7 +16,6 @@ Addons you can set under run_types.normal.addons / run_types.security.addons in 
   composer_normalizer
   deprecations_remover
   translations_updater
-  unsupported_modules
 ```
 
 ## What is and is not listed
@@ -24,11 +23,9 @@ Addons you can set under run_types.normal.addons / run_types.security.addons in 
 The command lists only the **configurable** addons — the ones it is meaningful to put in
 a `run_types.*.addons` list. It deliberately omits:
 
-- The four [mandatory addons](../addons/index.md) (`composer_allow_plugins`,
-  `composer_patches`, `composer_diff`, `update_hooks`), which always run and cannot be
-  disabled.
-- [`composer_audit`](../addons/composer-audit.md), which is added automatically in
-  `--security` mode.
+- The six [mandatory addons](../addons/index.md) (`composer_allow_plugins`,
+  `composer_patches`, `composer_diff`, `update_hooks`, `composer_audit`,
+  `unsupported_modules`), which always run and cannot be disabled.
 
 An addon name in an active list that is not in the registry aborts the run:
 
