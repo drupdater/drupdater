@@ -55,6 +55,7 @@ Changing a golden file changes the published example. `internal/addon/testdata/c
 make build          # Build binary
 make test           # Run all tests (go test -v ./...)
 make test-property  # Only the property tests, with far more generated cases (rapid)
+make fuzz           # Fuzz every target (FUZZTIME=30s each by default)
 make mutate         # Mutation testing over the whole module (mutago, pinned in go.mod)
 make lint           # golangci-lint (govet, staticcheck, gosec, etc. — see .golangci.yml) + hadolint on the Dockerfile
 make fmt            # Format code
@@ -165,6 +166,12 @@ Mocks are generated with mockery v3 (config in `.mockery.yml`). After changing a
 `pgregory.net/rapid` states invariants over generated input, next to the example-based tests. Convention: file `<subject>_property_test.go`, every test named `TestProperty…` (`make test-property` selects on that prefix). A property must state a law — idempotent, order-independent, round-trips, leaks nothing — never a second implementation of the function.
 
 **The seed is random on every run.** So when a property finds a bug, fix the code *and* add an ordinary test naming the counterexample: the blocking mutation gate must not depend on the exploration happening to hit the right input. Counterexamples rapid records under `testdata/rapid/*.fail` are replayed automatically and belong in the commit. Details: `docs/contributing/development.md`.
+
+## Fuzzing
+
+Go's built-in fuzzer covers what a hand-written rapid generator cannot reach: arbitrary bytes, invalid UTF-8, degenerate separators. Convention: file `<subject>_fuzz_test.go`, every target named `Fuzz…`, seeded via `f.Add` with the real shapes *and* the degenerate ones. Four targets, on input drupdater does not control — the repository URL, `.drupdater.yaml`, `composer audit` output, and the redactor.
+
+Same discipline as properties: a failing input lands in `testdata/fuzz/<target>/<hash>`, gets committed (`go test` replays it forever after), **and** gets an ordinary test naming the counterexample, because the blocking mutation gate must not depend on a generative run. Fuzzing itself is not a PR gate — `fuzz.yml` runs weekly; `go.yml`'s `test` job runs the seeds and counterexamples on every push. Details: `docs/contributing/development.md`.
 
 ## Docker
 

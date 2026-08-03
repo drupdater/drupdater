@@ -433,6 +433,23 @@ func TestAuditUnmarshalShapes(t *testing.T) {
 		assert.Equal(t, []AbandonedPackage{{PackageName: "foo/bar"}}, a.Abandoned)
 	})
 
+	t.Run("advisories are ordered by package, then advisory id", func(t *testing.T) {
+		// Ranging a Go map is random, so without the sort one audit output renders a different
+		// report, a different description and a different `composer update` argument list on
+		// every run. Named here as well as in the fuzz target: the mutation gate is blocking
+		// and must not depend on the fuzzer happening to generate two packages.
+		var a Audit
+		require.NoError(t, a.UnmarshalJSON([]byte(
+			`{"advisories":{"z/one":[{"advisoryId":"Z1","packageName":"z/one"}],`+
+				`"a/two":[{"advisoryId":"A2","packageName":"a/two"},{"advisoryId":"A1","packageName":"a/two"}]}}`)))
+
+		ids := make([]string, 0, len(a.Advisories))
+		for _, advisory := range a.Advisories {
+			ids = append(ids, advisory.AdvisoryID)
+		}
+		assert.Equal(t, []string{"A1", "A2", "Z1"}, ids)
+	})
+
 	t.Run("advisories and abandoned are captured from the same payload", func(t *testing.T) {
 		// The parser used to stop at the advisories key; a payload carrying both has to yield
 		// both.

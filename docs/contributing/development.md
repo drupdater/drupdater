@@ -18,6 +18,7 @@ make build
 make build          # build the binary (injects the version via -ldflags)
 make test           # go test -v ./...
 make test-property  # only the property tests, with far more generated cases
+make fuzz           # fuzz every target (FUZZTIME=30s each by default)
 make mutate         # mutation testing over the whole module (mutago)
 make lint           # golangci-lint + hadolint on the Dockerfile
 make fmt            # go fmt ./...
@@ -295,6 +296,93 @@ A function with two branches and no interesting input space is a table test, not
 `ActiveRunType` and `tokenRequired` are covered better by listing their cases than by generating
 them. Properties earn their keep where the input space is large and the promise is absolute:
 parsers, path handling, ordering, serialisation, and anything that must never leak a credential.
+
+## Fuzzing
+
+Property-based testing asks whether a law holds for every input a *generator* produces. That
+generator is written by hand, and it only ever produces inputs somebody imagined: rapid's
+`StringMatching` draws from an alphabet, `SliceOfN` from a length range. Fuzzing removes that
+ceiling. Go's built-in fuzzer mutates raw bytes and keeps whatever reaches a new branch, so it
+explores the inputs the generator's shape excludes — invalid UTF-8, a lone `%`, an embedded NUL,
+a path that is nothing but separators.
+
+The two are complementary, not alternatives, and both are kept on the same code:
+
+| | Generates | Finds | Corpus |
+|---|---|---|---|
+| rapid | Structured values from written generators | A law that is false for a plausible input | `testdata/rapid/*.fail` |
+| `go test -fuzz` | Arbitrary bytes, guided by coverage | A branch nothing plausible reaches | `testdata/fuzz/<target>/*` |
+
+```bash
+make test                      # every seed and every committed counterexample, as ordinary tests
+make fuzz                      # generative, 30s per target
+make fuzz FUZZTIME=5m          # longer
+go test ./internal/codehosting -run '^$' -fuzz '^FuzzParseGitURL$' -fuzztime 1h
+```
+
+`go test -fuzz` takes one target at a time and refuses a pattern that matches several, which is
+why `make fuzz` loops rather than passing `./...`.
+
+### The targets
+
+Four, on the code that parses input drupdater does not control:
+
+| Target | Covers |
+|---|---|
+| `FuzzParseGitURL` | The repository URL, in both the HTTP and the SCP shape, straight from a CI variable |
+| `FuzzLoadConfigFile` | `.drupdater.yaml`, including that a rejected file leaves the `Config` untouched |
+| `FuzzAuditUnmarshalJSON` | `composer audit` output, across the two shapes composer emits |
+| `FuzzRedact` | That a registered secret never survives redaction, on bytes no generator would write |
+
+### The convention
+
+- Targets live in `<subject>_fuzz_test.go`, next to `<subject>_test.go` and
+  `<subject>_property_test.go`.
+- Every target seeds `f.Add` with the real shapes **and** the degenerate ones — `""`, a bare
+  separator, a NUL. Seeds are the fuzzer's starting coverage, and they run on every `make test`.
+- Assert a law, never a second implementation — the same rule properties follow.
+- A target that writes to disk should take its directory from `f.TempDir()` once, outside
+  `f.Fuzz`, rather than calling `t.TempDir()` per execution.
+
+### When a target fails
+
+The fuzzer minimises the input, writes it to `testdata/fuzz/<target>/<hash>`, and prints how to
+re-run it:
+
+```text
+Failing input written to testdata/fuzz/FuzzParseGitURL/ea812ec424beb350
+To re-run:
+go test -run=FuzzParseGitURL/ea812ec424beb350
+```
+
+**Commit that file.** `go test` replays everything under `testdata/fuzz` before generating
+anything new, so the counterexample becomes a permanent regression case — exactly what a `.fail`
+file does for a property.
+
+Then do the other half. The mutation gate is blocking and generative exploration is not
+reproducible, so a mutant killed only because a run happened to generate the right input would
+pass on one pull request and fail on the next. **Fix the code, commit the corpus file, and add an
+ordinary test naming the concrete counterexample.** `TestParseGitURL`'s two `.git`-segment cases
+and `TestAuditUnmarshalShapes`'s ordering case are both written that way.
+
+!!! note "The generated corpus is not committed"
+
+    Inputs the fuzzer finds interesting go to `$(go env GOCACHE)/fuzz` and are local to the
+    machine that found them. Only seeds (in the target) and counterexamples (in `testdata/fuzz`)
+    are checked in. `go clean -fuzzcache` empties the cache when a stale corpus makes a run slow.
+
+### In CI
+
+| Where | Scope | Blocking |
+|---|---|---|
+| `test` job in `go.yml` | Seeds and committed counterexamples only, as ordinary tests | **Yes** |
+| `fuzz.yml` | Generative, one leg per target, weekly and on demand | No |
+
+Fuzzing is deliberately not a pull request gate: whether a generative run finds something is
+partly chance, and failing an unrelated pull request on a coin toss trains people to re-run
+until green. The deterministic half — every seed, every counterexample ever committed — does
+gate, on every push. A failing weekly leg uploads the input as a `fuzz-counterexample-<target>`
+artifact, ready to commit.
 
 ## Integration tests
 

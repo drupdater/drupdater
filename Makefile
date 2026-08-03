@@ -1,4 +1,4 @@
-.PHONY: build test test-property mutate clean mock lint fmt fix run docker-build docker-run docs-serve docs-build help
+.PHONY: build test test-property fuzz mutate clean mock lint fmt fix run docker-build docker-run docs-serve docs-build help
 
 # Variables
 BINARY_NAME=drupdater
@@ -21,6 +21,19 @@ test: ## Run tests
 # environment variable is read at init and simply ignored by those packages.
 test-property: ## Run only the property tests, with far more generated cases than `make test`
 	RAPID_CHECKS=10000 go test ./... -run TestProperty
+
+# `go test ./...` already replays every seed and every committed counterexample; this is the
+# generative run. One target at a time -- `go test -fuzz` refuses a pattern matching several.
+FUZZTIME ?= 30s
+
+fuzz: ## Fuzz every target for FUZZTIME each (default 30s)
+	@set -e; \
+	for pkg in $$(go list ./...); do \
+	  for target in $$(go test -list '^Fuzz' $$pkg 2>/dev/null | grep '^Fuzz' || true); do \
+	    echo "==> $$target ($$pkg)"; \
+	    go test $$pkg -run '^$$' -fuzz "^$$target$$" -fuzztime $(FUZZTIME); \
+	  done; \
+	done
 
 clean: ## Clean build artifacts
 	rm -f ${BINARY_NAME}
