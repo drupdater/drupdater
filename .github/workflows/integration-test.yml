@@ -150,7 +150,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Upload image
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: drupdater-image
           path: /tmp/drupdater-image.tar
@@ -422,7 +422,7 @@ jobs:
 
       - name: Upload run report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: drupdater-report-${{ matrix.fixture }}-${{ matrix.mode }}
           # A glob, since report-second.json only exists for the idempotency legs.
