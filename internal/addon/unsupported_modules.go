@@ -13,42 +13,35 @@ import (
 	"go.uber.org/zap"
 )
 
-// UnsupportedModules detects installed modules that have reached end-of-life according to
-// Drupal's update status service (status NOT_SUPPORTED): they have no supported upgrade path,
-// which is a different risk category than a security vulnerability caught by composer_audit.
-//
-// It also renders the abandoned packages composer_audit hands it on pre-merge-request-create.
-// Those come from Packagist and cover the non-Drupal libraries this addon cannot see, but they
-// tell a reviewer the same thing — no further fixes are coming — so they share one list.
+// UnsupportedModules detects modules Drupal's update status service reports as NOT_SUPPORTED, and
+// renders them together with the abandoned packages composer_audit hands it: one finding to a
+// reviewer, so one list.
 type UnsupportedModules struct {
 	internal.BasicAddon
 	logger *zap.Logger
 	drush  Drush
 
-	// mu guards modules: preSiteUpdateHandler runs concurrently for each site. Keyed by module
-	// name so results are deduplicated across sites in multisite runs.
+	// mu guards modules: preSiteUpdateHandler runs concurrently for each site. Keyed by name,
+	// so multisite results are deduplicated.
 	mu      sync.Mutex
 	modules map[string]drush.UnsupportedModule
 
-	// Written once from pre-merge-request-create, which fires after every site's goroutine has
-	// finished, so unlike modules it needs no lock.
+	// Written once from pre-merge-request-create, after every site's goroutine — no lock needed.
 	abandoned []services.AbandonedPackage
 }
 
-// EndOfLifeEntry is one row of the merged "unsupported or abandoned" table. Status names the
-// source, rather than pretending a module version and a replacement package are one column.
+// EndOfLifeEntry is one row of the merged "unsupported or abandoned" table.
 type EndOfLifeEntry struct {
 	Name string
 	// Status is "Unsupported module" or "Abandoned package".
 	Status string
-	// InstalledVersion is empty for an abandoned package: `composer audit` does not report one,
-	// and the dependency table already carries every installed version.
+	// InstalledVersion is empty for an abandoned package: `composer audit` reports none.
 	InstalledVersion string
 	// Recommendation is what to do about it, already phrased for the reader.
 	Recommendation string
 }
 
-// NewUnsupportedModules creates a new unsupported modules detector instance.
+// NewUnsupportedModules creates an unsupported modules detector.
 func NewUnsupportedModules(logger *zap.Logger, drushClient Drush) *UnsupportedModules {
 	return &UnsupportedModules{
 		logger:  logger,
@@ -63,9 +56,8 @@ func (um *UnsupportedModules) SubscribedEvents() map[string]any {
 			Priority: event.Normal,
 			Listener: event.ListenerFunc(um.preSiteUpdateHandler),
 		},
-		// Below Normal: composer_audit puts the abandoned packages on this event at Normal. At
-		// equal priority the dispatcher decides the order, and the list would sometimes be read
-		// before it is written.
+		// BelowNormal: composer_audit writes the abandoned packages at Normal. At equal
+		// priority the list would sometimes be read before it is written.
 		"pre-merge-request-create": event.ListenerItem{
 			Priority: event.BelowNormal,
 			Listener: event.ListenerFunc(um.preMergeRequestCreateHandler),
@@ -73,8 +65,7 @@ func (um *UnsupportedModules) SubscribedEvents() map[string]any {
 	}
 }
 
-// RenderTemplate returns the rendered template for this addon: the unsupported modules and the
-// abandoned packages as one table, or nothing at all when there is neither.
+// RenderTemplate renders modules and abandoned packages as one table, or nothing when empty.
 func (um *UnsupportedModules) RenderTemplate() (string, error) {
 	entries := um.endOfLifeEntries()
 	if len(entries) == 0 {
@@ -84,16 +75,12 @@ func (um *UnsupportedModules) RenderTemplate() (string, error) {
 	return um.Render("unsupported_modules.go.tmpl", entries)
 }
 
-// endOfLifeEntries returns the merged table rows, sorted by name. One list rather than two
-// groups: the Status column already says which kind each row is, and a reviewer should not have
-// to know which addon found a package. Sorting also makes the section byte-stable — both halves
-// come from maps, whose iteration order is random.
+// endOfLifeEntries returns the merged table rows. Sorted because both halves come from maps.
 func (um *UnsupportedModules) endOfLifeEntries() []EndOfLifeEntry {
 	entries := make([]EndOfLifeEntry, 0, len(um.modules)+len(um.abandoned))
 
 	for _, module := range um.collectModules() {
-		// drush reports the literal string "None" when there is no supported release at all,
-		// which is a status rather than a version to move to.
+		// drush reports "None" when there is no supported release — a status, not a version.
 		recommendation := "Update to " + module.RecommendedVersion
 		if module.RecommendedVersion == "" || module.RecommendedVersion == "None" {
 			recommendation = "No supported release — replace it"
@@ -125,9 +112,8 @@ func (um *UnsupportedModules) endOfLifeEntries() []EndOfLifeEntry {
 	return entries
 }
 
-// collectModules returns the modules gathered so far. The lock is not needed today —
-// errgroup.Wait already orders every site's goroutine before rendering — but that is the
-// caller's invariant, not this type's.
+// collectModules locks even though errgroup.Wait already orders every site's goroutine before
+// rendering: that ordering is the caller's invariant, not this type's.
 func (um *UnsupportedModules) collectModules() []drush.UnsupportedModule {
 	um.mu.Lock()
 	defer um.mu.Unlock()
@@ -135,8 +121,7 @@ func (um *UnsupportedModules) collectModules() []drush.UnsupportedModule {
 	return slices.Collect(maps.Values(um.modules))
 }
 
-// preMergeRequestCreateHandler takes composer_audit's abandoned packages so they render
-// alongside the unsupported modules. Not logged here — composer_audit already logged the count.
+// preMergeRequestCreateHandler takes composer_audit's abandoned packages, to render alongside.
 func (um *UnsupportedModules) preMergeRequestCreateHandler(e event.Event) error {
 	evt := e.(*services.PreMergeRequestCreateEvent)
 
@@ -145,8 +130,7 @@ func (um *UnsupportedModules) preMergeRequestCreateHandler(e event.Event) error 
 	return nil
 }
 
-// preSiteUpdateHandler checks a site for unsupported modules. Best-effort: an unreachable update
-// status service is logged and swallowed, since an unsupported module is reported, not an error.
+// preSiteUpdateHandler checks a site. Best-effort: an unreachable status service is not an error.
 func (um *UnsupportedModules) preSiteUpdateHandler(e event.Event) error {
 	evt := e.(*services.PreSiteUpdateEvent)
 

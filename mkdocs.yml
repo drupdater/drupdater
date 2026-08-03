@@ -48,8 +48,7 @@ extra_css:
   - stylesheets/extra.css
 
 extra:
-  # Analytics is opt-in per build: the publish workflow sets DRUPDATER_GOATCOUNTER,
-  # so `mkdocs serve` and local builds emit no tracking script at all.
+  # Opt-in per build: only the publish workflow sets DRUPDATER_GOATCOUNTER.
   goatcounter: !ENV [DRUPDATER_GOATCOUNTER, false]
   social:
     - icon: fontawesome/brands/github
@@ -74,9 +73,7 @@ markdown_extensions:
   - pymdownx.emoji:
       emoji_index: !!python/name:material.extensions.emoji.twemoji
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
-  # base_path includes the repository root so pages can embed files that live
-  # beside the code — the addon golden files and .github/assert-report.jq — and
-  # therefore cannot drift from what the tests and CI actually use.
+  # The repository root, so pages can embed the golden files and jq scripts CI itself uses.
   - pymdownx.snippets:
       base_path:
         - .

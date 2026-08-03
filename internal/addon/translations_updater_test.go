@@ -90,9 +90,8 @@ func TestUpdateTranslationsEventHandlerWithLocaleDeploy(t *testing.T) {
 }
 
 func TestUpdateTranslationsEventHandlerSkipsWhenTranslationPathUnavailable(t *testing.T) {
-	// A GetTranslationPath failure (e.g. locale.settings.translation.path unset) must be a soft
-	// skip, not a fatal error: nothing must be staged or committed on this path, since an empty
-	// path handed to Worktree.Add would stage the entire working tree instead of nothing.
+	// A soft skip, not a fatal error — and nothing staged: an empty path handed to
+	// Worktree.Add stages the entire working tree.
 	mockDrush := NewMockDrush(t)
 	mockRepository := NewMockRepository(t)
 	logger := zap.NewNop()
@@ -123,9 +122,7 @@ func TestUpdateTranslationsEventHandlerSkipsWhenTranslationPathUnavailable(t *te
 }
 
 func TestUpdateTranslationsEventHandlerRecordsNothingToCommit(t *testing.T) {
-	// Translations were localized but produced no change. The site must still appear in the
-	// report with its path -- and explicitly not as updated, which is what tells a reviewer the
-	// merge request contains no translation commit.
+	// Localized but unchanged: the site still appears in the report, explicitly not updated.
 	mockDrush := NewMockDrush(t)
 	mockRepository := NewMockRepository(t)
 	handler := NewTranslationsUpdater(zap.NewNop(), mockDrush, mockRepository)

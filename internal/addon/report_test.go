@@ -49,9 +49,8 @@ func TestComposerAuditReportData(t *testing.T) {
 	}, data.Abandoned)
 }
 
-// TestComposerAuditReportDataOnAbandonedAlone covers the case where the update resolved every
-// advisory it found: the section is still worth emitting, because the abandoned packages in it
-// are a standing finding that no update is going to clear.
+// An update that resolved every advisory still emits the section: abandoned packages are a
+// standing finding no update clears.
 func TestComposerAuditReportDataOnAbandonedAlone(t *testing.T) {
 	ca := &ComposerAudit{
 		afterAudit: composer.Audit{
@@ -67,9 +66,8 @@ func TestComposerAuditReportDataOnAbandonedAlone(t *testing.T) {
 	assert.Equal(t, "patchwork/jsqueeze", data.Abandoned[0].PackageName)
 }
 
-// TestComposerAuditReportDataNilWhenOnlyDrupalPackagesAreAbandoned checks the drupal/* filter
-// applies before the "nothing to report" decision, so a run whose only finding belongs to
-// unsupported_modules does not add an empty composer_audit section.
+// The drupal/* filter applies before the "nothing to report" check, so a finding that belongs
+// to unsupported_modules adds no empty composer_audit section.
 func TestComposerAuditReportDataNilWhenOnlyDrupalPackagesAreAbandoned(t *testing.T) {
 	ca := &ComposerAudit{
 		afterAudit: composer.Audit{

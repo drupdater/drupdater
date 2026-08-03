@@ -21,15 +21,8 @@ type SecurityReport struct {
 	AfterUpdateAdvisories []composer.Advisory
 }
 
-// ComposerAudit handles security auditing for Drupal sites.
-//
-// It runs on every update because `composer audit` answers two questions and only one is
-// specific to --security: which packages must be updated *now*, and what the resulting code's
-// security posture is. A monthly update that happens to close a CVE should say so, and the
-// abandoned-package list comes from the same audit.
-//
-// The security flag separates the two: only a security run lets the audit dictate the update's
-// scope, abort when there is nothing to fix, and relabel the merge request.
+// ComposerAudit runs on every update: a routine update that closes a CVE should say so. Only a
+// security run lets the audit dictate the update's scope, abort, and relabel the merge request.
 type ComposerAudit struct {
 	internal.BasicAddon
 	logger   *zap.Logger
@@ -41,8 +34,7 @@ type ComposerAudit struct {
 	afterAudit  composer.Audit
 }
 
-// NewComposerAudit creates a new security auditor instance. security marks a `--security` run,
-// in which the audit drives the update rather than only describing it.
+// NewComposerAudit creates a security auditor. security marks a `--security` run.
 func NewComposerAudit(logger *zap.Logger, composer Composer, security bool) *ComposerAudit {
 	return &ComposerAudit{
 		logger:   logger,
@@ -58,8 +50,7 @@ func (ca *ComposerAudit) SubscribedEvents() map[string]any {
 			Priority: event.Max,
 			Listener: event.ListenerFunc(ca.preComposerUpdateHandler),
 		},
-		// Below Normal: this reports the final code's security posture, so it must run after
-		// code_beautifier and deprecations_remover rather than interleaving with them.
+		// BelowNormal: audits the final code, so it must run after the addons that rewrite it.
 		"post-code-update": event.ListenerItem{
 			Priority: event.BelowNormal,
 			Listener: event.ListenerFunc(ca.postCodeUpdateHandler),
@@ -71,13 +62,8 @@ func (ca *ComposerAudit) SubscribedEvents() map[string]any {
 	}
 }
 
-// RenderTemplate returns the rendered template for this addon.
-//
-// A run with no advisories at all renders nothing — the common case on a normal run, where a
-// "🛡️ Security Report" section saying nothing would appear in every routine merge request.
-//
-// The abandoned packages go to unsupported_modules via pre-merge-request-create instead, which
-// renders both as one list: to a reviewer they are the same finding.
+// RenderTemplate renders nothing when there are no advisories at all, so a routine merge request
+// carries no empty security section. Abandoned packages go to unsupported_modules instead.
 func (ca *ComposerAudit) RenderTemplate() (string, error) {
 	fixed := ca.GetFixedAdvisories()
 	if len(fixed) == 0 && len(ca.afterAudit.Advisories) == 0 {
@@ -90,10 +76,8 @@ func (ca *ComposerAudit) RenderTemplate() (string, error) {
 	})
 }
 
-// preComposerUpdateHandler audits the code as it stands before the update.
-//
-// On a security run it narrows the update to the affected packages and aborts when there are
-// none. On a normal run it only records the audit: the scope is the user's to decide.
+// preComposerUpdateHandler audits the pre-update code. A security run narrows the update to the
+// affected packages and aborts when there are none; a normal run only records the audit.
 func (ca *ComposerAudit) preComposerUpdateHandler(e event.Event) error {
 	evt := e.(*services.PreComposerUpdateEvent)
 	var err error
@@ -107,8 +91,7 @@ func (ca *ComposerAudit) preComposerUpdateHandler(e event.Event) error {
 		return nil
 	}
 
-	// Deduplicated in first-seen order: several advisories often name one package, and the list
-	// becomes composer update's package arguments.
+	// Deduplicated: several advisories often name one package, and this becomes composer's args.
 	packagesToUpdate := make([]string, 0)
 	seen := make(map[string]bool, len(ca.beforeAudit.Advisories))
 	for _, advisory := range ca.beforeAudit.Advisories {
@@ -152,12 +135,8 @@ func (ca *ComposerAudit) postCodeUpdateHandler(e event.Event) error {
 	return nil
 }
 
-// GetAbandonedPackages returns the abandoned packages from the post-update audit, so the list
-// describes the code the merge request actually contains. Unlike an advisory, one that is no
-// longer abandoned is simply absent — there is nothing for the update to take credit for.
-//
-// drupal/* is left out: unsupported_modules already reports those from drupal.org's own release
-// data, and listing them twice would read as two separate findings.
+// GetAbandonedPackages returns the post-update audit's abandoned packages, minus drupal/*:
+// unsupported_modules reports those from drupal.org's release data, and twice reads as two findings.
 func (ca *ComposerAudit) GetAbandonedPackages() []composer.AbandonedPackage {
 	abandoned := make([]composer.AbandonedPackage, 0, len(ca.afterAudit.Abandoned))
 	for _, pkg := range ca.afterAudit.Abandoned {
@@ -169,9 +148,7 @@ func (ca *ComposerAudit) GetAbandonedPackages() []composer.AbandonedPackage {
 	return abandoned
 }
 
-// GetFixedAdvisories returns the advisories present before the update but not after. Identified
-// by CVE, falling back to advisory ID and then package+title, so the CVE-less ones don't all
-// collide on the empty string.
+// GetFixedAdvisories returns the advisories present before the update but not after.
 func (ca *ComposerAudit) GetFixedAdvisories() []composer.Advisory {
 	afterKeys := make(map[string]bool, len(ca.afterAudit.Advisories))
 	for _, afterAdvisory := range ca.afterAudit.Advisories {
@@ -187,11 +164,9 @@ func (ca *ComposerAudit) GetFixedAdvisories() []composer.Advisory {
 	return fixed
 }
 
-// advisoryKey returns a stable identity that does not collapse distinct advisories lacking a CVE.
-//
-// The last fallback quotes both halves instead of joining on a separator: a title is free text
-// and may contain one. Two advisories colliding here means one is reported as fixed while it is
-// still open, in a security update.
+// advisoryKey identifies an advisory without collapsing the CVE-less ones onto one key: a
+// collision reports an advisory as fixed while it is still open. The last fallback quotes both
+// halves rather than joining on a separator, because a title is free text.
 func advisoryKey(a composer.Advisory) string {
 	if a.CVE != "" {
 		return "cve:" + a.CVE
@@ -202,11 +177,8 @@ func advisoryKey(a composer.Advisory) string {
 	return "pkg:" + strconv.Quote(a.PackageName) + strconv.Quote(a.Title)
 }
 
-// preMergeRequestCreateHandler publishes the abandoned packages for unsupported_modules to
-// render, and — on a security run only — relabels the merge request.
-//
-// Priority is load-bearing: this runs at Normal and unsupported_modules at BelowNormal, so the
-// list is on the event before the addon that renders it reads it.
+// preMergeRequestCreateHandler publishes the abandoned packages for unsupported_modules and, on a
+// security run, relabels the merge request. Runs at Normal, above the BelowNormal consumer.
 func (ca *ComposerAudit) preMergeRequestCreateHandler(e event.Event) error {
 	evt := e.(*services.PreMergeRequestCreateEvent)
 

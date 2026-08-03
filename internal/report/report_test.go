@@ -179,9 +179,8 @@ func TestRecorderAutoMergeOutcome(t *testing.T) {
 	})
 }
 
-// The auto_merge key must be omitted entirely when it was never requested, so a consumer can
-// test for its presence rather than having to distinguish false-because-failed from
-// false-because-unset.
+// Omitted entirely when never requested, so a consumer can test presence rather than tell
+// false-because-failed from false-because-unset.
 func TestAutoMergeOmittedFromJSONWhenNotRequested(t *testing.T) {
 	rec := newTestRecorder()
 	rec.SetMergeRequest("https://example.com/mr/1")

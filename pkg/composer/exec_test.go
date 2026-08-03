@@ -11,13 +11,11 @@ import (
 	"go.uber.org/zap"
 )
 
-// Command is shared by every package that drives composer -- drush, phpcs and rector all go
-// through `composer exec` -- so its contracts are asserted here rather than inferred from those
-// packages' tests, which only ever exercise them by accident.
+// Command is shared by drush, phpcs and rector, so its contracts are asserted here rather than
+// inferred from tests that exercise them by accident.
 
-// shellCommand builds a factory that runs script through sh instead of composer, and records the
-// invocation Command asked for. Two things in one because they are two halves of the same
-// question: what was requested, and what the process then saw.
+// shellCommand runs script through sh instead of composer and records what Command asked for:
+// two halves of one question, what was requested and what the process saw.
 func shellCommand(script string, seen *[]string) CommandFactory {
 	return func(ctx context.Context, name string, args ...string) *exec.Cmd {
 		*seen = append([]string{name}, args...)
@@ -50,10 +48,8 @@ func TestCommandBuild(t *testing.T) {
 	})
 
 	t.Run("ExtraEnv beats the environment composer would otherwise be given", func(t *testing.T) {
-		// The whole reason ExtraEnv is appended after Env rather than before it. os/exec keeps
-		// the last entry for a repeated key, so the order in build() is what decides the value
-		// the subprocess reads -- and COMPOSER_PROCESS_TIMEOUT is one Env forces itself.
-		// Reversing the append is invisible to every other test in this module.
+		// os/exec keeps the last entry for a repeated key, so the append order in build() is
+		// what decides the value — and reversing it is invisible to every other test here.
 		var seen []string
 		c := Command{
 			New:      shellCommand(`printf %s "$COMPOSER_PROCESS_TIMEOUT"`, &seen),
@@ -106,9 +102,8 @@ func TestCommandCombined(t *testing.T) {
 	})
 
 	t.Run("strips exactly one trailing newline", func(t *testing.T) {
-		// Callers compare this against bare strings and parse it as JSON, so the trailing
-		// newline every command emits must go -- and only that one, or output whose last line
-		// is deliberately blank comes back altered.
+		// Callers compare this against bare strings, so the trailing newline must go — and
+		// only that one, or a deliberately blank last line comes back altered.
 		var seen []string
 		c := Command{New: shellCommand(`printf 'a\n\n'`, &seen), Logger: zap.NewNop()}
 

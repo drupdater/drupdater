@@ -23,8 +23,7 @@ func NewCLI(logger *zap.Logger) *CLI {
 	}
 }
 
-// command returns the runner for a rector invocation. rector runs through `composer exec` and
-// inherits composer's process timeout.
+// command runs rector through `composer exec`, inheriting its process timeout.
 func (s *CLI) command(dir string) composer.Command {
 	return composer.Command{New: execCommand, Logger: s.logger, Dir: dir}
 }
@@ -50,10 +49,8 @@ func (s *CLI) Run(ctx context.Context, dir string, customCodeDirectories []strin
 	if len(customCodeDirectories) == 0 {
 		s.logger.Debug("no custom code directories found")
 		return ReturnOutput{
-			// Known equivalent mutant: dropping this yields the same ReturnOutputTotals{}. Left
-			// un-suppressed because the annotation keys off the enclosing literal and would
-			// also silence the real FileDiffs and ChangedFiles mutants. The zeros are spelled
-			// out because this is the documented "nothing to do" result.
+			// Equivalent mutant, left un-suppressed: the annotation keys off the enclosing
+			// literal and would silence the real FileDiffs and ChangedFiles mutants too.
 			Totals: ReturnOutputTotals{
 				ChangedFiles: 0,
 				Errors:       0,
@@ -66,8 +63,7 @@ func (s *CLI) Run(ctx context.Context, dir string, customCodeDirectories []strin
 	args := []string{"exec", "--", "rector", "process", "--config=/opt/drupdater/rector.php", "--no-progress-bar", "--no-diffs", "--debug", "--output-format=json"}
 	args = append(args, customCodeDirectories...)
 
-	// Split, not combined: rector's --debug output and PHP notices go to stderr and would
-	// corrupt the JSON report.
+	// Split: rector's --debug output and PHP notices would corrupt the JSON report.
 	out, _, err := s.command(dir).Split(ctx, args...)
 
 	if err != nil {

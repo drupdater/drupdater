@@ -1,33 +1,26 @@
-# Codecov has been receiving this module's coverage since the Go workflow was written, with no
-# configuration at all: no target, no threshold, nothing ignored. The ">= 90% for a changed
-# package" rule lives in .claude/rules/coverage.md, CONTRIBUTING.md and two documentation pages,
-# and until now was enforced by nothing -- the local pre-commit hook prints the numbers and ends
-# in `; true`.
+# Enforces the ">= 90% for a changed package" rule documented in .claude/rules/coverage.md and
+# CONTRIBUTING.md, which the local pre-commit hook only ever printed.
 #
-# This does not replace the mutation gate in .github/workflows/go.yml. Line coverage says a line
-# ran; mutation says a test fails when it is wrong, and the module scored 67% MSI at 90%+ line
-# coverage. Coverage is the floor, not the bar.
+# Not a replacement for go.yml's mutation gate: the module scored 67% MSI at 90%+ line coverage.
+# Coverage is the floor, not the bar.
 
 coverage:
   status:
-    # The module sits around 95%. The target is the documented 90% rather than "never drop",
-    # so an honest refactor that trades a few covered lines for less code is not a failure.
+    # The documented 90%, not "never drop", so a refactor trading covered lines for less code
+    # is not a failure.
     project:
       default:
         target: 90%
         threshold: 1%
-    # New and changed lines are held to the same 90%. This is the one that matters day to day:
-    # it is the automated half of the rule contributors are already asked to follow.
+    # New and changed lines held to the same 90% -- the half that matters day to day.
     patch:
       default:
         target: 90%
 
-# main.go is `cmd.Execute()` and nothing else. It cannot be covered without executing the binary,
-# and a single permanently-uncovered statement drags the project number for no signal.
+# main.go is `cmd.Execute()` and nothing else, uncoverable without executing the binary.
 #
-# Deliberately NOT listed here: the generated mocks_test.go files. `go test -coverprofile` does
-# not instrument _test.go files at all, so they never reach the report and ignoring them would
-# be a no-op that reads like it does something.
+# The generated mocks_test.go files are deliberately absent: -coverprofile does not instrument
+# _test.go at all, so ignoring them would be a no-op that reads like it does something.
 ignore:
   - "main.go"
 

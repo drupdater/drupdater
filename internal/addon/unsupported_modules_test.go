@@ -36,9 +36,8 @@ func TestUnsupportedModules_SubscribedEvents(t *testing.T) {
 	assert.Contains(t, events, "pre-site-update")
 	assert.IsType(t, event.ListenerItem{}, events["pre-site-update"])
 
-	// Below Normal on pre-merge-request-create, strictly below the Normal that composer_audit
-	// publishes the abandoned packages at. Equal priorities would leave the order to the
-	// dispatcher and the list would sometimes be read before it is written.
+	// Strictly below the Normal composer_audit publishes at: at equal priority the list would
+	// sometimes be read before it is written.
 	assert.Contains(t, events, "pre-merge-request-create")
 	preMerge := events["pre-merge-request-create"].(event.ListenerItem)
 	assert.Equal(t, event.BelowNormal, preMerge.Priority)
@@ -180,10 +179,8 @@ func TestUnsupportedModules_PreMergeRequestCreateHandler(t *testing.T) {
 	assert.Equal(t, evt.AbandonedPackages, um.abandoned)
 }
 
-// TestUnsupportedModules_RenderTemplate_AbandonedOnly checks a project with no unsupported
-// module but an abandoned package still gets the section. Before the two were merged this was
-// the case that fell through the gap: nothing on Drupal.org's side to report, and no other
-// section to put a Packagist finding in.
+// An abandoned package with no unsupported module still gets the section — the case that fell
+// through the gap before the two lists were merged.
 func TestUnsupportedModules_RenderTemplate_AbandonedOnly(t *testing.T) {
 	um := NewUnsupportedModules(zap.NewNop(), NewMockDrush(t))
 	um.abandoned = []services.AbandonedPackage{{Name: "patchwork/jsqueeze"}}
@@ -193,9 +190,8 @@ func TestUnsupportedModules_RenderTemplate_AbandonedOnly(t *testing.T) {
 	assert.Contains(t, result, "| patchwork/jsqueeze | Abandoned package | — | No replacement suggested |")
 }
 
-// TestUnsupportedModules_EndOfLifeEntries_Ordering pins the row order: one list sorted by
-// name, with the two sources interleaved rather than grouped. Both halves originate from maps,
-// so without the sort two runs over an unchanged project would produce different descriptions.
+// One list sorted by name, sources interleaved. Both halves come from maps, so without the sort
+// two runs over an unchanged project produce different descriptions.
 func TestUnsupportedModules_EndOfLifeEntries_Ordering(t *testing.T) {
 	um := NewUnsupportedModules(zap.NewNop(), NewMockDrush(t))
 	um.modules = map[string]drush.UnsupportedModule{
@@ -214,9 +210,7 @@ func TestUnsupportedModules_EndOfLifeEntries_Ordering(t *testing.T) {
 	assert.Equal(t, []string{"acme/pkg", "alpha", "zebra", "zeta/pkg"}, names)
 }
 
-// TestUnsupportedModules_EndOfLifeEntries_Recommendations covers the four ways a row's
-// recommendation is phrased, including drush's literal "None" for a module with no supported
-// release at all — which is a status, not a version to update to.
+// The four phrasings, including drush's literal "None" — a status, not a version to update to.
 func TestUnsupportedModules_EndOfLifeEntries_Recommendations(t *testing.T) {
 	um := NewUnsupportedModules(zap.NewNop(), NewMockDrush(t))
 	um.modules = map[string]drush.UnsupportedModule{
@@ -242,10 +236,8 @@ func TestUnsupportedModules_EndOfLifeEntries_Recommendations(t *testing.T) {
 	}, got)
 }
 
-// TestUnsupportedModules_AbandonedHandoff runs the whole handoff through a real dispatcher:
-// composer_audit publishes on pre-merge-request-create and unsupported_modules renders. It is
-// the only test that covers the wiring rather than the two halves — the subscription itself,
-// and the priority that puts the write before the read.
+// The whole handoff through a real dispatcher — the only test covering the wiring itself: the
+// subscription, and the priority that puts the write before the read.
 func TestUnsupportedModules_AbandonedHandoff(t *testing.T) {
 	audit := NewComposerAudit(zap.NewNop(), NewMockComposer(t), false)
 	audit.afterAudit = composer.Audit{

@@ -47,9 +47,8 @@ func TestPathWithin(t *testing.T) {
 func TestIsSomethingStagedInPathIgnoresPrefixSiblings(t *testing.T) {
 	service := NewGitRepositoryService(zap.NewNop())
 
-	// A staged file in "translations-backup" must not be reported as a change in
-	// "translations": the translations addon commits based on this answer, and a false
-	// positive there makes it create a commit with no translation changes in it.
+	// The translations addon commits on this answer, so a false positive from the sibling
+	// "translations-backup" creates a commit with nothing in it.
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Status().Return(git.Status{
 		"translations-backup/de.po": &git.FileStatus{Staging: git.Modified},
@@ -177,9 +176,8 @@ func TestCloneRepository(t *testing.T) {
 	})
 
 	t.Run("clones shallow and without tags", func(t *testing.T) {
-		// Both are deliberate CloneOptions with no other visible effect, so without this they
-		// could be dropped silently. Depth keeps the clone cheap; NoTags keeps a project's
-		// release tags out of a throwaway update clone.
+		// Both options have no other visible effect and could be dropped silently. Depth keeps
+		// the clone cheap; NoTags keeps release tags out of a throwaway clone.
 		source, r := initRepoWithCommit(t)
 
 		// Three commits in total, so the clone is distinguishable from both a full clone and a
@@ -214,9 +212,8 @@ func TestCloneRepository(t *testing.T) {
 		require.NoError(t, err)
 		clonedHead, err := cloneShallow.Head()
 		require.NoError(t, err)
-		// The graft point is the tip itself. Any greater depth grafts further back, so
-		// comparing against HEAD -- rather than counting graft points, of which there is one
-		// either way -- is what pins the depth to exactly 1.
+		// Compared against HEAD, not the graft-point count: there is one either way, so only
+		// the tip being the graft point pins the depth to exactly 1.
 		require.Len(t, shallowCommits, 1)
 		assert.Equal(t, clonedHead.Hash(), shallowCommits[0])
 
@@ -326,9 +323,8 @@ func TestIsShallowClone(t *testing.T) {
 	})
 }
 
-// isolateGitConfig points go-git's global-config lookup at an empty directory, so these tests
-// see the same identity-less environment a CI runner has rather than the developer's own
-// ~/.gitconfig.
+// isolateGitConfig gives these tests a CI runner's identity-less environment, not the
+// developer's own ~/.gitconfig.
 func isolateGitConfig(t *testing.T) string {
 	t.Helper()
 	home := t.TempDir()
@@ -342,9 +338,8 @@ func TestIsSomethingStagedInPathOnStatusError(t *testing.T) {
 	service := NewGitRepositoryService(zap.New(core))
 
 	worktree := NewMockWorktree(t)
-	// The status is deliberately non-empty. With an empty one the guarded and unguarded
-	// versions both return false, so the test could not tell them apart; here, dropping the
-	// guard would let the loop below report a staged file from a status that failed to load.
+	// Non-empty on purpose: with an empty status the guarded and unguarded versions both
+	// return false, and the test could not tell them apart.
 	worktree.EXPECT().Status().Return(git.Status{
 		"file1.txt": &git.FileStatus{Staging: git.Modified},
 	}, assert.AnError)
@@ -357,9 +352,8 @@ func TestIsSomethingStagedInPathOnStatusError(t *testing.T) {
 func TestPrepareCheckoutKeepsExistingGlobalIdentity(t *testing.T) {
 	service := NewGitRepositoryService(zap.NewNop())
 
-	// The fallback must only fire when *nothing* supplies an identity. A developer running
-	// drupdater against their own checkout has a global git identity, and overwriting it in
-	// the repository config would attribute their later commits to drupdater.
+	// The fallback fires only when nothing supplies an identity: overwriting a developer's
+	// global one would attribute their later commits to drupdater.
 	home := isolateGitConfig(t)
 	require.NoError(t, os.WriteFile(filepath.Join(home, ".gitconfig"),
 		[]byte("[user]\n\tname = Real Person\n\temail = real@example.com\n"), 0o600))
@@ -382,9 +376,8 @@ func TestPrepareCheckoutKeepsExistingGlobalIdentity(t *testing.T) {
 func TestPrepareCheckoutKeepsExplicitIdentity(t *testing.T) {
 	service := NewGitRepositoryService(zap.NewNop())
 
-	// An identity passed in by the caller (resolved from the VCS platform) must win even when
-	// no git config anywhere supplies one -- otherwise every commit would be attributed to the
-	// generic fallback instead of the bot account the run authenticated as.
+	// A caller-supplied identity must win over the fallback, or every commit is attributed to
+	// the generic default instead of the bot account the run authenticated as.
 	isolateGitConfig(t)
 
 	dir := t.TempDir()
@@ -425,9 +418,8 @@ func TestPrepareCheckoutCommitIdentityFallback(t *testing.T) {
 	service := NewGitRepositoryService(zap.NewNop())
 
 	t.Run("falls back when nothing supplies an identity", func(t *testing.T) {
-		// A tokenless checkout-mode dry run has no VCS platform to ask, and a fresh clone or a
-		// CI checkout has no identity of its own, so without a fallback the first commit dies
-		// with go-git's "author field is required".
+		// A tokenless dry run has no platform to ask and a CI checkout no identity of its own,
+		// so without a fallback the first commit dies on "author field is required".
 		isolateGitConfig(t)
 		dir := t.TempDir()
 		_, err := git.PlainInit(dir, false)

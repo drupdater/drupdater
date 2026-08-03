@@ -60,9 +60,8 @@ func upgradeCore() []composer.PackageChange {
 }
 
 func TestUpdatePatchesRemovesRemotePatchForFixedIssue(t *testing.T) {
-	// A remote patch has no file in the repository, so there is nothing to remove from the
-	// worktree — passing its URL to worktree.Remove would fail, and the patch used to be
-	// dropped from composer.json without ever being reported in the merge request.
+	// A remote patch has no file to remove. Passing its URL to worktree.Remove used to fail,
+	// dropping the patch from composer.json unreported.
 	const patchURL = "https://www.drupal.org/files/issues/123456-1.patch"
 
 	composerService := NewMockComposer(t)
@@ -155,9 +154,8 @@ func TestDropPatchFile(t *testing.T) {
 }
 
 func TestValidateCombinedPatchesResolvesAbsoluteLocalPaths(t *testing.T) {
-	// An absolute local path is not a remote patch. url.ParseRequestURI accepts it, so the
-	// previous check passed it through unprefixed, composer could not find it, and the package
-	// was pinned on a patch conflict that did not exist.
+	// url.ParseRequestURI accepts an absolute local path, which once passed through unprefixed
+	// and pinned the package on a conflict that did not exist.
 	composerService := NewMockComposer(t)
 	composerService.EXPECT().
 		CheckIfPatchesApply(mock.Anything, mock.Anything, "drupal/core", "8.8.0", mock.Anything).
@@ -187,13 +185,9 @@ func TestValidateCombinedPatchesResolvesAbsoluteLocalPaths(t *testing.T) {
 }
 
 func TestUpdatePatchesRecognisesEveryFixedIssueStatus(t *testing.T) {
-	// drupal.org has three statuses that mean "the fix has landed": 2 (Fixed), 7 (Closed
-	// (fixed)) and 15 (Patch (to be ported)). Each is checked separately in the guard, so each
-	// needs its own case -- otherwise two of the three could be deleted and patches for issues
-	// closed under those statuses would be carried forward forever.
-	//
-	// The negative case matters just as much: an issue still open must keep its patch, or a
-	// live fix would be dropped from composer.json.
+	// Three drupal.org statuses mean "the fix has landed" -- 2, 7 and 15 -- each checked
+	// separately in the guard, so each needs its own case. The negative matters as much: an
+	// open issue must keep its patch, or a live fix is dropped from composer.json.
 	tests := []struct {
 		name        string
 		status      string

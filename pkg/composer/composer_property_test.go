@@ -13,10 +13,8 @@ import (
 	"pgregory.net/rapid"
 )
 
-// The helpers below all read output or configuration produced by Composer, which is to say by
-// something outside this repository's control. Each has a doc comment naming a concrete bug it
-// exists to prevent; these properties state that promise over the whole input space instead of
-// over the one example that prompted the comment.
+// The helpers below read output produced outside this repository's control, so these properties
+// state each one's promise over the whole input space rather than over one example.
 
 // jsonKeyGen generates an object key of the shape composer.json uses for a repository entry.
 func jsonKeyGen() *rapid.Generator[string] {
@@ -27,9 +25,8 @@ func TestPropertyOrderedObjectValuesKeepsDeclarationOrder(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		keys := rapid.SliceOfN(jsonKeyGen(), 0, 6).Draw(t, "keys")
 
-		// Values are made distinguishable by index so that a reordering is visible; sorting the
-		// keys, which this function once did, would shuffle the caller's repositories into a
-		// priority order the project never declared.
+		// Indexed so a reordering is visible: sorting the keys, which this once did, shuffles
+		// the repositories into a priority the project never declared.
 		pairs := make([]string, 0, len(keys))
 		want := make([]json.RawMessage, 0, len(keys))
 		for i, key := range keys {
@@ -72,10 +69,8 @@ func TestPropertyNormalizeRepositoryDropsOnlyTheDisableForm(t *testing.T) {
 		name := jsonKeyGen().Draw(t, "name")
 		disabled := rapid.Bool().Draw(t, "disabled")
 
-		// The disable form is one repository name mapped to a bool, and nothing else. It is
-		// matched on that exact shape because a real entry may carry a bool of its own —
-		// {"type":"composer","url":"...","canonical":false} is how a mirror is declared, and
-		// dropping that would silently change which packages resolve.
+		// Matched on the exact disable shape, because a real entry carries a bool of its own:
+		// a mirror is {"type":"composer","url":"…","canonical":false}.
 		_, keep := normalizeRepository(json.RawMessage(fmt.Sprintf(`{%q:%t}`, name, disabled)), "/project")
 		assert.False(t, keep, "a single name mapped to a bool is a disable entry")
 
@@ -101,9 +96,7 @@ func TestPropertyNormalizeRepositoryResolvesRelativePathsOnce(t *testing.T) {
 		require.NoError(t, json.Unmarshal(normalized, &got))
 		assert.Equal(t, filepath.Join(projectDir, relative), got.URL)
 
-		// Idempotent: the resolved URL is absolute, so normalising again must not join it onto
-		// the project directory a second time. The scratch project is rebuilt per check, and a
-		// doubled prefix would point at a directory that does not exist.
+		// Idempotent: the resolved URL is absolute, and a doubled prefix points nowhere.
 		again, keep := normalizeRepository(normalized, projectDir)
 		require.True(t, keep)
 		assert.JSONEq(t, string(normalized), string(again))
@@ -115,9 +108,8 @@ func TestPropertyNormalizeRepositoryPassesNonPathEntriesThrough(t *testing.T) {
 		repoType := rapid.SampledFrom([]string{"composer", "vcs", "git", "artifact", "package"}).Draw(t, "type")
 		url := rapid.StringMatching(`https://[a-z]{1,8}\.example\.com/[a-z]{0,8}`).Draw(t, "url")
 
-		// Only "path" repositories carry a filesystem location that the scratch project has to
-		// have rewritten. Everything else must arrive byte-identical, since re-marshalling it
-		// would reorder keys and could drop a field this struct does not know about.
+		// Only "path" entries are rewritten. Everything else must arrive byte-identical:
+		// re-marshalling reorders keys and can drop a field this struct does not know.
 		entry := json.RawMessage(fmt.Sprintf(`{"type":%q,"url":%q}`, repoType, url))
 		got, keep := normalizeRepository(entry, "/project")
 		assert.True(t, keep)
@@ -138,11 +130,9 @@ func TestPropertyUnresolvableReasonLetsPatchRejectionWin(t *testing.T) {
 		}), 0, 4).Draw(t, "markers")
 		noise := rapid.StringMatching(`[a-z .:/'"-]{0,40}`).Draw(t, "noise")
 
-		// Composer's dist-to-source fallback prints "could not be downloaded" and then carries
-		// on, so an unresolvable marker can sit in output that describes a genuine patch
-		// rejection. Classifying that as "could not obtain the package" would leave the package
-		// unpinned and ship a patch that does not apply — the worse of the two failures, so the
-		// rejection wins no matter how many markers accompany it.
+		// The dist-to-source fallback prints "could not be downloaded" and carries on, so an
+		// unresolvable marker can sit in output describing a genuine rejection. Shipping a
+		// patch that does not apply is the worse failure, so the rejection always wins.
 		out := noise + rejection + noise + strings.Join(markers, noise)
 		reason, unresolvable := unresolvableReason(out)
 		assert.False(t, unresolvable)
@@ -206,9 +196,7 @@ func TestPropertyAuditUnmarshalFlattensEveryShape(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		packages := rapid.SliceOfNDistinct(jsonKeyGen(), 0, 4, rapid.ID).Draw(t, "packages")
 
-		// Composer emits the advisories of a package either as a list or as a keyed map,
-		// depending on the package. Both have to flatten into the same one list, or an advisory
-		// silently disappears from a security report.
+		// Both shapes must flatten into one list, or an advisory disappears from the report.
 		entries := make([]string, 0, len(packages))
 		want := make([]string, 0)
 		for _, pkg := range packages {
@@ -259,11 +247,8 @@ func TestPropertyAuditUnmarshalToleratesAMissingAdvisoriesKey(t *testing.T) {
 	})
 }
 
-// TestPropertyAuditUnmarshalOrdersAbandonedByName states that the abandoned list does not
-// depend on the order composer happened to emit its keys in. It is built by ranging over a Go
-// map, whose iteration order is randomised per run, so without the sort the same audit output
-// would render a different merge request description and a different report on every run — and
-// a consumer diffing two reports of an unchanged site would see phantom changes.
+// The abandoned list is built by ranging a Go map, so without the sort the same audit output
+// renders a different report every run and a consumer diffing two sees phantom changes.
 func TestPropertyAuditUnmarshalOrdersAbandonedByName(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		names := rapid.SliceOfNDistinct(jsonKeyGen(), 0, 6, rapid.ID).Draw(t, "names")
@@ -293,11 +278,8 @@ func TestPropertyAuditUnmarshalOrdersAbandonedByName(t *testing.T) {
 	})
 }
 
-// TestPropertyComposerEnvLeavesEverythingElseAlone states the law Env has to obey for
-// the Dockerfile's other variables, COMPOSER_AUTH, PATH and anything else a deployment sets: it
-// forces the entries drupdater's correctness depends on and passes every other entry through
-// unchanged and in order. Forcing an environment by rebuilding it is the kind of change that
-// silently drops a variable nobody thought to write a test for.
+// Env forces the entries drupdater's correctness depends on and passes everything else through
+// unchanged and in order — rebuilding an environment silently drops variables nobody tested.
 func TestPropertyComposerEnvLeavesEverythingElseAlone(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		env := rapid.SliceOfN(envEntryGen(), 0, 8).Draw(t, "env")
@@ -324,9 +306,8 @@ func TestPropertyComposerEnvLeavesEverythingElseAlone(t *testing.T) {
 	})
 }
 
-// envEntryGen generates an environment entry, drawing the key from the forced variables often
-// enough that the override path is exercised, and occasionally emitting an entry that is not an
-// assignment at all — os.Environ() makes no promise that every entry contains "=".
+// envEntryGen draws forced keys often enough to exercise the override path, and sometimes emits
+// a non-assignment: os.Environ() does not promise every entry contains "=".
 func envEntryGen() *rapid.Generator[string] {
 	return rapid.Custom(func(t *rapid.T) string {
 		key := rapid.SampledFrom([]string{

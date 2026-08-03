@@ -128,9 +128,7 @@ func TestPrintCheckResults(t *testing.T) {
 }
 
 func TestPrintCheckResultsRedactsDetail(t *testing.T) {
-	// A failed check's Detail can carry raw subprocess output (e.g. a Composer error after a
-	// failed authenticated fetch), which is exactly where a leaked credential would otherwise
-	// reach stdout unredacted.
+	// Detail can carry raw subprocess output, where a credential would reach stdout unredacted.
 	redactor := logging.NewRedactor()
 	redactor.Register("s3cr3t-token")
 
@@ -167,8 +165,7 @@ func TestCleanupFullCheckArtifacts(t *testing.T) {
 	assert.NoDirExists(t, filepath.Join(parent, "private"))
 }
 
-// fakeShallowCloneChecker and fakeCheapChecksComposer are minimal test doubles for the narrow
-// interfaces runCheapChecks depends on, so its branching can be exercised without the real
+// Doubles for the narrow interfaces runCheapChecks needs, so its branching runs without the
 // composer/drush/git binaries CI doesn't install.
 type fakeShallowCloneChecker struct {
 	shallow bool
@@ -236,9 +233,8 @@ func TestRunCheapChecks(t *testing.T) {
 	})
 
 	t.Run("one result per configured site", func(t *testing.T) {
-		// The sites list comes from the config file, not a pre-set cfg.Sites: runCheapChecks
-		// loads it via checkConfigAndAddons. Only "default" gets a settings.php; "extra" is
-		// missing.
+		// The sites come from the config file, not a pre-set cfg.Sites. Only "default" has
+		// a settings.php.
 		cfgPath := filepath.Join(t.TempDir(), ".drupdater.yaml")
 		require.NoError(t, os.WriteFile(cfgPath, []byte("sites: [default, extra]\n"), 0o600))
 
@@ -267,9 +263,8 @@ func TestRunFullChecksNoRepositoryURL(t *testing.T) {
 }
 
 func TestRunFullChecksDefaultsToMainBranch(t *testing.T) {
-	// With no branch configured the full check must still pick one; "main" is the default the
-	// clone is attempted with. The clone fails here (the URL is a bare directory), but the
-	// failure detail names the branch that was tried.
+	// With no branch configured the clone must still try one. It fails here, but the detail
+	// names the branch it tried.
 	cfg := internal.Config{RepositoryURL: t.TempDir()}
 
 	results := runFullChecks(t.Context(), zap.NewNop(), cfg, "")

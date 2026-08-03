@@ -458,9 +458,8 @@ func TestCodingStyles(t *testing.T) {
 		composer := NewMockComposer(t)
 		composer.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/coder").Return(false, nil)
 		composer.EXPECT().Require(anyCtx, "/tmp", []string{"--dev", "drupal/coder"}).Return("", nil)
-		// Coder was installed only to run phpcs, so it has to go again -- even on this path,
-		// where there was nothing to fix. Left behind, it reaches the merge request as a dev
-		// dependency the project never asked for and that no report mentions.
+		// Coder has to go even on this path, or it reaches the merge request as a dependency
+		// nobody asked for.
 		composer.EXPECT().Remove(anyCtx, "/tmp", []string{"--dev", "drupal/coder"}).Return("", nil)
 
 		worktree.EXPECT().AddGlob("composer.*").Return(nil)
@@ -771,9 +770,7 @@ func TestRemoveCoder(t *testing.T) {
 }
 
 func TestCoderRemovalErrorDoesNotMaskTheRealFailure(t *testing.T) {
-	// The deferred cleanup reports its own failure only when the handler was otherwise fine.
-	// Letting it overwrite a live error would replace "phpcs blew up" with "could not uninstall
-	// coder", and the run report would name the wrong cause.
+	// The deferred cleanup must not overwrite a live error, or the report names the wrong cause.
 	logger := zap.NewNop()
 
 	fileExists = func(_ string) bool { return true }
@@ -834,13 +831,9 @@ func TestCoderRemovalFailureSurfacesOnAnOtherwiseCleanRun(t *testing.T) {
 }
 
 func TestCoderIsRemovedFromTheSectionItWasInstalledInto(t *testing.T) {
-	// Install and removal must name the same dependency section. composer rejects the mismatch
-	// outright -- "drupal/coder could not be found in require but it is present in require-dev"
-	// -- and the whole run fails in post-code-update.
-	//
-	// Asserting the two calls against each other rather than against a hard-coded flag: a mock
-	// that simply echoes back whatever the code passes will happily agree with a wrong flag, and
-	// did, until an integration run caught it.
+	// Install and removal must name the same dependency section, or composer rejects the
+	// mismatch and the run fails. Asserted against each other, not a hard-coded flag: a mock
+	// agrees with whatever the code passes, and did, until an integration run caught it.
 	logger := zap.NewNop()
 
 	fileExists = func(_ string) bool { return true }

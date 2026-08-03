@@ -12,18 +12,14 @@ import (
 	"go.uber.org/zap"
 )
 
-// TestComposerEnvironment covers what drush shares with every other package that shells out to
-// composer: `composer exec -- drush` runs drush as a subprocess of composer, so composer's
-// default 300s process timeout applies to it. `site:install` and `updatedb` on a real site
-// exceed that comfortably, and the run then dies with a killed subprocess rather than an
-// updated site — a failure that has nothing to do with the project being updated.
+// drush runs as a subprocess of composer, so composer's 300s default timeout applies — and
+// `site:install` and `updatedb` on a real site exceed it comfortably.
 func TestComposerEnvironment(t *testing.T) {
 	cache, _ := otter.MustBuilder[string, string](100).Build()
 	executor := NewCLI(zap.NewNop(), cache)
 
-	// captureCmd runs the helper process and hands back the command that actually ran, so the
-	// assertions are about the environment the subprocess was given rather than about the
-	// helper that builds it.
+	// captureCmd returns the command that actually ran, so the assertions are about the
+	// environment the subprocess was given.
 	captureCmd := func(t *testing.T) **exec.Cmd {
 		t.Helper()
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")

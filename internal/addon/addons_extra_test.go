@@ -290,11 +290,6 @@ func countOccurrences(haystack string, needle string) int {
 	return count
 }
 
-// anyCtx matches any non-nil context.Context in a mock expectation.
-//
-// Addons receive the context on the event payload and hand it to every service call. Matching
-// it with mock.Anything let a call site drop it entirely without a test noticing, which would
-// silently disable cancellation and the run timeout for everything below that point. The exact
-// value cannot always be pinned -- the workflow derives per-site contexts -- but requiring
-// non-nil catches the failure that matters.
+// anyCtx matches any non-nil context.Context in a mock expectation. mock.Anything would let a
+// call site drop the context entirely, silently disabling cancellation and the run timeout.
 var anyCtx = mock.MatchedBy(func(ctx context.Context) bool { return ctx != nil })

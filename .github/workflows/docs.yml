@@ -1,10 +1,7 @@
 name: docs
 
-# Builds the documentation site and publishes it to the gh-pages branch of
-# drupdater/drupdater.github.io, which GitHub Pages serves at https://drupdater.github.io/.
-#
-# The sources live here, beside the code, so a change to a flag or an addon updates its own
-# documentation in the same pull request. Only the built HTML is pushed to the site repository.
+# Builds docs/ and publishes the HTML to drupdater.github.io's gh-pages branch. The sources
+# live beside the code so a flag change updates its own documentation in the same pull request.
 on:
   push:
     branches: [main]
@@ -12,8 +9,7 @@ on:
       - "docs/**"
       - "mkdocs.yml"
       - "requirements-docs.txt"
-      # Snippet sources: these files are embedded into pages verbatim, so a change to one
-      # changes the published site even though it is not under docs/.
+      # Embedded into pages verbatim, so a change here changes the published site.
       - "internal/addon/testdata/**"
       - ".github/assert-report.jq"
       - ".github/assert-lock-matches-report.jq"
@@ -42,12 +38,9 @@ jobs:
 
       - run: pip install -r requirements-docs.txt
 
-      # --strict fails the build on a broken internal link or a nav entry pointing at a
-      # file that does not exist, so a bad link is caught here rather than published.
-      #
-      # DRUPDATER_GOATCOUNTER is what puts the analytics script into the pages. It is set
-      # here and nowhere else, so only the published site is counted — a contributor
-      # running mkdocs serve or make docs-build gets no tracking script.
+      # --strict catches a broken link or nav entry here rather than publishing it.
+      # DRUPDATER_GOATCOUNTER is set here and nowhere else, so only the published site is
+      # counted and a local mkdocs serve emits no tracking script.
       - run: mkdocs build --strict
         env:
           DRUPDATER_GOATCOUNTER: "true"

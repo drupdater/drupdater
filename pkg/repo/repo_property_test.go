@@ -9,14 +9,11 @@ import (
 	"pgregory.net/rapid"
 )
 
-// pathWithin decides whether a changed file counts as a change to a configured directory. Its
-// doc comment names the bug a substring test would have; these properties state the containment
-// laws that rule that class of bug out for every path rather than for the one example.
+// pathWithin decides whether a changed file counts as a change to a configured directory. These
+// properties state the containment laws for every path, not just the documented example.
 
-// segmentGen generates one segment of a slash-separated repository path. Segments start with an
-// alphanumeric so the generator cannot produce "." or ".."; git status paths are already
-// relative to the worktree root and never contain either, and path.Join would silently collapse
-// them into a shape the function is not being asked about.
+// segmentGen starts each segment with an alphanumeric so it cannot produce "." or "..": git
+// status paths never contain either, and path.Join would silently collapse them.
 func segmentGen() *rapid.Generator[string] {
 	return rapid.StringMatching(`[a-z0-9][a-z0-9_.-]{0,7}`)
 }
@@ -38,9 +35,8 @@ func TestPropertyPathWithinAcceptsEveryDescendant(t *testing.T) {
 func TestPropertyPathWithinRejectsPrefixSiblings(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		dir := path.Join(segmentsGen(3).Draw(t, "dir")...)
-		// A non-empty suffix that does not start with a separator turns the last segment into a
-		// different directory name — "translations" against "translations-backup". A substring
-		// test would report every file in it as a change to dir.
+		// A suffix with no separator makes a different directory — "translations-backup" —
+		// whose every file a substring test would report as a change to dir.
 		suffix := segmentGen().Draw(t, "suffix")
 		file := segmentGen().Draw(t, "file")
 
@@ -77,9 +73,8 @@ func TestPropertyPathWithinIgnoresSurroundingSlashes(t *testing.T) {
 		lead := strings.Repeat("/", rapid.IntRange(0, 2).Draw(t, "lead"))
 		trail := strings.Repeat("/", rapid.IntRange(0, 2).Draw(t, "trail"))
 
-		// Callers pass a directory straight from configuration, where writing it as
-		// "/translations/" is a matter of taste. Git status paths never carry them, so the
-		// two forms have to mean the same thing.
+		// Callers pass a directory from configuration, where "/translations/" is a matter of
+		// taste, but git status paths never carry the slashes.
 		assert.Equal(t, pathWithin(file, dir), pathWithin(file, lead+dir+trail))
 	})
 }

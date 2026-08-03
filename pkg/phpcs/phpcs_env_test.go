@@ -7,10 +7,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestComposerEnvironment covers what phpcs shares with every other package that shells out to
-// composer: `composer exec -- phpcs` runs phpcs as a subprocess of composer, so composer's
-// default 300s process timeout applies to it. A phpcbf pass over a large custom-code tree
-// exceeds that, and the run then fails with a killed subprocess rather than a report.
+// phpcs runs as a subprocess of composer, so composer's 300s default timeout applies — and a
+// phpcbf pass over a large custom-code tree exceeds it.
 func TestComposerEnvironment(t *testing.T) {
 	t.Run("Run", func(t *testing.T) {
 		cli, _ := newTestCLI(t)

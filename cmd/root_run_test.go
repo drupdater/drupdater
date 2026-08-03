@@ -45,9 +45,7 @@ func runUpdateWith(t *testing.T, args ...string) error {
 }
 
 func TestRunUpdateRequiresATokenWhenItWillPublish(t *testing.T) {
-	// A publishing run (no --dry-run) pushes a branch and opens a merge request, so it cannot
-	// start without credentials. Failing here rather than midway is the point: the alternative
-	// is a run that does all the work and then cannot deliver it.
+	// A publishing run must fail up front, not after doing all the work it cannot deliver.
 	t.Setenv("DRUPDATER_TOKEN", "")
 	withRootCmdState(t, internal.Config{WorkingDir: t.TempDir()}, "")
 
@@ -153,9 +151,7 @@ func checkoutWithOrigin(t *testing.T) string {
 }
 
 func TestRunUpdateWiresUpAndStartsTheWorkflow(t *testing.T) {
-	// Everything up to the workflow runs for real here: the service constructors, checkout
-	// resolution, the addon registry and the dispatcher. Only the run itself is replaced, so
-	// this covers the wiring that a unit test otherwise cannot reach at all.
+	// Everything up to the workflow runs for real; only the run itself is replaced.
 	fake := &fakeWorkflow{}
 	withFakeWorkflow(t, fake)
 
@@ -190,9 +186,7 @@ func TestRunUpdateReportsAWorkflowFailure(t *testing.T) {
 }
 
 func TestRunUpdateWritesTheRunReport(t *testing.T) {
-	// --report registers a sink on the workflow. The file itself is written by the workflow,
-	// which is faked here, so what this pins is that requesting a report does not break the
-	// wiring -- the option path is otherwise never exercised.
+	// The workflow writes the file and is faked here, so this pins only the option wiring.
 	fake := &fakeWorkflow{}
 	withFakeWorkflow(t, fake)
 
@@ -259,14 +253,11 @@ func TestExecuteDoesNotExitOnSuccess(t *testing.T) {
 }
 
 func TestCreateAddonsPassesEveryDependency(t *testing.T) {
-	// createAddons builds one dependency struct and hands it to every addon factory. Nothing
-	// downstream reports a missing field, so a dependency dropped here would only surface as a
-	// nil-pointer panic in the middle of a real run.
+	// Nothing downstream reports a missing dependency: it surfaces as a nil-pointer panic
+	// mid-run.
 	var got addonDeps
 	oldRegistry, oldMandatory := addonRegistry, mandatoryAddons
-	// The probes delegate to a real factory, so an actual addon is constructed from the
-	// captured dependencies rather than a stand-in. Two of them, so the test also shows the
-	// same struct reaches every addon rather than only the first.
+	// Real factories, and two of them, so the same struct is shown to reach every addon.
 	var second addonDeps
 	realFactory := oldRegistry["composer_diff"]
 	require.NotNil(t, realFactory)

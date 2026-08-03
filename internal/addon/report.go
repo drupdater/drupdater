@@ -9,33 +9,19 @@ import (
 	"github.com/drupdater/drupdater/pkg/drush"
 )
 
-// This file holds every addon's contribution to the machine-readable run report (--report).
+// Every addon's contribution to the --report document, together in one file because these
+// methods are a published contract and a rename spread over eight files is easy to miss.
 //
-// Together these methods are the report's addons schema, a published contract. Scattered across
-// eight files it is easy to rename a field without noticing a consumer depends on it.
+// Addons satisfy report.Reporter structurally, so none of them imports the report package. Keys
+// match .drupdater.yaml's addon names.
 //
-// Each addon satisfies report.Reporter structurally, so none of them imports the report package.
-// The keys match .drupdater.yaml's addon names, so a report reads the way the project is
-// configured.
-//
-// Two addons deliberately contribute nothing:
-//
-//   - composer_diff renders a markdown table of what the top-level "packages" field already
-//     carries in structured form.
-//   - composer_normalizer only reorders composer.json, which the diff shows.
-//
-// Everything else reports, even addons whose work is "only" a code change: most log and swallow
-// their own failures, so one that silently did nothing is otherwise indistinguishable from one
-// with nothing to do.
+// composer_diff and composer_normalizer contribute nothing: the top-level "packages" field
+// already carries what they do.
 
 // --- composer_audit ---
 
-// SecurityAdvisories is the composer_audit section: which advisories the update resolved and
-// which are still open. Remaining is the more actionable half — a fleet-wide exposure view is
-// built from it.
-//
-// Abandoned is not an advisory but the same shape of finding as an unsupported module, on the
-// non-Drupal packages unsupported_modules cannot see.
+// SecurityAdvisories is the composer_audit section. Abandoned is not an advisory but the same
+// kind of finding, on the non-Drupal packages unsupported_modules cannot see.
 type SecurityAdvisories struct {
 	Fixed     []composer.Advisory         `json:"fixed"`
 	Remaining []composer.Advisory         `json:"remaining"`
@@ -45,8 +31,7 @@ type SecurityAdvisories struct {
 // ReportKey implements report.Reporter.
 func (ca *ComposerAudit) ReportKey() string { return "composer_audit" }
 
-// ReportData implements report.Reporter. The abandoned packages are already sorted by name
-// when composer's output is parsed, so this section stays byte-stable across runs.
+// ReportData implements report.Reporter. Abandoned packages arrive sorted, so this stays stable.
 func (ca *ComposerAudit) ReportData() any {
 	fixed := ca.GetFixedAdvisories()
 	remaining := ca.afterAudit.Advisories
@@ -73,8 +58,7 @@ func (uh *UpdateHooks) ReportData() any {
 		return nil
 	}
 
-	// Copy: the caller has no way to know this map is mutex-guarded state. Deep, because the
-	// per-site maps are guarded too.
+	// Deep copy: the caller has no way to know these maps are mutex-guarded state.
 	out := make(map[string]map[string]drush.UpdateHook, len(uh.hooks))
 	for site, hooks := range uh.hooks {
 		out[site] = maps.Clone(hooks)
@@ -88,8 +72,7 @@ func (uh *UpdateHooks) ReportData() any {
 // ReportKey implements report.Reporter.
 func (um *UnsupportedModules) ReportKey() string { return "unsupported_modules" }
 
-// ReportData implements report.Reporter. Sorted by name so two runs over an unchanged site
-// produce byte-identical sections a consumer can diff directly.
+// ReportData implements report.Reporter. Sorted so an unchanged site reports byte-identically.
 func (um *UnsupportedModules) ReportData() any {
 	um.mu.Lock()
 	defer um.mu.Unlock()
@@ -106,8 +89,7 @@ func (um *UnsupportedModules) ReportData() any {
 
 // --- composer_patches ---
 
-// Patches is the composer_patches section. Conflicts are the ones that need a human: a patch
-// that no longer applies to the updated package and could not be replaced automatically.
+// Patches is the composer_patches section. Conflicts are the ones that need a human.
 type Patches struct {
 	Removed   []RemovedPatch  `json:"removed"`
 	Updated   []UpdatedPatch  `json:"updated"`
@@ -132,9 +114,8 @@ func (h *ComposerPatches1) ReportData() any {
 
 // --- code_beautifier ---
 
-// CodingStyleFixes is the code_beautifier section: which files PHPCBF fixed and committed, and
-// how many violations PHPCS called fixable beforehand. The two differ when PHPCBF cannot fix a
-// violation it reported as fixable.
+// CodingStyleFixes is the code_beautifier section. Files and Fixable differ when PHPCBF cannot
+// fix a violation PHPCS reported as fixable.
 type CodingStyleFixes struct {
 	Files   []string `json:"files"`
 	Fixable int      `json:"fixable"`
@@ -153,8 +134,8 @@ func (cb *CodeBeautifier) ReportData() any {
 
 // --- deprecations_remover ---
 
-// DeprecationFix is one file Rector rewrote, and the rules that fired on it. The rule names are
-// the actionable part: they say which deprecation was removed, which "the file changed" does not.
+// DeprecationFix is one file Rector rewrote, and the rules that fired — which name the
+// deprecation removed, where "the file changed" does not.
 type DeprecationFix struct {
 	File           string   `json:"file"`
 	AppliedRectors []string `json:"applied_rectors,omitempty"`
@@ -173,9 +154,8 @@ func (dr *DeprecationsRemover) ReportData() any {
 
 // --- translations_updater ---
 
-// TranslationResult is one site's outcome. Skipped is set when the addon bailed out by design --
-// no locale_deploy, or an unresolvable translation path -- which a report that simply omitted
-// the site would render indistinguishable from "ran and found nothing".
+// TranslationResult is one site's outcome. Skipped records a deliberate bail-out, which omitting
+// the site would make indistinguishable from "ran and found nothing".
 type TranslationResult struct {
 	Path    string `json:"path,omitempty"`
 	Updated bool   `json:"updated"`
@@ -185,8 +165,7 @@ type TranslationResult struct {
 // ReportKey implements report.Reporter.
 func (tu *TranslationsUpdater) ReportKey() string { return "translations_updater" }
 
-// ReportData implements report.Reporter. Keyed by site: in a multisite run each site has its own
-// translation directory and can succeed or skip independently.
+// ReportData implements report.Reporter. Keyed by site: each has its own translation directory.
 func (tu *TranslationsUpdater) ReportData() any {
 	tu.mu.Lock()
 	defer tu.mu.Unlock()

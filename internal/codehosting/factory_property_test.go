@@ -10,14 +10,11 @@ import (
 	"pgregory.net/rapid"
 )
 
-// Repository URLs arrive from a CI variable or a flag, in whichever of the two shapes git
-// itself accepts. The example-based tests cover the shapes someone wrote down; these state what
-// has to hold for every URL of either shape, and that the parser is total — it is called on
-// unvalidated user input, so "never panics" is part of the contract.
+// Repository URLs arrive from a CI variable or a flag, in either shape git accepts. The parser
+// is called on unvalidated input, so "never panics" is part of the contract.
 
-// hostGen generates a repository host: labels of the kind a real forge uses. No port — the SCP
-// form has no slot for one, since the colon after the host already introduces the path, so a
-// port belongs only to the URL form and is covered separately.
+// hostGen generates a forge-shaped host. No port: the SCP form has no slot for one, so ports
+// belong to the URL form and are covered separately.
 func hostGen() *rapid.Generator[string] {
 	return rapid.StringMatching(`[a-z][a-z0-9-]{0,10}(\.[a-z][a-z0-9-]{0,10}){1,2}`)
 }
@@ -34,9 +31,8 @@ func TestPropertyParseGitURLRoundTripsBothURLShapes(t *testing.T) {
 		repo := segmentGen().Draw(t, "repo")
 		wantPath := owner + "/" + repo
 
-		// Both forms name the same repository, so both have to parse back to the same pair.
-		// The SCP form is the one url.ParseRequestURI rejects outright, which is why
-		// ValidateRepositoryURL exists.
+		// Both forms name one repository, so both must parse to the same pair. The SCP form
+		// is the one url.ParseRequestURI rejects outright.
 		for _, raw := range []string{
 			"https://" + host + "/" + wantPath + ".git",
 			"https://" + host + "/" + wantPath,
@@ -58,8 +54,7 @@ func TestPropertyParseGitURLKeepsThePort(t *testing.T) {
 		owner := segmentGen().Draw(t, "owner")
 		repo := segmentGen().Draw(t, "repo")
 
-		// A self-hosted GitLab is routinely reached on a non-default port, and the port is part
-		// of the host the gitlab client is constructed with — dropping it would send every API
+		// A self-hosted GitLab runs on a non-default port, and dropping it sends every API
 		// call somewhere else.
 		hostPort := fmt.Sprintf("%s:%d", host, port)
 		gotHost, gotPath, err := parseGitURL("https://" + hostPort + "/" + owner + "/" + repo + ".git")
@@ -93,9 +88,8 @@ func TestPropertyValidateRepositoryURLAgreesWithParseGitURL(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		raw := rapid.String().Draw(t, "raw")
 
-		// The whole point of ValidateRepositoryURL is that a preflight check accepts exactly
-		// what a run will later accept. If the two ever diverged, a check would pass and the
-		// run would then fail on the same URL.
+		// A preflight check must accept exactly what a run will, or a check passes and the
+		// run fails on the same URL.
 		_, _, parseErr := parseGitURL(raw)
 		assert.Equal(t, parseErr == nil, ValidateRepositoryURL(raw) == nil, "for %q", raw)
 	})
@@ -127,9 +121,7 @@ func TestPropertyProviderFromHostPrefersGitlab(t *testing.T) {
 		middle := rapid.StringMatching(`[a-z.-]{0,8}`).Draw(t, "middle")
 		suffix := rapid.StringMatching(`[a-z.-]{0,8}`).Draw(t, "suffix")
 
-		// A host naming both is ambiguous and the precedence is load-bearing: gitlab wins,
-		// whichever order the two appear in. Create falls through to gitlab for "" as well, so
-		// the only host that reaches the github client is one that says github and not gitlab.
+		// A host naming both is ambiguous, and gitlab wins whichever order they appear in.
 		gitlabFirst := prefix + "gitlab" + middle + "github" + suffix
 		githubFirst := prefix + "github" + middle + "gitlab" + suffix
 

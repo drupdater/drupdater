@@ -17,8 +17,7 @@ type Github struct {
 	logger *zap.Logger
 }
 
-// newGithub builds a GitHub platform from an "owner/repo" path, erroring rather than panicking
-// when a segment is missing.
+// newGithub builds a GitHub platform from an "owner/repo" path.
 func newGithub(path string, token string, logger *zap.Logger) (*Github, error) {
 	owner, repo, found := strings.Cut(strings.Trim(path, "/"), "/")
 	if !found || owner == "" || repo == "" {
@@ -59,11 +58,8 @@ func (g *Github) DeleteBranch(ctx context.Context, branch string) error {
 	return nil
 }
 
-// GetUser returns the authenticated user's name and email.
-//
-// A GITHUB_TOKEN (Actions bot) gets 403 "Resource not accessible by integration" from GET /user;
-// that case falls back to the github-actions[bot] identity, so commits are attributed correctly
-// without a PAT. Any other error yields empty strings so callers can detect the failure.
+// GetUser returns the authenticated user's name and email, empty on failure. An Actions token
+// cannot read /user, so it falls back to the github-actions[bot] identity rather than need a PAT.
 func (g *Github) GetUser(ctx context.Context) (name string, email string) {
 	user, resp, err := g.client.Users.Get(ctx, "")
 	if err != nil {
@@ -83,11 +79,8 @@ func (g *Github) GetUser(ctx context.Context) (name string, email string) {
 	return user.GetName(), email
 }
 
-// EnableAutoMerge merges the PR once every required status check passes.
-//
-// The endpoint: go-github's base URL is the REST root, so "graphql" resolves correctly for
-// github.com. Enterprise serves GraphQL at /api/graphql, outside the /api/v3/ prefix, so this
-// path needs adjusting if newGithub ever gains enterprise support.
+// EnableAutoMerge merges the PR once every required status check passes. The "graphql" path
+// resolves only for github.com; Enterprise serves it outside the /api/v3/ prefix.
 func (g *Github) EnableAutoMerge(ctx context.Context, mr MergeRequest) error {
 	pr, _, err := g.client.PullRequests.Get(ctx, g.owner, g.repo, int(mr.ID))
 	if err != nil {
@@ -133,11 +126,7 @@ func (g *Github) EnableAutoMerge(ctx context.Context, mr MergeRequest) error {
 }
 
 // mergeMethodFor picks a method the repository permits: requesting a disallowed one fails the
-// mutation, and many repositories allow only squash or only rebase. With no flags set at all it
-// falls back to MERGE, whose rejection at least names the problem.
-//
-// Unlike GitLab there is no per-request "delete source branch" option; that is the repository's
-// delete_branch_on_merge setting.
+// mutation. With no flags set it falls back to MERGE, whose rejection at least names the problem.
 func mergeMethodFor(repo *github.Repository) string {
 	switch {
 	case repo.GetAllowMergeCommit():
@@ -151,9 +140,8 @@ func mergeMethodFor(repo *github.Repository) string {
 	}
 }
 
-// isGitHubActionsToken403 matches only the 403 an Actions token gets from /user, identified by
-// its "Resource not accessible by integration" message. Bad credentials and an under-scoped PAT
-// also give 403, with a different message, and must not be suppressed.
+// isGitHubActionsToken403 matches on the message, not the status: bad credentials and an
+// under-scoped PAT also give 403, and those must not be suppressed.
 func isGitHubActionsToken403(resp *github.Response, err error) bool {
 	var ghErr *github.ErrorResponse
 	if !errors.As(err, &ghErr) {

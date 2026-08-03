@@ -27,9 +27,8 @@ func NewCLI(logger *zap.Logger, cache otter.Cache[string, string]) *CLI {
 	}
 }
 
-// command returns the runner for a drush invocation on site. drush runs through `composer exec`
-// and inherits composer's process timeout, which `site:install` and `updatedb` both outlast;
-// SITE_NAME comes after that environment so it wins over any value the parent process set.
+// command runs drush through `composer exec`, inheriting its process timeout. SITE_NAME comes
+// after that environment so it wins over any value the parent process set.
 func (e *CLI) command(dir string, site string) composer.Command {
 	return composer.Command{
 		New:      execCommand,
@@ -47,8 +46,7 @@ func (e *CLI) execDrush(ctx context.Context, dir string, site string, args ...st
 	return e.command(dir, site).Combined(ctx, drushArgs(args)...)
 }
 
-// execDrushStreams keeps stdout and stderr apart. Commands whose stdout is parsed as JSON must
-// use this: drush's stderr notices would otherwise corrupt the payload.
+// execDrushStreams keeps the streams apart, so a stderr notice cannot corrupt a JSON payload.
 func (e *CLI) execDrushStreams(ctx context.Context, dir string, site string, args ...string) (stdout string, stderr string, err error) {
 	return e.command(dir, site).Split(ctx, drushArgs(args)...)
 }
@@ -93,8 +91,7 @@ func (e *CLI) ConfigResave(ctx context.Context, dir string, site string) error {
 	return err
 }
 
-// IsModuleEnabled uses execDrushStreams: a merged stderr notice would be folded into the
-// compared value and report an enabled module as disabled.
+// IsModuleEnabled splits the streams: a merged notice would report an enabled module as disabled.
 func (e *CLI) IsModuleEnabled(ctx context.Context, dir string, site string, module string) (bool, error) {
 	stdout, stderr, err := e.execDrushStreams(ctx, dir, site, "pm:list", "--status=enabled", "--field=name", "--filter="+module)
 	if err != nil {
@@ -118,9 +115,8 @@ func (e *CLI) GetTranslationPath(ctx context.Context, dir string, site string, r
 	if err != nil {
 		return "", err
 	}
-	// An empty result must never reach git: an empty path makes go-git's Worktree.Add stage the
-	// entire working tree. realpath() prints nothing when the target is absent, which here
-	// usually means nothing has been localized yet, so the directory was never created.
+	// An empty path must never reach git: Worktree.Add would stage the entire working tree.
+	// realpath() prints nothing when the directory was never created.
 	if strings.TrimSpace(translationPath) == "" {
 		return "", fmt.Errorf("translation path for site %s does not resolve to an existing directory", site)
 	}
@@ -140,16 +136,15 @@ type UpdateHook struct {
 	Type        string `json:"type"`
 }
 
-// UnsupportedModule is an installed module with no supported release, per Drupal's update
-// status service — no further fixes are coming.
+// UnsupportedModule is an installed module with no supported release: no further fixes coming.
 type UnsupportedModule struct {
 	Name               string `json:"name"`
 	InstalledVersion   string `json:"installed_version"`
 	RecommendedVersion string `json:"recommended_version"`
 }
 
-// GetUnsupportedModules returns the installed modules whose update status is NOT_SUPPORTED, via
-// the bundled unsupported-modules.php, which yields nothing when the update module is off.
+// GetUnsupportedModules runs the bundled unsupported-modules.php, which yields nothing when
+// Drupal's update module is off.
 func (e *CLI) GetUnsupportedModules(ctx context.Context, dir string, site string) ([]UnsupportedModule, error) {
 	stdout, stderr, err := e.execDrushStreams(ctx, dir, site, "php:script", "/opt/drupdater/unsupported-modules.php")
 	if err != nil {
@@ -174,8 +169,7 @@ func (e *CLI) GetUpdateHooks(ctx context.Context, dir string, site string) (map[
 		return nil, err
 	}
 
-	// "No database updates required" lands on stdout or stderr depending on the drush version.
-	// An empty stdout means the same thing.
+	// "No database updates required" lands on either stream, depending on the drush version.
 	if strings.Contains(stdout, "No database updates required") ||
 		strings.Contains(stderr, "No database updates required") ||
 		strings.TrimSpace(stdout) == "" {

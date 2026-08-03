@@ -14,10 +14,8 @@ import (
 	"pgregory.net/rapid"
 )
 
-// .drupdater.yaml is written by hand, in a repository this tool has no other contact with, and
-// it is decoded strictly — so every key present has to land where the documentation says, and
-// every key absent has to fall back to the documented default. Those two claims are about all
-// files, not about the fixtures someone happened to write.
+// .drupdater.yaml is hand-written and decoded strictly, so every key present must land where
+// the docs say and every key absent must take the documented default — for all files.
 
 // fileConfigGen generates a config with every key set, so a round-trip covers each of them
 // rather than the ones an example filled in.
@@ -42,9 +40,8 @@ func fileConfigGen() *rapid.Generator[fileConfig] {
 	})
 }
 
-// writePropertyConfig writes body to a .drupdater.yaml in dir and returns its path. Separate
-// from writeConfig in configfile_test.go because that one takes a *testing.T and makes its own
-// temporary directory per call, and a property makes hundreds of calls under a *rapid.T.
+// writePropertyConfig exists because writeConfig takes a *testing.T and a fresh temp directory
+// per call, and a property makes hundreds of calls under a *rapid.T.
 func writePropertyConfig(t require.TestingT, dir string, body string) string {
 	path := filepath.Join(dir, ".drupdater.yaml")
 	require.NoError(t, os.WriteFile(path, []byte(body), 0o600))
@@ -86,9 +83,8 @@ func TestPropertyLoadConfigFileFillsInEveryAbsentKey(t *testing.T) {
 		withTimeout := rapid.Bool().Draw(t, "withTimeout")
 		withRunTypes := rapid.Bool().Draw(t, "withRunTypes")
 
-		// A partial file is the normal case — most projects set `sites` and nothing else — and
-		// it has to resolve to a complete config, with the keys it does not mention taking the
-		// documented default rather than a zero value.
+		// A partial file is the normal case, and must resolve to a complete config — defaults
+		// for the unmentioned keys, not zero values.
 		var body strings.Builder
 		if withSites {
 			fmt.Fprintf(&body, "sites: [%s]\n", strings.Join(full.Sites, ", "))
@@ -119,9 +115,8 @@ func TestPropertyLoadConfigFileFillsInEveryAbsentKey(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, parsed, got.Timeout)
 
-		// Layering is per-key all the way down, not per-block: the generated run_types names
-		// only auto_merge, so the addon lists inside the same block still come from the
-		// defaults. A project that turns auto-merge on does not thereby switch every addon off.
+		// Layering is per-key, not per-block: turning auto-merge on must not switch every
+		// addon in the same block off.
 		if withRunTypes {
 			assert.Equal(t, full.RunTypes.Normal.AutoMerge, got.RunTypes.Normal.AutoMerge)
 			assert.Equal(t, full.RunTypes.Security.AutoMerge, got.RunTypes.Security.AutoMerge)
@@ -165,9 +160,7 @@ func TestPropertyFlexTimeoutAcceptsAnyGoDuration(t *testing.T) {
 		seconds := rapid.IntRange(0, 59).Draw(t, "seconds")
 		raw := fmt.Sprintf("%dh%dm%ds", hours, minutes, seconds)
 
-		// Quoted and bare have to mean the same thing. flexTimeout exists because `timeout: 0`,
-		// the documented way to disable the timeout, decodes as an int and would not fit a
-		// string field.
+		// Quoted and bare must mean the same thing: `timeout: 0` decodes as an int.
 		var quoted, bare Config
 		_, err := LoadConfigFile(writePropertyConfig(t, dir, fmt.Sprintf("sites: [default]\ntimeout: %q\n", raw)), &quoted)
 		require.NoError(t, err)
@@ -188,9 +181,7 @@ func TestPropertyLoadConfigFileRejectsAnEmptySiteList(t *testing.T) {
 		empty := rapid.SampledFrom([]string{"sites: []", "sites:", "sites: ~", "sites: null"}).Draw(t, "sites")
 		timeout := rapid.SampledFrom([]string{"", "\ntimeout: 30m", "\ntimeout: 0"}).Draw(t, "timeout")
 
-		// Every per-site phase iterates this list, so an empty one would skip installing the
-		// database, running update hooks and exporting configuration, and still open a merge
-		// request for an update nothing validated.
+		// An empty list skips every per-site phase and still opens the merge request.
 		var got Config
 		_, err := LoadConfigFile(writePropertyConfig(t, dir, empty+timeout+"\n"), &got)
 		require.Error(t, err, "for %q", empty+timeout)
@@ -226,9 +217,8 @@ func TestPropertyCheckLegacyLayoutStaysOutOfTheWayOfMalformedYAML(t *testing.T) 
 			"{{{\n",
 		}).Draw(t, "body")
 
-		// A document that does not parse is the strict decode's business, which reports it with
-		// the file name and the parser's own message. Guessing at a legacy layout here would
-		// replace that with advice about a key the file may not even contain.
+		// An unparsable document is the strict decode's business: guessing at a legacy layout
+		// here replaces its message with advice about a key the file may not contain.
 		assert.NoError(t, checkLegacyLayout([]byte(body)))
 	})
 }

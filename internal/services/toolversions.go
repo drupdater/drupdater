@@ -13,9 +13,8 @@ type ComposerVersionReporter interface {
 	Version(ctx context.Context) (composerpkg.Versions, error)
 }
 
-// LookupToolVersions reads the versions for the report, and logs them so a run without --report
-// names them too. Shared by the run and by "drupdater check". A failure warns and yields the
-// zero value: worth one subprocess, never a failed run.
+// LookupToolVersions reads the versions for the report and logs them, so a run without --report
+// names them too. A failure warns and yields the zero value: never worth failing a run over.
 func LookupToolVersions(ctx context.Context, logger *zap.Logger, composer ComposerVersionReporter) report.ToolVersions {
 	versions, err := composer.Version(ctx)
 	if err != nil {

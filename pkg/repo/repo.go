@@ -17,8 +17,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// Identity used for commits when neither the VCS platform nor the checkout supplies one.
-// Both are only reached in that last-resort case; see prepareCheckout.
+// Last-resort commit identity, when neither the platform nor the checkout supplies one.
 const (
 	defaultCommitName  = "drupdater"
 	defaultCommitEmail = "drupdater@localhost"
@@ -27,11 +26,9 @@ const (
 type Repository interface {
 	Push(o *git.PushOptions) error
 	Remote(name string) (*git.Remote, error)
-	// Head resolves to a branch (Name().IsBranch()) or, when detached — the usual CI state —
-	// straight to a commit hash (Name() == plumbing.HEAD).
+	// Head resolves to a branch, or to a commit hash when detached — the usual CI state.
 	Head() (*plumbing.Reference, error)
-	// Reference looks up a single local reference by name, returning plumbing.ErrReferenceNotFound
-	// if it doesn't exist.
+	// Reference looks up a local reference, erroring with plumbing.ErrReferenceNotFound.
 	Reference(name plumbing.ReferenceName, resolved bool) (*plumbing.Reference, error)
 }
 
@@ -57,8 +54,7 @@ func BasicAuth(token string) *http.BasicAuth {
 	}
 }
 
-// open opens the checkout at path, naming it in the error — every caller here is given the path
-// by the user or by CI, so a bad one must say which.
+// open names the path in the error: it comes from the user or CI, so a bad one must say which.
 func (rs *GitRepositoryService) open(path string) (*git.Repository, error) {
 	checkout, err := git.PlainOpen(path)
 	if err != nil {
@@ -103,8 +99,7 @@ func (rs *GitRepositoryService) CloneRepository(repository string, branch string
 	return rs.prepareCheckout(checkout, username, email)
 }
 
-// OpenRepository opens an existing checkout instead of cloning, with the same git-user and hook
-// setup as CloneRepository so commits and pushes behave identically.
+// OpenRepository opens an existing checkout, with CloneRepository's git-user and hook setup.
 func (rs *GitRepositoryService) OpenRepository(path string, username string, email string) (Repository, Worktree, string, error) {
 	checkout, err := rs.open(path)
 	if err != nil {
@@ -113,9 +108,7 @@ func (rs *GitRepositoryService) OpenRepository(path string, username string, ema
 	return rs.prepareCheckout(checkout, username, email)
 }
 
-// GetRemoteURL returns the checkout's "origin" URL, which is how checkout mode learns the
-// repository without being told. Embedded credentials (GitLab CI puts a token here) are
-// stripped.
+// GetRemoteURL returns the "origin" URL, stripped of the credentials GitLab CI embeds in it.
 func (rs *GitRepositoryService) GetRemoteURL(path string) (string, error) {
 	checkout, err := rs.open(path)
 	if err != nil {
@@ -136,8 +129,7 @@ func (rs *GitRepositoryService) GetRemoteURL(path string) (string, error) {
 	return urls[0], nil
 }
 
-// GetCurrentBranch returns HEAD's branch, or "" when detached (the usual CI state) — callers
-// fall back to CI environment variables then.
+// GetCurrentBranch returns HEAD's branch, or "" when detached — the usual CI state.
 func (rs *GitRepositoryService) GetCurrentBranch(path string) (string, error) {
 	checkout, err := rs.open(path)
 	if err != nil {
@@ -153,9 +145,8 @@ func (rs *GitRepositoryService) GetCurrentBranch(path string) (string, error) {
 	return "", nil
 }
 
-// IsShallowClone reports a truncated commit history (CI's fetch-depth: 1 default). Such a
-// checkout commits fine but fails the later push with "object not found": the remote needs an
-// ancestry the clone does not have.
+// IsShallowClone reports a truncated history (CI's fetch-depth: 1). Such a checkout commits
+// fine but fails the later push with "object not found".
 func (rs *GitRepositoryService) IsShallowClone(path string) (bool, error) {
 	checkout, err := rs.open(path)
 	if err != nil {
@@ -168,15 +159,13 @@ func (rs *GitRepositoryService) IsShallowClone(path string) (bool, error) {
 	return len(shallow) > 0, nil
 }
 
-// prepareCheckout sets the commit identity and removes the prepare-commit-msg hook, then
-// returns the repository, worktree and working-tree root. Shared by clone and open.
+// prepareCheckout sets the commit identity and removes the prepare-commit-msg hook.
 func (rs *GitRepositoryService) prepareCheckout(checkout *git.Repository, username string, email string) (Repository, Worktree, string, error) {
 	config, err := checkout.Config()
 	if err != nil {
 		return checkout, nil, "", fmt.Errorf("failed to read git config: %w", err)
 	}
-	// Empty values (no VCS platform to ask, e.g. a checkout-mode --dry-run run with no token)
-	// leave the checkout's existing commit identity in place instead of blanking it out.
+	// Empty values (no platform to ask) leave the checkout's own identity in place.
 	if username != "" {
 		config.User.Name = username
 	}
@@ -184,11 +173,8 @@ func (rs *GitRepositoryService) prepareCheckout(checkout *git.Repository, userna
 		config.User.Email = email
 	}
 
-	// ...but only when there is one. A fresh clone and a CI checkout have no identity, and
-	// go-git fails the first commit with "author field is required".
-	//
-	// The scoped config is what go-git itself resolves the author from, so a developer's global
-	// user.name still wins and the default is written only when there is none anywhere.
+	// ...but a CI checkout has none at all, and go-git fails the first commit without one.
+	// Checked against the scoped config go-git resolves from, so a global user.name still wins.
 	scoped, err := checkout.ConfigScoped(gitconfig.SystemScope)
 	if err != nil {
 		return checkout, nil, "", fmt.Errorf("failed to read scoped git config: %w", err)
@@ -210,12 +196,9 @@ func (rs *GitRepositoryService) prepareCheckout(checkout *git.Repository, userna
 	}
 	root := w.Filesystem.Root()
 
-	// go-git runs no hooks, but `drush config:export --commit` shells out to real git, which
-	// does — and a hook that prompts or rejects a machine-written message would wedge a
-	// non-interactive run that cannot pass --no-verify.
-	//
-	// Via the OS filesystem, not w.Filesystem: go-git's bound worktree rejects any path with a
-	// ".git" component, so a Stat through it can never find the hook.
+	// `drush config:export --commit` shells out to real git, which does run hooks, and one that
+	// prompts would wedge a run that cannot pass --no-verify. Through the OS filesystem, since
+	// go-git's bound worktree rejects any path with a ".git" component.
 	hookPath := filepath.Join(root, ".git", "hooks", "prepare-commit-msg")
 	if _, err := rs.fs.Stat(hookPath); err == nil {
 		if err := rs.fs.Remove(hookPath); err != nil {
@@ -226,8 +209,8 @@ func (rs *GitRepositoryService) prepareCheckout(checkout *git.Repository, userna
 	return checkout, w, root, nil
 }
 
-// BranchExists queries the remote, not the checkout's cached refs/remotes/origin/*: those go
-// stale the moment the host auto-deletes a merged branch, giving a false positive.
+// BranchExists queries the remote: the cached refs/remotes/origin/* go stale the moment the host
+// auto-deletes a merged branch, giving a false positive.
 func (rs *GitRepositoryService) BranchExists(repository Repository, branch string, token string) (bool, error) {
 	remote, err := repository.Remote("origin")
 	if err != nil {
@@ -264,9 +247,8 @@ func (rs *GitRepositoryService) IsSomethingStagedInPath(worktree Worktree, dir s
 	return false
 }
 
-// pathWithin reports whether filePath is dir or lives under it. A substring test would also
-// match a prefix-sharing sibling — dir "translations" matching "translations-backup/de.po".
-// An empty dir means no path filter, so it matches everything.
+// pathWithin reports whether filePath is dir or lives under it — not a substring test, which
+// would match the sibling "translations-backup/de.po" for dir "translations". Empty dir matches all.
 func pathWithin(filePath string, dir string) bool {
 	dir = strings.Trim(filepath.ToSlash(dir), "/")
 	if dir == "" {

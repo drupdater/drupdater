@@ -7,10 +7,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestComposerEnvironment covers what rector shares with every other package that shells out to
-// composer: `composer exec -- rector process` runs rector as a subprocess of composer, so
-// composer's default 300s process timeout applies to it. A rector pass over a large custom-code
-// tree exceeds that, and the run then fails with a killed subprocess rather than a report.
+// rector runs as a subprocess of composer, so composer's 300s default timeout applies — and a
+// pass over a large custom-code tree exceeds it.
 func TestComposerEnvironment(t *testing.T) {
 	cli, _ := newTestCLI(t)
 	_, _, cmd := stubExec(t, `{"totals":{"changed_files":0},"file_diffs":[]}`, false)

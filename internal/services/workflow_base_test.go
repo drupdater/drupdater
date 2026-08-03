@@ -93,10 +93,8 @@ func TestStartUpdate(t *testing.T) {
 }
 
 func TestStartUpdatePublishUsesLiveContext(t *testing.T) {
-	// Regression: publishWork must run on the outer (timeout-bounded) context, not the
-	// errgroup-derived context. The errgroup context is cancelled as soon as g.Wait()
-	// returns, so if publishWork received it, CreateMergeRequest would see a cancelled
-	// context. Assert the context handed to CreateMergeRequest is still alive.
+	// Regression: publishWork must run on the outer context. The errgroup's is cancelled as
+	// soon as g.Wait() returns, so CreateMergeRequest would see a dead one.
 	logger := zap.NewNop()
 	installer := NewMockInstaller(t)
 	repositoryService := NewMockRepository(t)
@@ -433,11 +431,9 @@ func TestStartUpdateBranchAlreadyExists(t *testing.T) {
 }
 
 func TestStartUpdateLocalBranchAlreadyExists(t *testing.T) {
-	// Regression: a local ref left over from a prior checkout-mode run of the same
-	// code-content hash (one that reached this branch before failing later) must abort with the
-	// same clean AbortError a remote collision gets, not the raw go-git "a branch named ...
-	// already exists" from the Create:true checkout that follows. BranchExists (the remote
-	// check) must never even run once the local ref is found.
+	// Regression: a local ref left by a prior run of the same content hash must abort with the
+	// clean AbortError, not go-git's raw message from the checkout that follows — and the
+	// remote check must not run at all once the local ref is found.
 	logger := zap.NewNop()
 	installer := NewMockInstaller(t)
 	repositoryService := NewMockRepository(t)
@@ -613,9 +609,8 @@ func TestStartUpdateWithDryRun(t *testing.T) {
 }
 
 func TestStartUpdateCheckoutDryRunWithoutPlatform(t *testing.T) {
-	// Regression for issue #167: a checkout-mode --dry-run run needs no token and therefore
-	// cmd/root.go builds no VCS platform for it. StartUpdate must not dereference a nil platform
-	// to get the commit identity; it proceeds with whatever identity the checkout already has.
+	// Regression for issue #167: a token-free dry run has no VCS platform, and StartUpdate must
+	// not dereference nil to get the commit identity.
 	logger := zap.NewNop()
 	installer := NewMockInstaller(t)
 	repositoryService := NewMockRepository(t)
@@ -673,9 +668,8 @@ func TestStartUpdateCheckoutDryRunWithoutPlatform(t *testing.T) {
 	repository.AssertExpectations(t)
 	drush.AssertExpectations(t)
 	mockComposer.AssertExpectations(t)
-	// A --dry-run never pushes, so ensureUpdateBranchAvailable deliberately skips the remote.
-	// This is the configuration documented as needing no token at all, and reaching the remote
-	// here used to fail it outright rather than merely need one.
+	// A --dry-run never pushes, so the remote check is skipped — reaching out used to fail the
+	// one configuration documented as needing no token.
 	repositoryService.AssertNotCalled(t, "BranchExists", mock.Anything, mock.Anything, mock.Anything)
 }
 
@@ -1429,11 +1423,8 @@ func TestStartUpdateWorkBranchCheckoutError(t *testing.T) {
 }
 
 func TestStartUpdateRestoresCheckoutOnFailureInCheckoutMode(t *testing.T) {
-	// Regression: a checkout-mode run that fails or aborts must not leave the checkout on
-	// drupdater's own throwaway work branch with an uncommitted composer.json (e.g.
-	// composer_allow_plugins' allow-plugins:true, set before the failure and never reverted).
-	// StartUpdate captures the original HEAD up front and, on any non-nil return in checkout
-	// mode, checks the worktree back out to it.
+	// Regression: a failed checkout-mode run must not leave the checkout on the throwaway work
+	// branch with an uncommitted composer.json — allow-plugins:true, say, never reverted.
 	logger := zap.NewNop()
 	installer := NewMockInstaller(t)
 	repositoryService := NewMockRepository(t)
@@ -1452,11 +1443,8 @@ func TestStartUpdateRestoresCheckoutOnFailureInCheckoutMode(t *testing.T) {
 	}
 
 	worktree := NewMockWorktree(t)
-	// updateSharedCode checks out a dedicated work branch before doing any work; the restore
-	// checkout (if any) happens afterward. Capture every call's arguments rather than trying to
-	// distinguish them via a second, more specific expectation, since testify matches expected
-	// calls for the same method in registration order and a wildcard registered first would
-	// simply swallow the later, more specific call too.
+	// Every call's arguments are captured rather than split across two expectations: testify
+	// matches in registration order, so a wildcard registered first swallows the specific one.
 	var checkoutCalls []*git.CheckoutOptions
 	worktree.EXPECT().Checkout(mock.Anything).RunAndReturn(func(opts *git.CheckoutOptions) error {
 		checkoutCalls = append(checkoutCalls, opts)
@@ -1660,11 +1648,8 @@ func TestCleanup(t *testing.T) {
 	})
 
 	t.Run("clone mode refuses to remove the temp dir itself", func(t *testing.T) {
-		// Point os.TempDir() at a sandbox first. This subtest deliberately asks cleanup()
-		// to delete the temp dir, relying on the guard in cleanup() to refuse — so if that
-		// guard is ever broken (a refactor, or a mutation-testing run that negates it),
-		// the RemoveAll must land in a directory owned by this test rather than wiping the
-		// machine's real temp dir out from under everything else running on it.
+		// This asks cleanup() to delete the temp dir and relies on its guard to refuse, so
+		// os.TempDir() is pointed at a sandbox: a broken guard must not wipe the real one.
 		t.Setenv("TMPDIR", t.TempDir())
 
 		ws := &WorkflowBaseService{logger: logger, config: internal.Config{Clone: true}}
@@ -1698,10 +1683,8 @@ func TestEnsureUpdateBranchAvailable(t *testing.T) {
 	}
 
 	t.Run("a dry run never reaches the remote", func(t *testing.T) {
-		// The remote half of this check only matters when the branch is going to be pushed,
-		// and a --dry-run never pushes. Reaching out anyway breaks the one configuration
-		// documented as needing no token at all: a checkout-mode dry run. BranchExists is
-		// deliberately left unstubbed, so the mock fails the test if it is called.
+		// A --dry-run never pushes, so the remote is never reached. BranchExists is left
+		// unstubbed, so the mock fails the test if it is called.
 		repository := NewMockRepository(t)
 		ws := &WorkflowBaseService{
 			logger:     zap.NewNop(),
@@ -1755,13 +1738,8 @@ func TestEnsureUpdateBranchAvailable(t *testing.T) {
 	})
 }
 
-// anyCtx matches any non-nil context.Context in a mock expectation.
-//
-// The exact value cannot be pinned: StartUpdate runs the per-site work through an errgroup,
-// which derives a cancellable child context, so what reaches installer.Install is not the
-// context handed to StartUpdate. Requiring non-nil still catches the failure that matters --
-// a call site that stops propagating the context altogether, which would silently disable
-// cancellation and the run timeout for everything below it.
+// anyCtx matches any non-nil context.Context: the errgroup derives a child, so the exact value
+// cannot be pinned, but non-nil still catches a call site that stops propagating it.
 var anyCtx = mock.MatchedBy(func(ctx context.Context) bool { return ctx != nil })
 
 // expectVersionLookup declares the version call every run makes. What the versions end up as is
@@ -1770,12 +1748,8 @@ func expectVersionLookup(composerMock *MockComposer) {
 	composerMock.EXPECT().Version(anyCtx).Return(composer.Versions{Composer: "2.10.2", PHP: "8.3.14"}, nil)
 }
 
-// workBranchCheckout pins the options of every branch drupdater creates.
-//
-// Both are load-bearing. Create is required because neither branch exists yet, so without it
-// the checkout fails outright. Keep preserves the working tree across the switch; dropping it
-// would reset the tree and discard changes the run has already made, which is exactly what the
-// work branch exists to carry.
+// workBranchCheckout pins both options: Create because neither branch exists yet, and Keep
+// because dropping it resets the tree and discards the changes the work branch exists to carry.
 var workBranchCheckout = mock.MatchedBy(func(opts *git.CheckoutOptions) bool {
 	return opts != nil && opts.Create && opts.Keep && !opts.Force &&
 		(strings.HasPrefix(opts.Branch.Short(), "drupdater-work-") ||
@@ -1821,13 +1795,9 @@ func TestStageScaffoldChanges(t *testing.T) {
 	})
 
 	t.Run("stages nothing outside the web root", func(t *testing.T) {
-		// Regression: staging every tracked change swept the configuration export and the
-		// translations into the shared-code commit, in the state the baseline install had left
-		// them -- core.extension.yml still carrying the installer's sqlite entry. The next run
-		// then refused to install from that configuration ("Unable to uninstall the SQLite
-		// module because: The module 'SQLite' is providing the database driver 'sqlite'"), so
-		// the update looked fine and was not reinstallable. Those trees belong to the per-site
-		// export, which commits them itself, after the sites have been updated.
+		// Regression: staging every tracked change swept the config export into the
+		// shared-code commit, still carrying the installer's sqlite entry, and the next run
+		// then refused to install from it. Those trees belong to the per-site export.
 		worktree := NewMockWorktree(t)
 		worktree.EXPECT().Status().Return(git.Status{
 			"web/robots.txt":                 {Worktree: git.Modified},

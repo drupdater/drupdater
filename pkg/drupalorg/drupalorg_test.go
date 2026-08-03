@@ -161,9 +161,8 @@ func TestFindIssueNumber(t *testing.T) {
 }
 
 func TestGetIssue_NonOKStatus(t *testing.T) {
-	// drupal.org answers an unknown node or an outage with an HTML error page. Checking the
-	// status first turns that into a message that names the real problem instead of an opaque
-	// JSON decode failure.
+	// drupal.org answers an unknown node with an HTML page, which without a status check
+	// surfaces as an opaque JSON decode failure.
 	for _, status := range []int{http.StatusNotFound, http.StatusServiceUnavailable} {
 		t.Run(http.StatusText(status), func(t *testing.T) {
 			mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
