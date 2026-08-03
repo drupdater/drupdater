@@ -23,8 +23,7 @@ type CodeBeautifier struct {
 	phpcs    PHPCS
 	composer Composer
 
-	// What the run fixed, for the report. Written once from the single post-code-update
-	// event, read after the run.
+	// For the report. Written once from the single post-code-update event, read after the run.
 	fixedFiles []string
 	fixable    int
 }
@@ -50,9 +49,8 @@ func (cb *CodeBeautifier) RenderTemplate() (string, error) {
 	return "", nil
 }
 
-// phpcsConfigPath returns the project's phpcs config file. found is true when a candidate is
-// present — or when stat failed for a reason other than absence, which is not this function's
-// call to interpret: a config that exists but cannot be read must not read as "no config".
+// phpcsConfigPath returns the project's phpcs config file. An unreadable config counts as found:
+// only absence means "no config".
 func phpcsConfigPath(path string) (configPath string, found bool) {
 	for _, name := range []string{"phpcs.xml", "phpcs.xml.dist"} {
 		candidate := filepath.Join(path, name)
@@ -94,7 +92,7 @@ var hasPHPCSPathDefinitions = func(path string) (bool, error) {
 	return len(ruleset.Files) > 0, nil
 }
 
-func (cb *CodeBeautifier) postCodeUpdateHandler(e event.Event) error { //nolint:cyclop
+func (cb *CodeBeautifier) postCodeUpdateHandler(e event.Event) (err error) { //nolint:cyclop
 	event := e.(*services.PostCodeUpdateEvent)
 	cb.logger.Info("updating coding styles")
 
@@ -122,6 +120,13 @@ func (cb *CodeBeautifier) postCodeUpdateHandler(e event.Event) error { //nolint:
 		if err := cb.InstallCoder(event.Context(), event.Path(), event.Worktree()); err != nil {
 			return err
 		}
+		// Deferred, not called at the end: every path below returns early, and a coder left
+		// behind is committed into the update branch as a dependency nobody asked for.
+		defer func() {
+			if removeErr := cb.removeCoder(event.Context(), event.Path(), event.Worktree()); removeErr != nil && err == nil {
+				err = removeErr
+			}
+		}()
 	}
 
 	codingStyleUpdateResult, err := cb.phpcs.Run(event.Context(), event.Path())
@@ -154,9 +159,8 @@ func (cb *CodeBeautifier) postCodeUpdateHandler(e event.Event) error { //nolint:
 		addedFiles = append(addedFiles, relativePath)
 	}
 
-	// phpcbf may have changed nothing — not every "fixable" issue is, and RunCBF errors are
-	// only logged — which would make an empty commit go-git rejects. Checked against just this
-	// handler's own paths, so another listener's dangling change is never swept in.
+	// phpcbf may have changed nothing, which would make an empty commit go-git rejects. Only
+	// this handler's own paths, so another listener's dangling change is never swept in.
 	staged, err := stagedAnyOf(event.Worktree(), addedFiles)
 	if err != nil {
 		return fmt.Errorf("failed to check worktree status: %w", err)
@@ -176,8 +180,7 @@ func (cb *CodeBeautifier) postCodeUpdateHandler(e event.Event) error { //nolint:
 	return nil
 }
 
-// stagedAnyOf reports whether any of paths has a staged (non-Unmodified) change in worktree. An
-// empty paths list is "nothing to check" and short-circuits without querying git status.
+// stagedAnyOf reports whether any of paths has a staged change in worktree.
 func stagedAnyOf(worktree Worktree, paths []string) (bool, error) {
 	if len(paths) == 0 {
 		return false, nil
@@ -236,8 +239,8 @@ func (cb *CodeBeautifier) CreatePHPCSConfig(ctx context.Context, path string, wo
 		return false, nil
 	}
 
-	// Render before touching the filesystem: an early return above would otherwise leave an
-	// empty phpcs.xml behind, and the next run fails parsing it for <file> definitions.
+	// Render before touching the filesystem, or a template failure leaves an empty phpcs.xml
+	// behind that the next run fails to parse.
 	var rendered bytes.Buffer
 	if err := tmpl.Execute(&rendered, data); err != nil {
 		return false, fmt.Errorf("failed to execute phpcs template: %w", err)
@@ -280,4 +283,27 @@ func (cb *CodeBeautifier) InstallCoder(ctx context.Context, path string, worktre
 	}
 
 	return nil
+}
+
+// removeCoder undoes InstallCoder. Removing it rarely restores composer.lock byte-for-byte, so the
+// remainder is committed here rather than swept into another listener's AddGlob("composer.*").
+func (cb *CodeBeautifier) removeCoder(ctx context.Context, path string, worktree Worktree) error {
+	cb.logger.Debug("removing drupal/coder")
+	// --dev because InstallCoder required it there; without the flag composer refuses.
+	if _, err := cb.composer.Remove(ctx, path, "--dev", "drupal/coder"); err != nil {
+		return err
+	}
+
+	if err := worktree.AddGlob("composer.*"); err != nil {
+		return fmt.Errorf("failed to add file to commit: %w", err)
+	}
+	staged, err := stagedAnyOf(worktree, []string{"composer.json", "composer.lock"})
+	if err != nil {
+		return err
+	}
+	if !staged {
+		return nil
+	}
+	_, err = worktree.Commit("Remove temporary drupal/coder installation", &git.CommitOptions{})
+	return err
 }

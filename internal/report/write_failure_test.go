@@ -10,10 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// failingFs fails one chosen filesystem operation and delegates the rest. writeJSON is written
-// to be atomic -- encode, write to a temp file, rename into place, and clean the temp file up
-// on any failure -- but on a real filesystem those failure branches are only reached by a full
-// disk or a permission change mid-write. This makes each one reachable on demand.
+// failingFs fails one chosen operation and delegates the rest, making writeJSON's atomicity
+// branches reachable — on a real filesystem they need a full disk or a mid-write chmod.
 type failingFs struct {
 	afero.Fs
 	mkdirAll bool
@@ -152,9 +150,8 @@ func TestWriteReportIsAtomic(t *testing.T) {
 }
 
 func TestSanitizeURLNormalizesOnlyWhenItReparses(t *testing.T) {
-	// Both halves of the "err != nil || parsed.User == nil" guard matter. A URL that parses but
-	// carries no credentials is returned verbatim rather than round-tripped through
-	// url.String(), which would rewrite it -- here by lower-casing the scheme and host.
+	// Both halves of the guard matter: a URL with no credentials is returned verbatim, not
+	// round-tripped through url.String(), which lower-cases the scheme and host.
 	const mixedCase = "HTTPS://Example.COM/Group/Repo.git"
 	assert.Equal(t, mixedCase, SanitizeURL(mixedCase))
 

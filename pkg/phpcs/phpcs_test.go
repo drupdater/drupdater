@@ -19,9 +19,7 @@ import (
 // whether the stderr stream was captured separately from the stdout that gets parsed.
 const helperStderrMarker = "helper-process-stderr"
 
-// newTestCLI returns a CLI whose debug output can be asserted on. Both exec helpers log the
-// command line together with the captured output, which is the only place several of their
-// steps are observable from outside.
+// newTestCLI captures the debug output, the only place several steps are observable.
 func newTestCLI(t *testing.T) (*CLI, *observer.ObservedLogs) {
 	t.Helper()
 	core, logs := observer.New(zapcore.DebugLevel)

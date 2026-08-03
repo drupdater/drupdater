@@ -54,10 +54,8 @@ func TestRedactorRedactsPercentEncodedForm(t *testing.T) {
 	assert.NotContains(t, out, encoded)
 }
 
-// TestRedactorRedactsPathEncodedForm covers the other escaping. Which one a tool emits depends
-// on where the value sat in the URL, not on the value: the same token is "a+b" after a query
-// component is escaped and "a%20b" after a path segment is. Registering only the query form
-// left the path form — still a perfectly usable credential — readable in the log.
+// The same token is "a+b" after query escaping and "a%20b" after path escaping. Registering
+// only the query form left the other — still a usable credential — readable in the log.
 func TestRedactorRedactsPathEncodedForm(t *testing.T) {
 	const token = "a b c"
 
@@ -154,9 +152,7 @@ func TestRedactorLongestSecretWinsOverSubstring(t *testing.T) {
 	logger.Info("value: secret-extended")
 
 	out := buf.String()
-	// Assert the whole result, not just that the secrets are absent. Replacing shortest-first
-	// yields "***-extended", which still contains neither "secret" nor "secret-extended" --
-	// absence checks alone cannot tell the correct ordering from the broken one.
+	// The whole result: shortest-first yields "***-extended", which an absence check passes.
 	assert.Contains(t, out, `"msg":"value: ***"`)
 	assert.NotContains(t, out, "-extended")
 }
@@ -184,9 +180,8 @@ func TestRedactorKeepsReplacerWhenNothingChanged(t *testing.T) {
 	redactor.Register("token") // already known
 	redactor.Register("")      // ignored
 
-	// Re-registering known or empty values must not throw the built replacer away: Register is
-	// called repeatedly as credentials are resolved, and rebuilding on every call would make
-	// redaction cost grow with the number of calls rather than the number of secrets.
+	// Register is called repeatedly as credentials resolve, so rebuilding on every call would
+	// grow redaction's cost with the call count rather than the number of secrets.
 	assert.Same(t, built, redactor.currentReplacer())
 }
 

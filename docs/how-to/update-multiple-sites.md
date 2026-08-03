@@ -116,3 +116,10 @@ heading per site:
   whether it was skipped and why.
 - [`unsupported_modules`](../reference/addons/unsupported-modules.md) deduplicates across
   sites, so a module installed everywhere is listed once.
+
+## A working example
+
+[`drupdater/test-drupal-multisite`](https://github.com/drupdater/test-drupal-multisite) is
+a two-site project laid out exactly as described above, and Drupdater's integration job
+runs against it. Read it if you would rather copy a working `sites.php`,
+`settings.php` and configuration layout than assemble one from the snippets here.

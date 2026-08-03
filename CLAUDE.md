@@ -114,7 +114,37 @@ Where things live. For *how they work*, read `docs/explanation/` rather than dup
 
 ## Comments
 
-Keep comments short, simple and precise. One line where one line does. Say *why*, not what the code already says. No restating the signature, no commented-out code, no filler.
+**Default to no comment.** Readable code with a good name is the goal; a comment is what you fall
+back to when the *reason* for the code can't be expressed in the code itself.
+
+Hard rules:
+
+- **One line. Under ~100 characters.** If it doesn't fit, the comment is explaining too much — cut it
+  to the single non-obvious fact, or delete it. Multi-line blocks are reserved for doc comments on
+  exported API and for `internal/addon/report.go`'s published schema.
+- **Say *why*, never *what*.** The code already says what. `// lock the mutex`, `// returns an error
+  if the path is empty`, `// loop over the packages` — all deleted.
+- **No signature restating**, no `// Foo does X` on unexported helpers whose name already says X.
+- **No narration of the diff**: `// changed to handle the new case`, `// moved from workflow_base`,
+  `// see PR #123`. Git holds that.
+- **No commented-out code**, no TODO/FIXME without a concrete reason, no section banners
+  (`// --- helpers ---`), no filler.
+- **Tests**: name the test after what it asserts instead of commenting it. No `// arrange` /
+  `// act` / `// assert` scaffolding.
+
+The comments worth keeping are the ones a reader can't derive: a workaround for an upstream bug (name
+it), a non-obvious ordering or concurrency constraint, an event-priority dependency, a deliberate
+deviation from the obvious implementation. Everything else goes.
+
+```go
+// bad — three lines restating the code
+// getPackages collects the packages that need updating. It iterates over
+// the installed packages, filters out the ones in PackagesToKeep and
+// returns the remaining slice.
+
+// good — one line, states what the reader can't see
+// Composer resolves patches lazily, so the lock has to be re-read after `require`.
+```
 
 ## Configuration
 

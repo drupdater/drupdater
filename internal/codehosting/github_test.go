@@ -246,10 +246,8 @@ func TestGithub_DeleteBranch_HonorsContext(t *testing.T) {
 	require.ErrorIs(t, err, context.Canceled)
 }
 
-// newAutoMergePRServer serves the PR endpoint with the given base repo JSON (the merge-method
-// flags) and a successful GraphQL mutation, capturing the mergeMethod variable that was sent.
-// Note the GraphQL path: WithEnterpriseURLs puts the REST root at /api/v3/, so "graphql"
-// resolves under it. Real GHES serves GraphQL at /api/graphql instead — see EnableAutoMerge.
+// newAutoMergePRServer serves the PR endpoint and a successful GraphQL mutation, capturing the
+// mergeMethod that was sent. WithEnterpriseURLs puts "graphql" under /api/v3/, unlike real GHES.
 func newAutoMergePRServer(t *testing.T, baseRepoJSON string, gotMethod *string) *httptest.Server {
 	t.Helper()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

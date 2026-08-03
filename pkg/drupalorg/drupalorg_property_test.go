@@ -8,10 +8,8 @@ import (
 	"pgregory.net/rapid"
 )
 
-// FindIssueNumber pulls an issue ID out of free-form text — a patch URL, a patch description, a
-// branch name — so the wrong answer silently attributes a patch to somebody else's issue. The
-// properties below pin what it extracts from arbitrary surroundings, including the cases that
-// are deliberate rather than accidental.
+// FindIssueNumber pulls an issue ID out of free-form text, so a wrong answer silently
+// attributes a patch to somebody else's issue.
 
 // nonDigitGen generates filler that cannot contribute digits of its own, so a generated issue
 // number stays exactly the number the property put there.

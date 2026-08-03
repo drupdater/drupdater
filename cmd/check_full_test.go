@@ -40,9 +40,8 @@ func (f *fakeInstaller) Install(_ context.Context, dir string, site string) erro
 	return f.failFor[site]
 }
 
-// stubFullCheckDeps swaps the real clone/composer/installer construction for doubles. The
-// production constructors reach for a real git remote, a real composer install and a real
-// drush site-install, so the tier's own control flow is otherwise untestable.
+// stubFullCheckDeps swaps in doubles for the real clone, composer install and site install,
+// without which the tier's control flow is untestable.
 func stubFullCheckDeps(t *testing.T, clonePath string, cloneErr error, composerDouble *fakeComposer, installer siteInstaller, installerErr error) *[]string {
 	t.Helper()
 

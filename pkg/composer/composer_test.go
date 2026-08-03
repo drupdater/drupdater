@@ -55,9 +55,7 @@ func TestExecComposer(t *testing.T) {
 }
 
 func TestGetComposerUpdatesMatchesEveryOccurrence(t *testing.T) {
-	// Two of each action. The parser asks the regexes for *all* matches; with only one of a
-	// kind, "first match only" and "all matches" are indistinguishable, and a real update
-	// touching several packages would silently report just one of them per category.
+	// Two of each action: with one, "first match" and "all matches" are indistinguishable.
 	logData := `- Upgrading drupal/core (10.2.0 => 10.3.1)
 - Upgrading drupal/token (1.11.0 => 1.13.0)
 - Downgrading drupal/paragraphs (1.17.0 => 1.16.0)
@@ -499,10 +497,7 @@ Using version ^11.1 for drupal/core`
 	})
 
 	t.Run("Package name with special JSON characters produces valid JSON", func(t *testing.T) {
-		// This test verifies that packageName, packageVersion, and patchPath
-		// containing double-quotes or backslashes are safely marshaled via
-		// json.Marshal rather than string concatenation, which would produce
-		// invalid JSON.
+		// Quotes and backslashes must go through json.Marshal, not concatenation.
 		fs := afero.NewMemMapFs()
 
 		capturedPatchesJSON := ""
@@ -520,9 +515,7 @@ Using version ^11.1 for drupal/core`
 			fs:     fs,
 		}
 
-		// Use a package name that contains a double-quote and a backslash —
-		// these would break raw string concatenation but must be escaped by
-		// json.Marshal, resulting in valid JSON.
+		// A name that breaks raw concatenation but must survive json.Marshal.
 		_, err := service.CheckIfPatchApplies(t.Context(), "/project", `drupal/"core"`, `1.0\0`, `path/to/"patch"`)
 		require.NoError(t, err)
 
@@ -599,6 +592,49 @@ func TestRemove(t *testing.T) {
 	})
 }
 
+func TestRequire(t *testing.T) {
+	service := &CLI{logger: zap.NewNop()}
+
+	t.Run("success", func(t *testing.T) {
+		var seen []string
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+			seen = arg
+			cs := []string{"-test.run=TestHelperProcess", "--", "ok"}
+			cs = append(cs, arg...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+
+		out, err := service.Require(t.Context(), "/tmp", "--dev", "drupal/coder")
+		require.NoError(t, err)
+		assert.Equal(t, "ok", out)
+
+		// The caller's arguments have to survive in order, after the flag: composer reads
+		// "--dev" as applying to the packages that follow it.
+		assert.Equal(t, []string{"require", "--ignore-platform-reqs", "--dev", "drupal/coder"}, seen)
+	})
+
+	t.Run("error", func(t *testing.T) {
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--"}
+			cs = append(cs, arg...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		defer func() { execCommand = exec.CommandContext }()
+
+		out, err := service.Require(t.Context(), "/tmp", "palantirnet/drupal-rector")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to require package")
+		// Deliberately empty on failure: the output is in the error, and a caller that used it
+		// anyway would be acting on the output of a command that did not run.
+		assert.Empty(t, out)
+	})
+}
+
 func TestNormalize(t *testing.T) {
 	service := &CLI{logger: zap.NewNop()}
 
@@ -656,13 +692,9 @@ func TestCheckPlatformReqs(t *testing.T) {
 	})
 
 	t.Run("output with trailing noise after the array", func(t *testing.T) {
-		// Combined stdout/stderr can interleave text on both sides of the payload, so the span
-		// runs to the *last* closing bracket rather than the first.
-		//
-		// Known limit: trailing text containing its own brackets (say "Done in 0.4s [cached]")
-		// would extend the span past the payload and fail to parse. Composer does not emit that
-		// today, and widening the extraction to a real scanner is a behaviour change this test
-		// deliberately does not assume.
+		// Merged output interleaves text on both sides of the payload, so the span runs to the
+		// last closing bracket. Known limit: trailing text with its own brackets would extend
+		// it past the payload — composer does not emit that today.
 		json := "Checking platform requirements using the lock file\n" +
 			`[{"name":"php","version":"8.4.23","status":"success","failed_requirement":null,"provider":null}]` +
 			"\nDone in 0.4s"

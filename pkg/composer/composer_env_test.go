@@ -74,9 +74,8 @@ func TestComposerEnv(t *testing.T) {
 	})
 
 	t.Run("keeps entries that are not KEY=VALUE", func(t *testing.T) {
-		// Including one that is a bare forced variable name: os.Environ() promises nothing about
-		// its entries containing "=", and a name on its own assigns nothing and so overrides
-		// nothing.
+		// Including a bare variable name: os.Environ() does not promise every entry has "=",
+		// and a name alone assigns — and so overrides — nothing.
 		got := Env([]string{"NOT_AN_ASSIGNMENT", "COMPOSER_PROCESS_TIMEOUT"})
 
 		assert.Contains(t, got, "NOT_AN_ASSIGNMENT")
@@ -106,9 +105,8 @@ func TestExecComposerEnvironmentReachesTheSubprocess(t *testing.T) {
 	service := &CLI{logger: zap.NewNop()}
 
 	t.Run("execComposer forces the process timeout over an inherited one", func(t *testing.T) {
-		// The whole point of the issue: a 300s cap that nobody configured kills a long
-		// `composer update` mid-phase. Assert on what the subprocess actually sees, not on the
-		// slice drupdater built, so a value that never survives into the child is caught.
+		// Asserted on what the subprocess sees, not the slice drupdater built, so a value
+		// that never survives into the child is caught.
 		fakeComposer(t, helperEnv(
 			"GO_HELPER_PROCESS_PRINT_ENV=COMPOSER_PROCESS_TIMEOUT",
 			"COMPOSER_PROCESS_TIMEOUT=300",
@@ -161,9 +159,8 @@ func TestExecComposerEnvironmentReachesTheSubprocess(t *testing.T) {
 	})
 
 	t.Run("inherits the process environment when the caller set none", func(t *testing.T) {
-		// exec.Cmd with a nil Env inherits os.Environ(); building the forced values on top of it
-		// must not drop that inheritance, or composer loses PATH and every other variable it
-		// needs.
+		// A nil Env inherits os.Environ(), which the forced values must not drop — composer
+		// would lose PATH.
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
 		t.Setenv("GOCOVERDIR", "/tmp")
 		t.Setenv("GO_HELPER_PROCESS_PRINT_ENV", "COMPOSER_AUTH")

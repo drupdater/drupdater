@@ -120,9 +120,8 @@ func (e *PostSiteUpdateEvent) Site() string {
 	return e.site
 }
 
-// AbandonedPackage carries the successor its maintainers suggested, empty when they suggested
-// none. It mirrors composer.AbandonedPackage rather than reusing it: this type is the wire
-// between two addons, and a change to composer's output shape must not reach through it.
+// AbandonedPackage mirrors composer.AbandonedPackage: it is the wire between two addons, so a
+// change to composer's output shape must not reach through it. Replacement is "" when none.
 type AbandonedPackage struct {
 	Name        string
 	Replacement string
@@ -131,11 +130,8 @@ type AbandonedPackage struct {
 type PreMergeRequestCreateEvent struct {
 	event.BasicEvent
 	Title string
-	// Written by composer_audit, read by unsupported_modules, which renders both kinds of
-	// end-of-life finding as one list — to a reviewer they are the same thing.
-	//
-	// Both addons' data is complete when this event fires, and the producer subscribes at
-	// Normal against the consumer's BelowNormal, so the list is filled in before it is read.
+	// Written by composer_audit at Normal, read by unsupported_modules at BelowNormal — that
+	// priority gap is what fills the list before it is read.
 	AbandonedPackages []AbandonedPackage
 }
 

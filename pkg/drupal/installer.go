@@ -60,9 +60,8 @@ func (is *Installer) Install(ctx context.Context, path string, site string) erro
 	return nil
 }
 
-// settingsMarker tags the block ConfigureDatabase appends to settings.php. Each site is
-// configured twice against the same file — baseline, then before the update hooks — so the
-// marker keeps the append idempotent instead of stacking duplicate settings.
+// settingsMarker keeps ConfigureDatabase's append idempotent: each site is configured twice
+// against the same settings.php, baseline and then before the update hooks.
 const settingsMarker = "// Added by drupdater: test database settings."
 
 func (is *Installer) ConfigureDatabase(ctx context.Context, dir string, site string) error {
@@ -76,8 +75,22 @@ func (is *Installer) ConfigureDatabase(ctx context.Context, dir string, site str
 	}
 
 	settingsPath := dir + "/" + webroot + "/sites/" + site + "/settings.php"
+
+	// Ahead of the marker check, because the two states are independent: settings.php survives
+	// a run, while core.extension.yml comes back from git without the sqlite entry. A reused
+	// working copy would otherwise have the marker set and the module gone, and Drupal refuses
+	// to install ("SQLite is providing the database driver").
+	isSqliteEnabled, _ := is.isSqliteModuleEnabled(ctx, dir, site)
+	if !isSqliteEnabled {
+		siteLogger.Debug("enabling sqlite module")
+		if err := is.addSqliteModule(ctx, dir, site); err != nil {
+			return fmt.Errorf("failed to enable sqlite module: %w", err)
+		}
+	}
+
+	// The marker guards only the append, which a repeated call would otherwise stack.
 	if existing, err := afero.ReadFile(is.fs, settingsPath); err == nil && strings.Contains(string(existing), settingsMarker) {
-		siteLogger.Debug("database already configured, skipping", zap.String("path", settingsPath))
+		siteLogger.Debug("settings already configured, skipping", zap.String("path", settingsPath))
 		return nil
 	}
 
@@ -98,12 +111,7 @@ $settings['file_private_path'] = '` + privatesDir + `';
 $settings['hash_salt'] = 'changeme';
 `
 
-	isSqliteEnabled, _ := is.isSqliteModuleEnabled(ctx, dir, site)
 	if !isSqliteEnabled {
-		siteLogger.Debug("enabling sqlite module")
-		if err := is.addSqliteModule(ctx, dir, site); err != nil {
-			return fmt.Errorf("failed to enable sqlite module: %w", err)
-		}
 		settings += `
 if (isset($settings['config_exclude_modules'])) {
 	$settings['config_exclude_modules'][] = 'sqlite';
@@ -115,8 +123,7 @@ if (isset($settings['config_exclude_modules'])) {
 
 	siteLogger.Debug("writing settings", zap.String("path", settingsPath), zap.String("settings", settings))
 
-	// A missing settings.php is an error, not something to create: this snippet alone is not a
-	// valid one, and every installed site already has the file.
+	// Never created: this snippet alone is not a valid settings.php.
 	f, err := is.fs.OpenFile(settingsPath, os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to open settings file: %w", err)
@@ -132,8 +139,7 @@ if (isset($settings['config_exclude_modules'])) {
 	return nil
 }
 
-// coreExtensionPath returns the site's core.extension.yml, the file that records which modules
-// and profile the site was installed with.
+// coreExtensionPath returns the site's core.extension.yml.
 func (is *Installer) coreExtensionPath(ctx context.Context, dir string, site string) (string, error) {
 	configSyncDir, err := is.drush.GetConfigSyncDir(ctx, dir, site, false)
 	if err != nil {
@@ -142,8 +148,8 @@ func (is *Installer) coreExtensionPath(ctx context.Context, dir string, site str
 	return configSyncDir + "/core.extension.yml", nil
 }
 
-// readCoreExtension reads and decodes core.extension.yml, returning its path alongside the whole
-// document and its module section — a file without one is unusable to every caller here.
+// readCoreExtension decodes core.extension.yml. A document with no module section is an error:
+// every caller here needs one.
 func (is *Installer) readCoreExtension(ctx context.Context, dir string, site string) (path string, config map[string]any, modules map[string]any, err error) {
 	path, err = is.coreExtensionPath(ctx, dir, site)
 	if err != nil {
@@ -224,8 +230,7 @@ func (is *Installer) RemoveProfile(ctx context.Context, dir string, site string)
 
 	profiles := []string{"standard"}
 
-	// Drop both the "profile: <name>" key and the profile's own entry under module:. Matched
-	// once per line rather than once per profile, or extra profiles would duplicate kept lines.
+	// Matched once per line, not once per profile, or extra profiles duplicate the kept lines.
 	var lines []string
 	scanner := bufio.NewScanner(fileToRead)
 	for scanner.Scan() {

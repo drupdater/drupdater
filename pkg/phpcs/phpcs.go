@@ -22,8 +22,7 @@ func NewCLI(logger *zap.Logger) *CLI {
 	}
 }
 
-// command returns the runner for a phpcs invocation. phpcs runs through `composer exec` and
-// inherits composer's process timeout.
+// command runs phpcs through `composer exec`, inheriting its process timeout.
 func (s *CLI) command(dir string) composer.Command {
 	return composer.Command{New: execCommand, Logger: s.logger, Dir: dir}
 }
@@ -54,8 +53,7 @@ type ReturnOutputTotals struct {
 	Fixable  int `json:"fixable"`
 }
 
-// Run reports the violations. Split, not combined: a PHP notice on stderr would corrupt the
-// JSON report.
+// Run reports the violations. Split: a PHP notice on stderr would corrupt the JSON report.
 func (s *CLI) Run(ctx context.Context, dir string) (ReturnOutput, error) {
 	out, _, err := s.command(dir).Split(ctx, "exec", "--", "phpcs", "--report=json", "-q", "--runtime-set", "ignore_errors_on_exit", "1", "--runtime-set", "ignore_warnings_on_exit", "1")
 	if err != nil {

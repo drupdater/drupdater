@@ -16,9 +16,8 @@ import (
 	"pgregory.net/rapid"
 )
 
-// This file is the report's published schema, so the promises worth stating over the whole input
-// space are the ones a consumer relies on: what is written parses back, no credential reaches
-// the file whichever field carried it, and a reader polling the path never sees a partial write.
+// The promises a consumer of the published schema relies on: what is written parses back, no
+// credential reaches the file, and a polling reader never sees a partial write.
 
 // secretGen generates a credential of the kind a repository URL or an error message can carry.
 func secretGen() *rapid.Generator[string] {
@@ -55,9 +54,8 @@ func TestPropertySanitizeURLLeavesCredentialFreeURLsAlone(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		raw := rapid.StringMatching(`https://[a-z]{1,8}\.example\.com(:[0-9]{2,4})?(/[a-z0-9_-]{1,8}){0,3}(\?[a-z]{1,5}=[a-z0-9]{1,5})?(#[a-z]{1,5})?`).Draw(t, "raw")
 
-		// A URL with nothing to remove has to come back byte-identical. Re-serialising it
-		// through net/url would normalise escaping and case, and the report is compared across
-		// runs by consumers who would read that as a change.
+		// Byte-identical when there is nothing to remove: net/url would normalise escaping
+		// and case, which a consumer diffing two reports reads as a change.
 		assert.Equal(t, raw, SanitizeURL(raw))
 	})
 }
@@ -157,9 +155,8 @@ func reportGen(secret string) *rapid.Generator[Report] {
 			}), 0, 4).Draw(t, "phases"),
 		}
 
-		// The secret is planted in whichever field this draw picks. Which one does not matter
-		// to the promise — that is the point of redacting the finished document rather than
-		// naming the fields that might carry a credential.
+		// Which field carries the secret does not matter — that is the point of redacting the
+		// finished document rather than naming the fields.
 		switch rapid.SampledFrom([]string{"repository", "error", "branch", "mr", "addons"}).Draw(t, "carrier") {
 		case "repository":
 			rep.Repository = "https://" + secret + "@example.com/org/repo.git"
@@ -222,9 +219,8 @@ func TestPropertyWriteLeavesNoTemporaryFileBehind(t *testing.T) {
 		fs := afero.NewMemMapFs()
 		require.NoError(t, Write(fs, filepath.Join(dir, "report.json"), rep, nil))
 
-		// The write is atomic so a consumer polling the path never reads half a document. That
-		// only holds if the temporary file is renamed rather than left next to the real one,
-		// where a glob would pick it up.
+		// Atomicity only holds if the temp file is renamed rather than left beside the real
+		// one, where a glob would pick it up.
 		entries, err := afero.ReadDir(fs, dir)
 		require.NoError(t, err)
 		for _, entry := range entries {

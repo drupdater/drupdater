@@ -635,9 +635,8 @@ func TestGetTranslationPath(t *testing.T) {
 	})
 
 	t.Run("unconfigured translation path errors instead of returning empty", func(t *testing.T) {
-		// locale.settings.translation.path unset means realpath('') resolves to false, which
-		// drush prints as an empty line. An empty path must never reach a caller: passed to
-		// go-git's Worktree.Add, it stages the entire working tree instead of "nothing".
+		// An unset translation path makes realpath('') print an empty line, and an empty path
+		// handed to Worktree.Add stages the entire working tree.
 		cache, _ := otter.MustBuilder[string, string](100).Build()
 		cli := NewCLI(logger, cache)
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")

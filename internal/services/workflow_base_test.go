@@ -46,6 +46,7 @@ func TestStartUpdate(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	worktree.EXPECT().Checkout(workBranchCheckout).Return(nil)
 
 	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil)
@@ -92,10 +93,8 @@ func TestStartUpdate(t *testing.T) {
 }
 
 func TestStartUpdatePublishUsesLiveContext(t *testing.T) {
-	// Regression: publishWork must run on the outer (timeout-bounded) context, not the
-	// errgroup-derived context. The errgroup context is cancelled as soon as g.Wait()
-	// returns, so if publishWork received it, CreateMergeRequest would see a cancelled
-	// context. Assert the context handed to CreateMergeRequest is still alive.
+	// Regression: publishWork must run on the outer context. The errgroup's is cancelled as
+	// soon as g.Wait() returns, so CreateMergeRequest would see a dead one.
 	logger := zap.NewNop()
 	installer := NewMockInstaller(t)
 	repositoryService := NewMockRepository(t)
@@ -118,6 +117,7 @@ func TestStartUpdatePublishUsesLiveContext(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	worktree.EXPECT().Checkout(workBranchCheckout).Return(nil)
 
 	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil)
@@ -186,6 +186,7 @@ func TestStartUpdateSiteFailureDoesNotPublish(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	worktree.EXPECT().Checkout(workBranchCheckout).Return(nil)
 
 	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil)
@@ -391,6 +392,7 @@ func TestStartUpdateBranchAlreadyExists(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	// updateSharedCode checks out a dedicated work branch before doing any work.
 	worktree.EXPECT().Checkout(mock.Anything).Return(nil).Maybe()
 
@@ -429,11 +431,9 @@ func TestStartUpdateBranchAlreadyExists(t *testing.T) {
 }
 
 func TestStartUpdateLocalBranchAlreadyExists(t *testing.T) {
-	// Regression: a local ref left over from a prior checkout-mode run of the same
-	// code-content hash (one that reached this branch before failing later) must abort with the
-	// same clean AbortError a remote collision gets, not the raw go-git "a branch named ...
-	// already exists" from the Create:true checkout that follows. BranchExists (the remote
-	// check) must never even run once the local ref is found.
+	// Regression: a local ref left by a prior run of the same content hash must abort with the
+	// clean AbortError, not go-git's raw message from the checkout that follows — and the
+	// remote check must not run at all once the local ref is found.
 	logger := zap.NewNop()
 	installer := NewMockInstaller(t)
 	repositoryService := NewMockRepository(t)
@@ -456,6 +456,7 @@ func TestStartUpdateLocalBranchAlreadyExists(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	worktree.EXPECT().Checkout(mock.Anything).Return(nil).Maybe()
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
@@ -512,6 +513,7 @@ func TestStartUpdateLocalBranchLookupError(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	worktree.EXPECT().Checkout(mock.Anything).Return(nil).Maybe()
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
@@ -564,6 +566,7 @@ func TestStartUpdateWithDryRun(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	worktree.EXPECT().Checkout(workBranchCheckout).Return(nil)
 
 	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil)
@@ -606,9 +609,8 @@ func TestStartUpdateWithDryRun(t *testing.T) {
 }
 
 func TestStartUpdateCheckoutDryRunWithoutPlatform(t *testing.T) {
-	// Regression for issue #167: a checkout-mode --dry-run run needs no token and therefore
-	// cmd/root.go builds no VCS platform for it. StartUpdate must not dereference a nil platform
-	// to get the commit identity; it proceeds with whatever identity the checkout already has.
+	// Regression for issue #167: a token-free dry run has no VCS platform, and StartUpdate must
+	// not dereference nil to get the commit identity.
 	logger := zap.NewNop()
 	installer := NewMockInstaller(t)
 	repositoryService := NewMockRepository(t)
@@ -628,6 +630,7 @@ func TestStartUpdateCheckoutDryRunWithoutPlatform(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	worktree.EXPECT().Checkout(workBranchCheckout).Return(nil)
 
 	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil)
@@ -665,9 +668,8 @@ func TestStartUpdateCheckoutDryRunWithoutPlatform(t *testing.T) {
 	repository.AssertExpectations(t)
 	drush.AssertExpectations(t)
 	mockComposer.AssertExpectations(t)
-	// A --dry-run never pushes, so ensureUpdateBranchAvailable deliberately skips the remote.
-	// This is the configuration documented as needing no token at all, and reaching the remote
-	// here used to fail it outright rather than merely need one.
+	// A --dry-run never pushes, so the remote check is skipped — reaching out used to fail the
+	// one configuration documented as needing no token.
 	repositoryService.AssertNotCalled(t, "BranchExists", mock.Anything, mock.Anything, mock.Anything)
 }
 
@@ -696,6 +698,7 @@ func TestPublishWorkDeletesBranchOnMRFailure(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	worktree.EXPECT().Checkout(workBranchCheckout).Return(nil)
 
 	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil)
@@ -757,6 +760,7 @@ func TestPublishWorkLogsWarningWhenDeleteBranchFails(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	worktree.EXPECT().Checkout(workBranchCheckout).Return(nil)
 
 	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil)
@@ -820,6 +824,7 @@ func TestPublishWorkPushFails(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	worktree.EXPECT().Checkout(workBranchCheckout).Return(nil)
 
 	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil)
@@ -877,6 +882,7 @@ func TestStartUpdateGetLockHashError(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	// updateSharedCode checks out a dedicated work branch before doing any work.
 	worktree.EXPECT().Checkout(mock.Anything).Return(nil).Maybe()
 
@@ -925,6 +931,7 @@ func TestStartUpdateBranchExistsError(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	// updateSharedCode checks out a dedicated work branch before doing any work.
 	worktree.EXPECT().Checkout(mock.Anything).Return(nil).Maybe()
 
@@ -975,6 +982,7 @@ func TestStartUpdateConfigResaveError(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	worktree.EXPECT().Checkout(workBranchCheckout).Return(nil)
 
 	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil)
@@ -1027,6 +1035,7 @@ func TestStartUpdateExportConfigurationError(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	worktree.EXPECT().Checkout(workBranchCheckout).Return(nil)
 
 	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil)
@@ -1081,6 +1090,7 @@ func TestStartUpdateWithAutoMerge(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	worktree.EXPECT().Checkout(workBranchCheckout).Return(nil)
 
 	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil)
@@ -1145,6 +1155,7 @@ func TestStartUpdateAutoMergeError(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	worktree.EXPECT().Checkout(workBranchCheckout).Return(nil)
 
 	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil)
@@ -1208,6 +1219,7 @@ func TestStartUpdateAutoMergeSkippedWhenDisabled(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	worktree.EXPECT().Checkout(workBranchCheckout).Return(nil)
 
 	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil)
@@ -1331,6 +1343,7 @@ func TestStartUpdateUsesExistingCheckout(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	worktree.EXPECT().Checkout(workBranchCheckout).Return(nil)
 
 	installer.EXPECT().Install(anyCtx, checkout, "site1").Return(nil)
@@ -1410,11 +1423,8 @@ func TestStartUpdateWorkBranchCheckoutError(t *testing.T) {
 }
 
 func TestStartUpdateRestoresCheckoutOnFailureInCheckoutMode(t *testing.T) {
-	// Regression: a checkout-mode run that fails or aborts must not leave the checkout on
-	// drupdater's own throwaway work branch with an uncommitted composer.json (e.g.
-	// composer_allow_plugins' allow-plugins:true, set before the failure and never reverted).
-	// StartUpdate captures the original HEAD up front and, on any non-nil return in checkout
-	// mode, checks the worktree back out to it.
+	// Regression: a failed checkout-mode run must not leave the checkout on the throwaway work
+	// branch with an uncommitted composer.json — allow-plugins:true, say, never reverted.
 	logger := zap.NewNop()
 	installer := NewMockInstaller(t)
 	repositoryService := NewMockRepository(t)
@@ -1433,11 +1443,8 @@ func TestStartUpdateRestoresCheckoutOnFailureInCheckoutMode(t *testing.T) {
 	}
 
 	worktree := NewMockWorktree(t)
-	// updateSharedCode checks out a dedicated work branch before doing any work; the restore
-	// checkout (if any) happens afterward. Capture every call's arguments rather than trying to
-	// distinguish them via a second, more specific expectation, since testify matches expected
-	// calls for the same method in registration order and a wildcard registered first would
-	// simply swallow the later, more specific call too.
+	// Every call's arguments are captured rather than split across two expectations: testify
+	// matches in registration order, so a wildcard registered first swallows the specific one.
 	var checkoutCalls []*git.CheckoutOptions
 	worktree.EXPECT().Checkout(mock.Anything).RunAndReturn(func(opts *git.CheckoutOptions) error {
 		checkoutCalls = append(checkoutCalls, opts)
@@ -1497,6 +1504,7 @@ func TestStartUpdateDoesNotRestoreCheckoutOnSuccess(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	// Only the work-branch/final-branch checkouts happen; no restore checkout on success.
 	worktree.EXPECT().Checkout(mock.Anything).Return(nil).Twice()
 
@@ -1640,11 +1648,8 @@ func TestCleanup(t *testing.T) {
 	})
 
 	t.Run("clone mode refuses to remove the temp dir itself", func(t *testing.T) {
-		// Point os.TempDir() at a sandbox first. This subtest deliberately asks cleanup()
-		// to delete the temp dir, relying on the guard in cleanup() to refuse — so if that
-		// guard is ever broken (a refactor, or a mutation-testing run that negates it),
-		// the RemoveAll must land in a directory owned by this test rather than wiping the
-		// machine's real temp dir out from under everything else running on it.
+		// This asks cleanup() to delete the temp dir and relies on its guard to refuse, so
+		// os.TempDir() is pointed at a sandbox: a broken guard must not wipe the real one.
 		t.Setenv("TMPDIR", t.TempDir())
 
 		ws := &WorkflowBaseService{logger: logger, config: internal.Config{Clone: true}}
@@ -1678,10 +1683,8 @@ func TestEnsureUpdateBranchAvailable(t *testing.T) {
 	}
 
 	t.Run("a dry run never reaches the remote", func(t *testing.T) {
-		// The remote half of this check only matters when the branch is going to be pushed,
-		// and a --dry-run never pushes. Reaching out anyway breaks the one configuration
-		// documented as needing no token at all: a checkout-mode dry run. BranchExists is
-		// deliberately left unstubbed, so the mock fails the test if it is called.
+		// A --dry-run never pushes, so the remote is never reached. BranchExists is left
+		// unstubbed, so the mock fails the test if it is called.
 		repository := NewMockRepository(t)
 		ws := &WorkflowBaseService{
 			logger:     zap.NewNop(),
@@ -1735,13 +1738,8 @@ func TestEnsureUpdateBranchAvailable(t *testing.T) {
 	})
 }
 
-// anyCtx matches any non-nil context.Context in a mock expectation.
-//
-// The exact value cannot be pinned: StartUpdate runs the per-site work through an errgroup,
-// which derives a cancellable child context, so what reaches installer.Install is not the
-// context handed to StartUpdate. Requiring non-nil still catches the failure that matters --
-// a call site that stops propagating the context altogether, which would silently disable
-// cancellation and the run timeout for everything below it.
+// anyCtx matches any non-nil context.Context: the errgroup derives a child, so the exact value
+// cannot be pinned, but non-nil still catches a call site that stops propagating it.
 var anyCtx = mock.MatchedBy(func(ctx context.Context) bool { return ctx != nil })
 
 // expectVersionLookup declares the version call every run makes. What the versions end up as is
@@ -1750,14 +1748,189 @@ func expectVersionLookup(composerMock *MockComposer) {
 	composerMock.EXPECT().Version(anyCtx).Return(composer.Versions{Composer: "2.10.2", PHP: "8.3.14"}, nil)
 }
 
-// workBranchCheckout pins the options of every branch drupdater creates.
-//
-// Both are load-bearing. Create is required because neither branch exists yet, so without it
-// the checkout fails outright. Keep preserves the working tree across the switch; dropping it
-// would reset the tree and discard changes the run has already made, which is exactly what the
-// work branch exists to carry.
+// workBranchCheckout pins both options: Create because neither branch exists yet, and Keep
+// because dropping it resets the tree and discards the changes the work branch exists to carry.
 var workBranchCheckout = mock.MatchedBy(func(opts *git.CheckoutOptions) bool {
 	return opts != nil && opts.Create && opts.Keep && !opts.Force &&
 		(strings.HasPrefix(opts.Branch.Short(), "drupdater-work-") ||
 			strings.HasPrefix(opts.Branch.Short(), "update-"))
 })
+
+func TestStageScaffoldChanges(t *testing.T) {
+	logger := zap.NewNop()
+
+	newComposer := func(webroot string) *MockComposer {
+		c := NewMockComposer(t)
+		c.EXPECT().GetConfig(mock.Anything, "/project", "extra.drupal-scaffold.locations.web-root").
+			Return(webroot, nil).Maybe()
+		return c
+	}
+
+	t.Run("stages tracked changes and leaves untracked files alone", func(t *testing.T) {
+		// A core update rewrites the scaffolded files; vendor/ is untracked and belongs to nobody.
+		worktree := NewMockWorktree(t)
+		worktree.EXPECT().Status().Return(git.Status{
+			"web/.htaccess":       {Worktree: git.Modified},
+			"web/robots.txt":      {Worktree: git.Modified},
+			"web/core/foo.php":    {Worktree: git.Untracked},
+			"vendor/autoload.php": {Worktree: git.Untracked},
+			"README.md":           {Worktree: git.Unmodified},
+		}, nil)
+
+		var staged []string
+		worktree.EXPECT().Add(mock.Anything).RunAndReturn(func(path string) (plumbing.Hash, error) {
+			staged = append(staged, path)
+			return plumbing.ZeroHash, nil
+		})
+
+		ws := &WorkflowBaseService{
+			logger:   logger,
+			config:   internal.Config{Sites: []string{"default"}},
+			composer: newComposer("web/"),
+		}
+
+		require.NoError(t, ws.stageScaffoldChanges(context.Background(), "/project", worktree))
+		// Sorted, so the commit a run produces does not depend on map iteration order.
+		assert.Equal(t, []string{"web/.htaccess", "web/robots.txt"}, staged)
+	})
+
+	t.Run("stages nothing outside the web root", func(t *testing.T) {
+		// Regression: staging every tracked change swept the config export into the
+		// shared-code commit, still carrying the installer's sqlite entry, and the next run
+		// then refused to install from it. Those trees belong to the per-site export.
+		worktree := NewMockWorktree(t)
+		worktree.EXPECT().Status().Return(git.Status{
+			"web/robots.txt":                 {Worktree: git.Modified},
+			"config/sync/core.extension.yml": {Worktree: git.Modified},
+			"config/second/system.site.yml":  {Worktree: git.Modified},
+			"translations/drupal.de.po":      {Worktree: git.Modified},
+			"webhooks/notes.md":              {Worktree: git.Modified},
+		}, nil)
+
+		var staged []string
+		worktree.EXPECT().Add(mock.Anything).RunAndReturn(func(path string) (plumbing.Hash, error) {
+			staged = append(staged, path)
+			return plumbing.ZeroHash, nil
+		})
+
+		ws := &WorkflowBaseService{
+			logger:   logger,
+			config:   internal.Config{Sites: []string{"default"}},
+			composer: newComposer("web/"),
+		}
+
+		require.NoError(t, ws.stageScaffoldChanges(context.Background(), "/project", worktree))
+		// "webhooks/" is in the list because a prefix match on "web" rather than "web/" would
+		// pull it in.
+		assert.Equal(t, []string{"web/robots.txt"}, staged)
+	})
+
+	t.Run("never stages a site's settings.php", func(t *testing.T) {
+		// The installer appends the throwaway SQLite database to it. Committing that would put
+		// test credentials and a local path into the merge request.
+		worktree := NewMockWorktree(t)
+		worktree.EXPECT().Status().Return(git.Status{
+			"web/sites/default/settings.php": {Worktree: git.Modified},
+			"web/sites/second/settings.php":  {Worktree: git.Modified},
+			"web/robots.txt":                 {Worktree: git.Modified},
+		}, nil)
+
+		var staged []string
+		worktree.EXPECT().Add(mock.Anything).RunAndReturn(func(path string) (plumbing.Hash, error) {
+			staged = append(staged, path)
+			return plumbing.ZeroHash, nil
+		})
+
+		ws := &WorkflowBaseService{
+			logger:   logger,
+			config:   internal.Config{Sites: []string{"default", "second"}},
+			composer: newComposer("web/"),
+		}
+
+		require.NoError(t, ws.stageScaffoldChanges(context.Background(), "/project", worktree))
+		assert.Equal(t, []string{"web/robots.txt"}, staged)
+	})
+
+	t.Run("propagates a status failure", func(t *testing.T) {
+		worktree := NewMockWorktree(t)
+		worktree.EXPECT().Status().Return(nil, errors.New("boom"))
+
+		ws := &WorkflowBaseService{logger: logger, composer: newComposer("web/")}
+
+		err := ws.stageScaffoldChanges(context.Background(), "/project", worktree)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to read worktree status")
+	})
+
+	t.Run("propagates a web root failure", func(t *testing.T) {
+		worktree := NewMockWorktree(t)
+		worktree.EXPECT().Status().Return(git.Status{"web/robots.txt": {Worktree: git.Modified}}, nil)
+
+		composerCLI := NewMockComposer(t)
+		composerCLI.EXPECT().GetConfig(mock.Anything, "/project", "extra.drupal-scaffold.locations.web-root").
+			Return("", errors.New("no web root"))
+
+		ws := &WorkflowBaseService{logger: logger, composer: composerCLI}
+
+		err := ws.stageScaffoldChanges(context.Background(), "/project", worktree)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to determine web root")
+	})
+
+	t.Run("propagates a staging failure", func(t *testing.T) {
+		worktree := NewMockWorktree(t)
+		worktree.EXPECT().Status().Return(git.Status{"web/robots.txt": {Worktree: git.Modified}}, nil)
+		worktree.EXPECT().Add("web/robots.txt").Return(plumbing.ZeroHash, errors.New("locked"))
+
+		ws := &WorkflowBaseService{logger: logger, composer: newComposer("web/")}
+
+		err := ws.stageScaffoldChanges(context.Background(), "/project", worktree)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to stage web/robots.txt")
+	})
+}
+
+func TestStartUpdateFailsWhenScaffoldChangesCannotBeStaged(t *testing.T) {
+	// Staging what the update rewrote is part of producing the commit, not a nicety: if it
+	// fails, the run must fail rather than push a branch missing the scaffold changes.
+	logger := zap.NewNop()
+	installer := NewMockInstaller(t)
+	repositoryService := NewMockRepository(t)
+	vcsProvider := NewMockPlatform(t)
+	repository := NewMockGitRepository(t)
+	mockComposer := NewMockComposer(t)
+	expectVersionLookup(mockComposer)
+	drush := NewMockDrush(t)
+
+	config := internal.Config{
+		RepositoryURL: "https://example.com/repo.git",
+		Branch:        "main",
+		Token:         "token",
+		Clone:         true,
+		Sites:         []string{"site1"},
+	}
+
+	worktree := NewMockWorktree(t)
+	worktree.EXPECT().Checkout(workBranchCheckout).Return(nil)
+	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(nil, assert.AnError)
+
+	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil)
+
+	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").
+		Return(repository, worktree, "/tmp", nil)
+	repositoryService.EXPECT().IsShallowClone("/tmp").Return(false, nil)
+	repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound).Maybe()
+	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
+
+	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, "/tmp").Return("", nil)
+	mockComposer.EXPECT().Install(anyCtx, "/tmp").Return(nil)
+	mockComposer.EXPECT().Update(anyCtx, "/tmp", mock.Anything, mock.Anything, false, false).
+		Return([]composer.PackageChange{{Package: "drupal/core", From: "9.0.0", To: "9.1.0"}}, nil)
+
+	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
+	err := workflowService.StartUpdate(context.Background(), nil)
+
+	require.ErrorIs(t, err, assert.AnError)
+	assert.Contains(t, err.Error(), "failed to read worktree status")
+}

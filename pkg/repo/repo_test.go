@@ -109,10 +109,8 @@ func TestIsSomethingStaged(t *testing.T) {
 	}
 }
 
-// remoteToLocalRepo creates a real local git repo with the given branches (all pointing at one
-// empty commit) and returns a *git.Remote whose "origin" points at it. BranchExists is exercised
-// against this real, live listing rather than a hand-rolled fake of go-git's ref format, so the
-// test would catch a mismatch against go-git's actual wire format.
+// remoteToLocalRepo builds a real local repo to list against, rather than faking go-git's ref
+// format, so a mismatch with the actual wire format is caught.
 func remoteToLocalRepo(t *testing.T, branches ...string) *git.Remote {
 	t.Helper()
 	dir := t.TempDir()
@@ -160,9 +158,8 @@ func TestBranchExists(t *testing.T) {
 	})
 
 	t.Run("branch deleted on remote since the last fetch is not reported as existing", func(t *testing.T) {
-		// A checkout with a stale cached refs/remotes/origin/my-feature (e.g. left over from a
-		// branch that was merged and auto-deleted on the host) must not produce a false
-		// positive: BranchExists queries the live remote, not the checkout's own refs.
+		// A stale cached ref, left by a branch the host auto-deleted, must not produce a false
+		// positive: BranchExists queries the live remote.
 		remote := remoteToLocalRepo(t, "main")
 		repo := NewMockRepository(t)
 		repo.EXPECT().Remote("origin").Return(remote, nil)
@@ -307,10 +304,8 @@ func TestOpenRepository(t *testing.T) {
 	})
 
 	t.Run("empty identity preserves the checkout's existing commit identity", func(t *testing.T) {
-		// A checkout-mode --dry-run run with no token has no VCS platform to ask for the user's
-		// name and email (see cmd/root.go's tokenRequired), so it calls OpenRepository with
-		// empty strings. That must not blank out an identity the checkout already has configured
-		// (e.g. set up by CI) — it should be left alone.
+		// A tokenless dry run has no platform to ask, so it passes empty strings — which must
+		// not blank out an identity the checkout already has.
 		dir := t.TempDir()
 		checkout, err := git.PlainInit(dir, false)
 		require.NoError(t, err)

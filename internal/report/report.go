@@ -1,9 +1,5 @@
-// Package report defines the machine-readable run report drupdater writes with --report.
-//
-// A run's outcome is otherwise only expressed for humans, and the merge request description only
-// exists for runs that get far enough to open one. The report is written on every exit path,
-// including failures, and records which phase failed and why -- what anything automating
-// drupdater across many repositories needs and the log makes expensive to obtain.
+// Package report defines the machine-readable run report drupdater writes with --report. It is
+// written on every exit path, failures included, so automation never has to parse the log.
 package report
 
 import (
@@ -19,9 +15,8 @@ import (
 	"github.com/spf13/afero"
 )
 
-// SchemaVersion is the version of the report format. It is part of the report's public contract:
-// new fields may be added without bumping it (consumers must ignore unknown fields), while
-// removing or renaming a field requires an increment.
+// SchemaVersion is bumped when a field is removed or renamed. Adding one does not need it —
+// consumers must ignore unknown fields.
 const SchemaVersion = 1
 
 // Status is the overall outcome of a run.
@@ -46,9 +41,8 @@ const (
 	ModeSecurity Mode = "security"
 )
 
-// ToolVersions records the versions of the tools whose behaviour the outcome depends on. Without
-// them, a fleet of repositories failing the same phase after an upstream composer release is
-// unattributable. Embedded in both documents so the two cannot drift on field names.
+// ToolVersions attributes a fleet-wide failure to an upstream release. Embedded in both documents
+// so the two cannot drift on field names.
 type ToolVersions struct {
 	ComposerVersion string `json:"composer_version,omitempty"`
 	PHPVersion      string `json:"php_version,omitempty"`
@@ -103,16 +97,12 @@ type Report struct {
 // MergeRequest identifies the merge/pull request a successful run opened.
 type MergeRequest struct {
 	URL string `json:"url"`
-	// AutoMerge is nil when the active run type did not ask for auto-merge, so a consumer can
-	// tell "not requested" apart from "requested and failed".
+	// AutoMerge is nil when not requested, so that reads differently from "requested and failed".
 	AutoMerge *AutoMerge `json:"auto_merge,omitempty"`
 }
 
-// AutoMerge is the outcome of asking the platform to merge the MR/PR once its pipeline passes.
-//
-// Reported because enabling auto-merge is best-effort: a failure is logged and the run still
-// succeeds, so without this a consumer would see a clean success and never learn the MR it is
-// waiting on will not merge itself.
+// AutoMerge is the outcome of the auto-merge request. Reported because it is best-effort: without
+// it a consumer sees a clean success and never learns the MR will not merge itself.
 type AutoMerge struct {
 	// Enabled is true when the platform accepted the request.
 	Enabled bool `json:"enabled"`
@@ -120,8 +110,8 @@ type AutoMerge struct {
 	Error string `json:"error,omitempty"`
 }
 
-// PackageChange mirrors composer.PackageChange rather than reusing it: this type is published
-// schema, so a refactor in the composer package must not be able to rename a field here.
+// PackageChange mirrors composer.PackageChange: published schema, so an internal refactor must
+// not be able to rename a field here.
 type PackageChange struct {
 	// Action is one of Install, Upgrade, Downgrade, Remove.
 	Action  string `json:"action"`
@@ -149,8 +139,8 @@ type Reporter interface {
 	ReportData() any
 }
 
-// Recorder accumulates a report over a run. Safe for concurrent use: sites update concurrently,
-// so addons may record from several goroutines even though the phases are sequential.
+// Recorder accumulates a report over a run. Concurrency-safe: sites update in parallel, so an
+// addon may record from several goroutines.
 type Recorder struct {
 	mu     sync.Mutex
 	report Report
@@ -163,8 +153,7 @@ func NewRecorder(version string, mode Mode, dryRun bool, repositoryURL string, b
 			SchemaVersion:    SchemaVersion,
 			DrupdaterVersion: version,
 			StartedAt:        time.Now(),
-			// A failing phase overwrites this, so a run cut short without an error is not
-			// reported as having failed a phase it never entered.
+			// A failing phase overwrites this. A run cut short without an error failed nothing.
 			Status:     StatusSuccess,
 			Mode:       mode,
 			DryRun:     dryRun,
@@ -175,9 +164,8 @@ func NewRecorder(version string, mode Mode, dryRun bool, repositoryURL string, b
 	}
 }
 
-// Run executes fn as a named phase, recording its duration and outcome, and returns fn's error
-// unchanged. Only the first failure sets the top-level status: later bookkeeping is not what
-// went wrong.
+// Run records fn as a named phase and returns its error unchanged. Only the first failure sets
+// the top-level status: later bookkeeping is not what went wrong.
 func (r *Recorder) Run(name string, fn func() error) error {
 	start := time.Now()
 	err := fn()
@@ -204,11 +192,8 @@ func (r *Recorder) Run(name string, fn func() error) error {
 	return err
 }
 
-// SetNoChanges records that the run found nothing to update.
-//
-// The workflow signals this by aborting a phase, so that phase stays on record as failed in
-// Phases. The top-level status is reset, or every consumer would treat a healthy repository as
-// one needing attention.
+// SetNoChanges records that the run found nothing to update. The aborted phase stays on record as
+// failed, but the top-level status resets — a healthy repository must not read as needing attention.
 func (r *Recorder) SetNoChanges() {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -218,8 +203,7 @@ func (r *Recorder) SetNoChanges() {
 	r.report.Error = ""
 }
 
-// SetToolVersions records the versions of the tools driving the run. A setter because reading
-// them costs a subprocess the recorder must already exist to outlive.
+// SetToolVersions is a setter because reading the versions costs a subprocess the recorder outlives.
 func (r *Recorder) SetToolVersions(versions ToolVersions) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -247,9 +231,8 @@ func (r *Recorder) SetMergeRequest(url string) {
 	r.report.MergeRequest = &MergeRequest{URL: SanitizeURL(url)}
 }
 
-// SetMergeRequestContent records the assembled title and description. Independent of
-// SetMergeRequest: the content exists once rendered, which is before -- and under --dry-run
-// without -- any merge request.
+// SetMergeRequestContent is independent of SetMergeRequest: the content exists once rendered,
+// which is before — and under --dry-run without — any merge request.
 func (r *Recorder) SetMergeRequestContent(title, description string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -257,8 +240,7 @@ func (r *Recorder) SetMergeRequestContent(title, description string) {
 	r.report.MergeRequestDescription = description
 }
 
-// SetAutoMerge records the outcome of the auto-merge request; err is nil when the platform
-// accepted it. A no-op when no merge request was recorded.
+// SetAutoMerge records the auto-merge outcome. A no-op when no merge request was recorded.
 func (r *Recorder) SetAutoMerge(err error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -272,8 +254,7 @@ func (r *Recorder) SetAutoMerge(err error) {
 	r.report.MergeRequest.AutoMerge = am
 }
 
-// AddAddons collects a section from every addon implementing Reporter. A nil ReportData is
-// skipped too, so an addon with nothing to say does not add an empty key.
+// AddAddons collects a section per Reporter, skipping nil data so nothing adds an empty key.
 func (r *Recorder) AddAddons(addons []internal.Addon) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -294,8 +275,7 @@ func (r *Recorder) AddAddons(addons []internal.Addon) {
 	}
 }
 
-// Finish closes the report and returns it. The caller may call it more than once; each call
-// refreshes the end timestamp.
+// Finish closes the report. Safe to call repeatedly; each call refreshes the end timestamp.
 func (r *Recorder) Finish() Report {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -306,8 +286,8 @@ func (r *Recorder) Finish() Report {
 	return r.report
 }
 
-// Check is the document "drupdater check --report" writes. A distinct shape from Report: a
-// preflight has no phases, packages or branch, only prerequisites and whether each holds.
+// Check is the document "drupdater check --report" writes. Its own shape, because a preflight has
+// no phases, packages or branch.
 type Check struct {
 	SchemaVersion    int    `json:"schema_version"`
 	DrupdaterVersion string `json:"drupdater_version"`
@@ -338,20 +318,14 @@ func NewCheck(version string, tools ToolVersions, results []CheckResult) Check {
 	}
 }
 
-// WriteCheck serialises a preflight result to path, with the same atomicity and redaction
-// guarantees as Write.
+// WriteCheck serialises a preflight result, with the same guarantees as Write.
 func WriteCheck(fs afero.Fs, path string, check Check, redact func(string) string) error {
 	return writeJSON(fs, path, check, redact)
 }
 
-// Write serialises rep to path.
-//
-// redact runs over the whole marshalled document, not per field, so a credential reaching it
-// through a field nobody thought about -- an error string quoting an authenticated URL -- is
-// caught anyway. Pass logging.Redactor.Redact; nil writes unfiltered and suits only tests.
-//
-// The write is atomic (temp file plus rename), so a reader polling for the report never sees a
-// partial one.
+// Write serialises rep to path atomically, so a polling reader never sees a partial document.
+// redact runs over the whole marshalled document, catching a credential in a field nobody thought
+// about. Pass logging.Redactor.Redact; nil writes unfiltered and suits only tests.
 func Write(fs afero.Fs, path string, rep Report, redact func(string) string) error {
 	return writeJSON(fs, path, rep, redact)
 }
@@ -396,8 +370,8 @@ func writeJSON(fs afero.Fs, path string, doc any, redact func(string) string) er
 	return nil
 }
 
-// SanitizeURL strips a URL's userinfo, so https://user:token@host/repo.git cannot carry a
-// secret into the report. Values that do not parse as a URL are returned unchanged.
+// SanitizeURL strips userinfo, so https://user:token@host/repo.git cannot carry a secret into
+// the report. Values that do not parse as a URL are returned unchanged.
 func SanitizeURL(raw string) string {
 	if raw == "" {
 		return ""

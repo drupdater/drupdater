@@ -78,9 +78,7 @@ func TestCreateMergeRequest(t *testing.T) {
 
 		jsonString := make([]byte, 0)
 		if r.URL.Path == "/api/v4/projects/test_project/merge_requests" {
-			// Capture what was actually sent. Asserting only on the response would let any of
-			// the request fields be dropped unnoticed -- a merge request with no title or no
-			// source branch is the tool failing at its one job.
+			// Asserting only on the response would let a request field be dropped unnoticed.
 			assert.NoError(t, json.NewDecoder(r.Body).Decode(&sent))
 			jsonString = []byte(`{"iid": 1, "web_url": "http://example.com"}`)
 			w.WriteHeader(http.StatusOK)
@@ -175,9 +173,8 @@ func TestGitlab_GetUser_HonorsContext(t *testing.T) {
 	assert.Empty(t, email)
 }
 
-// newAutoMergeServer serves the GetMergeRequest endpoint with the given sequence of
-// detailed_merge_status values (the last one repeats once exhausted) and accepts the merge.
-// It returns the server plus counters for the GET and PUT calls.
+// newAutoMergeServer replays a sequence of detailed_merge_status values, repeating the last,
+// and returns call counters alongside the server.
 func newAutoMergeServer(t *testing.T, statuses ...string) (*httptest.Server, *int, *int) {
 	t.Helper()
 	var getCount, putCount int
@@ -214,10 +211,8 @@ func TestGitlab_EnableAutoMerge_WaitsOutPendingStatus(t *testing.T) {
 	assert.Equal(t, 1, *putCount)
 }
 
-// TestGitlab_EnableAutoMerge_AcceptsWhileCIRunning is the regression test for the feature's
-// central case: a pipeline-gated MR never reports "mergeable" before the pipeline finishes, so
-// waiting for that status would make auto-merge unusable on exactly the projects that want it.
-// A CI status is a settled answer and must be accepted straight away.
+// A pipeline-gated MR never reports "mergeable" before the pipeline finishes, so waiting for
+// that status makes auto-merge unusable on the projects that want it.
 func TestGitlab_EnableAutoMerge_AcceptsWhileCIRunning(t *testing.T) {
 	for _, status := range []string{"ci_still_running", "ci_must_pass"} {
 		t.Run(status, func(t *testing.T) {

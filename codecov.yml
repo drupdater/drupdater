@@ -1,0 +1,29 @@
+# Enforces the ">= 90% for a changed package" rule documented in .claude/rules/coverage.md and
+# CONTRIBUTING.md, which the local pre-commit hook only ever printed.
+#
+# Not a replacement for go.yml's mutation gate: the module scored 67% MSI at 90%+ line coverage.
+# Coverage is the floor, not the bar.
+
+coverage:
+  status:
+    # The documented 90%, not "never drop", so a refactor trading covered lines for less code
+    # is not a failure.
+    project:
+      default:
+        target: 90%
+        threshold: 1%
+    # New and changed lines held to the same 90% -- the half that matters day to day.
+    patch:
+      default:
+        target: 90%
+
+# main.go is `cmd.Execute()` and nothing else, uncoverable without executing the binary.
+#
+# The generated mocks_test.go files are deliberately absent: -coverprofile does not instrument
+# _test.go at all, so ignoring them would be a no-op that reads like it does something.
+ignore:
+  - "main.go"
+
+comment:
+  layout: "reach, diff, flags, files"
+  require_changes: true

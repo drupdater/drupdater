@@ -62,7 +62,12 @@ The centre of the run:
 3. Run `composer update` with those constraints. **If nothing changed, the run aborts
    here** — reported as `no_changes`, exit `0`.
 4. Fire **`post-composer-update`** — the dependency diff and normalisation.
-5. Commit `composer.json` and `composer.lock`.
+5. Commit `composer.json` and `composer.lock`, together with anything else the update
+   rewrote that git already tracks — `drupal-scaffold` owns files in the web root such as
+   `.htaccess`, `robots.txt` and `index.php`, and a core update changes them. Untracked
+   paths are left alone: `vendor/`, `web/core` and the site's generated files belong to
+   nobody. Each site's `settings.php` is excluded too, because the baseline install
+   appended a throwaway SQLite database to it.
 6. Fire **`post-code-update`** — Rector, PHPCBF, and the post-update security audit.
 7. Compute the final branch name from a hash of the resulting `composer.lock`, and check
    it does not already exist.

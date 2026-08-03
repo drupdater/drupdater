@@ -12,10 +12,8 @@ import (
 	"pgregory.net/rapid"
 )
 
-// Both helpers below turn untrusted input into a decision about the filesystem: cleanURLString
-// builds a file name out of a drupal.org issue title, and isRemotePatch decides whether a patch
-// reference names a file to remove at all. Titles are written by whoever opened the issue, so
-// "for every input" is the only useful scope for their promises.
+// Both helpers below turn untrusted input into a filesystem decision, and the input is written
+// by whoever opened the drupal.org issue — so "for every input" is the only useful scope.
 
 // safeFileNameChars is the character set cleanURLString promises to stay inside — no separator
 // and nothing else that would break os.Create.
@@ -27,15 +25,12 @@ func TestPropertyCleanURLStringProducesASafeFileName(t *testing.T) {
 
 		cleaned := (&ComposerPatches1{}).cleanURLString(title)
 
-		// The result is concatenated into a path and handed to os.Create. Any title at all —
-		// including one containing "../", a NUL byte or a full URL — has to come out as
-		// something that cannot leave the patch directory.
+		// The result is concatenated into a path and handed to os.Create, so no title may
+		// produce a name that leaves the patch directory.
 		assert.Regexp(t, safeFileNameChars, cleaned, "cleaned %q", title)
 
-		// Stated on the name the caller actually builds rather than on the fragment. A run of
-		// dots survives cleaning, and that is fine: with no separator in the character set it
-		// cannot form a traversal, and the fragment is always embedded between an issue ID and
-		// the ".diff" suffix, so the name can never be "." or ".." either.
+		// Stated on the whole name, not the fragment: a run of dots survives cleaning, which
+		// is harmless once embedded between an issue ID and ".diff".
 		const patchDir = "patches/drupal"
 		name := fmt.Sprintf("%s-%s-%s.diff", "3456789", "0ff1ce", cleaned)
 		assert.Equal(t, name, filepath.Base(name), "%q is not a single path element", name)
@@ -64,9 +59,8 @@ func TestPropertyIsRemotePatchRejectsEveryFilesystemPath(t *testing.T) {
 			path = "/" + path
 		}
 
-		// A local patch has a file in the worktree that has to be removed when the patch is
-		// dropped. Classifying it as remote makes the removal a silent no-op, so the patch file
-		// stays behind and composer-patches keeps applying it.
+		// Misclassifying a local patch as remote makes its removal a silent no-op, and
+		// composer-patches keeps applying the file left behind.
 		assert.False(t, isRemotePatch(path), "for %q", path)
 	})
 }
@@ -94,9 +88,8 @@ func TestPropertyDropPatchFileTouchesTheWorktreeOnlyForLocalPatches(t *testing.T
 			worktree.EXPECT().Remove(patchPath).Return(plumbing.Hash{}, nil).Once()
 		}
 
-		// A remote patch has no file in the repository, so handing its URL to worktree.Remove
-		// would fail and leave the caller believing the patch could not be dropped. The two
-		// have to agree for every reference, not just for the ones someone listed.
+		// A URL handed to worktree.Remove fails, and reads as "the patch could not be
+		// dropped". The two have to agree for every reference, not just the listed ones.
 		assert.NoError(t, (&ComposerPatches1{}).dropPatchFile(worktree, patchPath))
 	})
 }

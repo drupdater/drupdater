@@ -151,9 +151,8 @@ func TestAdvisoryKey(t *testing.T) {
 	assert.Equal(t, `pkg:"drupal/foo""Title"`, advisoryKey(composer.Advisory{PackageName: "drupal/foo", Title: "Title"}))
 }
 
-// TestAdvisoryKey_SeparatorInTitle covers the fallback's ambiguity. An advisory title is free
-// text, so joining package and title on a separator lets two different advisories share a key —
-// and a shared key means the second one is reported as fixed while it is still open.
+// A title is free text, so joining package and title on a separator lets two advisories share
+// a key — and the second is then reported as fixed while it is still open.
 func TestAdvisoryKey_SeparatorInTitle(t *testing.T) {
 	split := composer.Advisory{PackageName: "drupal/foo|Access", Title: "bypass"}
 	other := composer.Advisory{PackageName: "drupal/foo", Title: "Access|bypass"}
@@ -286,9 +285,7 @@ func TestComposerAudit_RenderTemplate_EscapesPipes(t *testing.T) {
 	assert.NotContains(t, result, "a|b")
 }
 
-// TestComposerAudit_GetAbandonedPackages_FiltersDrupalPackages checks that drupal/* packages
-// are left to unsupported_modules, which reports them from drupal.org's own release data, so
-// one end-of-life module is not reported twice in the same merge request.
+// drupal/* is left to unsupported_modules, so one module is not reported twice.
 func TestComposerAudit_GetAbandonedPackages_FiltersDrupalPackages(t *testing.T) {
 	audit := NewComposerAudit(zap.NewNop(), NewMockComposer(t), true)
 	audit.afterAudit = composer.Audit{
@@ -321,10 +318,8 @@ func TestComposerAudit_GetAbandonedPackages_UsesTheAuditAfterTheUpdate(t *testin
 	assert.Equal(t, []composer.AbandonedPackage{{PackageName: "still/here"}}, audit.GetAbandonedPackages())
 }
 
-// TestComposerAudit_PreComposerUpdateHandler_NormalMode checks that a normal run audits without
-// taking over the update. The scope of a maintenance update is the user's to decide, and an
-// update with no advisories to fix still has everything else to do — narrowing or aborting here
-// would turn every normal run into a security run.
+// A normal run audits without taking over: narrowing or aborting here would turn every normal
+// run into a security run.
 func TestComposerAudit_PreComposerUpdateHandler_NormalMode(t *testing.T) {
 	mockComposer := NewMockComposer(t)
 	audit := NewComposerAudit(zap.NewNop(), mockComposer, false)
@@ -399,9 +394,8 @@ func TestComposerAudit_PreMergeRequestCreateHandler_PublishesAbandonedPackages(t
 	assert.Equal(t, []services.AbandonedPackage{{Name: "patchwork/jsqueeze"}}, mockEvent.AbandonedPackages)
 }
 
-// TestComposerAudit_RenderTemplate_NothingToReport checks a run that found no advisories at all
-// contributes no section. Otherwise every routine merge request would carry a security report
-// whose only content is that there was nothing to report.
+// No advisories at all contributes no section, or every routine merge request carries an empty
+// security report.
 func TestComposerAudit_RenderTemplate_NothingToReport(t *testing.T) {
 	audit := NewComposerAudit(zap.NewNop(), NewMockComposer(t), false)
 
@@ -410,9 +404,7 @@ func TestComposerAudit_RenderTemplate_NothingToReport(t *testing.T) {
 	assert.Empty(t, result)
 }
 
-// TestComposerAudit_RenderTemplate_OmitsAbandonedPackages checks the abandoned packages are not
-// rendered here: they go to unsupported_modules, and rendering them in both places would show
-// the same finding twice.
+// Abandoned packages go to unsupported_modules; rendering them here too shows one finding twice.
 func TestComposerAudit_RenderTemplate_OmitsAbandonedPackages(t *testing.T) {
 	audit := NewComposerAudit(zap.NewNop(), NewMockComposer(t), true)
 	audit.afterAudit = composer.Audit{
@@ -425,9 +417,7 @@ func TestComposerAudit_RenderTemplate_OmitsAbandonedPackages(t *testing.T) {
 	assert.NotContains(t, result, "patchwork/jsqueeze")
 }
 
-// TestComposerAudit_RenderTemplate_FixedOnly covers the other half of the "nothing to report"
-// guard: a run that closed every advisory it found still has something to say, and must not be
-// silenced along with the run that found none.
+// The other half of the guard: a run that closed every advisory still has something to say.
 func TestComposerAudit_RenderTemplate_FixedOnly(t *testing.T) {
 	audit := NewComposerAudit(zap.NewNop(), NewMockComposer(t), true)
 	audit.beforeAudit = composer.Audit{
@@ -438,4 +428,59 @@ func TestComposerAudit_RenderTemplate_FixedOnly(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, result, "CVE-1")
 	assert.Contains(t, result, "All security issues have been resolved.")
+}
+
+// A swallowed audit failure would let a security run continue with an empty advisory list,
+// updating nothing and reporting that everything is fine.
+func TestComposerAudit_AuditFailures(t *testing.T) {
+	path := "/test/path"
+
+	t.Run("before the update", func(t *testing.T) {
+		mockComposer := NewMockComposer(t)
+		audit := NewComposerAudit(zap.NewNop(), mockComposer, true)
+		mockComposer.EXPECT().Audit(anyCtx, path).Return(composer.Audit{}, assert.AnError)
+
+		evt := services.NewPreComposerUpdateEvent(context.Background(), path, NewMockWorktree(t), []string{}, []string{}, true)
+		err := audit.preComposerUpdateHandler(evt)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to run composer audit")
+		// Not an abort: aborting reads as "nothing to do here" and exits 0.
+		assert.False(t, evt.IsAborted())
+		assert.Empty(t, evt.PackagesToUpdate)
+	})
+
+	t.Run("after the update", func(t *testing.T) {
+		mockComposer := NewMockComposer(t)
+		audit := NewComposerAudit(zap.NewNop(), mockComposer, true)
+		mockComposer.EXPECT().Audit(anyCtx, path).Return(composer.Audit{}, assert.AnError)
+
+		evt := services.NewPostCodeUpdateEvent(context.Background(), path, NewMockWorktree(t))
+		err := audit.postCodeUpdateHandler(evt)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to run composer audit after update")
+	})
+}
+
+// The list becomes composer update's arguments, which must not name a package twice.
+func TestComposerAudit_PreComposerUpdateHandler_DeduplicatesPackages(t *testing.T) {
+	mockComposer := NewMockComposer(t)
+	audit := NewComposerAudit(zap.NewNop(), mockComposer, true)
+	path := "/test/path"
+
+	mockComposer.EXPECT().Audit(anyCtx, path).Return(composer.Audit{
+		Advisories: []composer.Advisory{
+			{PackageName: "drupal/webform", CVE: "CVE-1", Title: "first"},
+			{PackageName: "drupal/webform", CVE: "CVE-2", Title: "second"},
+			{PackageName: "other/package", CVE: "CVE-3", Title: "third"},
+			{PackageName: "drupal/webform", CVE: "CVE-4", Title: "fourth"},
+		},
+	}, nil)
+
+	evt := services.NewPreComposerUpdateEvent(context.Background(), path, NewMockWorktree(t), []string{}, []string{}, true)
+	require.NoError(t, audit.preComposerUpdateHandler(evt))
+
+	// First-seen order, not sorted: the order is the order composer receives the arguments in.
+	assert.Equal(t, []string{"drupal/webform", "other/package"}, evt.PackagesToUpdate)
 }

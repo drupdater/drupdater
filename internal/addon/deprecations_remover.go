@@ -17,8 +17,7 @@ type DeprecationsRemover struct {
 	rector   Rector
 	composer Composer
 
-	// Which rules rewrote which files, for the report. Written once from the single
-	// post-code-update event, read after the run.
+	// For the report. Written once from the single post-code-update event, read after the run.
 	fixes []DeprecationFix
 }
 
@@ -32,9 +31,8 @@ func NewDeprecationsRemover(logger *zap.Logger, rector Rector, composer Composer
 
 func (dr *DeprecationsRemover) SubscribedEvents() map[string]any {
 	return map[string]any{
-		// Above Normal: this handler temporarily requires palantirnet/drupal-rector, and
-		// code_beautifier (Normal) may commit composer.* via AddGlob. Running in between would
-		// sweep this handler's half-finished composer diff into that commit.
+		// AboveNormal: this temporarily requires drupal-rector, and code_beautifier (Normal)
+		// commits composer.* via AddGlob — interleaving sweeps a half-finished diff into it.
 		"post-code-update": event.ListenerItem{
 			Priority: event.AboveNormal,
 			Listener: event.ListenerFunc(dr.postCodeUpdateHandler),
@@ -74,8 +72,8 @@ func (dr *DeprecationsRemover) postCodeUpdateHandler(e event.Event) error {
 		if _, err := dr.composer.Remove(evt.Context(), evt.Path(), "palantirnet/drupal-rector"); err != nil {
 			return err
 		}
-		// Removing rector rarely restores composer.lock byte-for-byte. Commit the remainder here
-		// so no other listener's AddGlob("composer.*") sweeps this diff into its own commit.
+		// Removing rector rarely restores composer.lock byte-for-byte; commit the remainder
+		// here so no other listener's AddGlob("composer.*") sweeps it up.
 		if err := dr.commitTemporaryRectorCleanup(evt.Worktree()); err != nil {
 			return err
 		}
@@ -100,8 +98,7 @@ func (dr *DeprecationsRemover) postCodeUpdateHandler(e event.Event) error {
 	return err
 }
 
-// commitTemporaryRectorCleanup commits any composer.json/composer.lock diff left over from
-// temporarily requiring palantirnet/drupal-rector, or does nothing if removing it left no trace.
+// commitTemporaryRectorCleanup commits whatever composer.* diff removing drupal-rector left behind.
 func (dr *DeprecationsRemover) commitTemporaryRectorCleanup(worktree Worktree) error {
 	if err := worktree.AddGlob("composer.*"); err != nil {
 		return err
@@ -117,8 +114,7 @@ func (dr *DeprecationsRemover) commitTemporaryRectorCleanup(worktree Worktree) e
 	return err
 }
 
-// recordFixes captures which rules fired on which files, so the report says more than "some
-// deprecations were removed".
+// recordFixes captures which rules fired on which files, for the report.
 func (dr *DeprecationsRemover) recordFixes(result rector.ReturnOutput) {
 	rectorsByFile := make(map[string][]string, len(result.FileDiffs))
 	for _, diff := range result.FileDiffs {
@@ -127,8 +123,7 @@ func (dr *DeprecationsRemover) recordFixes(result rector.ReturnOutput) {
 
 	fixes := make([]DeprecationFix, 0, len(result.ChangedFiles))
 	for _, file := range result.ChangedFiles {
-		// Cloned before sorting: in place would reorder the caller's rector.ReturnOutput, and a
-		// file listed twice would leave two fixes sharing one backing array.
+		// Cloned: sorting in place would reorder the caller's rector.ReturnOutput.
 		applied := slices.Clone(rectorsByFile[file])
 		slices.Sort(applied)
 		fixes = append(fixes, DeprecationFix{File: file, AppliedRectors: applied})

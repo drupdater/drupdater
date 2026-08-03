@@ -40,8 +40,7 @@ func (uh *UpdateHooks) SubscribedEvents() map[string]any {
 	}
 }
 
-// RenderTemplate locks even though errgroup.Wait already orders every site's goroutine before
-// this call: that ordering is the caller's invariant, not this type's.
+// RenderTemplate locks because the goroutine ordering is the caller's invariant, not this type's.
 func (uh *UpdateHooks) RenderTemplate() (string, error) {
 	uh.mu.Lock()
 	defer uh.mu.Unlock()

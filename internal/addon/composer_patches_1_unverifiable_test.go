@@ -16,10 +16,8 @@ import (
 	"go.uber.org/zap"
 )
 
-// A patch check that could not be carried out is not the same as a patch that was checked and
-// rejected. Only the second is a conflict; the first must leave the package alone, or a package
-// whose registry is unreachable gets pinned on every run and the merge request blames a patch
-// conflict that never happened.
+// A check that could not run is not a rejected patch. Only the second is a conflict: pinning on
+// the first blames a conflict that never happened, on every run.
 func TestUpdatePatchesLeavesUnverifiablePatchesUnpinned(t *testing.T) {
 	logger := zap.NewNop()
 	unverifiable := errors.New("could not obtain drupal/core 8.8.0 to test its patches (not available from any configured repository)")
