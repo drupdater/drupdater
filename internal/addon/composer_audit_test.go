@@ -2,10 +2,10 @@ package addon
 
 import (
 	"context"
-	"os"
 	"testing"
 	"time"
 
+	"github.com/drupdater/drupdater/internal/golden"
 	"github.com/drupdater/drupdater/internal/services"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/gookit/event"
@@ -260,13 +260,9 @@ func TestComposerAudit_RenderTemplate(t *testing.T) {
 		},
 	}
 
-	fixture, err := os.ReadFile("testdata/composer_audit.md")
-	require.NoError(t, err)
-	expected := string(fixture)
-
 	result, err := audit.RenderTemplate()
 	require.NoError(t, err)
-	assert.Equal(t, expected, result)
+	golden.Assert(t, "testdata/composer_audit.md", result)
 }
 
 // TestComposerAudit_RenderTemplate_EscapesPipes ensures a "|" in an advisory

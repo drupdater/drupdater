@@ -120,6 +120,54 @@ get past it — fix the code.
 Changed packages must reach **≥ 90%** coverage. The hook prints per-package totals; add
 tests before committing if any package is below.
 
+## Golden files
+
+Some output is a contract with somebody outside this repository: the merge request sections a
+reviewer reads, and the `--report` document automation parses. For those, the whole shape matters
+— a renamed field breaks a consumer, and no assertion anybody remembers to write covers every
+field. So the expected output lives in a file under `testdata/` and the test compares against it
+byte for byte.
+
+```bash
+go test ./...                       # compare
+go test ./... -update               # rewrite every golden file
+go test ./internal/addon -update    # just one package's
+```
+
+`-update` is registered by `internal/golden`, which every golden assertion goes through. Always
+read the resulting `git diff` before committing: `-update` makes a change invisible if you let it,
+which is the one way a golden file can make tests worse rather than better.
+
+| Golden file | Pins |
+|---|---|
+| `internal/addon/testdata/*.md` | Each addon's merge request section, from its template |
+| `internal/services/testdata/dependency_update.md` | The assembled description a full run produces |
+| `internal/addon/testdata/run_report.json` | The whole `--report` document, every reporting addon at once |
+
+Most of these are embedded into this documentation with `pymdownx.snippets`, so the published
+examples cannot drift from what the code emits. Changing a golden file changes the docs.
+
+### Why the report has one
+
+`internal/addon/report.go` and `internal/report/report.go` are a published schema, and struct tags
+are invisible to everything else: coverage sees a line that ran, mutation testing does not mutate
+tags, and the property tests assert values rather than names. Before `run_report.json` existed,
+renaming `fixable` to `fixable_count` and `remaining` to `still_open` broke **no test at all**.
+`.github/assert-report.jq` does check field names, but only in the label-triggered integration
+run — never on a pull request.
+
+The golden is built through the real `report.Recorder`, so it also pins how `AddAddons` keys each
+section. Everything a clock produced is overwritten with fixed values first — otherwise the file
+would differ on every run — which is the one thing the golden deliberately does not check.
+
+### When not to write one
+
+A golden file freezes *everything* about its subject, so on an internal value it turns every
+unrelated change into a diff to re-approve and says nothing about which part mattered. The
+composer diff table and the preflight results are better served by the assertions they already
+have, which name the thing under test. Reach for a golden when the output is a published
+contract, not when it is merely large.
+
 ## The race detector
 
 Drupdater runs the per-site phases concurrently — an `errgroup` bounded by `--concurrency`, one

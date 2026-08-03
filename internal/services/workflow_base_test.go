@@ -12,6 +12,7 @@ import (
 
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/codehosting"
+	"github.com/drupdater/drupdater/internal/golden"
 	"github.com/drupdater/drupdater/pkg/composer"
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -64,11 +65,17 @@ func TestStartUpdate(t *testing.T) {
 
 	repository.EXPECT().Push(mock.Anything).Return(nil)
 
-	fixture, err := os.ReadFile("testdata/dependency_update.md")
-	require.NoError(t, err, "Failed to read test fixture")
+	// Captured rather than matched on: as an expectation a changed description fails as an
+	// unexpected call, and the diff that would say what changed is never printed. The other
+	// tests below still match on the file, and share this one's regeneration.
+	var description string
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
-	vcsProvider.EXPECT().CreateMergeRequest(anyCtx, mock.Anything, string(fixture), mock.Anything, config.Branch).Return(codehosting.MergeRequest{}, nil)
+	vcsProvider.EXPECT().CreateMergeRequest(anyCtx, mock.Anything, mock.Anything, mock.Anything, config.Branch).
+		RunAndReturn(func(_ context.Context, _ string, got string, _ string, _ string) (codehosting.MergeRequest, error) {
+			description = got
+			return codehosting.MergeRequest{}, nil
+		})
 
 	mockComposer.EXPECT().Update(anyCtx, "/tmp", mock.Anything, mock.Anything, false, false).Return([]composer.PackageChange{
 		{
@@ -81,9 +88,10 @@ func TestStartUpdate(t *testing.T) {
 	mockComposer.EXPECT().GetLockHash("/tmp").Return("dummy-hash", nil)
 
 	workflowService := NewWorkflowBaseService(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
-	err = workflowService.StartUpdate(ctx, nil)
+	err := workflowService.StartUpdate(ctx, nil)
 
 	require.NoError(t, err)
+	golden.Assert(t, "testdata/dependency_update.md", description)
 	installer.AssertExpectations(t)
 	repositoryService.AssertExpectations(t)
 	repository.AssertExpectations(t)

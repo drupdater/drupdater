@@ -3,9 +3,9 @@ package addon
 import (
 	"context"
 	"errors"
-	"os"
 	"testing"
 
+	"github.com/drupdater/drupdater/internal/golden"
 	"github.com/drupdater/drupdater/internal/services"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/drush"
@@ -45,10 +45,6 @@ func TestUnsupportedModules_SubscribedEvents(t *testing.T) {
 }
 
 func TestUnsupportedModules_RenderTemplate(t *testing.T) {
-	fixture, err := os.ReadFile("testdata/unsupported_modules.md")
-	require.NoError(t, err)
-	expected := string(fixture)
-
 	logger := zap.NewNop()
 	mockDrush := NewMockDrush(t)
 
@@ -65,7 +61,7 @@ func TestUnsupportedModules_RenderTemplate(t *testing.T) {
 	result, err := um.RenderTemplate()
 
 	require.NoError(t, err)
-	assert.Equal(t, expected, result)
+	golden.Assert(t, "testdata/unsupported_modules.md", result)
 }
 
 func TestUnsupportedModules_RenderTemplate_Empty(t *testing.T) {

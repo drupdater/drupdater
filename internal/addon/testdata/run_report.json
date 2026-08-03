@@ -1,0 +1,187 @@
+{
+  "schema_version": 1,
+  "drupdater_version": "v1.4.0",
+  "composer_version": "2.10.2",
+  "php_version": "8.3.14",
+  "started_at": "2026-03-14T09:30:00Z",
+  "finished_at": "2026-03-14T09:44:31Z",
+  "duration_seconds": 871,
+  "status": "success",
+  "mode": "security",
+  "dry_run": false,
+  "repository": "https://github.com/org/site.git",
+  "base_branch": "main",
+  "update_branch": "update-3f81a2c",
+  "merge_request": {
+    "url": "https://github.com/org/site/pull/42",
+    "auto_merge": {
+      "enabled": true
+    }
+  },
+  "merge_request_title": "Drupal Security Update",
+  "merge_request_description": "## 🔒 **Security Report**\n",
+  "sites": [
+    "default",
+    "second"
+  ],
+  "packages": [
+    {
+      "action": "Upgrade",
+      "package": "drupal/core",
+      "from": "10.3.8",
+      "to": "10.3.9"
+    },
+    {
+      "action": "Install",
+      "package": "drupal/redirect",
+      "to": "1.10.0"
+    },
+    {
+      "action": "Remove",
+      "package": "drupal/legacy_feature",
+      "from": "1.2.0"
+    }
+  ],
+  "phases": [
+    {
+      "name": "preflight",
+      "started_at": "2026-03-14T09:30:00Z",
+      "duration_seconds": 1.5,
+      "ok": true
+    },
+    {
+      "name": "update shared code",
+      "started_at": "2026-03-14T09:31:00Z",
+      "duration_seconds": 3,
+      "ok": true
+    },
+    {
+      "name": "site update",
+      "started_at": "2026-03-14T09:32:00Z",
+      "duration_seconds": 4.5,
+      "ok": true
+    }
+  ],
+  "addons": {
+    "code_beautifier": {
+      "files": [
+        "web/modules/custom/acme/acme.module",
+        "web/modules/custom/acme/src/Controller/AcmeController.php"
+      ],
+      "fixable": 3
+    },
+    "composer_audit": {
+      "fixed": [
+        {
+          "reportedAt": "2026-02-01T00:00:00+00:00",
+          "severity": "critical",
+          "advisoryId": "PKSA-2026-0001",
+          "cve": "CVE-2026-1111",
+          "sources": null,
+          "link": "https://www.drupal.org/sa-core-2026-001",
+          "packageName": "drupal/core",
+          "affectedVersions": "\u003e=10.3.0,\u003c10.3.9",
+          "title": "Cross site scripting in the render pipeline"
+        }
+      ],
+      "remaining": [
+        {
+          "reportedAt": "2026-02-10T00:00:00+00:00",
+          "severity": "moderate",
+          "advisoryId": "PKSA-2026-0002",
+          "cve": "CVE-2026-2222",
+          "sources": null,
+          "link": "https://www.drupal.org/sa-contrib-2026-002",
+          "packageName": "drupal/token",
+          "affectedVersions": "\u003c1.15.0",
+          "title": "Access bypass"
+        }
+      ],
+      "abandoned": [
+        {
+          "packageName": "swiftmailer/swiftmailer",
+          "replacement": "symfony/mailer"
+        },
+        {
+          "packageName": "patchwork/jsqueeze",
+          "replacement": ""
+        }
+      ]
+    },
+    "composer_patches": {
+      "removed": [
+        {
+          "package": "drupal/core",
+          "patch_description": "Fix the thing",
+          "patch_path": "https://www.drupal.org/files/issues/3001-12.patch",
+          "reason": "fixed upstream in 10.4.0"
+        }
+      ],
+      "updated": [
+        {
+          "package": "drupal/paragraphs",
+          "patch_description": "Support the other thing",
+          "previous_patch_path": "https://www.drupal.org/files/issues/3002-4.patch",
+          "new_patch_path": "https://www.drupal.org/files/issues/3002-9.patch"
+        }
+      ],
+      "conflicts": [
+        {
+          "package": "drupal/webform",
+          "fixed_version": "6.2.7",
+          "patch_path": "https://www.drupal.org/files/issues/3003-2.patch",
+          "patch_description": "Adjust the form",
+          "new_version": "6.3.0"
+        }
+      ]
+    },
+    "deprecations_remover": [
+      {
+        "file": "web/modules/custom/acme/src/Plugin/Block/AcmeBlock.php",
+        "applied_rectors": [
+          "Drupal\\Rector\\Rector\\Deprecation\\DrupalSetMessageRector"
+        ]
+      }
+    ],
+    "translations_updater": {
+      "default": {
+        "path": "translations",
+        "updated": true
+      },
+      "second": {
+        "updated": false,
+        "skipped": "locale_deploy not enabled"
+      }
+    },
+    "unsupported_modules": [
+      {
+        "name": "legacy_feature",
+        "installed_version": "1.2.0",
+        "recommended_version": "None"
+      },
+      {
+        "name": "old_widget",
+        "installed_version": "2.0.0",
+        "recommended_version": "3.1.0"
+      }
+    ],
+    "update_hooks": {
+      "default": {
+        "token_update_8002": {
+          "module": "token",
+          "update_id": 8002,
+          "description": "Rebuild the token cache",
+          "type": "hook_update_n"
+        }
+      },
+      "second": {
+        "node_post_update_index": {
+          "module": "node",
+          "update_id": "index",
+          "description": "Reindex nodes",
+          "type": "post_update"
+        }
+      }
+    }
+  }
+}

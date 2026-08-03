@@ -14,40 +14,11 @@ drupdater --dry-run --report ./drupdater-report.json
 
 ## Example
 
+A `--security` run with every reporting addon contributing. Embedded from the test suite's
+golden file, so this example cannot drift from what the code emits:
+
 ```json
-{
-  "schema_version": 1,
-  "drupdater_version": "v0.3.6",
-  "composer_version": "2.10.2",
-  "php_version": "8.3.14",
-  "started_at": "2026-07-25T02:00:00Z",
-  "finished_at": "2026-07-25T02:14:31Z",
-  "duration_seconds": 871.4,
-  "status": "success",
-  "mode": "security",
-  "dry_run": false,
-  "repository": "https://github.com/org/site.git",
-  "base_branch": "main",
-  "update_branch": "update-3f81a2c",
-  "merge_request": {
-    "url": "https://github.com/org/site/pull/42",
-    "auto_merge": { "enabled": true }
-  },
-  "merge_request_title": "July 2026: Drupal Security Updates",
-  "merge_request_description": "This automated merge request by Drupdater …",
-  "sites": ["default"],
-  "packages": [
-    { "action": "Upgrade", "package": "drupal/core", "from": "10.1.8", "to": "10.2.0" }
-  ],
-  "phases": [
-    { "name": "composer install", "started_at": "…", "duration_seconds": 63.2, "ok": true },
-    { "name": "baseline site install", "started_at": "…", "duration_seconds": 121.9, "ok": true }
-  ],
-  "addons": {
-    "composer_audit": { "fixed": [], "remaining": [], "abandoned": [] },
-    "update_hooks": { "default": {} }
-  }
-}
+--8<-- "internal/addon/testdata/run_report.json"
 ```
 
 ## Fields

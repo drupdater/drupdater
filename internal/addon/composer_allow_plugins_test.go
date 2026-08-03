@@ -2,9 +2,9 @@ package addon
 
 import (
 	"context"
-	"os"
 	"testing"
 
+	"github.com/drupdater/drupdater/internal/golden"
 	"github.com/drupdater/drupdater/internal/services"
 	"github.com/go-git/go-git/v5"
 	"github.com/stretchr/testify/assert"
@@ -97,10 +97,6 @@ func TestDefaultAllowPlugins_PostComposerUpdateHandler(t *testing.T) {
 }
 
 func TestDefaultAllowPlugins_RenderTemplate(t *testing.T) {
-	fixture, err := os.ReadFile("testdata/allowplugins.md")
-	require.NoError(t, err, "Failed to read test fixture")
-
-	expected := string(fixture)
 	logger := zap.NewNop()
 	composerRunner := NewMockComposer(t)
 
@@ -110,7 +106,7 @@ func TestDefaultAllowPlugins_RenderTemplate(t *testing.T) {
 	result, err := ap.RenderTemplate()
 
 	require.NoError(t, err)
-	assert.Equal(t, expected, result)
+	golden.Assert(t, "testdata/allowplugins.md", result)
 }
 
 func TestDefaultAllowPlugins_RenderTemplate_Empty(t *testing.T) {

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/drupdater/drupdater/internal/golden"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/drupalorg"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -926,10 +927,6 @@ func TestUpdatePatches(t *testing.T) {
 }
 
 func TestComposer_Patches_1_RenderTemplate(t *testing.T) {
-	fixture, err := os.ReadFile("testdata/composer_patches_1.md")
-	require.NoError(t, err, "Failed to read test fixture")
-
-	expected := string(fixture)
 	logger := zap.NewNop()
 	composerRunner := NewMockComposer(t)
 	drupalorgService := NewMockDrupalOrg(t)
@@ -972,7 +969,7 @@ func TestComposer_Patches_1_RenderTemplate(t *testing.T) {
 	result, err := ap.RenderTemplate()
 
 	require.NoError(t, err)
-	assert.Equal(t, expected, result)
+	golden.Assert(t, "testdata/composer_patches_1.md", result)
 }
 
 func TestDownloadFile(t *testing.T) {

@@ -3,9 +3,9 @@ package addon
 import (
 	"context"
 	"errors"
-	"os"
 	"testing"
 
+	"github.com/drupdater/drupdater/internal/golden"
 	"github.com/drupdater/drupdater/internal/services"
 	"github.com/drupdater/drupdater/pkg/drush"
 	"github.com/gookit/event"
@@ -37,10 +37,6 @@ func TestUpdateHooks_SubscribedEvents(t *testing.T) {
 }
 
 func TestUpdateHooks_RenderTemplate(t *testing.T) {
-	fixture, err := os.ReadFile("testdata/update_hooks.md")
-	require.NoError(t, err)
-	expected := string(fixture)
-
 	logger := zap.NewNop()
 	mockDrush := NewMockDrush(t)
 
@@ -58,7 +54,7 @@ func TestUpdateHooks_RenderTemplate(t *testing.T) {
 	result, err := ap.RenderTemplate()
 
 	require.NoError(t, err)
-	assert.Equal(t, expected, result)
+	golden.Assert(t, "testdata/update_hooks.md", result)
 }
 
 func TestUpdateHooks_RenderTemplate_Empty(t *testing.T) {

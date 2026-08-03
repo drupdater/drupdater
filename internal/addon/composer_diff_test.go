@@ -2,9 +2,9 @@ package addon
 
 import (
 	"context"
-	"os"
 	"testing"
 
+	"github.com/drupdater/drupdater/internal/golden"
 	"github.com/drupdater/drupdater/internal/services"
 	"github.com/gookit/event"
 	"github.com/stretchr/testify/assert"
@@ -54,11 +54,6 @@ func TestComposerDiff_PostComposerUpdateHandler_Success(t *testing.T) {
 }
 
 func TestComposerDiff_RenderTemplate(t *testing.T) {
-	// Setup - Read expected output from fixture file
-	fixture, err := os.ReadFile("testdata/composer_diff.md")
-	require.NoError(t, err, "Failed to read test fixture")
-
-	expected := string(fixture)
 	logger := zap.NewNop()
 
 	composerRunner := NewMockComposer(t)
@@ -68,7 +63,7 @@ func TestComposerDiff_RenderTemplate(t *testing.T) {
 	result, err := composerDiff.RenderTemplate()
 
 	require.NoError(t, err)
-	assert.Equal(t, expected, result)
+	golden.Assert(t, "testdata/composer_diff.md", result)
 	composerRunner.AssertExpectations(t)
 }
 
