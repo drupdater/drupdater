@@ -9,14 +9,11 @@ import (
 	"pgregory.net/rapid"
 )
 
-// GetFixedAdvisories is a set difference, and it decides what a security merge request claims to
-// have fixed. Getting it wrong in the generous direction — reporting an advisory as fixed while
-// it is still open — is the failure that matters, so the laws of set difference are asserted
-// here rather than sampled.
+// GetFixedAdvisories decides what a security merge request claims to have fixed, so the laws of
+// set difference are asserted rather than sampled.
 
-// advisoryGen generates an advisory in one of the three states the key function distinguishes:
-// with a CVE, with only an advisory ID, and with neither. Free-text fields draw separators on
-// purpose, because that is where a hand-rolled composite key breaks.
+// advisoryGen covers the three states advisoryKey distinguishes. Free-text fields draw
+// separators on purpose: that is where a composite key breaks.
 func advisoryGen() *rapid.Generator[composer.Advisory] {
 	text := rapid.StringMatching(`[a-zA-Z0-9 |:"\\-]{0,12}`)
 	return rapid.Custom(func(t *rapid.T) composer.Advisory {
@@ -92,9 +89,8 @@ func TestPropertyAdvisoryKeyTellsDistinctAdvisoriesApart(t *testing.T) {
 		a := advisoryGen().Draw(t, "a")
 		b := advisoryGen().Draw(t, "b")
 
-		// Two advisories may share a key only when they are the same advisory. Titles are free
-		// text and routinely contain the punctuation a composite key is built from, so this is
-		// where an ambiguous separator shows up.
+		// A shared key must mean the same advisory. Titles routinely carry the punctuation a
+		// composite key is built from.
 		sameIdentity := (a.CVE != "" && a.CVE == b.CVE) ||
 			(a.CVE == "" && b.CVE == "" && a.AdvisoryID != "" && a.AdvisoryID == b.AdvisoryID) ||
 			(a.CVE == "" && b.CVE == "" && a.AdvisoryID == "" && b.AdvisoryID == "" &&
@@ -112,11 +108,9 @@ func TestPropertyAdvisoryKeySurvivesSeparatorsInFreeText(t *testing.T) {
 		right := rapid.StringMatching(`[a-z]{1,6}`).Draw(t, "right")
 		separator := rapid.SampledFrom([]string{"|", ":", `"`, `\`, "/"}).Draw(t, "separator")
 
-		// Two genuinely different advisories, split at different points around the same
-		// character. Any key that joins the fields on a fixed separator maps both onto one
-		// string, and the second advisory is then reported as fixed while it is still open.
-		// Drawing the two halves independently, as the property above does, would essentially
-		// never line them up like this — the ambiguity has to be constructed to be found.
+		// Two different advisories split around the same character: a fixed separator maps
+		// both onto one key, reporting the second as fixed while it is still open. The
+		// property above would essentially never line them up — this has to be constructed.
 		a := composer.Advisory{PackageName: left + separator + middle, Title: right}
 		b := composer.Advisory{PackageName: left, Title: middle + separator + right}
 

@@ -33,8 +33,7 @@ func (cd *ComposerDiff) SubscribedEvents() map[string]any {
 	}
 }
 
-// RenderTemplate returns "" when there is no dependency diff to show, so the section is omitted
-// rather than emitted as an empty header — as every other addon does.
+// RenderTemplate returns "" with no diff, so the section is omitted rather than left empty.
 func (cd *ComposerDiff) RenderTemplate() (string, error) {
 	if cd.table == "" {
 		return "", nil
@@ -51,8 +50,7 @@ func (cd *ComposerDiff) postComposerUpdateHandler(e event.Event) error {
 	}
 	cd.table = table
 
-	// The log gets the link-free table — markdown URLs are unreadable in a terminal. A failure
-	// here costs only a log line, so it must not fail the run.
+	// The log gets the link-free table: markdown URLs are unreadable in a terminal.
 	plain, err := cd.composer.Diff(evt.Context(), evt.Path(), false)
 	if err != nil {
 		cd.logger.Warn("failed to render the dependency diff for the log", zap.Error(err))

@@ -11,8 +11,7 @@ import (
 	"github.com/gookit/event"
 )
 
-// cellReplacer escapes values interpolated into markdown table cells so a
-// literal "|" or newline can't break the table layout.
+// cellReplacer stops a literal "|" or newline in a value from breaking a markdown table.
 var cellReplacer = strings.NewReplacer("|", "\\|", "\n", " ", "\r", "")
 
 //go:embed addon/templates
@@ -28,8 +27,7 @@ type Addon interface {
 type BasicAddon struct {
 }
 
-// addonTemplates parses the embedded section templates once. The FS is compiled in, so the
-// result — success or failure — is the same on every call.
+// addonTemplates parses the embedded templates once: the FS is compiled in, so the result is fixed.
 var addonTemplates = sync.OnceValues(func() (*template.Template, error) {
 	return template.New("").Funcs(template.FuncMap{
 		"cell": cellReplacer.Replace,

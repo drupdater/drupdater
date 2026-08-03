@@ -16,9 +16,8 @@ else {
 }
 $drupalRoot = $drupalFinder->getDrupalRoot();
 
-// Composer-based sets pick the deprecation sets to run from the installed
-// `drupal/core` version, so the manual vendor-directory walk to build a set
-// list is no longer needed.
+// Composer-based sets read the deprecation sets from the installed drupal/core
+// version, replacing the manual vendor-directory walk.
 return RectorConfig::configure()
   ->withSetProviders(DrupalSetProvider::class)
   ->withComposerBased(drupal: TRUE)

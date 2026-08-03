@@ -16,10 +16,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// TestRecordFixes_DoesNotSortRectorsOutputInPlace pins that recordFixes only reads the value it
-// is handed. It sorts each file's rules, and doing that on the slice inside rector's own output
-// would reorder data the caller still owns — and hand two fixes for the same file one shared
-// backing array.
+// recordFixes sorts each file's rules, which in place would reorder data the caller still owns.
 func TestRecordFixes_DoesNotSortRectorsOutputInPlace(t *testing.T) {
 	output := rector.ReturnOutput{
 		ChangedFiles: []string{"web/modules/custom/a.php"},

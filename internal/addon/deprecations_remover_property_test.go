@@ -9,10 +9,8 @@ import (
 	"pgregory.net/rapid"
 )
 
-// recordFixes turns rector's output into a report section, and the section is supposed to be
-// byte-identical for two runs over unchanged code. Rector's output order is not something this
-// code controls, so "the same input in a different order gives the same section" is exactly the
-// promise — and a permutation is what states it.
+// recordFixes must produce a byte-identical section for two runs over unchanged code, and
+// rector's output order is not this code's to control — hence a permutation property.
 
 func rectorOutputGen() *rapid.Generator[rector.ReturnOutput] {
 	fileGen := rapid.StringMatching(`(web|modules)/[a-z0-9_]{1,8}/[a-z0-9_]{1,8}\.php`)
@@ -65,9 +63,7 @@ func TestPropertyRecordFixesCoversEveryChangedFile(t *testing.T) {
 		remover := &DeprecationsRemover{}
 		remover.recordFixes(output)
 
-		// Every changed file is accounted for, each carries exactly the rules rector recorded
-		// for it, and both levels come out ordered — that ordering is the whole reason the
-		// section is stable across runs.
+		// Every file accounted for, with its own rules, and both levels ordered.
 		assert.Len(t, remover.fixes, len(output.ChangedFiles))
 		for i, fix := range remover.fixes {
 			assert.ElementsMatch(t, rulesFor(output, fix.File), fix.AppliedRectors, "rules for %q", fix.File)
@@ -94,18 +90,16 @@ func TestPropertyRecordFixesLeavesRectorsOutputAlone(t *testing.T) {
 
 		(&DeprecationsRemover{}).recordFixes(output)
 
-		// The caller still owns this value — the post-code-update handler passes rector's own
-		// output and goes on using it. Sorting a slice out of it in place reaches back into
-		// data this function was only given to read.
+		// The caller still owns this value, so sorting in place reaches into data recordFixes
+		// was only given to read.
 		for i, diff := range output.FileDiffs {
 			assert.Equal(t, before[i], diff.AppliedRectors, "AppliedRectors of %q was rewritten", diff.File)
 		}
 	})
 }
 
-// rulesFor returns the rules the output records for file, unsorted, or nil when the file has no
-// diff entry. Deliberately not a second implementation of recordFixes: it only looks the entry
-// up, and the property compares the two as sets and checks the ordering separately.
+// rulesFor looks up a file's recorded rules, unsorted. Deliberately not a second implementation
+// of recordFixes: the property compares the two as sets and checks ordering separately.
 func rulesFor(output rector.ReturnOutput, file string) []string {
 	for _, diff := range output.FileDiffs {
 		if diff.File == file {

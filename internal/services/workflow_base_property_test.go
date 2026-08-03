@@ -9,11 +9,9 @@ import (
 	"pgregory.net/rapid"
 )
 
-// report.PackageChange deliberately mirrors composer.PackageChange instead of reusing it, so
-// that a refactor in the composer package cannot rename a field every consumer of the published
-// report depends on. That decoupling only pays off if something notices when the two drift, and
-// a hand-written example only covers the fields whoever wrote it filled in. Generating the whole
-// struct is what makes a dropped field fail.
+// report.PackageChange mirrors composer.PackageChange so a refactor cannot rename a published
+// field. That only pays off if drift is noticed, and a hand-written example covers only the
+// fields its author filled in — generating the whole struct is what makes a dropped field fail.
 
 func packageChangeGen() *rapid.Generator[composer.PackageChange] {
 	return rapid.Custom(func(t *rapid.T) composer.PackageChange {

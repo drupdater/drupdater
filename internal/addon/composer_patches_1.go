@@ -31,8 +31,7 @@ func (pu PatchUpdates) Changes() bool {
 	return len(pu.Removed) > 0 || len(pu.Updated) > 0 || len(pu.Conflicts) > 0
 }
 
-// The json tags on these three types are part of the --report schema (see report.go in this
-// package); rename a field only alongside a report.SchemaVersion bump.
+// The json tags below are published --report schema; renaming one needs a SchemaVersion bump.
 
 type RemovedPatch struct {
 	Package          string `json:"package"`
@@ -176,8 +175,8 @@ func (h *ComposerPatches1) updatePatches(ctx context.Context, path string, workt
 	for _, op := range operations {
 		switch op.Action {
 		case "Upgrade", "Downgrade":
-			// processSinglePatch mutates patches[op.Package], so snapshot first: a key it
-			// inserts must not be visited again in the same pass.
+			// processSinglePatch mutates patches[op.Package]; a key it inserts must not be
+			// visited again in the same pass.
 			for _, e := range snapshotPatches(patches[op.Package]) {
 				h.processSinglePatch(ctx, path, worktree, op, e.description, e.patchPath, patches, &updates)
 			}
@@ -198,8 +197,7 @@ type patchEntry struct {
 	patchPath   string
 }
 
-// snapshotPatches copies a package's description→path map into a stable slice so callers can
-// iterate while mutating the underlying map.
+// snapshotPatches copies a patch map so callers can iterate while mutating the underlying map.
 func snapshotPatches(m map[string]string) []patchEntry {
 	entries := make([]patchEntry, 0, len(m))
 	for description, patchPath := range m {
@@ -208,19 +206,14 @@ func snapshotPatches(m map[string]string) []patchEntry {
 	return entries
 }
 
-// isRemotePatch reports whether a patch reference is an http/https URL. The scheme is checked
-// explicitly because url.ParseRequestURI also accepts a local path like "/patches/x.diff".
+// isRemotePatch checks the scheme explicitly: url.ParseRequestURI also accepts "/patches/x.diff".
 func isRemotePatch(patchPath string) bool {
 	u, err := url.Parse(patchPath)
 	return err == nil && (u.Scheme == "http" || u.Scheme == "https")
 }
 
-// resolvePatchPath makes a patch reference absolute for the patch-test project, which runs from
-// a temp directory where a project-relative path points nowhere. A remote patch is already
-// absolute.
-//
-// Must go through isRemotePatch: url.ParseRequestURI accepts "/patches/x.diff", which would pass
-// through unprefixed, fail to resolve, and pin the package on a conflict that never happened.
+// resolvePatchPath makes a patch reference absolute for the patch-test project, which runs from a
+// temp directory where a project-relative path points nowhere.
 func resolvePatchPath(projectDir string, patchPath string) string {
 	if isRemotePatch(patchPath) {
 		return patchPath
@@ -239,9 +232,8 @@ func conflict(op composer.PackageChange, patchPath string, description string) C
 	}
 }
 
-// dropPatchFile removes a patch's file from the worktree. A remote patch has no file, which is
-// not an error. Every removal goes through here so a URL never reaches worktree.Remove, which
-// would fail and read as "the patch could not be dropped".
+// dropPatchFile removes a patch's file. Every removal goes through here so a remote patch's URL
+// never reaches worktree.Remove, which would fail and read as "the patch could not be dropped".
 func (h *ComposerPatches1) dropPatchFile(worktree Worktree, patchPath string) error {
 	if isRemotePatch(patchPath) {
 		return nil
@@ -250,10 +242,8 @@ func (h *ComposerPatches1) dropPatchFile(worktree Worktree, patchPath string) er
 	return err
 }
 
-// removeDependencyProvidedPatches drops root patches an installed dependency already applies to
-// the same package: composer-patches would otherwise apply the same file twice, and the second
-// fails. Only remote patches count — a local path is package-relative, so matching strings in
-// two packages are not the same file.
+// removeDependencyProvidedPatches drops root patches a dependency already applies, which
+// composer-patches would apply twice. Remote only: a local path is package-relative.
 func (h *ComposerPatches1) removeDependencyProvidedPatches(ctx context.Context, path string, patches map[string]map[string]string) []RemovedPatch {
 	depPatches, err := h.composer.GetDependencyPatches(ctx, path)
 	if err != nil {
@@ -343,8 +333,8 @@ func (h *ComposerPatches1) processSinglePatch(ctx context.Context, path string, 
 			} else if len(commits) != 0 {
 				h.logger.Debug("issue is fixed", zap.String("issue", issue.ID))
 				if err := h.dropPatchFile(worktree, patchPath); err != nil {
-					// Restore the entry deleted above: a patch whose file could not be removed
-					// must stay declared rather than vanish from composer.json unreported.
+					// Restore the entry deleted above: a patch whose file survived must stay
+					// declared rather than vanish from composer.json unreported.
 					h.logger.Error("failed to remove patch", zap.String("patch", patchPath), zap.Error(err))
 					patches[op.Package][description] = patchPath
 					return
@@ -364,9 +354,8 @@ func (h *ComposerPatches1) processSinglePatch(ctx context.Context, path string, 
 
 	ok, err := h.composer.CheckIfPatchApplies(ctx, path, op.Package, op.To, resolvePatchPath(path, patchPath))
 	if err != nil {
-		// The check could not run at all, usually because the package was unobtainable. An
-		// unverifiable patch is not a stale one: pinning here would hold the package back on
-		// every run and blame a conflict that never happened.
+		// An unverifiable patch is not a stale one: pinning here would hold the package back
+		// on every run and blame a conflict that never happened.
 		h.logger.Warn("could not check whether the patch still applies, leaving the package unpinned",
 			zap.String("package", op.Package), zap.String("patch", patchPath), zap.Error(err))
 		return
@@ -384,8 +373,7 @@ func (h *ComposerPatches1) processSinglePatch(ctx context.Context, path string, 
 		return
 	}
 
-	// Locating a newer patch from the issue fork needs the drupalcode GitLab client, which is
-	// only configured when DRUPALCODE_ACCESS_TOKEN is set. Without it, keep the current version.
+	// Finding a newer patch needs the drupalcode client, configured only with DRUPALCODE_ACCESS_TOKEN.
 	if h.gitlab == nil {
 		h.logger.Info("patch does not apply and no drupalcode client is configured, keeping current package version", zap.String("package", op.Package), zap.String("version", op.From), zap.String("patch", patchPath))
 		updates.Conflicts = append(updates.Conflicts, conflict(op, patchPath, description))
@@ -465,8 +453,8 @@ func (h *ComposerPatches1) validateCombinedPatches(ctx context.Context, path str
 	}
 }
 
-// fetchForkMergeRequests returns open MRs in projectMachineName that originate from forkProjectID.
-// ponytail: raw request because gitlab.ListMergeRequests doesn't support source_project_id filtering
+// fetchForkMergeRequests returns open MRs in projectMachineName originating from forkProjectID.
+// Raw request: gitlab.ListMergeRequests cannot filter on source_project_id.
 func (h *ComposerPatches1) fetchForkMergeRequests(projectMachineName string, forkProjectID int64) ([]*gitlab.BasicMergeRequest, error) {
 	opt := struct {
 		gitlab.ListProjectMergeRequestsOptions
@@ -490,8 +478,7 @@ func (h *ComposerPatches1) fetchForkMergeRequests(projectMachineName string, for
 
 var unsafeFileNameChars = regexp.MustCompile(`[^a-zA-Z0-9\-_.]`)
 
-// cleanURLString turns an issue title into a safe file name component: lower-cased, spaces to
-// underscores, everything outside [a-z0-9-_.] stripped, so it can hold no path separator.
+// cleanURLString turns an issue title into a file name component that holds no path separator.
 func (h *ComposerPatches1) cleanURLString(s string) string {
 	s = strings.ToLower(s)
 	s = strings.ReplaceAll(s, " ", "_")

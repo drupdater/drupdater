@@ -12,24 +12,20 @@ import (
 	"pgregory.net/rapid"
 )
 
-// COMPOSER_AUTH is a JSON blob of credentials whose shape Composer defines and extends, so the
-// walk that finds the secrets in it has to hold for structures nobody here wrote down. The
-// properties end where it matters: the value that reaches the log.
+// COMPOSER_AUTH's shape is Composer's to extend, so the walk that finds its secrets has to hold
+// for structures nobody here wrote down.
 
 // authLeafGen generates one credential value.
 func authLeafGen() *rapid.Generator[string] {
 	return rapid.StringMatching(`[a-zA-Z0-9_-]{8,24}`)
 }
 
-// authTreeGen builds a COMPOSER_AUTH-shaped JSON tree and reports, alongside it, exactly which
-// of its string leaves are secrets. key is the object key the value was reached through.
+// authTreeGen builds a COMPOSER_AUTH-shaped tree and reports which of its leaves are secrets.
 //
 // The bookkeeping states the documented rule rather than mirroring the walk: a string is a
-// secret unless it was reached through a "username" key — Composer's http-basic form commonly
-// sets that to the literal word "token", and redacting it would black out unrelated log output.
-// An array inherits the key it sits under, an object gives each of its values its own, and
-// numbers and booleans are never secrets. Encoding the rule here is what lets the property
-// generate nesting nobody wrote down and still know the right answer.
+// secret unless reached through a "username" key, arrays inherit the key they sit under, and
+// numbers are never secrets. That is what lets the property generate unwritten nesting and
+// still know the right answer.
 func authTreeGen(depth int, key string) *rapid.Generator[authTree] {
 	leafGen := func(t *rapid.T) authTree {
 		leaf := authLeafGen().Draw(t, "leaf")
@@ -97,10 +93,8 @@ func TestPropertyComposerAuthSecretLeavesIgnoresNesting(t *testing.T) {
 		tree := authTreeGen(2, "").Draw(t, "tree")
 		wraps := rapid.IntRange(1, 4).Draw(t, "wraps")
 
-		// An array propagates the key it was reached through, so wrapping a value in any number
-		// of arrays must not change which of its leaves count as secrets. Composer nests its
-		// per-host blocks differently between auth types, and the walk has to be indifferent
-		// to how deep a credential sits.
+		// Composer nests per-host blocks differently per auth type, so the walk must be
+		// indifferent to how deep a credential sits.
 		wrapped := tree.value
 		for range wraps {
 			wrapped = []any{wrapped}
@@ -146,9 +140,8 @@ func TestPropertyConfigurableAddonsMatchesTheRegistry(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		names := configurableAddons()
 
-		// The list `drupdater addons` prints is what a user may write in .drupdater.yaml, so it
-		// has to be exactly the registry minus the addons that always run. Adding a registry
-		// entry without touching this function would leave the command silent about it.
+		// What `drupdater addons` prints is what a user may write, so a new registry entry
+		// must not be able to go unlisted.
 		want := make([]string, 0, len(addonRegistry))
 		for name := range addonRegistry {
 			if name != "composer_audit" && !slices.Contains(mandatoryAddons, name) {
@@ -187,9 +180,7 @@ func TestPropertyValidateAddonsRejectsUnknownNamesInEitherRunType(t *testing.T) 
 			config.RunTypes.Normal.Addons = append(slices.Clone(known), unknown)
 		}
 
-		// Symmetric on purpose: a typo under run_types.security is caught on a normal run and
-		// the other way round, so the mistake surfaces the first time the tool runs at all
-		// rather than the first time a security update happens to be due.
+		// Symmetric on purpose, so a typo surfaces the first time the tool runs at all.
 		err := validateAddons(config)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), unknown)

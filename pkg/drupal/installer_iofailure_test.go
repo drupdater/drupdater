@@ -11,10 +11,8 @@ import (
 	"go.uber.org/zap"
 )
 
-// failingFs fails one chosen filesystem operation and delegates the rest. The installer's I/O
-// error branches -- a settings.php that opens but cannot be written, a core.extension.yml that
-// reads short, a rewrite that cannot be flushed -- are only reached on a full disk or a
-// permission change mid-run, so an in-memory filesystem alone never exercises them.
+// failingFs fails one chosen operation and delegates the rest, reaching the installer's I/O
+// branches — otherwise only a full disk or a mid-run chmod gets there.
 type failingFs struct {
 	afero.Fs
 	failWrite  bool // writes to an opened file fail

@@ -202,9 +202,8 @@ func TestReportRepositoryURLHasNoCredentials(t *testing.T) {
 	assert.NotContains(t, h.got.Repository, "s3cret")
 }
 
-// A --dry-run stops before publishing but is still a successful run: it did everything it was
-// asked to do. This is one of the cases that produces no merge request and therefore no output
-// at all without --report.
+// A --dry-run did everything it was asked to, so it is a success — and without --report it
+// produces no output at all.
 func TestReportWrittenOnDryRun(t *testing.T) {
 	h := newReportHarness(t, true)
 	h.expectFullRun(t)
@@ -238,9 +237,8 @@ func TestReportWrittenOnFailureNamesThePhase(t *testing.T) {
 	assert.Nil(t, h.got.MergeRequest)
 }
 
-// Acquiring the working copy is the first thing that can fail, and one of the most common ways
-// a run fails in practice: a bad token, an unreachable host, an unreadable checkout. The report
-// must still be written — this is precisely the case "written on every exit path" is for.
+// Acquiring the working copy is the first thing that can fail, and the case that "written on
+// every exit path" exists for.
 func TestReportWrittenWhenAcquiringTheWorkingCopyFails(t *testing.T) {
 	h := newReportHarness(t, false)
 	h.repoSvc.ExpectedCalls = nil
@@ -292,15 +290,12 @@ func TestRunWithoutReportSinkIsUnaffected(t *testing.T) {
 	assert.Nil(t, h.got)
 }
 
-// mergeRequestAddon stands in for a real addon at the two points the merge request is assembled:
-// it renames the title through pre-merge-request-create, the way composer_audit re-labels a
-// security run, and contributes a section to the description.
+// mergeRequestAddon stands in at both points the merge request is assembled: it renames the
+// title and contributes a description section.
 type mergeRequestAddon struct {
 	title   string
 	section string
-	// err makes the pre-merge-request-create handler fail, standing in for an addon that cannot
-	// produce its part of the merge request. renderErr does the same one step later, when the
-	// description template asks the addon for its section.
+	// err fails the handler, renderErr the section one step later.
 	err       error
 	renderErr error
 }
@@ -325,8 +320,7 @@ func (a *mergeRequestAddon) RenderTemplate() (string, error) { return a.section,
 
 var _ internal.Addon = (*mergeRequestAddon)(nil)
 
-// A --dry-run opens no merge request, but it does assemble one. Recording the title and
-// description is what lets a dry run be reviewed at all -- and what makes a broken description
+// A --dry-run assembles a merge request without opening one, which is what makes a broken
 // template visible before a real run has pushed anything.
 func TestReportRecordsMergeRequestContentOnDryRun(t *testing.T) {
 	h := newReportHarness(t, true)
@@ -347,9 +341,7 @@ func TestReportRecordsMergeRequestContentOnDryRun(t *testing.T) {
 	assert.Nil(t, h.got.MergeRequest)
 }
 
-// The reported content has to be the published content, not a second rendering of it: a report
-// that showed something other than what the reviewer sees on the merge request would be worse
-// than no report at all.
+// The reported content must be the published content, not a second rendering of it.
 func TestReportedMergeRequestContentIsWhatWasPublished(t *testing.T) {
 	h := newReportHarness(t, false)
 	h.expectFullRun(t)
@@ -373,9 +365,8 @@ func TestReportedMergeRequestContentIsWhatWasPublished(t *testing.T) {
 	assert.Equal(t, publishedDescription, h.got.MergeRequestDescription)
 }
 
-// Assembling the merge request is a phase like any other, so a failure there is attributed
-// rather than surfacing as an unexplained error at the end of a run. Both halves can fail: the
-// event that settles the title, and the template that renders the description.
+// A phase like any other, so its failure is attributed rather than unexplained. Both halves
+// can fail: the event settling the title, and the template rendering the description.
 func TestReportNamesTheRenderPhaseWhenAssemblyFails(t *testing.T) {
 	t.Run("the title event fails", func(t *testing.T) {
 		titleErr := errors.New("addon could not produce a title")

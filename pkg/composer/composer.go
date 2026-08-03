@@ -36,30 +36,20 @@ func NewCLI(logger *zap.Logger) *CLI {
 	}
 }
 
-// requiredComposerEnv is forced on every invocation (see Env) rather than left to the
-// Dockerfile, which only covers runs that use the published image.
-//
-//   - COMPOSER_PROCESS_TIMEOUT: composer's 300s default kills a large install mid-phase with a
-//     message that names no timeout.
-//   - COMPOSER_NO_AUDIT: the implicit post-update audit is output Update() cannot parse.
-//     Auditing is the composer_audit addon's job.
-//
-// Deployment policy (COMPOSER_HOME, COMPOSER_CACHE_DIR, …) is deliberately not forced here.
+// requiredComposerEnv is forced on every invocation (see Env), not left to the Dockerfile, which
+// only covers the published image. The 300s default timeout kills a large install mid-phase, and
+// the implicit audit is output Update() cannot parse. Deployment policy is not forced here.
 var requiredComposerEnv = []string{
 	"COMPOSER_PROCESS_TIMEOUT=0",
 	"COMPOSER_NO_AUDIT=1",
 }
 
-// Env applies requiredComposerEnv to env, passing every other entry through in order — notably
-// COMPOSER_AUTH, which carries registry credentials.
+// Env applies requiredComposerEnv to env, passing everything else through in order — notably
+// COMPOSER_AUTH. Inherited assignments to a required variable are dropped rather than shadowed,
+// so the outcome does not depend on how os/exec resolves duplicate keys.
 //
-// Inherited assignments to a required variable are dropped rather than shadowed, so the outcome
-// depends on this function and not on how os/exec resolves duplicate keys.
-//
-// Exported because drush, phpcs and rector run through `composer exec` and inherit the same
-// process timeout. Every package building a composer *exec.Cmd should set:
-//
-//	command.Env = composer.Env(command.Environ())
+// Exported because drush, phpcs and rector run through `composer exec`; each should set
+// command.Env = composer.Env(command.Environ()).
 func Env(env []string) []string {
 	result := make([]string, 0, len(env)+len(requiredComposerEnv))
 	for _, entry := range env {
@@ -76,8 +66,7 @@ func Env(env []string) []string {
 	return append(result, requiredComposerEnv...)
 }
 
-// command returns the runner for a composer invocation in dir. Built per call so a test that
-// swaps execCommand after the CLI was constructed still diverts the subprocess.
+// command is built per call so a test swapping execCommand later still diverts the subprocess.
 func (s *CLI) command(dir string) Command {
 	return Command{New: execCommand, Logger: s.logger, Dir: dir}
 }
@@ -86,22 +75,19 @@ func (s *CLI) execComposer(ctx context.Context, dir string, args ...string) (str
 	return s.command(dir).Combined(ctx, args...)
 }
 
-// execComposerJSON returns stdout only. Commands whose output is parsed as JSON must use this:
-// composer's stderr notices would otherwise corrupt the payload. stderr still reaches the log.
+// execComposerJSON returns stdout only, so composer's stderr notices cannot corrupt the payload.
 func (s *CLI) execComposerJSON(ctx context.Context, dir string, args ...string) (string, error) {
 	stdout, _, err := s.command(dir).Split(ctx, args...)
 	return stdout, err
 }
 
-// Versions are the tool versions a run's outcome depends on: composer because drupdater wraps
-// it, PHP because the image is built per PHP version.
+// Versions are the tool versions a run's outcome depends on.
 type Versions struct {
 	Composer string
 	PHP      string
 }
 
-// composer --version prints its own version on stdout and PHP's on stderr, so both are scraped
-// out of the merged output.
+// composer --version puts its version on stdout and PHP's on stderr — hence the merged output.
 var (
 	composerVersionRe = regexp.MustCompile(`(?m)^Composer version (\S+)`)
 	phpVersionRe      = regexp.MustCompile(`(?m)^PHP version (\S+)`)
@@ -154,14 +140,9 @@ func (s *CLI) Update(ctx context.Context, dir string, packages []string, package
 		return changes, fmt.Errorf("failed to update dependencies: %w, output: %s, arg: %v", err, out, args)
 	}
 
-	// Grouped by action rather than scanned line by line, so the result stays ordered by action
-	// however composer interleaved its output.
-	//
-	// Deduplicated because composer reports a version change twice: once resolving the lock
-	// ("Lock file operations") and again installing it ("Package operations"), in identical
-	// wording. Installs differ between the two ("Locking" vs "Installing") and only the second is
-	// matched, so nothing is lost by keeping the first of each. One update produces at most one
-	// operation per package, so an exact repeat is always the same operation seen twice.
+	// Grouped by action, not scanned line by line, so the result stays ordered however composer
+	// interleaved its output. Deduplicated because composer reports a version change twice, once
+	// for the lock and once for the install, in identical wording.
 	seen := make(map[PackageChange]struct{})
 	for _, pattern := range packageChangePatterns {
 		for _, match := range pattern.re.FindAllStringSubmatch(out, -1) {
@@ -184,14 +165,11 @@ func (s *CLI) Update(ctx context.Context, dir string, packages []string, package
 }
 
 // packageChangePatterns matches composer update's report of what it did, one entry per action.
-//
-// The order is the order the changes come back in, which the merge request description and the
-// report both carry, so it is part of what a consumer sees.
+// This order is the order the changes come back in, which both the report and the MR carry.
 var packageChangePatterns = []struct {
 	action string
 	re     *regexp.Regexp
 	// from and to are the capture groups holding those versions; 0 means the action has none.
-	// A removal reports only the version going away, an install only the one arriving.
 	from int
 	to   int
 }{
@@ -201,8 +179,7 @@ var packageChangePatterns = []struct {
 	{action: "Install", re: oneVersionRegex("Installing"), to: 2},
 }
 
-// versionPattern includes "+" and "~" in the class so build-metadata versions (1.0.0+21AF26D3)
-// still match.
+// versionPattern allows "+" and "~" so build-metadata versions (1.0.0+21AF26D3) still match.
 const versionPattern = `[\w.\-+~]+`
 
 func twoVersionRegex(verb string) *regexp.Regexp {
@@ -238,10 +215,7 @@ func (s *CLI) Remove(ctx context.Context, dir string, packages ...string) (strin
 }
 
 // Audit returns both halves of `composer audit` output: advisories and abandoned packages.
-//
-// --abandoned is deliberately not passed. The object is already in the JSON either way, and
-// omitting the flag lets the project's own `audit.abandoned: ignore` keep dismissed packages
-// out of every merge request.
+// --abandoned is not passed, so the project's own `audit.abandoned: ignore` still applies.
 func (s *CLI) Audit(ctx context.Context, dir string) (Audit, error) {
 	var composerAudit Audit
 	out, err := s.execComposerJSON(ctx, dir, "audit", "--format=json", "--locked", "--no-plugins")
@@ -277,8 +251,7 @@ type Advisory struct {
 // AdvisoriesMap is keyed by package name.
 type AdvisoriesMap map[string]json.RawMessage
 
-// AbandonedPackage has an empty Replacement when the maintainers suggested no successor,
-// which composer expresses as JSON null.
+// AbandonedPackage has an empty Replacement when composer reported JSON null — no successor.
 type AbandonedPackage struct {
 	PackageName string `json:"packageName"`
 	Replacement string `json:"replacement"`
@@ -289,8 +262,7 @@ type Audit struct {
 	Abandoned  []AbandonedPackage `json:"abandoned"`
 }
 
-// UnmarshalJSON flattens nested advisories into a single list and the abandoned object into a
-// sorted list.
+// UnmarshalJSON flattens nested advisories and the abandoned object into sorted lists.
 func (c *Audit) UnmarshalJSON(data []byte) error {
 	var raw map[string]any
 	if err := json.Unmarshal(data, &raw); err != nil {
@@ -307,10 +279,8 @@ func (c *Audit) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// flattenAdvisories flattens composer audit's `advisories` object. Composer emits a package's
-// advisories either as a list or as a keyed map (drupal/core does the latter); both shapes must
-// land in the same list or an advisory silently vanishes from a security report. Any other
-// shape means there is nothing to report.
+// flattenAdvisories handles both shapes composer emits — a list, or a keyed map as drupal/core
+// gets — since missing one silently drops an advisory from a security report.
 func flattenAdvisories(advisoriesData any) ([]Advisory, error) {
 	advMap, ok := advisoriesData.(map[string]any)
 	// Equivalent mutant: ranging a nil map already yields (nil, nil). Kept to state the intent.
@@ -344,12 +314,8 @@ func flattenAdvisories(advisoriesData any) ([]Advisory, error) {
 	return advisories, nil
 }
 
-// flattenAbandoned flattens composer audit's `abandoned` object into a sorted list.
-//
-// With nothing to report composer emits an empty JSON *array*, not an object, so a failed
-// assertion must read as "none" — this list is supplementary and no shape of it is worth
-// failing a security run over. Sorted because map order is random and the report and merge
-// request description must be byte-identical for unchanged input.
+// flattenAbandoned flattens composer audit's `abandoned` object into a sorted list. With nothing
+// to report composer emits an empty JSON *array*, so a failed assertion must read as "none".
 func flattenAbandoned(abandonedData any) []AbandonedPackage {
 	entries, ok := abandonedData.(map[string]any)
 	if !ok {
@@ -373,8 +339,7 @@ func flattenAbandoned(abandonedData any) []AbandonedPackage {
 	return abandoned
 }
 
-// platformRequirementConstraint describes the unmet constraint for a failed/missing row of
-// `composer check-platform-reqs --format=json` output.
+// platformRequirementConstraint is the unmet constraint of a failed or missing row.
 type platformRequirementConstraint struct {
 	Constraint string `json:"constraint"`
 }
@@ -388,15 +353,13 @@ type platformRequirement struct {
 	FailedRequirement *platformRequirementConstraint `json:"failed_requirement"`
 }
 
-// CheckPlatformReqs verifies the PHP version satisfies composer.lock. `Update` runs with
-// --ignore-platform-reqs, so this is the only fail-fast check and runs ahead of it for a clear
-// message. Extension requirements (ext-*) are ignored — the operator cannot act on which
-// extensions drupdater's own runtime loaded. The returned output names the unmet requirements.
+// CheckPlatformReqs verifies the PHP version satisfies composer.lock, and is the only fail-fast
+// check because `Update` runs with --ignore-platform-reqs. ext-* is ignored: the operator cannot
+// act on which extensions drupdater's own runtime loaded.
 func (s *CLI) CheckPlatformReqs(ctx context.Context, dir string) (string, error) {
 	out, err := s.execComposer(ctx, dir, "check-platform-reqs", "--lock", "--no-ansi", "--format=json")
 
-	// composer prints an informational line ahead of the payload, so extract the array rather
-	// than parsing the whole blob.
+	// composer prints an informational line ahead of the payload, so extract just the array.
 	jsonPayload := out
 	if start, end := strings.Index(out, "["), strings.LastIndex(out, "]"); start != -1 && end > start {
 		jsonPayload = out[start : end+1]
@@ -478,11 +441,9 @@ func (s *CLI) GetInstalledPackageVersion(ctx context.Context, dir string, packag
 	return composerShow.Versions[0], nil
 }
 
-// GetAllowPlugins returns composer's allow-plugins config as a package -> allowed map.
-//
-// The setting is polymorphic — an object of per-package entries, `true`, `false`, `[]`, `null`,
-// or unset — and only the object form carries entries, so every other shape yields an empty
-// map. Never nil: callers add newly discovered plugins to it.
+// GetAllowPlugins returns composer's allow-plugins config as a package -> allowed map. The
+// setting is polymorphic and only its object form carries entries, so every other shape yields
+// an empty map — never nil, since callers add newly discovered plugins to it.
 func (s *CLI) GetAllowPlugins(ctx context.Context, dir string) (map[string]bool, error) {
 	allowPluginsJSON, err := s.GetConfig(ctx, dir, "allow-plugins")
 	if err != nil {
@@ -527,8 +488,8 @@ func (s *CLI) SetConfig(ctx context.Context, dir string, key string, value strin
 	return err
 }
 
-// GetDependencyPatches returns patches declared by installed dependencies, as
-// targetPackage -> set of patch files. These apply on top of the root composer.json patches.
+// GetDependencyPatches returns targetPackage -> patch files declared by installed dependencies,
+// which apply on top of the root composer.json patches.
 func (s *CLI) GetDependencyPatches(_ context.Context, dir string) (map[string]map[string]bool, error) {
 	content, err := afero.ReadFile(s.fs, dir+"/composer.lock")
 	if err != nil {
@@ -568,12 +529,11 @@ type lockPackage struct {
 	Extra json.RawMessage `json:"extra"`
 }
 
-// Appended to every scratch project so a contrib module resolves even when the project declares
-// its repositories somewhere this code cannot read.
+// Appended to every scratch project so a contrib module resolves even when the project's own
+// repositories are declared somewhere this code cannot read.
 const drupalOrgRepositoryURL = "https://packages.drupal.org/8"
 
-// scratchComposerProject is the composer.json of the patch-test project. Written fresh before
-// every check (see resetScratchProject) so one check cannot leave state another reads.
+// scratchComposerProject is rewritten before every check, so one check leaves no state another reads.
 type scratchComposerProject struct {
 	Name         string            `json:"name"`
 	Type         string            `json:"type"`
@@ -583,16 +543,11 @@ type scratchComposerProject struct {
 	Extra        map[string]any    `json:"extra"`
 }
 
-// buildScratchComposerJSON returns the scratch project's composer.json, carrying over the
-// repositories declared by the project in projectDir.
+// buildScratchComposerJSON carries over projectDir's repositories, without which a private
+// registry's package is unresolvable and composer_patches misreads that as "does not apply".
 //
-// Without them a package from a private registry or in-house fork is unresolvable here, and
-// composer_patches reads that failure as "the patch does not apply" — pinning the package and
-// reporting a conflict that never happened, on every run.
-//
-// The project's repositories come first so a private fork keeps its priority. drupal.org is a
-// fallback and packagist.org stays enabled even if the project disables it: resolving more than
-// the real project can costs nothing and cannot affect its lock.
+// The project's repositories come first so a private fork keeps its priority; drupal.org and
+// packagist.org stay enabled regardless, which costs nothing and cannot affect the real lock.
 func (s *CLI) buildScratchComposerJSON(projectDir string) ([]byte, error) {
 	repositories := s.projectRepositories(projectDir)
 
@@ -619,10 +574,8 @@ func (s *CLI) buildScratchComposerJSON(projectDir string) ([]byte, error) {
 	})
 }
 
-// projectRepositories returns the repository entries declared by the project in projectDir.
-//
-// An unreadable or unparsable composer.json yields no entries rather than an error: checking
-// against fewer repositories beats failing the patch check outright.
+// projectRepositories returns projectDir's declared repositories. An unreadable composer.json
+// yields none rather than an error: fewer repositories beats failing the patch check outright.
 func (s *CLI) projectRepositories(projectDir string) []json.RawMessage {
 	if projectDir == "" {
 		return nil
@@ -662,9 +615,8 @@ func (s *CLI) projectRepositories(projectDir string) []json.RawMessage {
 	return repositories
 }
 
-// orderedObjectValues returns a JSON object's values in declaration order, and whether raw was
-// an object at all. A map[string]json.RawMessage would be shorter but loses that order, and
-// sorting the keys instead — as this once did — reorders the project's repositories.
+// orderedObjectValues returns a JSON object's values in declaration order. A map would be
+// shorter but loses that order, reordering the project's repositories.
 func orderedObjectValues(raw json.RawMessage) ([]json.RawMessage, bool) {
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 
@@ -689,13 +641,9 @@ func orderedObjectValues(raw json.RawMessage) ([]json.RawMessage, bool) {
 	return values, true
 }
 
-// normalizeRepository prepares a repository entry for the scratch project, reporting false for
-// entries that must not be carried over.
-//
-// A disable entry such as {"packagist.org": false} is dropped — the scratch project needs
-// packagist.org for composer-patches even when the real project mirrors everything. A "path"
-// repository's relative URL is resolved against the project, since the scratch project lives
-// in a temp directory where that path points nowhere.
+// normalizeRepository prepares an entry for the scratch project, false when it must be dropped.
+// A disable entry like {"packagist.org": false} goes, since the scratch project needs packagist
+// for composer-patches. A "path" repository's relative URL is resolved against the project.
 func normalizeRepository(raw json.RawMessage, projectDir string) (json.RawMessage, bool) {
 	var entry map[string]any
 	if err := json.Unmarshal(raw, &entry); err != nil {
@@ -740,13 +688,10 @@ func (s *CLI) initTempDir() {
 	s.tempDir, s.initErr = afero.TempDir(s.fs, "", "composer-service")
 }
 
-// resetScratchProject restores the scratch project before each check. Every check runs
-// `composer require <pkg>:<version>` here, which sticks; without a reset a version conflict
-// between two unrelated earlier checks fails the require, and that failure reads as "the patch
-// does not apply" — silently pinning the wrong package.
-//
-// composer.json is rebuilt here rather than at init because it carries the project's
-// repositories, which are unknown until a check asks.
+// resetScratchProject undoes the `composer require` each check leaves behind: without it, a
+// conflict between two unrelated checks fails the require and reads as "the patch does not
+// apply". composer.json is rebuilt here, not at init, because it carries the project's
+// repositories, unknown until a check asks.
 func (s *CLI) resetScratchProject(projectDir string) error {
 	composerJSON, err := s.buildScratchComposerJSON(projectDir)
 	if err != nil {
@@ -764,8 +709,7 @@ func (s *CLI) resetScratchProject(projectDir string) error {
 	return nil
 }
 
-// Cleanup removes the patch-test scratch project. A no-op when no check ran, and safe to call
-// twice. Defer it for the lifetime of the CLI, or every run leaks a full vendor tree.
+// Cleanup removes the patch-test scratch project; defer it, or every run leaks a vendor tree.
 func (s *CLI) Cleanup() {
 	if s.tempDir == "" {
 		return
@@ -783,21 +727,15 @@ type patchTestConfig struct {
 	Patches map[string]map[string]string `json:"patches"`
 }
 
-// CheckIfPatchApplies reports whether a single patch still applies to packageName at
-// packageVersion.
+// CheckIfPatchApplies reports whether one patch still applies to packageName at packageVersion.
 func (s *CLI) CheckIfPatchApplies(ctx context.Context, projectDir string, packageName string, packageVersion string, patchPath string) (bool, error) {
 	return s.CheckIfPatchesApply(ctx, projectDir, packageName, packageVersion, []string{patchPath})
 }
 
-// requireIntoScratch installs the package under test and classifies the outcome: true when the
-// patched package installed, false when the patch was rejected, error when composer never got
-// the package at all.
-//
-// The third case must stay distinct: false makes composer_patches pin the package and report a
-// conflict, which is right for a stale patch and wrong for an unreachable registry or a rejected
-// credential — that pins silently on every run for a reason the reviewer cannot act on.
-//
-// Deliberately not --quiet: that suppresses the message this classification reads.
+// requireIntoScratch installs the package under test: true when it installed, false when the
+// patch was rejected, error when composer never got the package. The third case must stay
+// distinct — false pins the package, which is wrong for an unreachable registry. Not --quiet:
+// that suppresses the message this classification reads.
 func (s *CLI) requireIntoScratch(ctx context.Context, packageName string, packageVersion string) (bool, error) {
 	out, err := s.execComposer(ctx, s.tempDir,
 		"require", "--ignore-platform-reqs", packageName+":"+packageVersion, "--with-all-dependencies")
@@ -812,20 +750,15 @@ func (s *CLI) requireIntoScratch(ctx context.Context, packageName string, packag
 	return false, nil //nolint:nilerr // composer obtained the package and the patch was rejected
 }
 
-// unresolvableReason reports whether composer's output says it could not obtain the package,
-// and why.
+// unresolvableReason reports whether composer could not obtain the package, and why. A rejected
+// patch wins outright: the dist-to-source fallback logs "could not be downloaded (404)" and then
+// succeeds, so the unresolvable patterns alone would misread a genuine rejection.
 //
-// A rejected patch is checked first and wins outright: composer's dist-to-source fallback logs
-// `… could not be downloaded (404)` and then succeeds, so matching the unresolvable patterns
-// alone would misread a genuine patch rejection and ship a patch that does not apply.
-//
-// Both match composer's English output, so a reworded message silently changes the
-// classification. Prefer adding a pattern to loosening one.
+// Both match composer's English output, so prefer adding a pattern to loosening one.
 func unresolvableReason(out string) (string, bool) {
 	lower := strings.ToLower(out)
 
-	// composer-patches v1 prints the first form on any patch failure, and the second when
-	// composer-exit-on-patch-failure turns that failure into the exception that ends the run.
+	// The two wordings composer-patches v1 uses for a patch failure.
 	if strings.Contains(lower, "could not apply patch") || strings.Contains(lower, "cannot apply patch") {
 		return "", false
 	}
@@ -847,9 +780,8 @@ var unresolvablePatterns = []struct{ pattern, reason string }{
 	{"could not be downloaded", "a required download failed"},
 }
 
-// CheckIfPatchesApply reports whether patchPaths all apply together to packageName at
-// packageVersion. The keys are zero-padded indexes: composer-patches v1 treats them as free-text
-// descriptions, but applies them in key order, so the caller's order must survive JSON encoding.
+// CheckIfPatchesApply reports whether patchPaths all apply together. The keys are zero-padded
+// indexes because composer-patches v1 applies patches in key order.
 func (s *CLI) CheckIfPatchesApply(ctx context.Context, projectDir string, packageName string, packageVersion string, patchPaths []string) (bool, error) {
 	s.initOnce.Do(s.initTempDir)
 	if s.initErr != nil {
@@ -879,8 +811,8 @@ func (s *CLI) CheckIfPatchesApply(ctx context.Context, projectDir string, packag
 	return s.requireIntoScratch(ctx, packageName, packageVersion)
 }
 
-// dependsRegex matches a row of `composer depends`. The version token matches any non-space
-// run, so dev-main and 1.0.0-beta1 are captured too.
+// dependsRegex matches a row of `composer depends`. The version token is any non-space run, so
+// dev-main and 1.0.0-beta1 are captured too.
 var dependsRegex = regexp.MustCompile(`(?m)^(\S+)\s+\S+\s+requires\b`)
 
 func (s *CLI) GetInstalledPlugins(ctx context.Context, dir string) (map[string]any, error) {
@@ -934,15 +866,12 @@ func (s *CLI) UpdateLockHash(ctx context.Context, dir string) error {
 	return err
 }
 
-// ConfigGetter is the one method WebRoot needs, so a caller's own narrow composer interface
-// satisfies it without importing this package's whole CLI.
+// ConfigGetter is the one method WebRoot needs, so a caller's own interface satisfies it.
 type ConfigGetter interface {
 	GetConfig(ctx context.Context, dir string, key string) (string, error)
 }
 
 // WebRoot returns the project's Drupal web root, relative to dir and without a trailing slash.
-// Everything Drupal — settings.php, custom modules, the config sync directory — is addressed
-// from it, so several packages need the same lookup.
 func WebRoot(ctx context.Context, cfg ConfigGetter, dir string) (string, error) {
 	webroot, err := cfg.GetConfig(ctx, dir, "extra.drupal-scaffold.locations.web-root")
 	if err != nil {

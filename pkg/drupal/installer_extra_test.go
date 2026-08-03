@@ -39,10 +39,8 @@ func newTestInstaller(t *testing.T, coreExtension string, settings string) (*Ins
 	return installer, fs, drush, composer
 }
 
-// newTestInstallerWithLogs is newTestInstaller plus the captured log output. The installer's
-// debug lines are what an operator sees with --verbose, and they are the only externally
-// visible trace of several decisions (which settings.php was written, whether the sqlite
-// module had to be enabled, whether an already-configured site was skipped).
+// newTestInstallerWithLogs captures the debug output, which is the only external trace of
+// several of the installer's decisions.
 func newTestInstallerWithLogs(t *testing.T, coreExtension string, settings string) (*Installer, afero.Fs, *MockDrush, *MockComposer, *observer.ObservedLogs) {
 	t.Helper()
 
@@ -77,9 +75,8 @@ func TestNewInstaller(t *testing.T) {
 }
 
 func TestInstallStopsAtTheFirstFailure(t *testing.T) {
-	// Install runs three steps in order and each guard must actually stop the run: continuing
-	// past a failed database configuration would install a site against the project's real
-	// database settings.
+	// Each guard must stop the run: continuing past a failed database configuration installs
+	// the site against the project's real database.
 	t.Run("database configuration fails", func(t *testing.T) {
 		installer, _, _, composer := newTestInstaller(t, coreExtensionWithSqlite, "<?php\n")
 		composer.EXPECT().GetConfig(t.Context(), "/project", "extra.drupal-scaffold.locations.web-root").
@@ -105,9 +102,8 @@ func TestInstallStopsAtTheFirstFailure(t *testing.T) {
 }
 
 func TestConfigureDatabaseIsIdempotent(t *testing.T) {
-	// The run configures each site twice — once for the baseline install, once before the
-	// update hooks — against the same settings.php. The second call must not append a second
-	// copy of the database, hash_salt and private-path settings.
+	// Each site is configured twice against the same settings.php, and the second call must
+	// not append a second copy of the settings.
 	installer, fs, drush, composer, logs := newTestInstallerWithLogs(t, coreExtensionWithSqlite, "<?php\n")
 
 	composer.EXPECT().GetConfig(t.Context(), "/project", "extra.drupal-scaffold.locations.web-root").Return("web", nil)
@@ -333,18 +329,10 @@ func TestRemoveProfileErrors(t *testing.T) {
 }
 
 func TestConfigureDatabaseRestoresSqliteOnAReusedWorkingCopy(t *testing.T) {
-	// Regression: settings.php and core.extension.yml go out of sync across runs, and only
-	// settings.php carries the marker.
-	//
-	// settings.php is deliberately never committed, so it survives a run with the marker in it.
-	// core.extension.yml does get committed, and the configuration export writes it *without*
-	// sqlite because config_exclude_modules excludes it. Reuse the working copy -- which is
-	// exactly what the integration job's idempotency check does, and what any CI runner with a
-	// cached checkout does -- and the second run finds the marker set and the module entry gone.
-	//
-	// Guarding the module entry behind the marker therefore left the site uninstallable:
-	// "Unable to uninstall the SQLite module because: The module 'SQLite' is providing the
-	// database driver 'sqlite'".
+	// Regression: settings.php keeps the marker across runs because it is never committed,
+	// while core.extension.yml comes back from git without the sqlite entry. A reused working
+	// copy therefore has the marker set and the module gone, and guarding the module entry
+	// behind the marker left the site uninstallable.
 	settingsFromEarlierRun := "<?php\n\n" + settingsMarker + "\n$databases['default']['default'] = [];\n"
 	installer, fs, drush, composer := newTestInstaller(t, coreExtensionWithoutSqlite, settingsFromEarlierRun)
 

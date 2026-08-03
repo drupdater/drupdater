@@ -15,9 +15,7 @@ import (
 	"go.uber.org/zap/zaptest/observer"
 )
 
-// newTestCLI returns a CLI whose debug output can be asserted on. execComposerJSON logs the
-// command line together with the captured stdout and stderr, which is the only place several
-// of its steps are observable from the outside.
+// newTestCLI captures the debug output, the only place several steps are observable.
 func newTestCLI(t *testing.T) (*CLI, *observer.ObservedLogs) {
 	t.Helper()
 	core, logs := observer.New(zapcore.DebugLevel)
@@ -65,9 +63,8 @@ func TestRectorRun(t *testing.T) {
 		assert.Equal(t, 0, result.Totals.ChangedFiles)
 		assert.Equal(t, 0, result.Totals.Errors)
 
-		// Empty but *not* nil: the zero ReturnOutput would satisfy assert.Empty just as well,
-		// so pin the distinction the early return deliberately makes. It survives into the run
-		// report, where a nil slice marshals to null instead of [].
+		// Empty but not nil: the distinction survives into the report, where nil marshals to
+		// null instead of [].
 		assert.NotNil(t, result.FileDiffs)
 		assert.Empty(t, result.FileDiffs)
 		assert.NotNil(t, result.ChangedFiles)

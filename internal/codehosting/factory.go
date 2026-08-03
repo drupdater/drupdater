@@ -53,8 +53,8 @@ func (vpf *DefaultVcsProviderFactory) Create(repositoryURL string, token string,
 	}
 }
 
-// providerFromEnv reads the provider from CI environment variables, which are authoritative and
-// work for self-hosted instances whose hostname does not name the provider. "" when not in CI.
+// providerFromEnv reads the provider from CI, which also covers self-hosted instances whose
+// hostname does not name it. "" when not in CI.
 func providerFromEnv() string {
 	if os.Getenv("GITHUB_ACTIONS") == "true" {
 		return "github"
@@ -65,8 +65,7 @@ func providerFromEnv() string {
 	return ""
 }
 
-// providerFromHost matches on the host, not the whole URL, so github.com/foo/gitlab-migration
-// is not misrouted to GitLab.
+// providerFromHost matches the host, not the URL: github.com/foo/gitlab-migration is not GitLab.
 func providerFromHost(host string) string {
 	host = strings.ToLower(host)
 	switch {
@@ -79,15 +78,13 @@ func providerFromHost(host string) string {
 	}
 }
 
-// ValidateRepositoryURL reports whether raw is a URL this tool can route to a provider, so
-// callers validate against what Create accepts — including scheme-less SCP-style git URLs.
+// ValidateRepositoryURL validates against exactly what Create accepts, SCP-style URLs included.
 func ValidateRepositoryURL(raw string) error {
 	_, _, err := parseGitURL(raw)
 	return err
 }
 
-// parseGitURL extracts the host and "owner/repo" from either an HTTP(S) URL or an SCP-style git
-// URL (git@host:owner/repo.git), stripping any trailing ".git".
+// parseGitURL extracts host and "owner/repo" from an HTTP(S) or SCP-style (git@host:owner/repo) URL.
 func parseGitURL(raw string) (host string, path string, err error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {

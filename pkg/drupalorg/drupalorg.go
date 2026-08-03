@@ -46,8 +46,7 @@ func (s *HTTPClient) GetIssue(ctx context.Context, issueID string) (*Issue, erro
 	}
 	defer resp.Body.Close()
 
-	// Status before decoding: drupal.org answers an unknown node or an outage with an HTML
-	// error page, which would otherwise surface as an opaque decode failure.
+	// Status first: drupal.org answers an unknown node with an HTML page, not JSON.
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to fetch issue %s: unexpected status %s", issueID, resp.Status)
 	}

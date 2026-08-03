@@ -90,13 +90,8 @@ jobs:
       - name: Check for dead code
         run: go tool deadcode -test ./... | tee /tmp/deadcode.txt; [ ! -s /tmp/deadcode.txt ]
 
-  # Mutation testing, scoped to the lines this pull request touches.
-  #
-  # Line coverage only proves a line ran; this proves a test fails when the line
-  # is wrong. Scoring the whole module on every PR would take ~20 minutes and
-  # would fail on pre-existing survivors, so the gate looks at changed lines
-  # only -- new code has to be tested well, existing code is left to the weekly
-  # full run in mutation.yml.
+  # Mutation testing, scoped to the lines this pull request touches: the whole module takes
+  # ~20 minutes and would fail on pre-existing survivors. mutation.yml covers those weekly.
   mutation:
     name: mutation
     runs-on: ubuntu-latest

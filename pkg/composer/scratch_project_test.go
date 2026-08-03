@@ -32,11 +32,8 @@ func stubComposerFailureWithOutput(t *testing.T, out string) {
 	t.Cleanup(func() { execCommand = exec.CommandContext })
 }
 
-// newScratchCLI returns a CLI backed by the real filesystem, plus a project directory holding
-// projectComposerJSON (or no composer.json at all, when it is empty).
-//
-// The real filesystem, not a MemMapFs: the scratch project's temp directory becomes a
-// subprocess's working directory, and a directory that exists only in memory cannot be one.
+// newScratchCLI returns a CLI on the real filesystem, not a MemMapFs: the scratch project's temp
+// directory becomes a subprocess's working directory, which an in-memory one cannot be.
 func newScratchCLI(t *testing.T, projectComposerJSON string) (*CLI, string) {
 	t.Helper()
 	projectDir := t.TempDir()
@@ -49,11 +46,9 @@ func newScratchCLI(t *testing.T, projectComposerJSON string) (*CLI, string) {
 }
 
 func TestBuildScratchComposerJSONShape(t *testing.T) {
-	// Every other test here decodes only "repositories", so nothing pins the rest of the
-	// document -- yet each remaining field is what makes the patch check work at all:
-	// composer-patches must be required for patches to be applied, plugins must be allowed for
-	// it to run, and composer-exit-on-patch-failure is what turns a failed patch into a
-	// non-zero exit instead of a silent pass that reports every patch as applying cleanly.
+	// Every other test decodes only "repositories", yet the rest is what makes the check work:
+	// composer-patches required, its plugin allowed, and exit-on-patch-failure turning a failed
+	// patch into a non-zero exit instead of a silent pass.
 	service, projectDir := newScratchCLI(t, "")
 
 	out, err := service.buildScratchComposerJSON(projectDir)
@@ -83,9 +78,8 @@ func TestBuildScratchComposerJSONShape(t *testing.T) {
 
 func TestBuildScratchComposerJSON(t *testing.T) {
 	t.Run("carries the project's repositories, in order, ahead of the drupal.org fallback", func(t *testing.T) {
-		// The regression this guards: a package served only from a private registry could not be
-		// resolved in the scratch project at all, so its patch check failed for a reason that had
-		// nothing to do with the patch.
+		// Regression: a package served only from a private registry was unresolvable here, so
+		// its patch check failed for a reason unrelated to the patch.
 		service, projectDir := newScratchCLI(t, `{
 			"repositories": [
 				{"type": "composer", "url": "https://repo.packagist.com/acme/"},
@@ -108,10 +102,8 @@ func TestBuildScratchComposerJSON(t *testing.T) {
 	})
 
 	t.Run("keeps the object form in declaration order, not alphabetical order", func(t *testing.T) {
-		// Order is composer's resolution priority in the object form just as in the array form.
-		// Sorting by key -- which an earlier revision did, for byte-stability -- would put the
-		// public repository ahead of the private fork declared before it, so the fork loses and
-		// its patch is tested against the wrong package: the very failure this fix removes.
+		// Order is composer's resolution priority in both forms. Sorting by key, as an earlier
+		// revision did, puts a public repository ahead of the private fork declared first.
 		service, projectDir := newScratchCLI(t, `{
 			"repositories": {
 				"zeta-private-fork": {"type": "composer", "url": "https://zeta.example.com"},
@@ -270,10 +262,8 @@ func TestUnresolvableReason(t *testing.T) {
 		"download failed":      {"The 'https://repo.packagist.com/acme/p2/x.json' file could not be downloaded", true},
 		"patch was rejected":   {"  - Applying patches for drupal/core\nCould not apply patch! Skipping.", false},
 		"exit-on-failure form": {`Cannot apply patch Issue #123: [Fix the thing](https://drupal.org/i/123)`, false},
-		// Composer's dist-to-source fallback prints a non-fatal "could not be downloaded" and
-		// carries on. Matching it would classify a real patch rejection as an unobtainable
-		// package, so the package would be left unpinned and the merge request would ship a patch
-		// that does not apply.
+		// The dist-to-source fallback prints a non-fatal "could not be downloaded", which
+		// matched here would ship a patch that does not apply.
 		"rejection after a non-fatal download warning": {
 			`The "https://api.github.com/repos/acme/widget/zipball/abc" file could not be downloaded (HTTP/1.1 404 Not Found)
     Now trying to download from source
@@ -293,9 +283,8 @@ Could not apply patch! Skipping. The error was: patch does not apply`, false},
 
 func TestCheckIfPatchAppliesClassifiesFailures(t *testing.T) {
 	t.Run("a package composer cannot obtain is an error, not a patch conflict", func(t *testing.T) {
-		// Reported as "the patch does not apply", this pinned the package at its current version
-		// and told the reviewer a patch conflicted -- on every run, since nothing about it ever
-		// changes. The callers leave the package alone on an error instead.
+		// Read as "the patch does not apply", this pinned the package and blamed a conflict on
+		// every run. Callers leave the package alone on an error instead.
 		stubComposerFailureWithOutput(t, "Could not find package acme/private-module in any version")
 		service, projectDir := newScratchCLI(t, `{"repositories": []}`)
 

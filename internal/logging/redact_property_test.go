@@ -13,18 +13,14 @@ import (
 	"pgregory.net/rapid"
 )
 
-// The example-based tests in redact_test.go pin the cases someone thought of. The redactor is
-// the one component where a case nobody thought of means a credential in a log, so its promises
-// are stated here as properties over generated input instead.
+// A case nobody thought of means a credential in a log, so the redactor's promises are stated
+// as properties over generated input.
 
-// secretGen generates a plausible credential value: the alphabet is the one real tokens are
-// drawn from, plus the separators that show up around them in basic-auth URLs and query
-// strings, so the generated values actually exercise the URL-encoded registration.
+// secretGen draws from the alphabet real tokens use, plus the separators found around them in
+// URLs, so the values exercise the URL-encoded registration.
 //
-// '*' is deliberately excluded. The placeholder is "***", so a secret consisting only of
-// asterisks is a substring of the very thing that replaces it and would reappear in the output
-// by construction. A credential of one to three asterisks is not a credential; stating the
-// no-leak property for secrets distinguishable from the placeholder is the useful reading.
+// '*' is excluded: the placeholder is "***", so an all-asterisk secret is a substring of the
+// thing that replaces it and would reappear by construction.
 func secretGen() *rapid.Generator[string] {
 	return rapid.StringMatching(`[a-zA-Z0-9_.:/+= @-]{1,20}`)
 }
@@ -35,9 +31,8 @@ func secretsGen() *rapid.Generator[[]string] {
 	return rapid.SliceOfNDistinct(secretGen(), 1, 4, rapid.ID)
 }
 
-// logLineGen builds a line out of the given secrets and arbitrary filler. Drawing a wholly
-// random string instead would exercise redaction only by accident: a generated secret would
-// almost never appear in it, and the property would pass without ever replacing anything.
+// logLineGen plants the secrets in the line. A wholly random string would almost never contain
+// one, and the property would pass without ever replacing anything.
 func logLineGen(secrets []string) *rapid.Generator[string] {
 	parts := make([]*rapid.Generator[string], 0, len(secrets)+1)
 	parts = append(parts, rapid.String())
@@ -90,10 +85,8 @@ func TestPropertyRedactCoversURLEncodedForms(t *testing.T) {
 		redactor := NewRedactor()
 		redactor.Register(secret)
 
-		// A subprocess that echoes a token inside a URL emits it percent-encoded, and which
-		// encoding it is depends on where in the URL it landed: the query escaping turns a
-		// space into '+', the path escaping into "%20". Both have to be registered, or the
-		// value survives in the log in the form that is still perfectly usable.
+		// Which escaping a subprocess emits depends on where in the URL the token landed, and
+		// either form is still a usable credential — so both must be registered.
 		assert.Equal(t, placeholder, redactor.Redact(secret))
 		assert.Equal(t, placeholder, redactor.Redact(url.QueryEscape(secret)))
 		assert.Equal(t, placeholder, redactor.Redact(url.PathEscape(secret)))
@@ -102,10 +95,8 @@ func TestPropertyRedactCoversURLEncodedForms(t *testing.T) {
 
 func TestPropertyRedactLeavesSecretFreeTextAlone(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
-		// Disjoint alphabets: the filler is drawn from characters no secret can contain, so
-		// "this text holds no secret" holds by construction rather than by luck. Neither
-		// URL-encoded form can bridge the two either, since encoding a lower-case secret
-		// introduces only '%' and hex digits.
+		// Disjoint alphabets, so "this filler holds no secret" is true by construction rather
+		// than by luck — encoding introduces only '%' and hex digits, which bridge nothing.
 		secrets := rapid.SliceOfNDistinct(rapid.StringMatching(`[a-z0-9]{1,12}`), 1, 4, rapid.ID).Draw(t, "secrets")
 		text := rapid.StringMatching(`[ ,.!?()\[\]]{0,40}`).Draw(t, "text")
 
@@ -163,10 +154,8 @@ func TestPropertyWrappedLoggerNeverWritesASecret(t *testing.T) {
 		redactor.Register(secrets...)
 		newTestLogger(&buf, redactor).Info(message, zap.String("detail", field))
 
-		// Asserted on the decoded entry rather than on the raw line, because the raw line also
-		// carries zap's own envelope. A one-character secret like "8" occurs in the timestamp
-		// of roughly every entry, and no redactor can or should do anything about that — the
-		// promise is about what the call site passed in.
+		// On the decoded entry, not the raw line: a one-character secret like "8" occurs in
+		// zap's own timestamp, which is not what the promise is about.
 		var entry struct {
 			Message string `json:"msg"`
 			Detail  string `json:"detail"`

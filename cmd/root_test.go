@@ -55,10 +55,8 @@ func TestNewLogger(t *testing.T) {
 }
 
 func TestPersistentFlagDefaults(t *testing.T) {
-	// The defaults are the behaviour of an invocation that passes no flags, and several of them
-	// are safety-critical: --security defaulting to true would silently change every run into a
-	// security-only one, and --clone defaulting to true would make drupdater clone instead of
-	// updating the checkout it was pointed at.
+	// Safety-critical: --security defaulting to true makes every run security-only, --clone
+	// makes drupdater clone instead of updating the checkout it was pointed at.
 	tests := []struct {
 		flag string
 		want string
@@ -170,9 +168,7 @@ func TestCreateAddons(t *testing.T) {
 	})
 
 	t.Run("composer_audit and unsupported_modules run on a normal update", func(t *testing.T) {
-		// Both are mandatory in either mode: between them they are the project's "no longer
-		// maintained" report, and they render it as one list. A mode that ran only one of them
-		// would publish half a list.
+		// Both are mandatory: they render one list, so either alone publishes half of it.
 		config := internal.Config{RunTypes: internal.RunTypesConfig{Normal: internal.RunTypeConfig{}}}
 		addons, err := createAddons(logger, config, nil, nil, nil, nil)
 		require.NoError(t, err)
@@ -181,9 +177,8 @@ func TestCreateAddons(t *testing.T) {
 		assert.Contains(t, mandatoryAddons, "unsupported_modules")
 	})
 
-	// composer_audit now runs in both modes, so --security has to reach it some other way than
-	// by its mere presence. These two pin that wiring on the one difference visible from here:
-	// only a security run relabels the merge request.
+	// composer_audit runs in both modes, so --security must reach it some other way. Pinned on
+	// the one difference visible here: only a security run relabels the merge request.
 	t.Run("security mode lets composer_audit relabel the merge request", func(t *testing.T) {
 		config := internal.Config{Security: true, RunTypes: internal.RunTypesConfig{Security: internal.RunTypeConfig{}}}
 		addons, err := createAddons(logger, config, nil, nil, nil, nil)
@@ -311,9 +306,7 @@ func TestResolveCheckoutBranch(t *testing.T) {
 	})
 
 	t.Run("falls back to the GitLab CI variable", func(t *testing.T) {
-		// Both CI variables are consulted. With only the GitHub one covered, dropping the GitLab
-		// operand would go unnoticed and every detached GitLab CI run would fail to find its
-		// branch.
+		// Both CI variables: covering only GitHub would let the GitLab operand be dropped.
 		t.Setenv("GITHUB_REF_NAME", "")
 		t.Setenv("CI_COMMIT_REF_NAME", "release-2")
 		branch, err := resolveCheckoutBranch(svc, initRepo(t, true))

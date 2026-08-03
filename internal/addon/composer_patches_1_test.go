@@ -77,10 +77,8 @@ func TestComposerPatches1_RenderTemplate_NoChanges(t *testing.T) {
 }
 
 func TestComposerPatches1_RenderTemplate_AnyChangeRenders(t *testing.T) {
-	// The empty check has three independent clauses, and each one alone must be enough to
-	// produce a section. Testing only "all empty" and "everything populated" would let any two
-	// of the three be deleted without a failure -- and the addon would then stay silent about a
-	// patch it had removed, updated or found conflicting.
+	// Each of the three clauses alone must produce a section, or two could be deleted and the
+	// addon would stay silent about a patch it removed, updated or found conflicting.
 	tests := []struct {
 		name    string
 		updates PatchUpdates
@@ -267,9 +265,7 @@ func TestUpdatePatches(t *testing.T) {
 
 		report, newPatches := updater.updatePatches(t.Context(), "/tmp", worktree, operations, patches)
 		assert.Empty(t, newPatches["drupal/core"], "patch provided by a dependency should be removed from root")
-		// Assert the whole record, not just the path. Every field ends up in the merge request:
-		// the package and description identify which patch was dropped, and the reason is the
-		// only explanation the reviewer gets for why it disappeared.
+		// The whole record, not just the path: every field ends up in the merge request.
 		require.Len(t, report.Removed, 1)
 		assert.Equal(t, RemovedPatch{
 			Package:          "drupal/core",

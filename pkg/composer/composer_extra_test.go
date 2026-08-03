@@ -51,9 +51,8 @@ func TestNewCLI(t *testing.T) {
 }
 
 func TestGetAllowPluginsPolymorphicShapes(t *testing.T) {
-	// composer accepts several shapes for allow-plugins. Only the object form carries
-	// per-package entries; the rest mean "nothing to merge" and must not fail the run, because
-	// composer_allow_plugins is mandatory and would abort every update on such a project.
+	// Only the object form carries entries; the rest mean "nothing to merge" and must not fail
+	// the run, since composer_allow_plugins is mandatory.
 	for _, shape := range []string{"true", "false", "[]", "null", ""} {
 		t.Run("shape "+shape, func(t *testing.T) {
 			stubComposerOutput(t, shape)
@@ -139,9 +138,7 @@ func TestResetScratchProject(t *testing.T) {
 	service.initOnce.Do(service.initTempDir)
 	require.NoError(t, service.initErr)
 
-	// Simulate what a prior CheckIfPatchApplies/CheckIfPatchesApply call left behind: a
-	// composer.json with a pinned require added by `composer require` for an earlier, unrelated
-	// check, plus the composer.lock and vendor tree that call produced.
+	// What a prior patch check leaves behind: a pinned require, plus its lock and vendor tree.
 	require.NoError(t, afero.WriteFile(fs, service.tempDir+"/composer.json", []byte(`{"require":{"some/leftover-package":"1.2.3"}}`), 0644))
 	require.NoError(t, afero.WriteFile(fs, service.tempDir+"/composer.lock", []byte("{}"), 0644))
 	require.NoError(t, afero.WriteFile(fs, service.tempDir+"/vendor/autoload.php", []byte("<?php"), 0644))
@@ -205,13 +202,9 @@ func TestUpdatePropagatesFailure(t *testing.T) {
 }
 
 func TestUpdateDeduplicatesTheTwoOperationSections(t *testing.T) {
-	// composer reports a version change twice -- once resolving the lock, once installing it --
-	// in identical wording, so a naive scan reports every upgrade and downgrade double. That
-	// reaches the run report's .packages and the merge request's dependency table, where a
-	// reviewer sees each package listed twice.
-	//
-	// Installs are worded differently per section ("Locking" vs "Installing") and only the
-	// second form is matched, so they must still arrive exactly once.
+	// composer reports a version change twice in identical wording, so a naive scan lists every
+	// upgrade twice in the report and the dependency table. Installs are worded differently per
+	// section and only the second form is matched, so they must still arrive exactly once.
 	stubComposerOutput(t, `Loading composer repositories with package information
 Updating dependencies
 Lock file operations: 1 install, 2 updates, 1 removal
@@ -330,11 +323,8 @@ func TestGetInstalledPackageVersionErrors(t *testing.T) {
 }
 
 func TestDiffFallsBackWhenTooLargeInBytes(t *testing.T) {
-	// GitHub/GitLab's merge/pull request body limit is a byte limit, not a rune count. A diff
-	// table full of multi-byte characters (accented package or issue titles, say) can be under
-	// the threshold in runes yet already over it in bytes, so the fallback must measure bytes.
-	// "é" is a single rune but 2 bytes in UTF-8: 40000 of them is 40000 runes (under the 63000
-	// rune threshold) but 80000 bytes (over it).
+	// The MR body limit is bytes, not runes: 40000 "é" is under the rune threshold and over the
+	// byte one, so the fallback must measure bytes.
 	hugeMultiByte := strings.Repeat("é", 40000)
 
 	var calls int

@@ -97,10 +97,7 @@ func TestTokenRequired(t *testing.T) {
 }
 
 func TestRegisterEnvSecrets(t *testing.T) {
-	// registerEnvSecrets is what wires DRUPALCODE_ACCESS_TOKEN and COMPOSER_AUTH into the
-	// redactor for both a real run (cmd/root.go) and "drupdater check" (cmd/check.go), which
-	// shells out to the same subprocesses and must redact the same secrets from anything it
-	// prints.
+	// One wiring for both a real run and "drupdater check": same subprocesses, same secrets.
 	t.Setenv("DRUPALCODE_ACCESS_TOKEN", "drupalcode-secret")
 	t.Setenv("COMPOSER_AUTH", `{"bearer":{"example.com":"bearer-secret"}}`)
 
@@ -113,9 +110,8 @@ func TestRegisterEnvSecrets(t *testing.T) {
 }
 
 func TestRegisterComposerAuth(t *testing.T) {
-	// registerComposerAuth must register the individual credentials inside COMPOSER_AUTH, not
-	// just the raw JSON blob: Composer echoes the username/password/token itself (typically
-	// embedded in a URL after a failed authenticated fetch), never the blob verbatim.
+	// The individual credentials, not just the raw blob: Composer echoes the leaf, never the
+	// JSON verbatim.
 	redact := func(t *testing.T, redactor *logging.Redactor, msg string) string {
 		t.Helper()
 		core, logs := observer.New(zap.DebugLevel)
@@ -159,9 +155,8 @@ func TestComposerAuthSecretLeaves(t *testing.T) {
 }
 
 func TestComposerAuthSecretLeavesSkipsUsername(t *testing.T) {
-	// Packagist.com's documented http-basic form sets username to the literal word "token" and
-	// the real secret in password; the username leaf must not be registered as a secret, or every
-	// occurrence of the word "token" in unrelated log output gets redacted too.
+	// http-basic sets username to the literal word "token", which must stay out of the secret
+	// set or every unrelated "token" in the log is redacted too.
 	leaves := composerAuthSecretLeaves(map[string]any{
 		"http-basic": map[string]any{
 			"repo.packagist.com": map[string]any{

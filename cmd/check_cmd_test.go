@@ -40,10 +40,8 @@ func runCheckCmd(t *testing.T, args ...string) (string, error) {
 }
 
 func TestCheckCommandReportsFailuresAndExitsNonZero(t *testing.T) {
-	// A bare git checkout with no Drupal project in it: the cheap tier can run end to end, and
-	// every check that depends on a real project fails. That is the shape of the command's
-	// unhappy path, and it is what proves RunE collects results, prints them, and turns a
-	// failure into a non-zero exit rather than reporting success.
+	// A bare checkout with no Drupal project: every project-dependent check fails, which is
+	// the command's unhappy path end to end.
 	dir := t.TempDir()
 	_, err := git.PlainInit(dir, false)
 	require.NoError(t, err)

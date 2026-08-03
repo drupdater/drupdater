@@ -1,6 +1,5 @@
 // Package logging wraps a zapcore.Core to redact known secret values before they reach any sink.
-// Subprocesses echo credentials back in their own output, most often in a URL after a failed
-// authenticated fetch; wrapping the logger covers every call site at once.
+// Subprocesses echo credentials back in their own output; wrapping the logger covers every call site.
 package logging
 
 import (
@@ -17,27 +16,22 @@ import (
 // placeholder replaces every registered secret value wherever it appears in log output.
 const placeholder = "***"
 
-// Redactor holds the exact secret values that must never appear in log output. Value-based, not
-// pattern-based: matching "things that look like a token" both misses unusual formats and mangles
-// innocent output, and the real values are known at startup. Safe for concurrent use.
+// Redactor holds the exact secret values to hide. Value-based, not pattern-based: the real values
+// are known at startup, and "looks like a token" both misses formats and mangles innocent output.
 type Redactor struct {
 	mu       sync.RWMutex
 	secrets  map[string]struct{}
 	replacer *strings.Replacer
 }
 
-// NewRedactor returns an empty Redactor. Register secret values as soon as they are known so
-// nothing is logged unredacted in between.
+// NewRedactor returns an empty Redactor. Register values as soon as they are known.
 func NewRedactor() *Redactor {
 	return &Redactor{secrets: map[string]struct{}{}}
 }
 
 // Register adds values to redact from all later log output. Empty strings are ignored: redacting
-// "" would replace every character in every line.
-//
-// Each value's URL-encoded forms are registered too, because a token in a URL may appear encoded,
-// and both query and path escaping are used — a space is '+' in one and "%20" in the other, so
-// one form alone leaves the value readable. The map collapses duplicates.
+// "" would replace every character in every line. Both URL escapings go in too — query and path
+// escaping differ on a space, so one form alone leaves the value readable.
 func (r *Redactor) Register(values ...string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -62,9 +56,8 @@ func (r *Redactor) Register(values ...string) {
 	}
 }
 
-// Redact replaces every registered secret value in s with the placeholder. The exported
-// counterpart of redact, for output that bypasses the logger — a preflight check's results, or
-// the run report — and must be filtered all the same.
+// Redact is the exported counterpart of redact, for output that bypasses the logger: a preflight
+// check's results, or the run report.
 func (r *Redactor) Redact(s string) string {
 	return r.redact(s)
 }
@@ -108,15 +101,13 @@ func (r *Redactor) currentReplacer() *strings.Replacer {
 	return r.replacer
 }
 
-// core rewrites the message and any string/error field through the Redactor before handing the
-// entry on. It never logs the secret set itself.
+// core rewrites the message and any string/error field before handing the entry on.
 type core struct {
 	zapcore.Core
 	redactor *Redactor
 }
 
-// WrapCore returns a constructor for zap.WrapCore, so every entry the logger emits — at every
-// level, Debug included — is filtered before it reaches its sink.
+// WrapCore returns a constructor for zap.WrapCore, so every entry is filtered, Debug included.
 func WrapCore(r *Redactor) func(zapcore.Core) zapcore.Core {
 	return func(c zapcore.Core) zapcore.Core {
 		return &core{Core: c, redactor: r}
@@ -151,8 +142,7 @@ func (c *core) redactFields(fields []zapcore.Field) []zapcore.Field {
 				f.Interface = errors.New(c.redactor.redact(err.Error()))
 			}
 		default:
-			// Numbers, durations, zap.Any and friends pass through: no call site puts
-			// subprocess output into those.
+			// Numbers and durations pass through: no call site puts subprocess output there.
 		}
 		out[i] = f
 	}
