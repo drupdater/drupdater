@@ -74,8 +74,9 @@ esac
 Drupdater's own integration tests use a jq script for this, and it is directly reusable.
 
 It checks two different things. The `$expect` fields are what *your* project expects —
-status, a minimum package count, named phases present **and** succeeded, named addons that
-reported something, packages that had to move, actions that must not appear. Everything
+status, a minimum package count, named phases present **and** succeeded, the phase a run is
+meant to fail in, named addons that reported something, packages that had to move, actions
+that must not appear. Everything
 after them is the report's own internal consistency and is always on: package changes have
 a shape, phases are ordered and unique, a `success` has no failed phase, a `--dry-run` has
 no merge request, an advisory is not both fixed and remaining, and an addon that reported

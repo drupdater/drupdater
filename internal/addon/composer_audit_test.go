@@ -439,3 +439,63 @@ func TestComposerAudit_RenderTemplate_FixedOnly(t *testing.T) {
 	assert.Contains(t, result, "CVE-1")
 	assert.Contains(t, result, "All security issues have been resolved.")
 }
+
+// TestComposerAudit_AuditFailures covers the two points where composer audit itself fails.
+//
+// Both matter more than a usual error path: composer_audit runs at Max priority on
+// pre-composer-update, so a swallowed failure here would let a security run continue with an
+// empty advisory list -- updating nothing and reporting that everything is fine.
+func TestComposerAudit_AuditFailures(t *testing.T) {
+	path := "/test/path"
+
+	t.Run("before the update", func(t *testing.T) {
+		mockComposer := NewMockComposer(t)
+		audit := NewComposerAudit(zap.NewNop(), mockComposer, true)
+		mockComposer.EXPECT().Audit(anyCtx, path).Return(composer.Audit{}, assert.AnError)
+
+		evt := services.NewPreComposerUpdateEvent(context.Background(), path, NewMockWorktree(t), []string{}, []string{}, true)
+		err := audit.preComposerUpdateHandler(evt)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to run composer audit")
+		// Not an abort: aborting reads as "nothing to do here" and exits 0.
+		assert.False(t, evt.IsAborted())
+		assert.Empty(t, evt.PackagesToUpdate)
+	})
+
+	t.Run("after the update", func(t *testing.T) {
+		mockComposer := NewMockComposer(t)
+		audit := NewComposerAudit(zap.NewNop(), mockComposer, true)
+		mockComposer.EXPECT().Audit(anyCtx, path).Return(composer.Audit{}, assert.AnError)
+
+		evt := services.NewPostCodeUpdateEvent(context.Background(), path, NewMockWorktree(t))
+		err := audit.postCodeUpdateHandler(evt)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to run composer audit after update")
+	})
+}
+
+// TestComposerAudit_PreComposerUpdateHandler_DeduplicatesPackages pins the behaviour the handler's
+// own comment describes: several advisories usually name the same package, and this list becomes
+// composer update's arguments. Passing a package twice is what the dedup exists to prevent.
+func TestComposerAudit_PreComposerUpdateHandler_DeduplicatesPackages(t *testing.T) {
+	mockComposer := NewMockComposer(t)
+	audit := NewComposerAudit(zap.NewNop(), mockComposer, true)
+	path := "/test/path"
+
+	mockComposer.EXPECT().Audit(anyCtx, path).Return(composer.Audit{
+		Advisories: []composer.Advisory{
+			{PackageName: "drupal/webform", CVE: "CVE-1", Title: "first"},
+			{PackageName: "drupal/webform", CVE: "CVE-2", Title: "second"},
+			{PackageName: "other/package", CVE: "CVE-3", Title: "third"},
+			{PackageName: "drupal/webform", CVE: "CVE-4", Title: "fourth"},
+		},
+	}, nil)
+
+	evt := services.NewPreComposerUpdateEvent(context.Background(), path, NewMockWorktree(t), []string{}, []string{}, true)
+	require.NoError(t, audit.preComposerUpdateHandler(evt))
+
+	// First-seen order, not sorted: the order is the order composer receives the arguments in.
+	assert.Equal(t, []string{"drupal/webform", "other/package"}, evt.PackagesToUpdate)
+}

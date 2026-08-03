@@ -15,7 +15,16 @@ name: Integration Test
 #     real non-dry run.
 #
 # ADDING A FIXTURE: append an entry to .github/integration-fixtures.json. The
-# label path picks it up automatically -- nothing here needs editing.
+# label path picks it up automatically -- nothing here needs editing. Beyond
+# name/repository_url/branch/expect, an entry may set:
+#
+#   modes     which of normal/security to run; default both. Narrow it when the
+#             second mode would prove nothing -- a run that fails in preflight
+#             fails there in either mode.
+#   shallow   clone with --depth 1. Only for asserting that preflight rejects it.
+#
+# A fixture whose expect.status contains "failed" is a failure fixture: drupdater
+# is expected to exit non-zero, and the leg fails if it exits 0 instead.
 
 on:
   pull_request:
@@ -95,28 +104,34 @@ jobs:
             # One leg, exactly as asked.
             mode=normal; [ "$IN_SECURITY" = "true" ] && mode=security
             url=${IN_URL:-https://github.com/drupdater/test-drupal-cms.git}
-            # If the target happens to be a known fixture, take its
-            # expectations too, so a dispatch at the default gets the same
-            # verification a label does. Otherwise assert only the status --
-            # a dispatch can be aimed at any repository.
+            # If the target happens to be a known fixture, take its expectations too, so a
+            # dispatch at the default gets the same verification a label does. Otherwise
+            # assert only the status -- a dispatch can be aimed at any repository.
+            #
+            # Matched on url AND branch, because several fixtures share a repository and
+            # differ only by branch: on the url alone a dispatch would inherit the wrong
+            # fixture's expectations, and a broken/* branch expects the opposite of main.
             include=$(jq -c \
               --arg n "$(basename "$url" .git)" \
               --arg u "$url" \
               --arg b "${IN_BRANCH:-main}" \
               --arg m "$mode" \
-              '(map(select(.repository_url == $u)) | first) as $f
+              '(map(select(.repository_url == $u and .branch == $b)) | first) as $f
                | [{fixture: ($f.name // $n), repository_url: $u, branch: $b, mode: $m,
+                   shallow: ($f.shallow // false),
                    expect: (($f.expect[$m] // {status:["success","no_changes"]}) | tojson)}]' \
               .github/integration-fixtures.json)
             dry_run=$IN_DRY_RUN
             verbose=$IN_VERBOSE
           else
-            # A label means every fixture in both modes. The two exercise
-            # different code paths -- security mode is driven by composer_audit
-            # and updates only what has an advisory -- so one passing says
-            # nothing about the other.
-            include=$(jq -c '[ .[] as $f | ("normal","security") as $m |
+            # A label means every fixture in every mode it declares. The default is both,
+            # because they exercise different code paths -- security mode is driven by
+            # composer_audit and updates only what has an advisory -- so one passing says
+            # nothing about the other. A fixture narrows it with "modes" when the second mode
+            # would prove nothing: a run that fails in preflight fails there either way.
+            include=$(jq -c '[ .[] as $f | ($f.modes // ["normal","security"])[] as $m |
               {fixture:$f.name, repository_url:$f.repository_url, branch:$f.branch, mode:$m,
+               shallow: ($f.shallow // false),
                expect: (($f.expect[$m] // {status:["success","no_changes"]}) | tojson)} ]' \
               .github/integration-fixtures.json)
             # A label event carries none of the inputs above, and an unset
@@ -133,7 +148,9 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           echo "### Integration test plan" >> "$GITHUB_STEP_SUMMARY"
           echo "dry_run=\`$dry_run\`" >> "$GITHUB_STEP_SUMMARY"
-          jq -r '.[] | "- \(.fixture) / \(.mode) -- \(.repository_url)@\(.branch)"' \
+          jq -r '.[] | "- \(.fixture) / \(.mode) -- \(.repository_url)@\(.branch)"
+            + (if .shallow then " (shallow)" else "" end)
+            + (if ((.expect | fromjson).status | index("failed")) then " -- expected to fail" else "" end)' \
             <<<"$include" >> "$GITHUB_STEP_SUMMARY"
 
   # The image is identical for every leg, so build it once and pass it along as
@@ -226,6 +243,7 @@ jobs:
       - name: Clone project
         env:
           REPO_TOKEN: ${{ secrets.DRUPDATER_TEST_TOKEN }}
+          SHALLOW: ${{ matrix.shallow }}
         run: |
           # ./run is the mount root, the project a level below it. drupdater
           # writes <site>.sqlite and private/ into the checkout's PARENT
@@ -233,10 +251,16 @@ jobs:
           # we control -- mounting the checkout itself at /workspace puts them
           # in the container's /.
           mkdir -p ./run
-          # No --depth: drupdater's preflight rejects a shallow checkout
-          # ("git history complete"), and a shallow clone cannot be pushed.
+          # Normally no --depth: drupdater's preflight rejects a shallow checkout
+          # ("git history complete"), and a shallow clone cannot be pushed. The
+          # multisite-shallow fixture asks for one precisely to prove that
+          # rejection still happens -- it is the only leg that sets this.
+          depth=()
+          if [ "$SHALLOW" = "true" ]; then
+            depth=(--depth 1)
+          fi
           git -c credential.helper='!f(){ echo username=oauth2; echo "password=$REPO_TOKEN"; };f' \
-            clone --branch "$TARGET_BRANCH" "$TARGET_URL" ./run/project
+            clone "${depth[@]}" --branch "$TARGET_BRANCH" "$TARGET_URL" ./run/project
           # Deliberately NO git identity configured here. A fresh clone has none,
           # which is exactly the case drupdater has to handle on its own -- leaving
           # it unset is what makes this job a regression test for that fallback.
@@ -250,15 +274,36 @@ jobs:
           DRY_RUN: ${{ needs.plan.outputs.dry_run }}
           VERBOSE: ${{ needs.plan.outputs.verbose }}
           MODE: ${{ matrix.mode }}
+          EXPECT: ${{ matrix.expect }}
         run: |
           args=(--working-dir /workspace/project --report /workspace/report.json)
           [ "$DRY_RUN" = "true" ]    && args+=(--dry-run)
           [ "$MODE" = "security" ]   && args+=(--security)
           [ "$VERBOSE" = "true" ]    && args+=(--verbose)
+
+          # A fixture built to fail exits non-zero by design, and this step runs under bash -e:
+          # it would abort before the report is read, and the report is the actual verdict.
+          # Derived from the fixture's own status list rather than a second flag, which could
+          # disagree with it.
+          want_failure=$(jq -r 'if (.status | index("failed")) then "true" else "false" end' <<<"$EXPECT")
+
+          rc=0
           docker run --rm \
             -e DRUPALCODE_ACCESS_TOKEN \
             -v "$(pwd)/run:/workspace" \
-            drupdater:test "$REPO_TOKEN" "${args[@]}"
+            drupdater:test "$REPO_TOKEN" "${args[@]}" || rc=$?
+
+          # Both directions: a failure fixture that suddenly succeeds has stopped testing
+          # what it was built for, which no assertion on the report would catch -- the
+          # report of a successful run is perfectly consistent.
+          if [ "$want_failure" = "true" ] && [ "$rc" -eq 0 ]; then
+            echo "::error::the run was expected to fail, but exited 0"
+            exit 1
+          fi
+          if [ "$want_failure" != "true" ] && [ "$rc" -ne 0 ]; then
+            echo "::error::drupdater exited $rc"
+            exit "$rc"
+          fi
 
       # The report is written on every exit path, so this runs even when the
       # container failed -- a failed run's report is the one worth reading.
@@ -275,16 +320,24 @@ jobs:
             ${{ secrets.DRUPDATER_TEST_TOKEN }}
             ${{ secrets.DRUPALCODE_ACCESS_TOKEN }}
         run: |
+          # pipefail is load-bearing here, not decoration. Without it this step's verdict was
+          # `jq -e ... | tee`, whose exit status is tee's -- always 0 -- so assert-report.jq
+          # could never fail a leg. Every run before this only ever proved the container
+          # exited 0, which is precisely what that script exists to stop being the standard.
+          set -euo pipefail
           # The container runs as root and the report is written 0600, so both jq
           # and upload-artifact get EACCES until the runner owns it back.
           sudo chown -R "$(id -u):$(id -g)" ./run || true
           test -f ./run/report.json || { echo "::error::no run report was written"; exit 1; }
           echo "### ${{ matrix.fixture }} / ${{ matrix.mode }}" >> "$GITHUB_STEP_SUMMARY"
+          # The // [] guards matter now that pipefail is on: a run that died before recording
+          # anything would otherwise fail this step on "Cannot iterate over null" and hide the
+          # real reason behind a jq error.
           jq -r '
             "status=\(.status)  mode=\(.mode)  dry_run=\(.dry_run)",
             "failed_phase=\(.failed_phase // "-")  error=\(.error // "-")",
-            "packages=\(.packages | length)",
-            "phases:", (.phases[] | "  \(.name): ok=\(.ok) \(.duration_seconds)s \(.error // "")"),
+            "packages=\((.packages // []) | length)",
+            "phases:", ((.phases // [])[] | "  \(.name): ok=\(.ok) \(.duration_seconds)s \(.error // "")"),
             "addons:",
             ((.addons // {}) | to_entries[]
              | "  \(.key): \(.value | tojson | if length > 400 then .[0:400] + " ..." else . end)")
@@ -299,8 +352,14 @@ jobs:
             echo "status=$(jq -r '.status' ./run/report.json)"
             echo "update_branch=$(jq -r '.update_branch // ""' ./run/report.json)"
           } >> "$GITHUB_OUTPUT"
+          # Captured rather than piped into tee, which is what swallowed the exit status, and
+          # with stderr folded in: halt_error writes the "report assertions failed" list there,
+          # so the piped version reached the raw log but never the summary anyone opens.
+          assert_status=0
           jq -e -r --argjson expect "$EXPECT" -f .github/assert-report.jq \
-            ./run/report.json | tee -a "$GITHUB_STEP_SUMMARY"
+            ./run/report.json > /tmp/assert-report.out 2>&1 || assert_status=$?
+          tee -a "$GITHUB_STEP_SUMMARY" < /tmp/assert-report.out
+          exit "$assert_status"
 
       # Everything above reads the report, which is drupdater's own account of
       # the run. The steps below read the repository it left behind, which is

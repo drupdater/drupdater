@@ -18,6 +18,7 @@
 #   status          list of acceptable .status values
 #   min_packages    minimum number of package changes
 #   phases          phase names that must be present AND ok
+#   failed_phase    the phase this run is meant to fail in
 #   addons          keys that must appear under .addons
 #   packages_match  regexes, each of which some package name must match
 #   forbid_actions  package actions that must not appear at all
@@ -89,6 +90,14 @@ def secrets: (env.DRUPDATER_ASSERT_SECRETS // "") | split("\n") | map(select(len
       elif ($found | map(select(.ok)) | length) == 0
       then "phase not ok: \($name) (\($found[0].error // "no error recorded"))"
       else empty end ),
+
+  # A fixture built to fail has to fail where it was built to fail. The invariant below only
+  # asks that failed_phase name *some* recorded failure, which a fixture that broke earlier
+  # than intended -- an unresolvable constraint tripping composer install rather than the
+  # update -- satisfies while testing nothing it was meant to.
+  ( if $expect.failed_phase and $r.failed_phase != $expect.failed_phase
+    then "failed_phase: got \($r.failed_phase // "none"), want \($expect.failed_phase)"
+    else empty end ),
 
   ( ($expect.addons // [])[]
     | . as $key
