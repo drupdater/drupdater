@@ -1,4 +1,4 @@
-.PHONY: build test test-property mutate clean mock lint fmt fix run docker-build docker-run docs-serve docs-build help
+.PHONY: build test test-race test-property fuzz mutate clean mock lint fmt fix run docker-build docker-run docs-serve docs-build help
 
 # Variables
 BINARY_NAME=drupdater
@@ -16,11 +16,29 @@ build: ## Build the binary
 test: ## Run tests
 	go test -v ./...
 
+# Around a minute rather than a couple of seconds: pkg/composer and pkg/drush fake subprocesses
+# by re-executing the test binary, and -race instruments every one of those execs.
+test-race: ## Run tests with the race detector
+	go test -race ./...
+
 # RAPID_CHECKS rather than -rapid.checks: rapid only registers its flags in test binaries that
 # import it, so passing the flag to ./... fails on every package that has no property tests. The
 # environment variable is read at init and simply ignored by those packages.
 test-property: ## Run only the property tests, with far more generated cases than `make test`
 	RAPID_CHECKS=10000 go test ./... -run TestProperty
+
+# `go test ./...` already replays every seed and every committed counterexample; this is the
+# generative run. One target at a time -- `go test -fuzz` refuses a pattern matching several.
+FUZZTIME ?= 30s
+
+fuzz: ## Fuzz every target for FUZZTIME each (default 30s)
+	@set -e; \
+	for pkg in $$(go list ./...); do \
+	  for target in $$(go test -list '^Fuzz' $$pkg 2>/dev/null | grep '^Fuzz' || true); do \
+	    echo "==> $$target ($$pkg)"; \
+	    go test $$pkg -run '^$$' -fuzz "^$$target$$" -fuzztime $(FUZZTIME); \
+	  done; \
+	done
 
 clean: ## Clean build artifacts
 	rm -f ${BINARY_NAME}

@@ -221,7 +221,8 @@ func TestPropertyAuditUnmarshalFlattensEveryShape(t *testing.T) {
 		var audit Audit
 		require.NoError(t, json.Unmarshal([]byte(fmt.Sprintf(`{"advisories":{%s}}`, strings.Join(entries, ","))), &audit))
 
-		// Compared as a set: the map iteration inside UnmarshalJSON has no defined order.
+		// Compared as a set: this property is about losing none of them, not about their
+		// order — TestAuditUnmarshalShapes and FuzzAuditUnmarshalJSON cover the sort.
 		got := make([]string, 0, len(audit.Advisories))
 		for _, advisory := range audit.Advisories {
 			got = append(got, advisory.AdvisoryID)

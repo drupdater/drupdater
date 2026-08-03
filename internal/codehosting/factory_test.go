@@ -194,6 +194,13 @@ func TestParseGitURL(t *testing.T) {
 		{name: "scp with empty host", raw: ":owner/repo", wantErr: true},
 		// The user part is optional: a bare "@" prefix still leaves a usable host.
 		{name: "scp with empty user", raw: "@github.com:owner/repo.git", wantHost: "github.com", wantPath: "owner/repo"},
+		// Found by FuzzParseGitURL. Trimming the slashes only before removing ".git" left the
+		// separator in front of it behind, and the path went to the API with a trailing slash.
+		{name: "scp with a bare .git segment", raw: "git@github.com:owner/.git", wantHost: "github.com", wantPath: "owner"},
+		{name: "https with a bare .git segment", raw: "https://gitlab.com/group/user/.git", wantHost: "gitlab.com", wantPath: "group/user"},
+		// Also from FuzzParseGitURL. TrimSuffix removes one occurrence, so a doubled suffix
+		// survived; no forge allows a project name ending in ".git" for it to have been one.
+		{name: "doubled .git suffix", raw: "git@github.com:owner/repo.git.git", wantHost: "github.com", wantPath: "owner/repo"},
 	}
 
 	for _, tt := range tests {

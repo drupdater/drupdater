@@ -17,7 +17,9 @@ make build
 ```bash
 make build          # build the binary (injects the version via -ldflags)
 make test           # go test -v ./...
+make test-race      # the suite under the race detector
 make test-property  # only the property tests, with far more generated cases
+make fuzz           # fuzz every target (FUZZTIME=30s each by default)
 make mutate         # mutation testing over the whole module (mutago)
 make lint           # golangci-lint + hadolint on the Dockerfile
 make fmt            # go fmt ./...
@@ -117,6 +119,100 @@ get past it — fix the code.
 
 Changed packages must reach **≥ 90%** coverage. The hook prints per-package totals; add
 tests before committing if any package is below.
+
+## Golden files
+
+Some output is a contract with somebody outside this repository: the merge request sections a
+reviewer reads, and the `--report` document automation parses. For those, the whole shape matters
+— a renamed field breaks a consumer, and no assertion anybody remembers to write covers every
+field. So the expected output lives in a file under `testdata/` and the test compares against it
+byte for byte.
+
+```bash
+go test ./...                       # compare
+go test ./... -update               # rewrite every golden file
+go test ./internal/addon -update    # just one package's
+```
+
+`-update` is registered by `internal/golden`, which every golden assertion goes through. Always
+read the resulting `git diff` before committing: `-update` makes a change invisible if you let it,
+which is the one way a golden file can make tests worse rather than better.
+
+| Golden file | Pins |
+|---|---|
+| `internal/addon/testdata/*.md` | Each addon's merge request section, from its template |
+| `internal/services/testdata/dependency_update.md` | The assembled description a full run produces |
+| `internal/addon/testdata/run_report.json` | The whole `--report` document, every reporting addon at once |
+
+Most of these are embedded into this documentation with `pymdownx.snippets`, so the published
+examples cannot drift from what the code emits. Changing a golden file changes the docs.
+
+### Why the report has one
+
+`internal/addon/report.go` and `internal/report/report.go` are a published schema, and struct tags
+are invisible to everything else: coverage sees a line that ran, mutation testing does not mutate
+tags, and the property tests assert values rather than names. Before `run_report.json` existed,
+renaming `fixable` to `fixable_count` and `remaining` to `still_open` broke **no test at all**.
+`.github/assert-report.jq` does check field names, but only in the label-triggered integration
+run — never on a pull request.
+
+The golden is built through the real `report.Recorder`, so it also pins how `AddAddons` keys each
+section. Everything a clock produced is overwritten with fixed values first — otherwise the file
+would differ on every run — which is the one thing the golden deliberately does not check.
+
+### When not to write one
+
+A golden file freezes *everything* about its subject, so on an internal value it turns every
+unrelated change into a diff to re-approve and says nothing about which part mattered. The
+composer diff table and the preflight results are better served by the assertions they already
+have, which name the thing under test. Reach for a golden when the output is a published
+contract, not when it is merely large.
+
+## The race detector
+
+Drupdater runs the per-site phases concurrently — an `errgroup` bounded by `--concurrency`, one
+goroutine per site — and several addons accumulate state across those goroutines. That state is
+mutex-guarded, and nothing else in the toolchain can tell you when it stops being: coverage
+proves a line ran, mutation testing proves a test would notice a *changed* line, and both are
+blind to two goroutines touching the same map.
+
+```bash
+make test-race
+```
+
+CI runs it as its own `race` job in `go.yml`, in parallel with `test` so the coverage profile
+still comes from an uninstrumented run.
+
+!!! note "It takes about a minute, not a couple of seconds"
+
+    `pkg/composer` and `pkg/drush` fake subprocesses with the `TestHelperProcess` pattern, which
+    re-executes the test binary once per faked command. Under `-race` every one of those execs
+    starts an instrumented process, so those two packages account for almost all of the runtime.
+    Nothing is wrong; they simply have no concurrency for the detector to find either.
+
+### The detector only sees what actually runs
+
+This is the part worth internalising. `-race` is not a static check — it observes real memory
+accesses, so it finds nothing in code no test drives concurrently. Every `StartUpdate` test used
+to run a single site, which walks the per-site phases on one goroutine: the addon maps were
+written by one writer, and removing their mutexes would have gone unnoticed.
+
+So the concurrency tests and the detector are one tool, not two:
+
+| Test | Drives |
+|---|---|
+| `TestStartUpdateWithConcurrentSites` | The real workflow with four sites, asserting the baseline installs overlap and the committing tail does not |
+| `internal/addon/concurrency_test.go` | Each mutex-guarded addon's per-site handler, fired from all sites at once |
+| `TestForEachSite` | The fan-out itself: the concurrency bound, and cancellation on first error |
+
+Deleting a mutex from `internal/addon` makes the matching test fail under `-race` and **pass
+without it**. When you add state that accumulates across sites, add it to
+`concurrency_test.go` — otherwise the guard around it is untested however green CI looks.
+
+Where the shared resource is not memory, the detector cannot help and the test has to assert
+directly. `siteCommitMu` serialises the tail of `updateSite` because the sites share one git
+index — which is mocked in the suite, so there is no shared memory to observe.
+`TestStartUpdateWithConcurrentSites` measures peak occupancy instead.
 
 ## Mutation testing
 
@@ -295,6 +391,93 @@ A function with two branches and no interesting input space is a table test, not
 `ActiveRunType` and `tokenRequired` are covered better by listing their cases than by generating
 them. Properties earn their keep where the input space is large and the promise is absolute:
 parsers, path handling, ordering, serialisation, and anything that must never leak a credential.
+
+## Fuzzing
+
+Property-based testing asks whether a law holds for every input a *generator* produces. That
+generator is written by hand, and it only ever produces inputs somebody imagined: rapid's
+`StringMatching` draws from an alphabet, `SliceOfN` from a length range. Fuzzing removes that
+ceiling. Go's built-in fuzzer mutates raw bytes and keeps whatever reaches a new branch, so it
+explores the inputs the generator's shape excludes — invalid UTF-8, a lone `%`, an embedded NUL,
+a path that is nothing but separators.
+
+The two are complementary, not alternatives, and both are kept on the same code:
+
+| | Generates | Finds | Corpus |
+|---|---|---|---|
+| rapid | Structured values from written generators | A law that is false for a plausible input | `testdata/rapid/*.fail` |
+| `go test -fuzz` | Arbitrary bytes, guided by coverage | A branch nothing plausible reaches | `testdata/fuzz/<target>/*` |
+
+```bash
+make test                      # every seed and every committed counterexample, as ordinary tests
+make fuzz                      # generative, 30s per target
+make fuzz FUZZTIME=5m          # longer
+go test ./internal/codehosting -run '^$' -fuzz '^FuzzParseGitURL$' -fuzztime 1h
+```
+
+`go test -fuzz` takes one target at a time and refuses a pattern that matches several, which is
+why `make fuzz` loops rather than passing `./...`.
+
+### The targets
+
+Four, on the code that parses input drupdater does not control:
+
+| Target | Covers |
+|---|---|
+| `FuzzParseGitURL` | The repository URL, in both the HTTP and the SCP shape, straight from a CI variable |
+| `FuzzLoadConfigFile` | `.drupdater.yaml`, including that a rejected file leaves the `Config` untouched |
+| `FuzzAuditUnmarshalJSON` | `composer audit` output, across the two shapes composer emits |
+| `FuzzRedact` | That a registered secret never survives redaction, on bytes no generator would write |
+
+### The convention
+
+- Targets live in `<subject>_fuzz_test.go`, next to `<subject>_test.go` and
+  `<subject>_property_test.go`.
+- Every target seeds `f.Add` with the real shapes **and** the degenerate ones — `""`, a bare
+  separator, a NUL. Seeds are the fuzzer's starting coverage, and they run on every `make test`.
+- Assert a law, never a second implementation — the same rule properties follow.
+- A target that writes to disk should take its directory from `f.TempDir()` once, outside
+  `f.Fuzz`, rather than calling `t.TempDir()` per execution.
+
+### When a target fails
+
+The fuzzer minimises the input, writes it to `testdata/fuzz/<target>/<hash>`, and prints how to
+re-run it:
+
+```text
+Failing input written to testdata/fuzz/FuzzParseGitURL/ea812ec424beb350
+To re-run:
+go test -run=FuzzParseGitURL/ea812ec424beb350
+```
+
+**Commit that file.** `go test` replays everything under `testdata/fuzz` before generating
+anything new, so the counterexample becomes a permanent regression case — exactly what a `.fail`
+file does for a property.
+
+Then do the other half. The mutation gate is blocking and generative exploration is not
+reproducible, so a mutant killed only because a run happened to generate the right input would
+pass on one pull request and fail on the next. **Fix the code, commit the corpus file, and add an
+ordinary test naming the concrete counterexample.** `TestParseGitURL`'s two `.git`-segment cases
+and `TestAuditUnmarshalShapes`'s ordering case are both written that way.
+
+!!! note "The generated corpus is not committed"
+
+    Inputs the fuzzer finds interesting go to `$(go env GOCACHE)/fuzz` and are local to the
+    machine that found them. Only seeds (in the target) and counterexamples (in `testdata/fuzz`)
+    are checked in. `go clean -fuzzcache` empties the cache when a stale corpus makes a run slow.
+
+### In CI
+
+| Where | Scope | Blocking |
+|---|---|---|
+| `test` job in `go.yml` | Seeds and committed counterexamples only, as ordinary tests | **Yes** |
+| `fuzz.yml` | Generative, one leg per target, weekly and on demand | No |
+
+Fuzzing is deliberately not a pull request gate: whether a generative run finds something is
+partly chance, and failing an unrelated pull request on a coin toss trains people to re-run
+until green. The deterministic half — every seed, every counterexample ever committed — does
+gate, on every push. A failing weekly leg uploads the input as a `fuzz-counterexample-<target>`
+artifact, ready to commit.
 
 ## Integration tests
 

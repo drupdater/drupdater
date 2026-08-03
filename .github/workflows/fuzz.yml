@@ -1,0 +1,91 @@
+name: Fuzzing
+
+# Explores the parsers with generated input: repository URLs, .drupdater.yaml, `composer audit`
+# output, and the redactor's promise that a registered secret never reaches a sink.
+#
+# Not a pull request gate. The seed corpus and every committed counterexample already run in
+# go.yml's `test` job, which is the deterministic part; a generative run finds new inputs by
+# chance, and failing an unrelated pull request on that would make the gate a coin toss.
+#
+# When a leg fails it uploads the input that caused it. Commit that file under
+# testdata/fuzz/<target>/ -- `go test` replays it from then on, the same way rapid replays a
+# .fail file.
+
+on:
+  schedule:
+    # Mondays, 05:00 UTC -- after the mutation run rather than alongside it.
+    - cron: "0 5 * * 1"
+  workflow_dispatch:
+    inputs:
+      fuzztime:
+        description: 'How long to fuzz each target'
+        required: false
+        default: '5m'
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  # Discovered rather than hardcoded, so adding a target adds its own leg.
+  plan:
+    name: plan
+    runs-on: ubuntu-latest
+    outputs:
+      targets: ${{ steps.list.outputs.targets }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: List fuzz targets
+        id: list
+        run: |
+          targets=$(for pkg in $(go list ./...); do
+            go test -list '^Fuzz' "$pkg" 2>/dev/null | grep '^Fuzz' | while read -r target; do
+              jq -n --arg p "$pkg" --arg t "$target" '{package: $p, target: $t}'
+            done
+          done | jq -s -c .)
+          echo "targets=$targets" >> "$GITHUB_OUTPUT"
+          echo "Fuzzing: $targets"
+
+  fuzz:
+    name: fuzz ${{ matrix.entry.target }}
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      # One target finding something must not cancel the others' exploration.
+      fail-fast: false
+      matrix:
+        entry: ${{ fromJson(needs.plan.outputs.targets) }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Fuzz ${{ matrix.entry.target }}
+        run: |
+          go test ${{ matrix.entry.package }} \
+            -run '^$' \
+            -fuzz '^${{ matrix.entry.target }}$' \
+            -fuzztime '${{ inputs.fuzztime || '5m' }}'
+
+      # Written into the package's testdata by the fuzzer itself, so this is the file to commit.
+      - name: Upload the failing input
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-counterexample-${{ matrix.entry.target }}
+          path: '**/testdata/fuzz/**'
+          if-no-files-found: ignore

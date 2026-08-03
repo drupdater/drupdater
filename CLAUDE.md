@@ -45,6 +45,7 @@ Verify with `make docs-build` (runs `mkdocs build --strict`, which fails on brok
 Some pages embed files from the repo via `pymdownx.snippets`, so they cannot drift:
 
 - `internal/addon/testdata/*.md` → the "pull request section" examples on addon pages
+- `internal/addon/testdata/run_report.json` → the example report on `docs/reference/run-report.md`
 - `.github/assert-report.jq`, `.github/assert-lock-matches-report.jq` → `docs/how-to/consume-the-run-report.md`
 
 Changing a golden file changes the published example. `internal/addon/testdata/composer_diff.md` is a `Dummy Table` placeholder and is deliberately *not* embedded — that page hand-writes its example.
@@ -54,7 +55,9 @@ Changing a golden file changes the published example. `internal/addon/testdata/c
 ```bash
 make build          # Build binary
 make test           # Run all tests (go test -v ./...)
+make test-race      # Run the suite under the race detector (~1 min; CI runs this too)
 make test-property  # Only the property tests, with far more generated cases (rapid)
+make fuzz           # Fuzz every target (FUZZTIME=30s each by default)
 make mutate         # Mutation testing over the whole module (mutago, pinned in go.mod)
 make lint           # golangci-lint (govet, staticcheck, gosec, etc. — see .golangci.yml) + hadolint on the Dockerfile
 make fmt            # Format code
@@ -100,6 +103,7 @@ Where things live. For *how they work*, read `docs/explanation/` rather than dup
 | `internal/codehosting/` | GitHub and GitLab implementations, provider factory |
 | `internal/report/` | The published JSON report schema and its atomic writer |
 | `internal/logging/redact.go` | Value-based secret redaction, wrapping the zap core |
+| `internal/golden/` | Golden-file comparison and the `-update` flag; imported only from tests |
 | `pkg/` | One directory per wrapped external tool: `composer`, `drush`, `repo` (go-git), `phpcs`, `rector`, `drupal` (installer), `drupalorg` |
 | `scripts/` | PHP helpers copied into the image (`rector.php`, `unsupported-modules.php`, `config-resave.php`) |
 
@@ -107,10 +111,10 @@ Where things live. For *how they work*, read `docs/explanation/` rather than dup
 
 - **Addons never call each other.** They communicate only through mutable event payloads (`PackagesToUpdate`, `PackagesToKeep`, `MinimalChanges`, `Title`).
 - **Event priority is load-bearing** on `pre-composer-update` and `post-code-update`. See `docs/explanation/addon-architecture.md` before changing one.
-- **`internal/addon/report.go` is a published contract.** Renaming a field there is a breaking change to `schema_version`.
+- **`internal/addon/report.go` is a published contract.** Renaming a field there is a breaking change to `schema_version`, and `internal/addon/testdata/run_report.json` is what makes such a rename fail rather than ship. A new reporting addon belongs in that golden's `reportingAddons()`.
 - **Report types mirror rather than reuse internal types** (`report.PackageChange` vs `composer.PackageChange`) so an internal refactor can't rename a published field.
 - **The report's deferred write is registered first**, so it runs last and is emitted on every exit path.
-- **Per-site events fire concurrently.** Addon state accumulated across sites must be mutex-guarded, and maps handed to the report must be copies.
+- **Per-site events fire concurrently.** Addon state accumulated across sites must be mutex-guarded, and maps handed to the report must be copies. `-race` only catches a missing guard if a test drives the handler from several sites at once — when you add cross-site state, add it to `internal/addon/concurrency_test.go` too.
 
 ## Comments
 
@@ -165,6 +169,12 @@ Mocks are generated with mockery v3 (config in `.mockery.yml`). After changing a
 `pgregory.net/rapid` states invariants over generated input, next to the example-based tests. Convention: file `<subject>_property_test.go`, every test named `TestProperty…` (`make test-property` selects on that prefix). A property must state a law — idempotent, order-independent, round-trips, leaks nothing — never a second implementation of the function.
 
 **The seed is random on every run.** So when a property finds a bug, fix the code *and* add an ordinary test naming the counterexample: the blocking mutation gate must not depend on the exploration happening to hit the right input. Counterexamples rapid records under `testdata/rapid/*.fail` are replayed automatically and belong in the commit. Details: `docs/contributing/development.md`.
+
+## Fuzzing
+
+Go's built-in fuzzer covers what a hand-written rapid generator cannot reach: arbitrary bytes, invalid UTF-8, degenerate separators. Convention: file `<subject>_fuzz_test.go`, every target named `Fuzz…`, seeded via `f.Add` with the real shapes *and* the degenerate ones. Four targets, on input drupdater does not control — the repository URL, `.drupdater.yaml`, `composer audit` output, and the redactor.
+
+Same discipline as properties: a failing input lands in `testdata/fuzz/<target>/<hash>`, gets committed (`go test` replays it forever after), **and** gets an ordinary test naming the counterexample, because the blocking mutation gate must not depend on a generative run. Fuzzing itself is not a PR gate — `fuzz.yml` runs weekly; `go.yml`'s `test` job runs the seeds and counterexamples on every push. Details: `docs/contributing/development.md`.
 
 ## Docker
 

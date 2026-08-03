@@ -100,7 +100,7 @@ func parseGitURL(raw string) (host string, path string, err error) {
 		if !found || host == "" || path == "" {
 			return "", "", fmt.Errorf("invalid repository URL %q", raw)
 		}
-		return host, strings.TrimSuffix(strings.Trim(path, "/"), ".git"), nil
+		return host, normalizeRepoPath(path), nil
 	}
 
 	u, err := url.Parse(raw)
@@ -110,5 +110,18 @@ func parseGitURL(raw string) (host string, path string, err error) {
 	if u.Host == "" {
 		return "", "", fmt.Errorf("invalid repository URL %q: missing host", raw)
 	}
-	return u.Host, strings.TrimSuffix(strings.Trim(u.Path, "/"), ".git"), nil
+	return u.Host, normalizeRepoPath(u.Path), nil
+}
+
+// normalizeRepoPath reduces a URL path to "owner/repo". Slashes are trimmed on both sides of the
+// suffix removal: a path ending in "/.git" keeps a trailing separator if they are trimmed only
+// before it, and that separator reaches the API call as part of the project name.
+func normalizeRepoPath(path string) string {
+	path = strings.Trim(path, "/")
+	// Repeated, not a single TrimSuffix: neither GitHub nor GitLab permits a project name ending
+	// in ".git", so "repo.git.git" is a doubled suffix rather than a project called "repo.git".
+	for strings.HasSuffix(path, ".git") {
+		path = strings.Trim(strings.TrimSuffix(path, ".git"), "/")
+	}
+	return path
 }

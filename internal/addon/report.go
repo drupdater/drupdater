@@ -31,7 +31,7 @@ type SecurityAdvisories struct {
 // ReportKey implements report.Reporter.
 func (ca *ComposerAudit) ReportKey() string { return "composer_audit" }
 
-// ReportData implements report.Reporter. Abandoned packages arrive sorted, so this stays stable.
+// ReportData implements report.Reporter. Both lists arrive sorted, so this stays stable.
 func (ca *ComposerAudit) ReportData() any {
 	fixed := ca.GetFixedAdvisories()
 	remaining := ca.afterAudit.Advisories

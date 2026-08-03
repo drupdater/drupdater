@@ -51,6 +51,26 @@ jobs:
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
 
+  # Separate from `test` so the coverage profile comes from an uninstrumented run and the two
+  # go in parallel. The suite is hermetic but genuinely concurrent -- an errgroup per site, and
+  # addons accumulating state across those goroutines -- and no amount of coverage or mutation
+  # score can see a data race.
+  race:
+    name: race
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      # Slower than it looks: pkg/composer and pkg/drush fake subprocesses by re-executing the
+      # test binary, and under -race every one of those execs starts an instrumented process.
+      - name: Test with the race detector
+        run: go test -race ./...
+
   lint:
     name: lint
     runs-on: ubuntu-latest

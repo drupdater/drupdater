@@ -2,6 +2,7 @@ package composer
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -311,7 +312,20 @@ func flattenAdvisories(advisoriesData any) ([]Advisory, error) {
 		}
 	}
 
+	slices.SortFunc(advisories, compareAdvisories)
+
 	return advisories, nil
+}
+
+// compareAdvisories orders the flattened list. Ranging a Go map is random, and this list reaches
+// the run report, the merge request description and a security run's `composer update` arguments.
+func compareAdvisories(a, b Advisory) int {
+	return cmp.Or(
+		strings.Compare(a.PackageName, b.PackageName),
+		strings.Compare(a.AdvisoryID, b.AdvisoryID),
+		strings.Compare(a.CVE, b.CVE),
+		strings.Compare(a.Title, b.Title),
+	)
 }
 
 // flattenAbandoned flattens composer audit's `abandoned` object into a sorted list. With nothing
