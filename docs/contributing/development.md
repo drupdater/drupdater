@@ -17,6 +17,7 @@ make build
 ```bash
 make build          # build the binary (injects the version via -ldflags)
 make test           # go test -v ./...
+make test-race      # the suite under the race detector
 make test-property  # only the property tests, with far more generated cases
 make fuzz           # fuzz every target (FUZZTIME=30s each by default)
 make mutate         # mutation testing over the whole module (mutago)
@@ -118,6 +119,52 @@ get past it — fix the code.
 
 Changed packages must reach **≥ 90%** coverage. The hook prints per-package totals; add
 tests before committing if any package is below.
+
+## The race detector
+
+Drupdater runs the per-site phases concurrently — an `errgroup` bounded by `--concurrency`, one
+goroutine per site — and several addons accumulate state across those goroutines. That state is
+mutex-guarded, and nothing else in the toolchain can tell you when it stops being: coverage
+proves a line ran, mutation testing proves a test would notice a *changed* line, and both are
+blind to two goroutines touching the same map.
+
+```bash
+make test-race
+```
+
+CI runs it as its own `race` job in `go.yml`, in parallel with `test` so the coverage profile
+still comes from an uninstrumented run.
+
+!!! note "It takes about a minute, not a couple of seconds"
+
+    `pkg/composer` and `pkg/drush` fake subprocesses with the `TestHelperProcess` pattern, which
+    re-executes the test binary once per faked command. Under `-race` every one of those execs
+    starts an instrumented process, so those two packages account for almost all of the runtime.
+    Nothing is wrong; they simply have no concurrency for the detector to find either.
+
+### The detector only sees what actually runs
+
+This is the part worth internalising. `-race` is not a static check — it observes real memory
+accesses, so it finds nothing in code no test drives concurrently. Every `StartUpdate` test used
+to run a single site, which walks the per-site phases on one goroutine: the addon maps were
+written by one writer, and removing their mutexes would have gone unnoticed.
+
+So the concurrency tests and the detector are one tool, not two:
+
+| Test | Drives |
+|---|---|
+| `TestStartUpdateWithConcurrentSites` | The real workflow with four sites, asserting the baseline installs overlap and the committing tail does not |
+| `internal/addon/concurrency_test.go` | Each mutex-guarded addon's per-site handler, fired from all sites at once |
+| `TestForEachSite` | The fan-out itself: the concurrency bound, and cancellation on first error |
+
+Deleting a mutex from `internal/addon` makes the matching test fail under `-race` and **pass
+without it**. When you add state that accumulates across sites, add it to
+`concurrency_test.go` — otherwise the guard around it is untested however green CI looks.
+
+Where the shared resource is not memory, the detector cannot help and the test has to assert
+directly. `siteCommitMu` serialises the tail of `updateSite` because the sites share one git
+index — which is mocked in the suite, so there is no shared memory to observe.
+`TestStartUpdateWithConcurrentSites` measures peak occupancy instead.
 
 ## Mutation testing
 

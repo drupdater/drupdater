@@ -54,6 +54,7 @@ Changing a golden file changes the published example. `internal/addon/testdata/c
 ```bash
 make build          # Build binary
 make test           # Run all tests (go test -v ./...)
+make test-race      # Run the suite under the race detector (~1 min; CI runs this too)
 make test-property  # Only the property tests, with far more generated cases (rapid)
 make fuzz           # Fuzz every target (FUZZTIME=30s each by default)
 make mutate         # Mutation testing over the whole module (mutago, pinned in go.mod)
@@ -111,7 +112,7 @@ Where things live. For *how they work*, read `docs/explanation/` rather than dup
 - **`internal/addon/report.go` is a published contract.** Renaming a field there is a breaking change to `schema_version`.
 - **Report types mirror rather than reuse internal types** (`report.PackageChange` vs `composer.PackageChange`) so an internal refactor can't rename a published field.
 - **The report's deferred write is registered first**, so it runs last and is emitted on every exit path.
-- **Per-site events fire concurrently.** Addon state accumulated across sites must be mutex-guarded, and maps handed to the report must be copies.
+- **Per-site events fire concurrently.** Addon state accumulated across sites must be mutex-guarded, and maps handed to the report must be copies. `-race` only catches a missing guard if a test drives the handler from several sites at once — when you add cross-site state, add it to `internal/addon/concurrency_test.go` too.
 
 ## Comments
 

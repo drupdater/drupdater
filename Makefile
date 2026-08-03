@@ -1,4 +1,4 @@
-.PHONY: build test test-property fuzz mutate clean mock lint fmt fix run docker-build docker-run docs-serve docs-build help
+.PHONY: build test test-race test-property fuzz mutate clean mock lint fmt fix run docker-build docker-run docs-serve docs-build help
 
 # Variables
 BINARY_NAME=drupdater
@@ -15,6 +15,11 @@ build: ## Build the binary
 
 test: ## Run tests
 	go test -v ./...
+
+# Around a minute rather than a couple of seconds: pkg/composer and pkg/drush fake subprocesses
+# by re-executing the test binary, and -race instruments every one of those execs.
+test-race: ## Run tests with the race detector
+	go test -race ./...
 
 # RAPID_CHECKS rather than -rapid.checks: rapid only registers its flags in test binaries that
 # import it, so passing the flag to ./... fails on every package that has no property tests. The
