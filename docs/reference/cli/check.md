@@ -51,8 +51,8 @@ With `--full`, three more are appended: `clone for full check`, `composer instal
 ## Safety
 
 `check` never modifies your checkout. The `--full` tier clones to a scratch directory
-rather than touching the live working copy, and removes the clone, each `<site>.sqlite`
-and `private/<site>` afterwards.
+rather than touching the live working copy, and removes the clone and the sites'
+databases afterwards.
 
 ## Output
 

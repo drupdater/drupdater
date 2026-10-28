@@ -148,23 +148,6 @@ func TestAnyCheckFailed(t *testing.T) {
 	assert.False(t, anyCheckFailed(nil))
 }
 
-func TestCleanupFullCheckArtifacts(t *testing.T) {
-	parent := t.TempDir()
-	clone := filepath.Join(parent, "repo123")
-	require.NoError(t, os.MkdirAll(clone, 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(parent, "default.sqlite"), []byte("x"), 0o600))
-	require.NoError(t, os.MkdirAll(filepath.Join(parent, "private", "default"), 0o755))
-	require.NoError(t, os.WriteFile(filepath.Join(parent, "private", "default", "f.txt"), []byte("x"), 0o600))
-
-	cleanupFullCheckArtifacts(clone, []string{"default"})
-
-	assert.NoDirExists(t, clone)
-	assert.NoFileExists(t, filepath.Join(parent, "default.sqlite"))
-	assert.NoDirExists(t, filepath.Join(parent, "private", "default"))
-	// The private parent is removed too, since nothing else claims it.
-	assert.NoDirExists(t, filepath.Join(parent, "private"))
-}
-
 // Doubles for the narrow interfaces runCheapChecks needs, so its branching runs without the
 // composer/drush/git binaries CI doesn't install.
 type fakeShallowCloneChecker struct {
@@ -283,18 +266,4 @@ func TestRunFullChecksCloneFailure(t *testing.T) {
 	require.Len(t, results, 1)
 	assert.False(t, results[0].OK)
 	assert.Equal(t, "clone for full check", results[0].Name)
-}
-
-func TestCleanupFullCheckArtifactsKeepsUnrelatedPrivateData(t *testing.T) {
-	parent := t.TempDir()
-	clone := filepath.Join(parent, "repo123")
-	require.NoError(t, os.MkdirAll(clone, 0o755))
-	require.NoError(t, os.MkdirAll(filepath.Join(parent, "private", "default"), 0o755))
-	require.NoError(t, os.MkdirAll(filepath.Join(parent, "private", "other-stuff"), 0o755))
-
-	cleanupFullCheckArtifacts(clone, []string{"default"})
-
-	assert.NoDirExists(t, filepath.Join(parent, "private", "default"))
-	// A non-empty "private" dir (something this run didn't create) must survive.
-	assert.DirExists(t, filepath.Join(parent, "private", "other-stuff"))
 }

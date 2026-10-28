@@ -57,6 +57,7 @@ func newTestInstallerWithLogs(t *testing.T, coreExtension string, settings strin
 		drush:    drush,
 		composer: composer,
 		fs:       fs,
+		dataDir:  "/data",
 	}, fs, drush, composer, logs
 }
 
@@ -65,12 +66,13 @@ func TestNewInstaller(t *testing.T) {
 	drush := NewMockDrush(t)
 	composer := NewMockComposer(t)
 
-	installer := NewInstaller(logger, drush, composer)
+	installer := NewInstaller(logger, drush, composer, "/data")
 
 	require.NotNil(t, installer)
 	assert.Equal(t, logger, installer.logger)
 	assert.Equal(t, drush, installer.drush)
 	assert.Equal(t, composer, installer.composer)
+	assert.Equal(t, "/data", installer.dataDir)
 	assert.NotNil(t, installer.fs)
 }
 
@@ -102,35 +104,75 @@ func TestInstallStopsAtTheFirstFailure(t *testing.T) {
 }
 
 func TestConfigureDatabaseIsIdempotent(t *testing.T) {
-	// Each site is configured twice against the same settings.php, and the second call must
-	// not append a second copy of the settings.
-	installer, fs, drush, composer, logs := newTestInstallerWithLogs(t, coreExtensionWithSqlite, "<?php\n")
+	installer, fs, drush, composer := newTestInstaller(t, coreExtensionWithSqlite, "<?php\n")
 
 	composer.EXPECT().GetConfig(t.Context(), "/project", "extra.drupal-scaffold.locations.web-root").Return("web", nil)
 	drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1", false).Return("/config/sync", nil)
 
 	require.NoError(t, installer.ConfigureDatabase(t.Context(), "/project", "site1"))
-
-	after, err := afero.ReadFile(fs, "/project/web/sites/site1/settings.php")
+	first, err := afero.ReadFile(fs, "/project/web/sites/site1/settings.php")
 	require.NoError(t, err)
-	first := string(after)
-	assert.Equal(t, 1, strings.Count(first, settingsMarker))
-	assert.Equal(t, 1, strings.Count(first, "$settings['hash_salt']"))
+	assert.Equal(t, 1, strings.Count(string(first), settingsMarker))
+	assert.Equal(t, 1, strings.Count(string(first), "$settings['hash_salt']"))
 
-	// Second call: the marker is present, so the append is skipped without touching the file.
-	// core.extension.yml is still checked, which is why GetConfigSyncDir is reached again.
+	require.NoError(t, installer.ConfigureDatabase(t.Context(), "/project", "site1"))
+	second, err := afero.ReadFile(fs, "/project/web/sites/site1/settings.php")
+	require.NoError(t, err)
+	assert.Equal(t, string(first), string(second))
+}
+
+func TestRestoreSettingsPutsBackTheProjectsFileExactly(t *testing.T) {
+	const original = "<?php\n\n$settings['config_sync_directory'] = '../config/sync';\n"
+	installer, fs, drush, composer := newTestInstaller(t, coreExtensionWithSqlite, original)
+
+	composer.EXPECT().GetConfig(t.Context(), "/project", "extra.drupal-scaffold.locations.web-root").Return("web", nil)
+	drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1", false).Return("/config/sync", nil)
+
+	require.NoError(t, installer.ConfigureDatabase(t.Context(), "/project", "site1"))
+	configured, err := afero.ReadFile(fs, "/project/web/sites/site1/settings.php")
+	require.NoError(t, err)
+	assert.Contains(t, string(configured), "'database' => '/data/site1.sqlite'")
+	assert.Contains(t, string(configured), "$settings['file_private_path'] = '/data/private/site1';")
+
+	require.NoError(t, installer.RestoreSettings(t.Context(), "/project", "site1"))
+	restored, err := afero.ReadFile(fs, "/project/web/sites/site1/settings.php")
+	require.NoError(t, err)
+	assert.Equal(t, original, string(restored))
+}
+
+func TestRestoreSettingsWithoutABlockDoesNotWrite(t *testing.T) {
+	fs := &failingFs{failWrite: true}
+	installer, _, composer := newFailingInstaller(t, fs, coreExtensionWithSqlite)
+	installer.logger = zap.NewNop()
+	composer.EXPECT().GetConfig(t.Context(), "/project", "extra.drupal-scaffold.locations.web-root").Return("web", nil)
+
+	require.NoError(t, installer.RestoreSettings(t.Context(), "/project", "site1"))
+}
+
+func TestReconfiguringAfterRestoreKeepsTheSqliteExclusion(t *testing.T) {
+	// The first configure adds sqlite to core.extension.yml, so the second sees it enabled. The
+	// exclusion must survive anyway, or the update's config export ships the throwaway module.
+	installer, fs, drush, composer := newTestInstaller(t, coreExtensionWithoutSqlite, "<?php\n")
+
+	composer.EXPECT().GetConfig(t.Context(), "/project", "extra.drupal-scaffold.locations.web-root").Return("web", nil)
+	drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1", false).Return("/config/sync", nil)
+
+	require.NoError(t, installer.ConfigureDatabase(t.Context(), "/project", "site1"))
+	require.NoError(t, installer.RestoreSettings(t.Context(), "/project", "site1"))
 	require.NoError(t, installer.ConfigureDatabase(t.Context(), "/project", "site1"))
 
-	after, err = afero.ReadFile(fs, "/project/web/sites/site1/settings.php")
+	settings, err := afero.ReadFile(fs, "/project/web/sites/site1/settings.php")
 	require.NoError(t, err)
-	assert.Equal(t, first, string(after), "settings.php must be unchanged by the second call")
+	assert.Contains(t, string(settings), "$settings['config_exclude_modules'] = ['sqlite'];")
+}
 
-	// The skip is only visible in the log, so without this a silent second write and a correct
-	// skip would look identical from the outside.
-	assert.Equal(t, 1, logs.FilterMessage("settings already configured, skipping").Len())
-	assert.Equal(t, 1, logs.FilterMessage("writing settings").Len())
-	writing := logs.FilterMessage("writing settings").All()[0].ContextMap()
-	assert.Equal(t, "/project/web/sites/site1/settings.php", writing["path"])
+func TestStripSettingsBlock(t *testing.T) {
+	assert.Equal(t, "<?php\n", string(stripSettingsBlock([]byte("<?php\n\n"+settingsMarker+"\n$x = 1;\n"))))
+	assert.Equal(t, "<?php\n", string(stripSettingsBlock([]byte("<?php\n\n\n" + settingsMarker + "\n")))[:6],
+		"only the one newline the block starts with is removed")
+	assert.Equal(t, "<?php", string(stripSettingsBlock([]byte("<?php\n"+settingsMarker+"\n"))))
+	assert.Empty(t, stripSettingsBlock([]byte(settingsMarker+"\n")))
+	assert.Equal(t, "<?php\n", string(stripSettingsBlock([]byte("<?php\n"))))
 }
 
 func TestConfigureDatabaseEnablesSqliteWhenMissing(t *testing.T) {
@@ -328,12 +370,10 @@ func TestRemoveProfileErrors(t *testing.T) {
 	})
 }
 
-func TestConfigureDatabaseRestoresSqliteOnAReusedWorkingCopy(t *testing.T) {
-	// Regression: settings.php keeps the marker across runs because it is never committed,
-	// while core.extension.yml comes back from git without the sqlite entry. A reused working
-	// copy therefore has the marker set and the module gone, and guarding the module entry
-	// behind the marker left the site uninstallable.
-	settingsFromEarlierRun := "<?php\n\n" + settingsMarker + "\n$databases['default']['default'] = [];\n"
+func TestConfigureDatabaseOnAReusedWorkingCopy(t *testing.T) {
+	// A killed earlier run can leave its block behind, pointing at a data directory that is gone,
+	// and core.extension.yml back from git without the sqlite entry.
+	settingsFromEarlierRun := "<?php\n\n" + settingsMarker + "\n$databases['default']['default'] = ['database' => '/gone/site1.sqlite'];\n"
 	installer, fs, drush, composer := newTestInstaller(t, coreExtensionWithoutSqlite, settingsFromEarlierRun)
 
 	composer.EXPECT().GetConfig(t.Context(), "/project", "extra.drupal-scaffold.locations.web-root").Return("web", nil)
@@ -345,12 +385,11 @@ func TestConfigureDatabaseRestoresSqliteOnAReusedWorkingCopy(t *testing.T) {
 	require.NoError(t, err)
 	var parsed map[string]any
 	require.NoError(t, yaml.Unmarshal(core, &parsed))
-	assert.Equal(t, 0, parsed["module"].(map[string]any)["sqlite"],
-		"sqlite must be put back even though settings.php was already configured")
+	assert.Equal(t, 0, parsed["module"].(map[string]any)["sqlite"])
 
-	// The append stays skipped: the marker still does its original job.
 	after, err := afero.ReadFile(fs, "/project/web/sites/site1/settings.php")
 	require.NoError(t, err)
-	assert.Equal(t, settingsFromEarlierRun, string(after),
-		"settings.php must not gain a second database block")
+	assert.Equal(t, 1, strings.Count(string(after), settingsMarker))
+	assert.NotContains(t, string(after), "/gone/")
+	assert.Contains(t, string(after), "/data/site1.sqlite")
 }

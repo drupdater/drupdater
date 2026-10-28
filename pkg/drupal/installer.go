@@ -2,11 +2,14 @@ package drupal
 
 import (
 	"bufio"
+	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/spf13/afero"
@@ -30,24 +33,40 @@ type Installer struct {
 	drush    Drush
 	composer Composer
 	fs       afero.Fs
+	dataDir  string
+
+	// blocks holds the settings appended per settings.php, so a reconfigure after RestoreSettings
+	// reuses the first decision: by then core.extension.yml already carries our sqlite entry.
+	mu     sync.Mutex
+	blocks map[string]string
 }
 
-func NewInstaller(logger *zap.Logger, drush Drush, composer Composer) *Installer {
+// NewInstaller writes each site's SQLite database and private files under dataDir, which the
+// caller owns and removes.
+func NewInstaller(logger *zap.Logger, drush Drush, composer Composer, dataDir string) *Installer {
 	return &Installer{
 		logger:   logger,
 		drush:    drush,
 		composer: composer,
 		fs:       afero.NewOsFs(),
+		dataDir:  dataDir,
 	}
 }
 
-func (is *Installer) Install(ctx context.Context, path string, site string) error {
+// Install leaves settings.php as it found it; only the database under dataDir remains.
+func (is *Installer) Install(ctx context.Context, path string, site string) (err error) {
 
 	is.logger.Info("installing site", zap.String("site", site))
 
-	if err := is.ConfigureDatabase(ctx, path, site); err != nil {
+	settingsPath, err := is.configureDatabase(ctx, path, site)
+	if err != nil {
 		return err
 	}
+	defer func() {
+		if restoreErr := is.restoreSettingsFile(site, settingsPath); restoreErr != nil {
+			err = errors.Join(err, restoreErr)
+		}
+	}()
 
 	if err := is.RemoveProfile(ctx, path, site); err != nil {
 		return err
@@ -60,42 +79,76 @@ func (is *Installer) Install(ctx context.Context, path string, site string) erro
 	return nil
 }
 
-// settingsMarker keeps ConfigureDatabase's append idempotent: each site is configured twice
-// against the same settings.php, baseline and then before the update hooks.
+// settingsMarker opens the appended block, so RestoreSettings can cut it off again — including
+// one a killed earlier run left behind.
 const settingsMarker = "// Added by drupdater: test database settings."
 
+func (is *Installer) settingsPath(ctx context.Context, dir string, site string) (string, error) {
+	webroot, err := composer.WebRoot(ctx, is.composer, dir)
+	if err != nil {
+		return "", fmt.Errorf("failed to get Drupal web dir: %w", err)
+	}
+	return dir + "/" + webroot + "/sites/" + site + "/settings.php", nil
+}
+
+// ConfigureDatabase points the site at a throwaway SQLite database. Pair it with RestoreSettings:
+// settings.php is tracked, and nothing may stage it while the block is in place.
 func (is *Installer) ConfigureDatabase(ctx context.Context, dir string, site string) error {
+	_, err := is.configureDatabase(ctx, dir, site)
+	return err
+}
+
+func (is *Installer) configureDatabase(ctx context.Context, dir string, site string) (string, error) {
 
 	siteLogger := is.logger.With(zap.String("site", site))
 	siteLogger.Debug("configuring database", zap.String("dir", dir))
 
-	webroot, err := composer.WebRoot(ctx, is.composer, dir)
+	settingsPath, err := is.settingsPath(ctx, dir, site)
 	if err != nil {
-		return fmt.Errorf("failed to get Drupal web dir: %w", err)
+		return "", err
 	}
 
-	settingsPath := dir + "/" + webroot + "/sites/" + site + "/settings.php"
-
-	// Ahead of the marker check, because the two states are independent: settings.php survives
-	// a run, while core.extension.yml comes back from git without the sqlite entry. A reused
-	// working copy would otherwise have the marker set and the module gone, and Drupal refuses
-	// to install ("SQLite is providing the database driver").
+	// Checked on every call: core.extension.yml comes back from git without the sqlite entry
+	// whenever a run is restored, and Drupal refuses to install without it ("SQLite is
+	// providing the database driver").
 	isSqliteEnabled, _ := is.isSqliteModuleEnabled(ctx, dir, site)
 	if !isSqliteEnabled {
 		siteLogger.Debug("enabling sqlite module")
 		if err := is.addSqliteModule(ctx, dir, site); err != nil {
-			return fmt.Errorf("failed to enable sqlite module: %w", err)
+			return "", fmt.Errorf("failed to enable sqlite module: %w", err)
 		}
 	}
 
-	// The marker guards only the append, which a repeated call would otherwise stack.
-	if existing, err := afero.ReadFile(is.fs, settingsPath); err == nil && strings.Contains(string(existing), settingsMarker) {
-		siteLogger.Debug("settings already configured, skipping", zap.String("path", settingsPath))
-		return nil
+	is.mu.Lock()
+	if is.blocks == nil {
+		is.blocks = map[string]string{}
+	}
+	settings, seen := is.blocks[settingsPath]
+	if !seen {
+		settings = is.settingsBlock(site, isSqliteEnabled)
+		is.blocks[settingsPath] = settings
+	}
+	is.mu.Unlock()
+
+	// Never created: this snippet alone is not a valid settings.php.
+	original, err := afero.ReadFile(is.fs, settingsPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to open settings file: %w", err)
 	}
 
-	sqliteFile, _ := filepath.Abs(fmt.Sprintf("%s/../%s.sqlite", dir, site))
-	privatesDir, _ := filepath.Abs(fmt.Sprintf("%s/../private/%s", dir, site))
+	siteLogger.Debug("writing settings", zap.String("path", settingsPath), zap.String("settings", settings))
+
+	content := append(stripSettingsBlock(original), settings...)
+	if err := is.writeSettings(settingsPath, content); err != nil {
+		return "", fmt.Errorf("failed to write settings: %w", err)
+	}
+
+	return settingsPath, nil
+}
+
+func (is *Installer) settingsBlock(site string, isSqliteEnabled bool) string {
+	sqliteFile := filepath.Join(is.dataDir, site+".sqlite")
+	privatesDir := filepath.Join(is.dataDir, "private", site)
 
 	settings := `
 ` + settingsMarker + `
@@ -111,6 +164,7 @@ $settings['file_private_path'] = '` + privatesDir + `';
 $settings['hash_salt'] = 'changeme';
 `
 
+	// Only when the project does not use sqlite itself, or the export would drop a real module.
 	if !isSqliteEnabled {
 		settings += `
 if (isset($settings['config_exclude_modules'])) {
@@ -120,23 +174,59 @@ if (isset($settings['config_exclude_modules'])) {
 }
 `
 	}
+	return settings
+}
 
-	siteLogger.Debug("writing settings", zap.String("path", settingsPath), zap.String("settings", settings))
-
-	// Never created: this snippet alone is not a valid settings.php.
-	f, err := is.fs.OpenFile(settingsPath, os.O_APPEND|os.O_WRONLY, 0644)
+// RestoreSettings removes the block ConfigureDatabase appended, leaving settings.php byte-for-byte
+// as the project has it. A file without the block is left alone.
+func (is *Installer) RestoreSettings(ctx context.Context, dir string, site string) error {
+	settingsPath, err := is.settingsPath(ctx, dir, site)
 	if err != nil {
-		return fmt.Errorf("failed to open settings file: %w", err)
+		return err
 	}
-	if _, err := f.Write([]byte(settings)); err != nil {
-		f.Close() // ignore error; Write error takes precedence
-		return fmt.Errorf("failed to write settings: %w", err)
+	return is.restoreSettingsFile(site, settingsPath)
+}
+
+func (is *Installer) restoreSettingsFile(site string, settingsPath string) error {
+	content, err := afero.ReadFile(is.fs, settingsPath)
+	if err != nil {
+		return fmt.Errorf("failed to read settings file: %w", err)
 	}
-	if err := f.Close(); err != nil {
-		return fmt.Errorf("failed to close settings file: %w", err)
+	stripped := stripSettingsBlock(content)
+	if len(stripped) == len(content) {
+		return nil
 	}
 
+	is.logger.Debug("restoring settings", zap.String("site", site), zap.String("path", settingsPath))
+	if err := is.writeSettings(settingsPath, stripped); err != nil {
+		return fmt.Errorf("failed to restore settings: %w", err)
+	}
 	return nil
+}
+
+// stripSettingsBlock cuts content at the marker, together with the newline the block starts with.
+func stripSettingsBlock(content []byte) []byte {
+	i := bytes.Index(content, []byte(settingsMarker))
+	if i < 0 {
+		return content
+	}
+	if i > 0 && content[i-1] == '\n' {
+		i--
+	}
+	return content[:i:i]
+}
+
+// writeSettings truncates in place rather than replacing the file, keeping its mode and owner.
+func (is *Installer) writeSettings(path string, content []byte) error {
+	f, err := is.fs.OpenFile(path, os.O_WRONLY|os.O_TRUNC, 0)
+	if err != nil {
+		return err
+	}
+	if _, err := f.Write(content); err != nil {
+		f.Close() // ignore error; Write error takes precedence
+		return err
+	}
+	return f.Close()
 }
 
 // coreExtensionPath returns the site's core.extension.yml.

@@ -82,6 +82,7 @@ func TestRunWithConcurrentSites(t *testing.T) {
 	for _, site := range sites {
 		installer.EXPECT().Install(anyCtx, "/tmp", site).RunAndReturn(baseline.probe)
 		installer.EXPECT().ConfigureDatabase(anyCtx, "/tmp", site).Return(nil)
+		installer.EXPECT().RestoreSettings(anyCtx, "/tmp", site).Return(nil)
 		drush.EXPECT().UpdateSite(anyCtx, "/tmp", site).Return(nil)
 		drush.EXPECT().ExportConfiguration(anyCtx, "/tmp", site).RunAndReturn(commitTail.probe)
 		drush.EXPECT().ConfigResave(anyCtx, "/tmp", site).Return(nil)
