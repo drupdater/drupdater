@@ -1,6 +1,7 @@
 package repo
 
 import (
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"net/url"
@@ -58,6 +59,9 @@ func BasicAuth(token string) *http.BasicAuth {
 func (rs *GitRepositoryService) open(path string) (*git.Repository, error) {
 	checkout, err := git.PlainOpen(path)
 	if err != nil {
+		if errors.Is(err, git.ErrRepositoryNotExists) {
+			return nil, fmt.Errorf("no git repository at %q: --working-dir must be the repository root (the directory containing .git): %w", path, err)
+		}
 		return nil, fmt.Errorf("git open %q: %w", path, err)
 	}
 	return checkout, nil
