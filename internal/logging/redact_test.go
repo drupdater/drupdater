@@ -203,11 +203,9 @@ func TestRedactorRegisterIsSafeForConcurrentUse(t *testing.T) {
 
 	var wg sync.WaitGroup
 	for i := range 8 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			redactor.Register(fmt.Sprintf("secret-%d", i))
-		}()
+		})
 	}
 	wg.Wait()
 

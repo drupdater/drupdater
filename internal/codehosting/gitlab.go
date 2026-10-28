@@ -93,7 +93,7 @@ func (g *Gitlab) EnableAutoMerge(ctx context.Context, mr MergeRequest) error {
 // waitForSettledMergeStatus polls until detailed_merge_status is no longer pending. It does not
 // require a mergeable one — see pendingMergeStatuses.
 func (g *Gitlab) waitForSettledMergeStatus(ctx context.Context, iid int64) (string, error) {
-	for i := 0; i < maxMergeStatusChecks; i++ {
+	for i := range maxMergeStatusChecks {
 		if i > 0 {
 			select {
 			case <-ctx.Done():
@@ -123,7 +123,7 @@ func (g *Gitlab) acceptWithAutoMerge(ctx context.Context, iid int64, status stri
 	}
 
 	var lastErr error
-	for i := 0; i < maxAcceptAttempts; i++ {
+	for i := range maxAcceptAttempts {
 		if i > 0 {
 			select {
 			case <-ctx.Done():

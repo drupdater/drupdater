@@ -332,7 +332,7 @@ func ensureGitSafeDirectory(ctx context.Context, logger *zap.Logger, dir string)
 	}
 
 	if out, err := exec.CommandContext(ctx, "git", "config", "--global", "--get-all", "safe.directory").Output(); err == nil {
-		for _, entry := range strings.Split(string(out), "\n") {
+		for entry := range strings.SplitSeq(string(out), "\n") {
 			if entry == abs || entry == "*" {
 				return
 			}

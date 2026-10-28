@@ -35,12 +35,10 @@ func runPerSite(t *testing.T, sites []string, fn func(site string) error) {
 	var wg sync.WaitGroup
 	start := make(chan struct{})
 	for _, site := range sites {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			<-start
 			assert.NoError(t, fn(site))
-		}()
+		})
 	}
 	// Released together, so the handlers overlap instead of finishing as they are spawned.
 	close(start)
