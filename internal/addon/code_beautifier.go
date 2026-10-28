@@ -11,7 +11,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/drupdater/drupdater/internal/services"
+	"github.com/drupdater/drupdater/internal/workflow"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/gookit/event"
@@ -93,7 +93,7 @@ var hasPHPCSPathDefinitions = func(path string) (bool, error) {
 }
 
 func (cb *CodeBeautifier) postCodeUpdateHandler(e event.Event) (err error) { //nolint:cyclop
-	event := e.(*services.PostCodeUpdateEvent)
+	event := e.(*workflow.PostCodeUpdateEvent)
 	cb.logger.Info("updating coding styles")
 
 	if !fileExists(event.Path()) {

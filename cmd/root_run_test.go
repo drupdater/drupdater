@@ -3,18 +3,19 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"os"
+	"path/filepath"
+	"testing"
+
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/drupalorg"
 	"github.com/drupdater/drupdater/pkg/drush"
 	"github.com/drupdater/drupdater/pkg/repo"
 	"github.com/spf13/cobra"
-	"os"
-	"path/filepath"
-	"testing"
 
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/codehosting"
-	"github.com/drupdater/drupdater/internal/services"
+	"github.com/drupdater/drupdater/internal/workflow"
 	git "github.com/go-git/go-git/v5"
 	gitConfig "github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -105,7 +106,7 @@ type fakeWorkflow struct {
 	err    error
 }
 
-func (f *fakeWorkflow) StartUpdate(_ context.Context, addons []internal.Addon) error {
+func (f *fakeWorkflow) Run(_ context.Context, addons []workflow.Addon) error {
 	f.called = true
 	f.addons = len(addons)
 	return f.err
@@ -114,15 +115,15 @@ func (f *fakeWorkflow) StartUpdate(_ context.Context, addons []internal.Addon) e
 // withFakeWorkflow swaps the workflow constructor for one returning fake.
 func withFakeWorkflow(t *testing.T, fake *fakeWorkflow) {
 	t.Helper()
-	old := newWorkflowService
-	newWorkflowService = func(
-		*zap.Logger, internal.Config, services.Drush, codehosting.Platform,
-		services.Repository, services.Installer, services.Composer,
-		services.EventDispatcher, ...services.Option,
-	) updateWorkflow {
+	old := newRunner
+	newRunner = func(
+		*zap.Logger, internal.Config, workflow.Drush, codehosting.Platform,
+		workflow.Repository, workflow.Installer, workflow.Composer,
+		workflow.EventDispatcher, ...workflow.Option,
+	) updateRunner {
 		return fake
 	}
-	t.Cleanup(func() { newWorkflowService = old })
+	t.Cleanup(func() { newRunner = old })
 }
 
 // checkoutWithOrigin returns a git checkout whose origin points at a GitHub URL, which is what
@@ -261,9 +262,9 @@ func TestCreateAddonsPassesEveryDependency(t *testing.T) {
 	var second addonDeps
 	realFactory := oldRegistry["composer_diff"]
 	require.NotNil(t, realFactory)
-	addonRegistry = map[string]func(addonDeps) internal.Addon{
-		"probe":       func(d addonDeps) internal.Addon { got = d; return realFactory(d) },
-		"probe_other": func(d addonDeps) internal.Addon { second = d; return realFactory(d) },
+	addonRegistry = map[string]func(addonDeps) workflow.Addon{
+		"probe":       func(d addonDeps) workflow.Addon { got = d; return realFactory(d) },
+		"probe_other": func(d addonDeps) workflow.Addon { second = d; return realFactory(d) },
 	}
 	mandatoryAddons = []string{"probe", "probe_other"}
 	t.Cleanup(func() { addonRegistry, mandatoryAddons = oldRegistry, oldMandatory })

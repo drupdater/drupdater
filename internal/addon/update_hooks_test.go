@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/drupdater/drupdater/internal/golden"
-	"github.com/drupdater/drupdater/internal/services"
+	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/drupdater/drupdater/pkg/drush"
 	"github.com/gookit/event"
 	"github.com/stretchr/testify/assert"
@@ -87,7 +87,7 @@ func TestUpdateHooks_PreSiteUpdateHandler_Success(t *testing.T) {
 	}
 
 	worktree := NewMockWorktree(t)
-	mockEvent := services.NewPreSiteUpdateEvent(ctx, testPath, worktree, testSite)
+	mockEvent := workflow.NewPreSiteUpdateEvent(ctx, testPath, worktree, testSite)
 
 	mockDrush.EXPECT().GetUpdateHooks(ctx, testPath, testSite).Return(mockHooks, nil)
 
@@ -109,7 +109,7 @@ func TestUpdateHooks_PreSiteUpdateHandler_NoHooks(t *testing.T) {
 	emptyHooks := map[string]drush.UpdateHook{}
 
 	worktree := NewMockWorktree(t)
-	mockEvent := services.NewPreSiteUpdateEvent(ctx, testPath, worktree, testSite)
+	mockEvent := workflow.NewPreSiteUpdateEvent(ctx, testPath, worktree, testSite)
 
 	mockDrush.EXPECT().GetUpdateHooks(ctx, testPath, testSite).Return(emptyHooks, nil)
 
@@ -130,7 +130,7 @@ func TestUpdateHooks_PreSiteUpdateHandler_Error(t *testing.T) {
 	expectedError := errors.New("drush error")
 
 	worktree := NewMockWorktree(t)
-	mockEvent := services.NewPreSiteUpdateEvent(ctx, testPath, worktree, testSite)
+	mockEvent := workflow.NewPreSiteUpdateEvent(ctx, testPath, worktree, testSite)
 
 	mockDrush.EXPECT().GetUpdateHooks(ctx, testPath, testSite).Return(nil, expectedError)
 

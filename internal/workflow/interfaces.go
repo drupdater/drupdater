@@ -1,4 +1,4 @@
-package services
+package workflow
 
 import (
 	"context"
@@ -8,6 +8,14 @@ import (
 	"github.com/drupdater/drupdater/pkg/repo"
 	"github.com/gookit/event"
 )
+
+// Addon subscribes to workflow events and renders a merge request section.
+type Addon interface {
+	event.Subscriber
+
+	// RenderTemplate returns "" when the addon has nothing to say, which omits the section.
+	RenderTemplate() (string, error)
+}
 
 type Composer interface {
 	Install(ctx context.Context, dir string) error

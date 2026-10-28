@@ -4,8 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/drupdater/drupdater/internal"
-	"github.com/drupdater/drupdater/internal/services"
+	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/drupdater/drupdater/pkg/drush"
 	"github.com/gookit/event"
 	"go.uber.org/zap"
@@ -14,7 +13,6 @@ import (
 type UpdateHooksPerSite map[string]map[string]drush.UpdateHook
 
 type UpdateHooks struct {
-	internal.BasicAddon
 	logger *zap.Logger
 	drush  Drush
 
@@ -48,11 +46,11 @@ func (uh *UpdateHooks) RenderTemplate() (string, error) {
 	if len(uh.hooks) == 0 {
 		return "", nil
 	}
-	return uh.Render("update_hooks.go.tmpl", uh.hooks)
+	return render("update_hooks.go.tmpl", uh.hooks)
 }
 
 func (uh *UpdateHooks) preSiteUpdateHandler(e event.Event) error {
-	evt := e.(*services.PreSiteUpdateEvent)
+	evt := e.(*workflow.PreSiteUpdateEvent)
 
 	hooks, err := uh.drush.GetUpdateHooks(evt.Context(), evt.Path(), evt.Site())
 	uh.logger.Debug("update hooks", zap.Any("hooks", hooks))

@@ -14,7 +14,7 @@ import (
 	"github.com/drupdater/drupdater/internal/codehosting"
 	"github.com/drupdater/drupdater/internal/logging"
 	"github.com/drupdater/drupdater/internal/report"
-	"github.com/drupdater/drupdater/internal/services"
+	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/drupal"
 	"github.com/drupdater/drupdater/pkg/drush"
@@ -77,7 +77,7 @@ Exits non-zero if any check fails, so it can gate a pipeline.`,
 		printCheckResults(cmd.OutOrStdout(), results, redactor)
 
 		writeCheckReport(logger, redactor, config.ReportPath,
-			services.LookupToolVersions(ctx, logger, composerCLI), results)
+			workflow.LookupToolVersions(ctx, logger, composerCLI), results)
 
 		if anyCheckFailed(results) {
 			return errors.New("preflight check failed")
@@ -88,8 +88,8 @@ Exits non-zero if any check fails, so it can gate a pipeline.`,
 
 // cheapChecksComposer is narrow so tests can supply a fake; *composer.CLI satisfies it as-is.
 type cheapChecksComposer interface {
-	services.PlatformReqsChecker
-	services.ComposerConfigGetter
+	workflow.PlatformReqsChecker
+	workflow.ComposerConfigGetter
 }
 
 // runCheapChecks runs the free checks: no install, no network beyond one optional VCS call.
@@ -98,25 +98,25 @@ func runCheapChecks(
 	logger *zap.Logger,
 	cfgFilePath string,
 	cfg *internal.Config,
-	repository services.ShallowCloneChecker,
+	repository workflow.ShallowCloneChecker,
 	composerSvc cheapChecksComposer,
 	fs afero.Fs,
 	token string,
 	resolveErr error,
-) []services.CheckResult {
-	var results []services.CheckResult
+) []workflow.CheckResult {
+	var results []workflow.CheckResult
 	results = append(results, checkConfigAndAddons(cfgFilePath, cfg)...)
-	results = append(results, services.CheckGitHistoryComplete(repository, cfg.WorkingDir))
-	results = append(results, services.CheckPlatformRequirements(ctx, composerSvc, cfg.WorkingDir))
+	results = append(results, workflow.CheckGitHistoryComplete(repository, cfg.WorkingDir))
+	results = append(results, workflow.CheckPlatformRequirements(ctx, composerSvc, cfg.WorkingDir))
 	for _, site := range cfg.Sites {
-		results = append(results, services.CheckSiteSettings(ctx, composerSvc, fs, cfg.WorkingDir, site))
+		results = append(results, workflow.CheckSiteSettings(ctx, composerSvc, fs, cfg.WorkingDir, site))
 	}
 	results = append(results, checkVCS(ctx, logger, cfg.RepositoryURL, token, resolveErr)...)
 	return results
 }
 
 // writeCheckReport writes the preflight result, or nothing without --report. Failures are logged.
-func writeCheckReport(logger *zap.Logger, redactor *logging.Redactor, path string, tools report.ToolVersions, results []services.CheckResult) {
+func writeCheckReport(logger *zap.Logger, redactor *logging.Redactor, path string, tools report.ToolVersions, results []workflow.CheckResult) {
 	if path == "" {
 		return
 	}
@@ -130,7 +130,7 @@ func writeCheckReport(logger *zap.Logger, redactor *logging.Redactor, path strin
 }
 
 // toReportCheckResults converts to the report's own schema type — see report.PackageChange.
-func toReportCheckResults(results []services.CheckResult) []report.CheckResult {
+func toReportCheckResults(results []workflow.CheckResult) []report.CheckResult {
 	out := make([]report.CheckResult, 0, len(results))
 	for _, r := range results {
 		out = append(out, report.CheckResult{Name: r.Name, OK: r.OK, Detail: r.Detail})
@@ -148,30 +148,28 @@ func checkToken(args []string) string {
 }
 
 // checkConfigAndAddons validates .drupdater.yaml and its addon names, and fills cfg for the rest.
-func checkConfigAndAddons(path string, cfg *internal.Config) []services.CheckResult {
+func checkConfigAndAddons(path string, cfg *internal.Config) []workflow.CheckResult {
 	if _, err := internal.LoadConfigFile(path, cfg); err != nil {
-		return []services.CheckResult{services.CheckFailed(".drupdater.yaml valid", err.Error())}
+		return []workflow.CheckResult{workflow.CheckFailed(".drupdater.yaml valid", err.Error())}
 	}
 
-	results := []services.CheckResult{
-		services.CheckOK(fmt.Sprintf(".drupdater.yaml valid (sites: %s)", strings.Join(cfg.Sites, ", "))),
+	results := []workflow.CheckResult{
+		workflow.CheckOK(fmt.Sprintf(".drupdater.yaml valid (sites: %s)", strings.Join(cfg.Sites, ", "))),
 	}
 
 	const addonsName = "addon names resolve"
 	if err := validateAddons(*cfg); err != nil {
-		return append(results, services.CheckFailed(addonsName, err.Error()))
+		return append(results, workflow.CheckFailed(addonsName, err.Error()))
 	}
-	return append(results, services.CheckOK(addonsName))
+	return append(results, workflow.CheckOK(addonsName))
 }
 
 // newVcsProvider is a variable so the token check can be tested without a real GetUser request.
-var newVcsProvider = func(repositoryURL string, token string, logger *zap.Logger) (codehosting.Platform, error) {
-	return codehosting.NewDefaultVcsProviderFactory().Create(repositoryURL, token, logger)
-}
+var newVcsProvider = codehosting.New
 
 // checkVCS reports whether the URL routes to a known provider and, with a token, authenticates.
 // resolveErr is surfaced here because this is the only check it would otherwise silently fail.
-func checkVCS(ctx context.Context, logger *zap.Logger, repositoryURL string, token string, resolveErr error) []services.CheckResult {
+func checkVCS(ctx context.Context, logger *zap.Logger, repositoryURL string, token string, resolveErr error) []workflow.CheckResult {
 	const name = "repository host recognized (GitHub/GitLab)"
 
 	if repositoryURL == "" {
@@ -179,13 +177,13 @@ func checkVCS(ctx context.Context, logger *zap.Logger, repositoryURL string, tok
 		if resolveErr != nil {
 			detail = resolveErr.Error()
 		}
-		return []services.CheckResult{services.CheckFailed(name, detail)}
+		return []workflow.CheckResult{workflow.CheckFailed(name, detail)}
 	}
 	if err := codehosting.ValidateRepositoryURL(repositoryURL); err != nil {
-		return []services.CheckResult{services.CheckFailed(name, err.Error())}
+		return []workflow.CheckResult{workflow.CheckFailed(name, err.Error())}
 	}
 
-	results := []services.CheckResult{services.CheckOK(name)}
+	results := []workflow.CheckResult{workflow.CheckOK(name)}
 	if token == "" {
 		return results
 	}
@@ -193,13 +191,13 @@ func checkVCS(ctx context.Context, logger *zap.Logger, repositoryURL string, tok
 	const tokenCheckName = "token authenticates"
 	platform, err := newVcsProvider(repositoryURL, token, logger)
 	if err != nil {
-		return append(results, services.CheckFailed(tokenCheckName, err.Error()))
+		return append(results, workflow.CheckFailed(tokenCheckName, err.Error()))
 	}
 	userName, email := platform.GetUser(ctx)
 	if userName == "" && email == "" {
-		return append(results, services.CheckFailed(tokenCheckName, "did not authenticate, or lacks API access"))
+		return append(results, workflow.CheckFailed(tokenCheckName, "did not authenticate, or lacks API access"))
 	}
-	return append(results, services.CheckOK(tokenCheckName))
+	return append(results, workflow.CheckOK(tokenCheckName))
 }
 
 // fullCheckComposer is what the --full tier needs from composer.
@@ -222,7 +220,7 @@ type fullCheckDeps struct {
 	newInstaller func(fullCheckComposer) (siteInstaller, error)
 }
 
-// newFullCheckDeps builds the real services. A variable so tests can substitute doubles.
+// newFullCheckDeps builds the real dependencies. A variable so tests can substitute doubles.
 var newFullCheckDeps = func(logger *zap.Logger) fullCheckDeps {
 	return fullCheckDeps{
 		clone: func(repositoryURL string, branch string, token string) (string, error) {
@@ -242,9 +240,9 @@ var newFullCheckDeps = func(logger *zap.Logger) fullCheckDeps {
 }
 
 // runFullChecks clones to a scratch directory, never the live working copy, and installs each site.
-func runFullChecks(ctx context.Context, logger *zap.Logger, cfg internal.Config, token string) []services.CheckResult {
+func runFullChecks(ctx context.Context, logger *zap.Logger, cfg internal.Config, token string) []workflow.CheckResult {
 	if cfg.RepositoryURL == "" {
-		return []services.CheckResult{services.CheckFailed("sites install from configuration",
+		return []workflow.CheckResult{workflow.CheckFailed("sites install from configuration",
 			"no repository URL to clone (pass --repository-url or run inside a checkout "+
 				"with an origin remote)")}
 	}
@@ -257,7 +255,7 @@ func runFullChecks(ctx context.Context, logger *zap.Logger, cfg internal.Config,
 
 	path, err := deps.clone(cfg.RepositoryURL, branch, token)
 	if err != nil {
-		return []services.CheckResult{services.CheckFailed("clone for full check", err.Error())}
+		return []workflow.CheckResult{workflow.CheckFailed("clone for full check", err.Error())}
 	}
 	defer cleanupFullCheckArtifacts(path, cfg.Sites)
 
@@ -265,22 +263,22 @@ func runFullChecks(ctx context.Context, logger *zap.Logger, cfg internal.Config,
 	defer composerCLI.Cleanup()
 
 	if err := composerCLI.Install(ctx, path); err != nil {
-		return []services.CheckResult{services.CheckFailed("composer install", err.Error())}
+		return []workflow.CheckResult{workflow.CheckFailed("composer install", err.Error())}
 	}
-	results := []services.CheckResult{services.CheckOK("composer install")}
+	results := []workflow.CheckResult{workflow.CheckOK("composer install")}
 
 	installer, err := deps.newInstaller(composerCLI)
 	if err != nil {
-		return append(results, services.CheckFailed("drush site-install --existing-config", err.Error()))
+		return append(results, workflow.CheckFailed("drush site-install --existing-config", err.Error()))
 	}
 
 	for _, site := range cfg.Sites {
 		name := fmt.Sprintf("site %q installs from configuration", site)
 		if err := installer.Install(ctx, path, site); err != nil {
-			results = append(results, services.CheckFailed(name, err.Error()))
+			results = append(results, workflow.CheckFailed(name, err.Error()))
 			continue
 		}
-		results = append(results, services.CheckOK(name))
+		results = append(results, workflow.CheckOK(name))
 	}
 	return results
 }
@@ -289,11 +287,11 @@ func runFullChecks(ctx context.Context, logger *zap.Logger, cfg internal.Config,
 func cleanupFullCheckArtifacts(path string, sites []string) {
 	defer os.RemoveAll(path)
 
-	services.CleanupSiteArtifacts(filepath.Dir(path), sites)
+	workflow.CleanupSiteArtifacts(filepath.Dir(path), sites)
 }
 
 // printCheckResults redacts each detail: a failure's Detail can carry raw subprocess output.
-func printCheckResults(w io.Writer, results []services.CheckResult, redactor *logging.Redactor) {
+func printCheckResults(w io.Writer, results []workflow.CheckResult, redactor *logging.Redactor) {
 	for _, r := range results {
 		mark := "✓"
 		if !r.OK {
@@ -307,8 +305,8 @@ func printCheckResults(w io.Writer, results []services.CheckResult, redactor *lo
 	}
 }
 
-func anyCheckFailed(results []services.CheckResult) bool {
-	return slices.ContainsFunc(results, func(r services.CheckResult) bool { return !r.OK })
+func anyCheckFailed(results []workflow.CheckResult) bool {
+	return slices.ContainsFunc(results, func(r workflow.CheckResult) bool { return !r.OK })
 }
 
 func init() {

@@ -3,14 +3,12 @@ package addon
 import (
 	"fmt"
 
-	"github.com/drupdater/drupdater/internal"
-	"github.com/drupdater/drupdater/internal/services"
+	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/gookit/event"
 	"go.uber.org/zap"
 )
 
 type ComposerNormalizer struct {
-	internal.BasicAddon
 	logger   *zap.Logger
 	composer Composer
 }
@@ -37,7 +35,7 @@ func (cn *ComposerNormalizer) RenderTemplate() (string, error) {
 }
 
 func (cn *ComposerNormalizer) postComposerUpdateHandler(e event.Event) error {
-	evt := e.(*services.PostComposerUpdateEvent)
+	evt := e.(*workflow.PostComposerUpdateEvent)
 
 	installed, err := cn.composer.IsPackageInstalled(evt.Context(), evt.Path(), "ergebnis/composer-normalize")
 	if err != nil {

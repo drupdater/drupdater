@@ -1,4 +1,4 @@
-package services
+package workflow
 
 import (
 	"context"
@@ -19,7 +19,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// reportHarness wires up the mocks a StartUpdate run needs, with a report sink attached. Each
+// reportHarness wires up the mocks a Run run needs, with a report sink attached. Each
 // test then overrides only the expectations relevant to the outcome it exercises.
 type reportHarness struct {
 	config      internal.Config
@@ -31,9 +31,9 @@ type reportHarness struct {
 	drush       *MockDrush
 	worktree    *MockWorktree
 
-	// addons are handed to StartUpdate and registered with the run's event manager, the same
+	// addons are handed to Run and registered with the run's event manager, the same
 	// way cmd/root.go wires the real ones up. Empty for the runs that do not care.
-	addons []internal.Addon
+	addons []Addon
 
 	// What the version lookup returns. Fields, so a test can make it fail after the harness has
 	// wired the expectation up.
@@ -107,7 +107,7 @@ func (h *reportHarness) expectFullRun(t *testing.T) {
 
 // withAddons registers addons with the run, so a test can stand in for the real ones where the
 // workflow reads back what an addon contributed.
-func (h *reportHarness) withAddons(addons ...internal.Addon) {
+func (h *reportHarness) withAddons(addons ...Addon) {
 	h.addons = addons
 }
 
@@ -119,13 +119,13 @@ func (h *reportHarness) run(t *testing.T) error {
 		dispatcher.AddSubscriber(addon)
 	}
 
-	svc := NewWorkflowBaseService(
+	svc := New(
 		zap.NewNop(), h.config, h.drush, h.vcsProvider, h.repoSvc, h.installer, h.composer,
 		dispatcher,
 		WithReportSink(func(rep report.Report) { h.got = &rep }),
 	)
 
-	return svc.StartUpdate(context.Background(), h.addons)
+	return svc.Run(context.Background(), h.addons)
 }
 
 func TestReportWrittenOnSuccessfulRun(t *testing.T) {
@@ -281,12 +281,12 @@ func TestRunWithoutReportSinkIsUnaffected(t *testing.T) {
 	h := newReportHarness(t, true)
 	h.expectFullRun(t)
 
-	svc := NewWorkflowBaseService(
+	svc := New(
 		zap.NewNop(), h.config, h.drush, h.vcsProvider, h.repoSvc, h.installer, h.composer,
 		event.NewManager(""),
 	)
 
-	require.NoError(t, svc.StartUpdate(context.Background(), nil))
+	require.NoError(t, svc.Run(context.Background(), nil))
 	assert.Nil(t, h.got)
 }
 
@@ -318,7 +318,7 @@ func (a *mergeRequestAddon) SubscribedEvents() map[string]any {
 
 func (a *mergeRequestAddon) RenderTemplate() (string, error) { return a.section, a.renderErr }
 
-var _ internal.Addon = (*mergeRequestAddon)(nil)
+var _ Addon = (*mergeRequestAddon)(nil)
 
 // A --dry-run assembles a merge request without opening one, which is what makes a broken
 // template visible before a real run has pushed anything.
@@ -462,4 +462,28 @@ func TestReportRecordsAutoMergeOutcome(t *testing.T) {
 		assert.False(t, h.got.MergeRequest.AutoMerge.Enabled)
 		assert.Contains(t, h.got.MergeRequest.AutoMerge.Error, "not allowed")
 	})
+}
+
+type reportingAddon struct {
+	mergeRequestAddon
+	key  string
+	data any
+}
+
+func (a *reportingAddon) ReportKey() string { return a.key }
+func (a *reportingAddon) ReportData() any   { return a.data }
+
+func TestReportCollectsSectionsOnlyFromReporters(t *testing.T) {
+	h := newReportHarness(t, true)
+	h.expectFullRun(t)
+	h.withAddons(
+		&reportingAddon{key: "composer_audit", data: map[string]int{"fixed": 2}},
+		&reportingAddon{key: "quiet_addon"},
+		&mergeRequestAddon{},
+	)
+
+	require.NoError(t, h.run(t))
+
+	require.NotNil(t, h.got)
+	assert.Equal(t, map[string]any{"composer_audit": map[string]int{"fixed": 2}}, h.got.Addons)
 }

@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/drupdater/drupdater/internal/services"
+	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/drupdater/drupdater/pkg/drush"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -61,7 +61,7 @@ func TestUpdateHooksRecordsEverySiteUnderConcurrency(t *testing.T) {
 	}
 
 	runPerSite(t, sites, func(site string) error {
-		return updateHooks.preSiteUpdateHandler(services.NewPreSiteUpdateEvent(ctx, "/project", worktree, site))
+		return updateHooks.preSiteUpdateHandler(workflow.NewPreSiteUpdateEvent(ctx, "/project", worktree, site))
 	})
 
 	require.Len(t, updateHooks.hooks, len(sites))
@@ -88,7 +88,7 @@ func TestUnsupportedModulesRecordsEverySiteUnderConcurrency(t *testing.T) {
 	}
 
 	runPerSite(t, sites, func(site string) error {
-		return um.preSiteUpdateHandler(services.NewPreSiteUpdateEvent(ctx, "/project", worktree, site))
+		return um.preSiteUpdateHandler(workflow.NewPreSiteUpdateEvent(ctx, "/project", worktree, site))
 	})
 
 	require.Len(t, um.modules, len(sites)+1)
@@ -113,7 +113,7 @@ func TestTranslationsUpdaterRecordsEverySiteUnderConcurrency(t *testing.T) {
 	}
 
 	runPerSite(t, sites, func(site string) error {
-		return tu.postSiteUpdateHandler(services.NewPostSiteUpdateEvent(ctx, "/project", worktree, site))
+		return tu.postSiteUpdateHandler(workflow.NewPostSiteUpdateEvent(ctx, "/project", worktree, site))
 	})
 
 	require.Len(t, tu.results, len(sites))

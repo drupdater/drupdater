@@ -1,4 +1,4 @@
-package services
+package workflow
 
 import (
 	"context"
@@ -44,11 +44,11 @@ func (o *occupancyProbe) probe(context.Context, string, string) error {
 
 func (o *occupancyProbe) peak() int32 { return o.high.Load() }
 
-// Every other StartUpdate test runs a single site, which walks the per-site phases on one
+// Every other Run test runs a single site, which walks the per-site phases on one
 // goroutine and leaves forEachSite's fan-out and siteCommitMu untested against each other. This
 // one drives the real workflow with several sites, and asserts both halves of the design: the
 // independent phase overlaps, the committing one does not.
-func TestStartUpdateWithConcurrentSites(t *testing.T) {
+func TestRunWithConcurrentSites(t *testing.T) {
 	installer := NewMockInstaller(t)
 	repositoryService := NewMockRepository(t)
 	vcsProvider := NewMockPlatform(t)
@@ -103,9 +103,9 @@ func TestStartUpdateWithConcurrentSites(t *testing.T) {
 	vcsProvider.EXPECT().CreateMergeRequest(anyCtx, mock.Anything, mock.Anything, mock.Anything, config.Branch).
 		Return(codehosting.MergeRequest{}, nil)
 
-	workflowService := NewWorkflowBaseService(zap.NewNop(), config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
+	workflowService := New(zap.NewNop(), config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
 
-	require.NoError(t, workflowService.StartUpdate(context.Background(), nil))
+	require.NoError(t, workflowService.Run(context.Background(), nil))
 
 	// The baseline installs are the fan-out: independent per site, so they must overlap or the
 	// concurrency the whole design rests on is not happening.

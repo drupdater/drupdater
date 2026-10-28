@@ -8,7 +8,7 @@ import (
 
 	"github.com/drupdater/drupdater/internal/logging"
 	"github.com/drupdater/drupdater/internal/report"
-	"github.com/drupdater/drupdater/internal/services"
+	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -71,7 +71,7 @@ func TestWriteCheckReportWritesWhenPathGiven(t *testing.T) {
 
 	writeCheckReport(zap.New(core), logging.NewRedactor(), path,
 		report.ToolVersions{ComposerVersion: "2.10.2", PHPVersion: "8.3.14"},
-		[]services.CheckResult{
+		[]workflow.CheckResult{
 			{Name: "git history complete", OK: true},
 			{Name: "platform requirements", OK: false, Detail: "php 8.4 required"},
 		})
@@ -92,7 +92,7 @@ func TestWriteCheckReportWritesWhenPathGiven(t *testing.T) {
 func TestWriteCheckReportDoesNothingWithoutAPath(t *testing.T) {
 	dir := t.TempDir()
 
-	writeCheckReport(zap.NewNop(), logging.NewRedactor(), "", report.ToolVersions{}, []services.CheckResult{{Name: "a", OK: true}})
+	writeCheckReport(zap.NewNop(), logging.NewRedactor(), "", report.ToolVersions{}, []workflow.CheckResult{{Name: "a", OK: true}})
 
 	entries, err := os.ReadDir(dir)
 	require.NoError(t, err)
@@ -111,7 +111,7 @@ func TestWriteCheckReportWarnsWhenTheWriteFails(t *testing.T) {
 }
 
 func TestToReportCheckResults(t *testing.T) {
-	out := toReportCheckResults([]services.CheckResult{
+	out := toReportCheckResults([]workflow.CheckResult{
 		{Name: "git history complete", OK: true},
 		{Name: "site \"default\": settings.php", OK: false, Detail: "not found at web/sites/default"},
 	})
