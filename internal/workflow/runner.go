@@ -103,8 +103,7 @@ func (r *Runner) Run(ctx context.Context, addons []Addon) (err error) {
 		if r.reportSink == nil {
 			return
 		}
-		var abort AbortError
-		if errors.As(err, &abort) {
+		if _, ok := errors.AsType[AbortError](err); ok {
 			rec.SetNoChanges()
 		}
 		for _, a := range addons {

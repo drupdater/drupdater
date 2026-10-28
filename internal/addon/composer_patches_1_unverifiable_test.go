@@ -95,10 +95,8 @@ func TestUpdatePatchesLeavesUnverifiablePatchesUnpinned(t *testing.T) {
 				jsonString, _ = json.Marshal(&gitlab.Project{ID: 5678})
 			case "/api/v4/projects/project/drupal/merge_requests":
 				jsonString, _ = json.Marshal([]gitlab.MergeRequest{{
-					BasicMergeRequest: gitlab.BasicMergeRequest{
-						ID: 1234, IID: 5678, Title: "Remote patch", SHA: "111111",
-						WebURL: serverURL + "/project/drupal/-/merge_requests/1",
-					},
+					ID: 1234, IID: 5678, Title: "Remote patch", SHA: "111111",
+					WebURL: serverURL + "/project/drupal/-/merge_requests/1",
 				}})
 			}
 			_, err := w.Write(jsonString)

@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- **Go 1.26.4+** — the version in `go.mod`.
+- **Go 1.27.1+** — the version in `go.mod`.
 - **`make`**.
 - **Docker** — for `make mock`, the hadolint half of `make lint`, and building images.
 
@@ -97,13 +97,13 @@ get past it — fix the code.
 
     ```text
     can't load config: the Go language version (go1.24) used to build golangci-lint
-    is lower than the targeted Go version (1.26.4)
+    is lower than the targeted Go version (1.27.1)
     ```
 
     Build the CI-pinned version with the module's toolchain, once per session:
 
     ```bash
-    GOTOOLCHAIN=go1.26.4 go install \
+    GOTOOLCHAIN=go1.27.1 go install \
       github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
     cp "$(go env GOPATH)/bin/golangci-lint" /usr/local/bin/golangci-lint
     ```

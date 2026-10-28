@@ -219,7 +219,7 @@ func (cb *CodeBeautifier) CreatePHPCSConfig(ctx context.Context, path string, wo
 	}
 
 	drupalVersion, _ := cb.composer.GetInstalledPackageVersion(ctx, path, "drupal/core")
-	majorVersion := strings.Split(drupalVersion, ".")[0]
+	majorVersion, _, _ := strings.Cut(drupalVersion, ".")
 
 	data := struct {
 		Files   []string

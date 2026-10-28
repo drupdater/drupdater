@@ -431,13 +431,11 @@ func TestUpdatePatches(t *testing.T) {
 			if r.URL.Path == "/api/v4/projects/project/drupal/merge_requests" {
 				response := []gitlab.MergeRequest{
 					{
-						BasicMergeRequest: gitlab.BasicMergeRequest{
-							ID:     1234,
-							IID:    5678,
-							Title:  "Remote patch",
-							SHA:    "111111",
-							WebURL: serverURL + "/project/drupal/-/merge_requests/1",
-						},
+						ID:     1234,
+						IID:    5678,
+						Title:  "Remote patch",
+						SHA:    "111111",
+						WebURL: serverURL + "/project/drupal/-/merge_requests/1",
 					},
 				}
 				jsonString, _ = json.Marshal(response)
@@ -531,13 +529,11 @@ func TestUpdatePatches(t *testing.T) {
 			if r.URL.Path == "/api/v4/projects/project/drupal/merge_requests" {
 				response := []gitlab.MergeRequest{
 					{
-						BasicMergeRequest: gitlab.BasicMergeRequest{
-							ID:     1234,
-							IID:    5678,
-							Title:  "Remote patch",
-							SHA:    "111111",
-							WebURL: serverURL + "/project/drupal/-/merge_requests/1",
-						},
+						ID:     1234,
+						IID:    5678,
+						Title:  "Remote patch",
+						SHA:    "111111",
+						WebURL: serverURL + "/project/drupal/-/merge_requests/1",
 					},
 				}
 				jsonString, _ = json.Marshal(response)

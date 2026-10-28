@@ -1,8 +1,8 @@
 package drupalorg
 
 import (
-	"io"
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"

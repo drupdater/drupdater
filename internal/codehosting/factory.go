@@ -87,8 +87,8 @@ func parseGitURL(raw string) (host string, path string, err error) {
 
 	// SCP-like syntax has no scheme: [user@]host:owner/repo.
 	if !strings.Contains(raw, "://") {
-		if i := strings.LastIndex(raw, "@"); i >= 0 {
-			raw = raw[i+1:]
+		if _, after, found := strings.CutLast(raw, "@"); found {
+			raw = after
 		}
 		host, path, found := strings.Cut(raw, ":")
 		if !found || host == "" || path == "" {

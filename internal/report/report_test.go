@@ -220,13 +220,11 @@ func TestRecorderIsSafeForConcurrentUse(t *testing.T) {
 
 	var wg sync.WaitGroup
 	for i := range 20 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			_ = rec.Run("phase", func() error { return nil })
 			rec.SetUpdateBranch("branch")
 			rec.AddSection("addon", i)
-		}()
+		})
 	}
 	wg.Wait()
 
