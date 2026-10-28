@@ -104,7 +104,7 @@ get past it — fix the code.
 
     ```bash
     GOTOOLCHAIN=go1.27.1 go install \
-      github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
+      github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
     cp "$(go env GOPATH)/bin/golangci-lint" /usr/local/bin/golangci-lint
     ```
 
