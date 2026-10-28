@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/drupdater/drupdater/internal/services"
+	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/drupdater/drupdater/pkg/drush"
 	"github.com/drupdater/drupdater/pkg/rector"
 	git "github.com/go-git/go-git/v5"
@@ -45,7 +45,7 @@ func TestComposerAllowPluginsNilMapIsNotAPanic(t *testing.T) {
 	ap := NewComposerAllowPlugins(zap.NewNop(), composerService)
 	ap.allowPlugins = nil // as if GetAllowPlugins had produced nothing
 
-	err := ap.postComposerUpdateHandler(services.NewPostComposerUpdateEvent(t.Context(), "/tmp", nil))
+	err := ap.postComposerUpdateHandler(workflow.NewPostComposerUpdateEvent(t.Context(), "/tmp", nil))
 	require.NoError(t, err)
 	assert.Equal(t, []string{"new/plugin"}, ap.newAllowPlugins)
 }
@@ -56,7 +56,7 @@ func TestComposerAllowPluginsErrors(t *testing.T) {
 		composerService.EXPECT().GetAllowPlugins(anyCtx, "/tmp").Return(nil, assert.AnError)
 
 		ap := NewComposerAllowPlugins(zap.NewNop(), composerService)
-		err := ap.preComposerUpdateHandler(services.NewPreComposerUpdateEvent(t.Context(), "/tmp", nil, nil, nil, false))
+		err := ap.preComposerUpdateHandler(workflow.NewPreComposerUpdateEvent(t.Context(), "/tmp", nil, nil, nil, false))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to get composer allow plugins")
 	})
@@ -66,7 +66,7 @@ func TestComposerAllowPluginsErrors(t *testing.T) {
 		composerService.EXPECT().GetInstalledPlugins(anyCtx, "/tmp").Return(nil, assert.AnError)
 
 		ap := NewComposerAllowPlugins(zap.NewNop(), composerService)
-		require.Error(t, ap.postComposerUpdateHandler(services.NewPostComposerUpdateEvent(t.Context(), "/tmp", nil)))
+		require.Error(t, ap.postComposerUpdateHandler(workflow.NewPostComposerUpdateEvent(t.Context(), "/tmp", nil)))
 	})
 
 	t.Run("writing the config back fails", func(t *testing.T) {
@@ -76,7 +76,7 @@ func TestComposerAllowPluginsErrors(t *testing.T) {
 
 		ap := NewComposerAllowPlugins(zap.NewNop(), composerService)
 		ap.allowPlugins = map[string]bool{}
-		require.Error(t, ap.postComposerUpdateHandler(services.NewPostComposerUpdateEvent(t.Context(), "/tmp", nil)))
+		require.Error(t, ap.postComposerUpdateHandler(workflow.NewPostComposerUpdateEvent(t.Context(), "/tmp", nil)))
 	})
 }
 
@@ -90,7 +90,7 @@ func TestComposerDiffLogFailureDoesNotFailTheRun(t *testing.T) {
 	composerService.EXPECT().Diff(anyCtx, "/tmp", false).Return("", assert.AnError)
 
 	cd := NewComposerDiff(zap.New(core), composerService)
-	err := cd.postComposerUpdateHandler(services.NewPostComposerUpdateEvent(t.Context(), "/tmp", nil))
+	err := cd.postComposerUpdateHandler(workflow.NewPostComposerUpdateEvent(t.Context(), "/tmp", nil))
 
 	require.NoError(t, err)
 	assert.Equal(t, "| linked table |", cd.table, "the merge request still gets the linked table")
@@ -103,7 +103,7 @@ func TestComposerDiffFailure(t *testing.T) {
 	composerService.EXPECT().Diff(anyCtx, "/tmp", true).Return("", assert.AnError)
 
 	cd := NewComposerDiff(zap.NewNop(), composerService)
-	err := cd.postComposerUpdateHandler(services.NewPostComposerUpdateEvent(t.Context(), "/tmp", nil))
+	err := cd.postComposerUpdateHandler(workflow.NewPostComposerUpdateEvent(t.Context(), "/tmp", nil))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to get diff")
 }
@@ -114,7 +114,7 @@ func TestComposerNormalizerErrors(t *testing.T) {
 		composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "ergebnis/composer-normalize").Return(false, assert.AnError)
 
 		cn := NewComposerNormalizer(zap.NewNop(), composerService)
-		require.Error(t, cn.postComposerUpdateHandler(services.NewPostComposerUpdateEvent(t.Context(), "/tmp", nil)))
+		require.Error(t, cn.postComposerUpdateHandler(workflow.NewPostComposerUpdateEvent(t.Context(), "/tmp", nil)))
 	})
 
 	t.Run("normalize fails", func(t *testing.T) {
@@ -123,7 +123,7 @@ func TestComposerNormalizerErrors(t *testing.T) {
 		composerService.EXPECT().Normalize(anyCtx, "/tmp").Return("", assert.AnError)
 
 		cn := NewComposerNormalizer(zap.NewNop(), composerService)
-		err := cn.postComposerUpdateHandler(services.NewPostComposerUpdateEvent(t.Context(), "/tmp", nil))
+		err := cn.postComposerUpdateHandler(workflow.NewPostComposerUpdateEvent(t.Context(), "/tmp", nil))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to normalize composer.json")
 	})
@@ -136,7 +136,7 @@ func TestDeprecationsRemoverErrors(t *testing.T) {
 		composerService.EXPECT().Require(anyCtx, "/tmp", []string{"palantirnet/drupal-rector"}).Return("", assert.AnError)
 
 		dr := NewDeprecationsRemover(zap.NewNop(), NewMockRector(t), composerService)
-		require.Error(t, dr.postCodeUpdateHandler(services.NewPostCodeUpdateEvent(t.Context(), "/tmp", nil)))
+		require.Error(t, dr.postCodeUpdateHandler(workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", nil)))
 	})
 
 	t.Run("listing custom code directories fails", func(t *testing.T) {
@@ -145,7 +145,7 @@ func TestDeprecationsRemoverErrors(t *testing.T) {
 		composerService.EXPECT().GetCustomCodeDirectories(anyCtx, "/tmp").Return(nil, assert.AnError)
 
 		dr := NewDeprecationsRemover(zap.NewNop(), NewMockRector(t), composerService)
-		require.Error(t, dr.postCodeUpdateHandler(services.NewPostCodeUpdateEvent(t.Context(), "/tmp", nil)))
+		require.Error(t, dr.postCodeUpdateHandler(workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", nil)))
 	})
 
 	t.Run("removing the temporarily installed rector fails", func(t *testing.T) {
@@ -159,7 +159,7 @@ func TestDeprecationsRemoverErrors(t *testing.T) {
 		runner.EXPECT().Run(anyCtx, "/tmp", []string{"web/modules/custom"}).Return(rector.ReturnOutput{}, nil)
 
 		dr := NewDeprecationsRemover(zap.NewNop(), runner, composerService)
-		require.Error(t, dr.postCodeUpdateHandler(services.NewPostCodeUpdateEvent(t.Context(), "/tmp", nil)))
+		require.Error(t, dr.postCodeUpdateHandler(workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", nil)))
 	})
 
 	t.Run("staging a changed file fails", func(t *testing.T) {
@@ -177,13 +177,13 @@ func TestDeprecationsRemoverErrors(t *testing.T) {
 		worktree.EXPECT().Add("web/modules/custom/a.php").Return(plumbing.NewHash(""), assert.AnError)
 
 		dr := NewDeprecationsRemover(zap.NewNop(), runner, composerService)
-		require.Error(t, dr.postCodeUpdateHandler(services.NewPostCodeUpdateEvent(t.Context(), "/tmp", worktree)))
+		require.Error(t, dr.postCodeUpdateHandler(workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", worktree)))
 	})
 }
 
 func TestTranslationsUpdaterErrors(t *testing.T) {
-	newEvent := func(worktree Worktree) *services.PostSiteUpdateEvent {
-		return services.NewPostSiteUpdateEvent(t.Context(), "/tmp", worktree, "site1")
+	newEvent := func(worktree Worktree) *workflow.PostSiteUpdateEvent {
+		return workflow.NewPostSiteUpdateEvent(t.Context(), "/tmp", worktree, "site1")
 	}
 
 	t.Run("module check fails", func(t *testing.T) {
@@ -256,7 +256,7 @@ func TestUpdateHooksHandlerError(t *testing.T) {
 	drushService.EXPECT().GetUpdateHooks(anyCtx, "/tmp", "site1").Return(nil, assert.AnError)
 
 	uh := NewUpdateHooks(zap.NewNop(), drushService)
-	err := uh.preSiteUpdateHandler(services.NewPreSiteUpdateEvent(t.Context(), "/tmp", nil, "site1"))
+	err := uh.preSiteUpdateHandler(workflow.NewPreSiteUpdateEvent(t.Context(), "/tmp", nil, "site1"))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to get update hooks")
 }
@@ -270,8 +270,8 @@ func TestUnsupportedModulesDeduplicatesAcrossSites(t *testing.T) {
 	drushService.EXPECT().GetUnsupportedModules(anyCtx, "/tmp", "site2").Return([]drush.UnsupportedModule{module}, nil)
 
 	um := NewUnsupportedModules(zap.NewNop(), drushService)
-	require.NoError(t, um.preSiteUpdateHandler(services.NewPreSiteUpdateEvent(t.Context(), "/tmp", nil, "site1")))
-	require.NoError(t, um.preSiteUpdateHandler(services.NewPreSiteUpdateEvent(t.Context(), "/tmp", nil, "site2")))
+	require.NoError(t, um.preSiteUpdateHandler(workflow.NewPreSiteUpdateEvent(t.Context(), "/tmp", nil, "site1")))
+	require.NoError(t, um.preSiteUpdateHandler(workflow.NewPreSiteUpdateEvent(t.Context(), "/tmp", nil, "site2")))
 
 	assert.Len(t, um.modules, 1)
 

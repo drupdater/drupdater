@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/drupdater/drupdater/internal/golden"
-	"github.com/drupdater/drupdater/internal/services"
+	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/gookit/event"
 	"github.com/stretchr/testify/assert"
@@ -75,7 +75,7 @@ func TestComposerAudit_PreComposerUpdateHandler_WithAdvisories(t *testing.T) {
 		},
 	}
 
-	mockEvent := services.NewPreComposerUpdateEvent(ctx, path, worktree, []string{}, []string{}, true)
+	mockEvent := workflow.NewPreComposerUpdateEvent(ctx, path, worktree, []string{}, []string{}, true)
 
 	mockComposer.EXPECT().Audit(ctx, path).Return(mockAudit, nil)
 
@@ -102,13 +102,13 @@ func TestComposerAudit_PreComposerUpdateHandler_NoAdvisories(t *testing.T) {
 		Advisories: []composer.Advisory{},
 	}
 
-	mockEvent := services.NewPreComposerUpdateEvent(ctx, path, worktree, []string{}, []string{}, true)
+	mockEvent := workflow.NewPreComposerUpdateEvent(ctx, path, worktree, []string{}, []string{}, true)
 
 	mockComposer.EXPECT().Audit(ctx, path).Return(mockAudit, nil)
 
 	err := audit.preComposerUpdateHandler(mockEvent)
 
-	require.ErrorAs(t, err, &services.AbortError{})
+	require.ErrorAs(t, err, &workflow.AbortError{})
 	assert.Equal(t, "No security advisories found", err.Error())
 	assert.Equal(t, mockAudit, audit.beforeAudit)
 	assert.Empty(t, mockEvent.PackagesToUpdate)
@@ -134,7 +134,7 @@ func TestComposerAudit_PostCodeUpdateHandler(t *testing.T) {
 		},
 	}
 
-	mockEvent := services.NewPostCodeUpdateEvent(ctx, path, worktree)
+	mockEvent := workflow.NewPostCodeUpdateEvent(ctx, path, worktree)
 
 	mockComposer.EXPECT().Audit(ctx, path).Return(mockAudit, nil)
 
@@ -220,7 +220,7 @@ func TestComposerAudit_PreMergeRequestCreateHandler(t *testing.T) {
 		security: true,
 	}
 
-	mockEvent := &services.PreMergeRequestCreateEvent{}
+	mockEvent := &workflow.PreMergeRequestCreateEvent{}
 	mockEvent.SetName("pre-merge-request-create")
 
 	err := audit.preMergeRequestCreateHandler(mockEvent)
@@ -328,7 +328,7 @@ func TestComposerAudit_PreComposerUpdateHandler_NormalMode(t *testing.T) {
 	}
 	mockComposer.EXPECT().Audit(ctx, path).Return(mockAudit, nil)
 
-	mockEvent := services.NewPreComposerUpdateEvent(ctx, path, worktree, []string{}, []string{}, false)
+	mockEvent := workflow.NewPreComposerUpdateEvent(ctx, path, worktree, []string{}, []string{}, false)
 
 	require.NoError(t, audit.preComposerUpdateHandler(mockEvent))
 	assert.Equal(t, mockAudit, audit.beforeAudit, "the audit still runs: it is what the security report is built from")
@@ -347,7 +347,7 @@ func TestComposerAudit_PreComposerUpdateHandler_NormalModeNoAdvisories(t *testin
 	path := "/test/path"
 	mockComposer.EXPECT().Audit(ctx, path).Return(composer.Audit{}, nil)
 
-	mockEvent := services.NewPreComposerUpdateEvent(ctx, path, worktree, []string{}, []string{}, false)
+	mockEvent := workflow.NewPreComposerUpdateEvent(ctx, path, worktree, []string{}, []string{}, false)
 
 	require.NoError(t, audit.preComposerUpdateHandler(mockEvent))
 }
@@ -360,12 +360,12 @@ func TestComposerAudit_PreMergeRequestCreateHandler_NormalMode(t *testing.T) {
 		Abandoned: []composer.AbandonedPackage{{PackageName: "swiftmailer/swiftmailer", Replacement: "symfony/mailer"}},
 	}
 
-	mockEvent := &services.PreMergeRequestCreateEvent{Title: "July 2026: Drupal Maintenance Updates"}
+	mockEvent := &workflow.PreMergeRequestCreateEvent{Title: "July 2026: Drupal Maintenance Updates"}
 	mockEvent.SetName("pre-merge-request-create")
 
 	require.NoError(t, audit.preMergeRequestCreateHandler(mockEvent))
 	assert.Equal(t, "July 2026: Drupal Maintenance Updates", mockEvent.Title)
-	assert.Equal(t, []services.AbandonedPackage{
+	assert.Equal(t, []workflow.AbandonedPackage{
 		{Name: "swiftmailer/swiftmailer", Replacement: "symfony/mailer"},
 	}, mockEvent.AbandonedPackages)
 }
@@ -381,13 +381,13 @@ func TestComposerAudit_PreMergeRequestCreateHandler_PublishesAbandonedPackages(t
 		},
 	}
 
-	mockEvent := &services.PreMergeRequestCreateEvent{}
+	mockEvent := &workflow.PreMergeRequestCreateEvent{}
 	mockEvent.SetName("pre-merge-request-create")
 
 	require.NoError(t, audit.preMergeRequestCreateHandler(mockEvent))
 	// drupal/* is filtered out before the handoff, so the merged list cannot show one
 	// end-of-life module as two rows.
-	assert.Equal(t, []services.AbandonedPackage{{Name: "patchwork/jsqueeze"}}, mockEvent.AbandonedPackages)
+	assert.Equal(t, []workflow.AbandonedPackage{{Name: "patchwork/jsqueeze"}}, mockEvent.AbandonedPackages)
 }
 
 // No advisories at all contributes no section, or every routine merge request carries an empty
@@ -436,7 +436,7 @@ func TestComposerAudit_AuditFailures(t *testing.T) {
 		audit := NewComposerAudit(zap.NewNop(), mockComposer, true)
 		mockComposer.EXPECT().Audit(anyCtx, path).Return(composer.Audit{}, assert.AnError)
 
-		evt := services.NewPreComposerUpdateEvent(context.Background(), path, NewMockWorktree(t), []string{}, []string{}, true)
+		evt := workflow.NewPreComposerUpdateEvent(context.Background(), path, NewMockWorktree(t), []string{}, []string{}, true)
 		err := audit.preComposerUpdateHandler(evt)
 
 		require.Error(t, err)
@@ -451,7 +451,7 @@ func TestComposerAudit_AuditFailures(t *testing.T) {
 		audit := NewComposerAudit(zap.NewNop(), mockComposer, true)
 		mockComposer.EXPECT().Audit(anyCtx, path).Return(composer.Audit{}, assert.AnError)
 
-		evt := services.NewPostCodeUpdateEvent(context.Background(), path, NewMockWorktree(t))
+		evt := workflow.NewPostCodeUpdateEvent(context.Background(), path, NewMockWorktree(t))
 		err := audit.postCodeUpdateHandler(evt)
 
 		require.Error(t, err)
@@ -474,7 +474,7 @@ func TestComposerAudit_PreComposerUpdateHandler_DeduplicatesPackages(t *testing.
 		},
 	}, nil)
 
-	evt := services.NewPreComposerUpdateEvent(context.Background(), path, NewMockWorktree(t), []string{}, []string{}, true)
+	evt := workflow.NewPreComposerUpdateEvent(context.Background(), path, NewMockWorktree(t), []string{}, []string{}, true)
 	require.NoError(t, audit.preComposerUpdateHandler(evt))
 
 	// First-seen order, not sorted: the order is the order composer receives the arguments in.

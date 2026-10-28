@@ -9,7 +9,7 @@ import (
 
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/logging"
-	"github.com/drupdater/drupdater/internal/services"
+	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/drupdater/drupdater/pkg/repo"
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -109,7 +109,7 @@ func TestHandleWorkflowError(t *testing.T) {
 		core, logs := observer.New(zap.WarnLevel)
 		logger := zap.New(core)
 
-		abortErr := services.AbortError{Msg: "branch already exists, skipping"}
+		abortErr := workflow.AbortError{Msg: "branch already exists, skipping"}
 		result := handleWorkflowError(logger, abortErr)
 
 		require.NoError(t, result)
@@ -132,7 +132,7 @@ func TestHandleWorkflowError(t *testing.T) {
 	})
 
 	t.Run("errors.Unwrap returns nil for AbortError confirming fix is needed", func(t *testing.T) {
-		abortErr := services.AbortError{Msg: "no changes detected"}
+		abortErr := workflow.AbortError{Msg: "no changes detected"}
 		require.NoError(t, errors.Unwrap(abortErr), "AbortError has no wrapped error, so Unwrap returns nil")
 		assert.Equal(t, "no changes detected", abortErr.Error())
 	})
@@ -184,7 +184,7 @@ func TestCreateAddons(t *testing.T) {
 		addons, err := createAddons(logger, config, nil, nil, nil, nil)
 		require.NoError(t, err)
 
-		evt := services.NewPreMergeRequestCreateEvent("July 2026: Drupal Maintenance Updates")
+		evt := workflow.NewPreMergeRequestCreateEvent("July 2026: Drupal Maintenance Updates")
 		require.NoError(t, createDispatcher(addons).FireEvent(evt))
 		assert.Contains(t, evt.Title, "Drupal Security Updates")
 	})
@@ -194,7 +194,7 @@ func TestCreateAddons(t *testing.T) {
 		addons, err := createAddons(logger, config, nil, nil, nil, nil)
 		require.NoError(t, err)
 
-		evt := services.NewPreMergeRequestCreateEvent("July 2026: Drupal Maintenance Updates")
+		evt := workflow.NewPreMergeRequestCreateEvent("July 2026: Drupal Maintenance Updates")
 		require.NoError(t, createDispatcher(addons).FireEvent(evt))
 		assert.Equal(t, "July 2026: Drupal Maintenance Updates", evt.Title)
 	})

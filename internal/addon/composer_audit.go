@@ -7,8 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/drupdater/drupdater/internal"
-	"github.com/drupdater/drupdater/internal/services"
+	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/gookit/event"
 
@@ -24,7 +23,6 @@ type SecurityReport struct {
 // ComposerAudit runs on every update: a routine update that closes a CVE should say so. Only a
 // security run lets the audit dictate the update's scope, abort, and relabel the merge request.
 type ComposerAudit struct {
-	internal.BasicAddon
 	logger   *zap.Logger
 	composer Composer
 	security bool
@@ -70,7 +68,7 @@ func (ca *ComposerAudit) RenderTemplate() (string, error) {
 		return "", nil
 	}
 
-	return ca.Render("security_report.go.tmpl", SecurityReport{
+	return render("security_report.go.tmpl", SecurityReport{
 		FixedAdvisories:       fixed,
 		AfterUpdateAdvisories: ca.afterAudit.Advisories,
 	})
@@ -79,7 +77,7 @@ func (ca *ComposerAudit) RenderTemplate() (string, error) {
 // preComposerUpdateHandler audits the pre-update code. A security run narrows the update to the
 // affected packages and aborts when there are none; a normal run only records the audit.
 func (ca *ComposerAudit) preComposerUpdateHandler(e event.Event) error {
-	evt := e.(*services.PreComposerUpdateEvent)
+	evt := e.(*workflow.PreComposerUpdateEvent)
 	var err error
 
 	ca.beforeAudit, err = ca.composer.Audit(evt.Context(), evt.Path())
@@ -111,14 +109,14 @@ func (ca *ComposerAudit) preComposerUpdateHandler(e event.Event) error {
 	evt.MinimalChanges = true
 
 	if len(packagesToUpdate) == 0 {
-		return services.AbortError{Msg: "No security advisories found"}
+		return workflow.AbortError{Msg: "No security advisories found"}
 	}
 
 	return nil
 }
 
 func (ca *ComposerAudit) postCodeUpdateHandler(e event.Event) error {
-	evt := e.(*services.PostCodeUpdateEvent)
+	evt := e.(*workflow.PostCodeUpdateEvent)
 
 	var err error
 	ca.afterAudit, err = ca.composer.Audit(evt.Context(), evt.Path())
@@ -180,10 +178,10 @@ func advisoryKey(a composer.Advisory) string {
 // preMergeRequestCreateHandler publishes the abandoned packages for unsupported_modules and, on a
 // security run, relabels the merge request. Runs at Normal, above the BelowNormal consumer.
 func (ca *ComposerAudit) preMergeRequestCreateHandler(e event.Event) error {
-	evt := e.(*services.PreMergeRequestCreateEvent)
+	evt := e.(*workflow.PreMergeRequestCreateEvent)
 
 	for _, pkg := range ca.GetAbandonedPackages() {
-		evt.AbandonedPackages = append(evt.AbandonedPackages, services.AbandonedPackage{
+		evt.AbandonedPackages = append(evt.AbandonedPackages, workflow.AbandonedPackage{
 			Name:        pkg.PackageName,
 			Replacement: pkg.Replacement,
 		})

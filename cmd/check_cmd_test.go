@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"github.com/drupdater/drupdater/internal/codehosting"
-	"go.uber.org/zap"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/drupdater/drupdater/internal/codehosting"
+	"go.uber.org/zap"
 
 	"github.com/drupdater/drupdater/internal"
 	git "github.com/go-git/go-git/v5"

@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/drupdater/drupdater/internal/golden"
-	"github.com/drupdater/drupdater/internal/services"
+	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/drush"
 	"github.com/gookit/event"
@@ -53,7 +53,7 @@ func TestUnsupportedModules_RenderTemplate(t *testing.T) {
 		"module_b": {Name: "module_b", InstalledVersion: "2.3.1", RecommendedVersion: "3.0.0"},
 		"module_a": {Name: "module_a", InstalledVersion: "1.0.0", RecommendedVersion: "None"},
 	}
-	um.abandoned = []services.AbandonedPackage{
+	um.abandoned = []workflow.AbandonedPackage{
 		{Name: "swiftmailer/swiftmailer", Replacement: "symfony/mailer"},
 		{Name: "patchwork/jsqueeze"},
 	}
@@ -88,7 +88,7 @@ func TestUnsupportedModules_PreSiteUpdateHandler_Success(t *testing.T) {
 	}
 
 	worktree := NewMockWorktree(t)
-	mockEvent := services.NewPreSiteUpdateEvent(ctx, testPath, worktree, testSite)
+	mockEvent := workflow.NewPreSiteUpdateEvent(ctx, testPath, worktree, testSite)
 
 	mockDrush.EXPECT().GetUnsupportedModules(ctx, testPath, testSite).Return(mockModules, nil)
 
@@ -111,8 +111,8 @@ func TestUnsupportedModules_PreSiteUpdateHandler_Dedupe(t *testing.T) {
 	mockDrush.EXPECT().GetUnsupportedModules(ctx, "/test/path", "site1").Return([]drush.UnsupportedModule{shared}, nil)
 	mockDrush.EXPECT().GetUnsupportedModules(ctx, "/test/path", "site2").Return([]drush.UnsupportedModule{shared}, nil)
 
-	require.NoError(t, um.preSiteUpdateHandler(services.NewPreSiteUpdateEvent(ctx, "/test/path", worktree, "site1")))
-	require.NoError(t, um.preSiteUpdateHandler(services.NewPreSiteUpdateEvent(ctx, "/test/path", worktree, "site2")))
+	require.NoError(t, um.preSiteUpdateHandler(workflow.NewPreSiteUpdateEvent(ctx, "/test/path", worktree, "site1")))
+	require.NoError(t, um.preSiteUpdateHandler(workflow.NewPreSiteUpdateEvent(ctx, "/test/path", worktree, "site2")))
 
 	assert.Len(t, um.modules, 1)
 	assert.Equal(t, shared, um.modules["module_a"])
@@ -128,7 +128,7 @@ func TestUnsupportedModules_PreSiteUpdateHandler_NoModules(t *testing.T) {
 	testSite := "default"
 
 	worktree := NewMockWorktree(t)
-	mockEvent := services.NewPreSiteUpdateEvent(ctx, testPath, worktree, testSite)
+	mockEvent := workflow.NewPreSiteUpdateEvent(ctx, testPath, worktree, testSite)
 
 	mockDrush.EXPECT().GetUnsupportedModules(ctx, testPath, testSite).Return(nil, nil)
 
@@ -149,7 +149,7 @@ func TestUnsupportedModules_PreSiteUpdateHandler_Error(t *testing.T) {
 	expectedError := errors.New("drush error")
 
 	worktree := NewMockWorktree(t)
-	mockEvent := services.NewPreSiteUpdateEvent(ctx, testPath, worktree, testSite)
+	mockEvent := workflow.NewPreSiteUpdateEvent(ctx, testPath, worktree, testSite)
 
 	mockDrush.EXPECT().GetUnsupportedModules(ctx, testPath, testSite).Return(nil, expectedError)
 
@@ -166,8 +166,8 @@ func TestUnsupportedModules_PreSiteUpdateHandler_Error(t *testing.T) {
 func TestUnsupportedModules_PreMergeRequestCreateHandler(t *testing.T) {
 	um := NewUnsupportedModules(zap.NewNop(), NewMockDrush(t))
 
-	evt := &services.PreMergeRequestCreateEvent{
-		AbandonedPackages: []services.AbandonedPackage{{Name: "patchwork/jsqueeze"}},
+	evt := &workflow.PreMergeRequestCreateEvent{
+		AbandonedPackages: []workflow.AbandonedPackage{{Name: "patchwork/jsqueeze"}},
 	}
 	evt.SetName("pre-merge-request-create")
 
@@ -179,7 +179,7 @@ func TestUnsupportedModules_PreMergeRequestCreateHandler(t *testing.T) {
 // through the gap before the two lists were merged.
 func TestUnsupportedModules_RenderTemplate_AbandonedOnly(t *testing.T) {
 	um := NewUnsupportedModules(zap.NewNop(), NewMockDrush(t))
-	um.abandoned = []services.AbandonedPackage{{Name: "patchwork/jsqueeze"}}
+	um.abandoned = []workflow.AbandonedPackage{{Name: "patchwork/jsqueeze"}}
 
 	result, err := um.RenderTemplate()
 	require.NoError(t, err)
@@ -194,7 +194,7 @@ func TestUnsupportedModules_EndOfLifeEntries_Ordering(t *testing.T) {
 		"zebra": {Name: "zebra", InstalledVersion: "1.0.0", RecommendedVersion: "2.0.0"},
 		"alpha": {Name: "alpha", InstalledVersion: "1.0.0", RecommendedVersion: "None"},
 	}
-	um.abandoned = []services.AbandonedPackage{
+	um.abandoned = []workflow.AbandonedPackage{
 		{Name: "zeta/pkg"},
 		{Name: "acme/pkg", Replacement: "acme/next"},
 	}
@@ -214,7 +214,7 @@ func TestUnsupportedModules_EndOfLifeEntries_Recommendations(t *testing.T) {
 		"empty":   {Name: "empty", RecommendedVersion: ""},
 		"upgrade": {Name: "upgrade", RecommendedVersion: "3.0.0"},
 	}
-	um.abandoned = []services.AbandonedPackage{
+	um.abandoned = []workflow.AbandonedPackage{
 		{Name: "a/replaced", Replacement: "a/next"},
 		{Name: "b/orphan"},
 	}
@@ -245,7 +245,7 @@ func TestUnsupportedModules_AbandonedHandoff(t *testing.T) {
 	manager.AddSubscriber(audit)
 	manager.AddSubscriber(um)
 
-	err := manager.FireEvent(services.NewPreMergeRequestCreateEvent("July 2026: Drupal Maintenance Updates"))
+	err := manager.FireEvent(workflow.NewPreMergeRequestCreateEvent("July 2026: Drupal Maintenance Updates"))
 	require.NoError(t, err)
 
 	result, err := um.RenderTemplate()

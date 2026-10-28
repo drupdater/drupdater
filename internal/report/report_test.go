@@ -8,8 +8,6 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/drupdater/drupdater/internal"
-	"github.com/gookit/event"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -195,48 +193,22 @@ func TestAutoMergeOmittedFromJSONWhenNotRequested(t *testing.T) {
 	assert.Contains(t, string(encoded), `"auto_merge":{"enabled":true}`)
 }
 
-// reportingAddon implements both internal.Addon and Reporter.
-type reportingAddon struct {
-	key  string
-	data any
-}
-
-func (a reportingAddon) SubscribedEvents() map[string]any { return map[string]any{} }
-func (a reportingAddon) RenderTemplate() (string, error)  { return "", nil }
-func (a reportingAddon) ReportKey() string                { return a.key }
-func (a reportingAddon) ReportData() any                  { return a.data }
-
-// plainAddon implements internal.Addon only, and must be absent from the report.
-type plainAddon struct{}
-
-func (plainAddon) SubscribedEvents() map[string]any { return map[string]any{} }
-func (plainAddon) RenderTemplate() (string, error)  { return "", nil }
-
-var (
-	_ internal.Addon   = reportingAddon{}
-	_ internal.Addon   = plainAddon{}
-	_ event.Subscriber = reportingAddon{}
-)
-
-func TestRecorderCollectsOnlyReportingAddons(t *testing.T) {
+func TestRecorderAddSectionSkipsNilData(t *testing.T) {
 	rec := newTestRecorder()
 
-	rec.AddAddons([]internal.Addon{
-		reportingAddon{key: "composer_audit", data: map[string]any{"fixed": 2}},
-		plainAddon{},
-		reportingAddon{key: "quiet_addon", data: nil},
-	})
+	rec.AddSection("composer_audit", map[string]any{"fixed": 2})
+	rec.AddSection("quiet_addon", nil)
 
 	rep := rec.Finish()
 
-	require.Len(t, rep.Addons, 1, "addons without Reporter, and those returning nil, are omitted")
+	require.Len(t, rep.Addons, 1)
 	assert.Contains(t, rep.Addons, "composer_audit")
 	assert.NotContains(t, rep.Addons, "quiet_addon")
 }
 
 func TestRecorderAddonsAbsentWhenNoneReport(t *testing.T) {
 	rec := newTestRecorder()
-	rec.AddAddons([]internal.Addon{plainAddon{}})
+	rec.AddSection("quiet_addon", nil)
 
 	rep := rec.Finish()
 	assert.Nil(t, rep.Addons, "an empty addons map should be omitted from the document entirely")
@@ -253,7 +225,7 @@ func TestRecorderIsSafeForConcurrentUse(t *testing.T) {
 			defer wg.Done()
 			_ = rec.Run("phase", func() error { return nil })
 			rec.SetUpdateBranch("branch")
-			rec.AddAddons([]internal.Addon{reportingAddon{key: "addon", data: i}})
+			rec.AddSection("addon", i)
 		}()
 	}
 	wg.Wait()
@@ -354,7 +326,7 @@ func TestWriteCleansUpWhenTheFinalMoveFails(t *testing.T) {
 // the write cleanly rather than panic or emit a truncated document.
 func TestWriteFailsOnUnserialisableAddonData(t *testing.T) {
 	rec := newTestRecorder()
-	rec.AddAddons([]internal.Addon{reportingAddon{key: "broken", data: make(chan int)}})
+	rec.AddSection("broken", make(chan int))
 
 	err := Write(afero.NewMemMapFs(), "/out/report.json", rec.Finish(), nil)
 
@@ -464,4 +436,17 @@ func TestRecorderSanitizesRepositoryURL(t *testing.T) {
 	rep := rec.Finish()
 	assert.Equal(t, "https://example.com/org/site.git", rep.Repository)
 	assert.NotContains(t, rep.Repository, "token")
+}
+
+type stubReporter struct{}
+
+func (stubReporter) ReportKey() string { return "stub" }
+func (stubReporter) ReportData() any   { return 1 }
+
+func TestRecorderAddReporterIgnoresNonReporters(t *testing.T) {
+	rec := newTestRecorder()
+	rec.AddReporter(stubReporter{})
+	rec.AddReporter("not a reporter")
+
+	assert.Equal(t, map[string]any{"stub": 1}, rec.Finish().Addons)
 }

@@ -6,8 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/drupdater/drupdater/internal"
-	"github.com/drupdater/drupdater/internal/services"
+	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/drupdater/drupdater/pkg/drush"
 	"github.com/gookit/event"
 	"go.uber.org/zap"
@@ -17,7 +16,6 @@ import (
 // renders them together with the abandoned packages composer_audit hands it: one finding to a
 // reviewer, so one list.
 type UnsupportedModules struct {
-	internal.BasicAddon
 	logger *zap.Logger
 	drush  Drush
 
@@ -27,7 +25,7 @@ type UnsupportedModules struct {
 	modules map[string]drush.UnsupportedModule
 
 	// Written once from pre-merge-request-create, after every site's goroutine — no lock needed.
-	abandoned []services.AbandonedPackage
+	abandoned []workflow.AbandonedPackage
 }
 
 // EndOfLifeEntry is one row of the merged "unsupported or abandoned" table.
@@ -72,7 +70,7 @@ func (um *UnsupportedModules) RenderTemplate() (string, error) {
 		return "", nil
 	}
 
-	return um.Render("unsupported_modules.go.tmpl", entries)
+	return render("unsupported_modules.go.tmpl", entries)
 }
 
 // endOfLifeEntries returns the merged table rows. Sorted because both halves come from maps.
@@ -123,7 +121,7 @@ func (um *UnsupportedModules) collectModules() []drush.UnsupportedModule {
 
 // preMergeRequestCreateHandler takes composer_audit's abandoned packages, to render alongside.
 func (um *UnsupportedModules) preMergeRequestCreateHandler(e event.Event) error {
-	evt := e.(*services.PreMergeRequestCreateEvent)
+	evt := e.(*workflow.PreMergeRequestCreateEvent)
 
 	um.abandoned = evt.AbandonedPackages
 
@@ -132,7 +130,7 @@ func (um *UnsupportedModules) preMergeRequestCreateHandler(e event.Event) error 
 
 // preSiteUpdateHandler checks a site. Best-effort: an unreachable status service is not an error.
 func (um *UnsupportedModules) preSiteUpdateHandler(e event.Event) error {
-	evt := e.(*services.PreSiteUpdateEvent)
+	evt := e.(*workflow.PreSiteUpdateEvent)
 
 	modules, err := um.drush.GetUnsupportedModules(evt.Context(), evt.Path(), evt.Site())
 	if err != nil {

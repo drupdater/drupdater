@@ -1,8 +1,9 @@
 package addon
 
 import (
-	"github.com/drupdater/drupdater/pkg/rector"
 	"testing"
+
+	"github.com/drupdater/drupdater/pkg/rector"
 
 	"github.com/drupdater/drupdater/internal/report"
 	"github.com/drupdater/drupdater/pkg/composer"

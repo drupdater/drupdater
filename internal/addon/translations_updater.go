@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/drupdater/drupdater/internal/services"
+	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/go-git/go-git/v5"
 	"github.com/gookit/event"
 
@@ -43,7 +43,7 @@ func (tu *TranslationsUpdater) RenderTemplate() (string, error) {
 }
 
 func (tu *TranslationsUpdater) postSiteUpdateHandler(e event.Event) error {
-	evt := e.(*services.PostSiteUpdateEvent)
+	evt := e.(*workflow.PostSiteUpdateEvent)
 
 	enabled, err := tu.drush.IsModuleEnabled(evt.Context(), evt.Path(), evt.Site(), "locale_deploy")
 	if err != nil {

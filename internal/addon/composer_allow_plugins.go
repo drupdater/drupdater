@@ -3,14 +3,12 @@ package addon
 import (
 	"fmt"
 
-	"github.com/drupdater/drupdater/internal"
-	"github.com/drupdater/drupdater/internal/services"
+	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/gookit/event"
 	"go.uber.org/zap"
 )
 
 type ComposerAllowPlugins struct {
-	internal.BasicAddon
 	logger   *zap.Logger
 	composer Composer
 
@@ -42,7 +40,7 @@ func (ap *ComposerAllowPlugins) RenderTemplate() (string, error) {
 	if len(ap.newAllowPlugins) == 0 {
 		return "", nil
 	}
-	return ap.Render("allowplugins.go.tmpl", struct {
+	return render("allowplugins.go.tmpl", struct {
 		NewAllowPlugins []string
 	}{
 		NewAllowPlugins: ap.newAllowPlugins,
@@ -50,7 +48,7 @@ func (ap *ComposerAllowPlugins) RenderTemplate() (string, error) {
 }
 
 func (ap *ComposerAllowPlugins) preComposerUpdateHandler(e event.Event) error {
-	evt := e.(*services.PreComposerUpdateEvent)
+	evt := e.(*workflow.PreComposerUpdateEvent)
 
 	var err error
 	ap.allowPlugins, err = ap.composer.GetAllowPlugins(evt.Context(), evt.Path())
@@ -62,7 +60,7 @@ func (ap *ComposerAllowPlugins) preComposerUpdateHandler(e event.Event) error {
 }
 
 func (ap *ComposerAllowPlugins) postComposerUpdateHandler(e event.Event) error {
-	evt := e.(*services.PostComposerUpdateEvent)
+	evt := e.(*workflow.PostComposerUpdateEvent)
 
 	allPlugins, err := ap.composer.GetInstalledPlugins(evt.Context(), evt.Path())
 	if err != nil {

@@ -11,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/drupdater/drupdater/internal"
 	"github.com/spf13/afero"
 )
 
@@ -130,7 +129,7 @@ type Phase struct {
 }
 
 // Reporter is the optional interface an addon implements to contribute a section to the report.
-// Kept separate from internal.Addon so adding it does not force every addon and mock to change.
+// Kept separate from workflow.Addon so adding it does not force every addon and mock to change.
 type Reporter interface {
 	// ReportKey is the stable key this addon's section appears under. It should match the
 	// addon's registry name so a report reads the same way as .drupdater.yaml.
@@ -254,24 +253,25 @@ func (r *Recorder) SetAutoMerge(err error) {
 	r.report.MergeRequest.AutoMerge = am
 }
 
-// AddAddons collects a section per Reporter, skipping nil data so nothing adds an empty key.
-func (r *Recorder) AddAddons(addons []internal.Addon) {
+// AddSection records one addon's section under key. Nil data is skipped, so no key is empty.
+func (r *Recorder) AddSection(key string, data any) {
+	if data == nil {
+		return
+	}
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	for _, a := range addons {
-		reporter, ok := a.(Reporter)
-		if !ok {
-			continue
-		}
-		data := reporter.ReportData()
-		if data == nil {
-			continue
-		}
-		if r.report.Addons == nil {
-			r.report.Addons = map[string]any{}
-		}
-		r.report.Addons[reporter.ReportKey()] = data
+	if r.report.Addons == nil {
+		r.report.Addons = map[string]any{}
+	}
+	r.report.Addons[key] = data
+}
+
+// AddReporter records v's section when v implements Reporter, and is a no-op otherwise.
+func (r *Recorder) AddReporter(v any) {
+	if reporter, ok := v.(Reporter); ok {
+		r.AddSection(reporter.ReportKey(), reporter.ReportData())
 	}
 }
 

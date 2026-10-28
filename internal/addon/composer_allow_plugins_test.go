@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/drupdater/drupdater/internal/golden"
-	"github.com/drupdater/drupdater/internal/services"
+	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/go-git/go-git/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -51,7 +51,7 @@ func TestDefaultAllowPlugins_PreComposerUpdateHandler(t *testing.T) {
 
 	ap := NewComposerAllowPlugins(logger, composerRunner)
 
-	e := services.NewPreComposerUpdateEvent(ctx, path, worktree, []string{}, []string{}, false)
+	e := workflow.NewPreComposerUpdateEvent(ctx, path, worktree, []string{}, []string{}, false)
 	err := ap.preComposerUpdateHandler(e)
 
 	require.NoError(t, err)
@@ -88,7 +88,7 @@ func TestDefaultAllowPlugins_PostComposerUpdateHandler(t *testing.T) {
 	ap := NewComposerAllowPlugins(logger, composerRunner)
 	ap.allowPlugins = existingPlugins
 
-	e := services.NewPostComposerUpdateEvent(ctx, path, worktree)
+	e := workflow.NewPostComposerUpdateEvent(ctx, path, worktree)
 	err := ap.postComposerUpdateHandler(e)
 
 	require.NoError(t, err)

@@ -11,8 +11,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/drupdater/drupdater/internal"
-	"github.com/drupdater/drupdater/internal/services"
+	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/drupalorg"
 	git "github.com/go-git/go-git/v5"
@@ -56,7 +55,6 @@ type ConflictPatch struct {
 }
 
 type ComposerPatches1 struct {
-	internal.BasicAddon
 	logger       *zap.Logger
 	composer     Composer
 	drupalOrg    DrupalOrg
@@ -98,11 +96,11 @@ func (h *ComposerPatches1) RenderTemplate() (string, error) {
 	if len(h.patchUpdates.Removed) == 0 && len(h.patchUpdates.Updated) == 0 && len(h.patchUpdates.Conflicts) == 0 {
 		return "", nil
 	}
-	return h.Render("composer_patches_1.go.tmpl", h.patchUpdates)
+	return render("composer_patches_1.go.tmpl", h.patchUpdates)
 }
 
 func (h *ComposerPatches1) preComposerUpdateHandler(e event.Event) error {
-	event := e.(*services.PreComposerUpdateEvent)
+	event := e.(*workflow.PreComposerUpdateEvent)
 	ctx := event.Context()
 	path := event.Path()
 	worktree := event.Worktree()

@@ -27,12 +27,10 @@ import (
 	"github.com/gookit/event"
 	"go.uber.org/zap"
 
-	"github.com/drupdater/drupdater/internal"
-	"github.com/drupdater/drupdater/internal/services"
+	"github.com/drupdater/drupdater/internal/workflow"
 )
 
 type YourAddon struct {
-	internal.BasicAddon
 	logger *zap.Logger
 	// injected dependencies — a Composer or Drush wrapper, etc.
 }
@@ -51,7 +49,7 @@ func (a *YourAddon) SubscribedEvents() map[string]any {
 }
 
 func (a *YourAddon) OnPostCodeUpdate(e event.Event) error {
-	evt := e.(*services.PostCodeUpdateEvent)
+	evt := e.(*workflow.PostCodeUpdateEvent)
 	// evt.Context(), evt.Path(), evt.Worktree()
 	return nil
 }
@@ -62,7 +60,8 @@ func (a *YourAddon) RenderTemplate() (string, error) {
 }
 ```
 
-Embedding `BasicAddon` provides `Render(name, data)` for template rendering.
+The package-level `render(name, data)` executes a template from `internal/addon/templates/`.
+The `workflow.Addon` interface is the whole contract.
 
 ### Choosing an event and priority
 
@@ -92,7 +91,7 @@ report must be a copy — see the existing per-site addons for the pattern.
 In `cmd/root.go`, add it to `addonRegistry`:
 
 ```go
-"your_addon": func(d addonDeps) internal.Addon { return addon.NewYourAddon(d.logger) },
+"your_addon": func(d addonDeps) workflow.Addon { return addon.NewYourAddon(d.logger) },
 ```
 
 The registry key is exactly what users write in `.drupdater.yaml`. An unknown name aborts

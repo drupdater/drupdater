@@ -141,7 +141,7 @@ which is the one way a golden file can make tests worse rather than better.
 | Golden file | Pins |
 |---|---|
 | `internal/addon/testdata/*.md` | Each addon's merge request section, from its template |
-| `internal/services/testdata/dependency_update.md` | The assembled description a full run produces |
+| `internal/workflow/testdata/dependency_update.md` | The assembled description a full run produces |
 | `internal/addon/testdata/run_report.json` | The whole `--report` document, every reporting addon at once |
 
 Most of these are embedded into this documentation with `pymdownx.snippets`, so the published
@@ -156,7 +156,7 @@ renaming `fixable` to `fixable_count` and `remaining` to `still_open` broke **no
 `.github/assert-report.jq` does check field names, but only in the label-triggered integration
 run — never on a pull request.
 
-The golden is built through the real `report.Recorder`, so it also pins how `AddAddons` keys each
+The golden is built through the real `report.Recorder`, so it also pins how `AddReporter` keys each
 section. Everything a clock produced is overwritten with fixed values first — otherwise the file
 would differ on every run — which is the one thing the golden deliberately does not check.
 
@@ -193,7 +193,7 @@ still comes from an uninstrumented run.
 ### The detector only sees what actually runs
 
 This is the part worth internalising. `-race` is not a static check — it observes real memory
-accesses, so it finds nothing in code no test drives concurrently. Every `StartUpdate` test used
+accesses, so it finds nothing in code no test drives concurrently. Every `Run` test used
 to run a single site, which walks the per-site phases on one goroutine: the addon maps were
 written by one writer, and removing their mutexes would have gone unnoticed.
 
@@ -201,7 +201,7 @@ So the concurrency tests and the detector are one tool, not two:
 
 | Test | Drives |
 |---|---|
-| `TestStartUpdateWithConcurrentSites` | The real workflow with four sites, asserting the baseline installs overlap and the committing tail does not |
+| `TestRunWithConcurrentSites` | The real workflow with four sites, asserting the baseline installs overlap and the committing tail does not |
 | `internal/addon/concurrency_test.go` | Each mutex-guarded addon's per-site handler, fired from all sites at once |
 | `TestForEachSite` | The fan-out itself: the concurrency bound, and cancellation on first error |
 
@@ -212,7 +212,7 @@ without it**. When you add state that accumulates across sites, add it to
 Where the shared resource is not memory, the detector cannot help and the test has to assert
 directly. `siteCommitMu` serialises the tail of `updateSite` because the sites share one git
 index — which is mocked in the suite, so there is no shared memory to observe.
-`TestStartUpdateWithConcurrentSites` measures peak occupancy instead.
+`TestRunWithConcurrentSites` measures peak occupancy instead.
 
 ## Mutation testing
 
@@ -550,7 +550,7 @@ package it mocks. Do not edit those files by hand.
 | Path | Contains |
 |---|---|
 | `main.go` → `cmd/` | Cobra commands, flag parsing, service construction, the addon registry |
-| `internal/services/` | The workflow, its phases, events, and preflight checks |
+| `internal/workflow/` | The workflow runner, its phases, events, the `Addon` contract, and preflight checks |
 | `internal/addon/` | The addons, their report data, and their description templates |
 | `internal/codehosting/` | The GitHub and GitLab implementations and the provider factory |
 | `internal/report/` | The published JSON report schema and its writer |

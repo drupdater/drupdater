@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/drupdater/drupdater/internal/services"
+	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/stretchr/testify/assert"
@@ -41,7 +41,7 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 		worktree.EXPECT().Commit("Update patches", mock.Anything).Return(plumbing.NewHash(""), nil)
 
 		h := &ComposerPatches1{logger: logger, composer: composerService, drupalOrg: drupalOrgService}
-		e := services.NewPreComposerUpdateEvent(t.Context(), path, worktree, []string{}, []string{}, false)
+		e := workflow.NewPreComposerUpdateEvent(t.Context(), path, worktree, []string{}, []string{}, false)
 
 		require.NoError(t, h.preComposerUpdateHandler(e))
 		assert.JSONEq(t, `{}`, written)
@@ -69,7 +69,7 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 		worktree.EXPECT().Commit("Update patches", mock.Anything).Return(plumbing.NewHash(""), nil)
 
 		h := &ComposerPatches1{logger: logger, composer: composerService, drupalOrg: drupalOrgService}
-		e := services.NewPreComposerUpdateEvent(t.Context(), path, worktree, []string{}, []string{}, false)
+		e := workflow.NewPreComposerUpdateEvent(t.Context(), path, worktree, []string{}, []string{}, false)
 
 		require.NoError(t, h.preComposerUpdateHandler(e))
 		assert.Contains(t, e.PackagesToKeep, "drupal/core:8.7.0")
@@ -91,7 +91,7 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 		composerService.EXPECT().CheckIfPatchApplies(anyCtx, mock.Anything, "drupal/core", "8.8.0", path+"/patches/x.patch").Return(true, nil)
 
 		h := &ComposerPatches1{logger: logger, composer: composerService, drupalOrg: drupalOrgService}
-		e := services.NewPreComposerUpdateEvent(t.Context(), path, worktree, []string{}, []string{}, false)
+		e := workflow.NewPreComposerUpdateEvent(t.Context(), path, worktree, []string{}, []string{}, false)
 
 		// No SetConfig/UpdateLockHash/Commit expectations: the mock fails if they are called.
 		require.NoError(t, h.preComposerUpdateHandler(e))
@@ -108,7 +108,7 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 		composerService.EXPECT().GetDependencyPatches(anyCtx, path).Return(nil, nil)
 
 		h := &ComposerPatches1{logger: logger, composer: composerService}
-		e := services.NewPreComposerUpdateEvent(t.Context(), path, worktree, []string{}, []string{}, false)
+		e := workflow.NewPreComposerUpdateEvent(t.Context(), path, worktree, []string{}, []string{}, false)
 
 		require.NoError(t, h.preComposerUpdateHandler(e))
 	})
@@ -120,7 +120,7 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 		composerService.EXPECT().GetConfig(anyCtx, path, "extra.patches").Return("not-json", nil)
 
 		h := &ComposerPatches1{logger: logger, composer: composerService}
-		e := services.NewPreComposerUpdateEvent(t.Context(), path, worktree, []string{}, []string{}, false)
+		e := workflow.NewPreComposerUpdateEvent(t.Context(), path, worktree, []string{}, []string{}, false)
 
 		err := h.preComposerUpdateHandler(e)
 		require.ErrorContains(t, err, "failed to unmarshal patches")
@@ -186,7 +186,7 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 				tc.arrange(composerService, worktree)
 
 				h := &ComposerPatches1{logger: logger, composer: composerService}
-				e := services.NewPreComposerUpdateEvent(t.Context(), path, worktree, []string{}, []string{}, false)
+				e := workflow.NewPreComposerUpdateEvent(t.Context(), path, worktree, []string{}, []string{}, false)
 
 				require.ErrorContains(t, h.preComposerUpdateHandler(e), tc.wantErr)
 			})
@@ -202,7 +202,7 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 			Return(nil, errors.New("boom"))
 
 		h := &ComposerPatches1{logger: logger, composer: composerService}
-		e := services.NewPreComposerUpdateEvent(t.Context(), path, worktree, []string{}, []string{}, false)
+		e := workflow.NewPreComposerUpdateEvent(t.Context(), path, worktree, []string{}, []string{}, false)
 
 		err := h.preComposerUpdateHandler(e)
 		require.ErrorContains(t, err, "failed to get composer updates")

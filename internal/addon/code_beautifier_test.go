@@ -8,7 +8,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/drupdater/drupdater/internal/services"
+	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/drupdater/drupdater/pkg/phpcs"
 
 	git "github.com/go-git/go-git/v5"
@@ -369,7 +369,7 @@ func TestCodingStyles(t *testing.T) {
 		composer := NewMockComposer(t)
 
 		updateCodingStyles := NewCodeBeautifier(logger, runner, composer)
-		postCodeUpdate := services.NewPostCodeUpdateEvent(t.Context(), "/tmp", worktree)
+		postCodeUpdate := workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", worktree)
 
 		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
 		require.NoError(t, err)
@@ -392,7 +392,7 @@ func TestCodingStyles(t *testing.T) {
 		composer := NewMockComposer(t)
 
 		updateCodingStyles := NewCodeBeautifier(logger, runner, composer)
-		postCodeUpdate := services.NewPostCodeUpdateEvent(t.Context(), "/tmp", worktree)
+		postCodeUpdate := workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", worktree)
 
 		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
 		require.Error(t, err)
@@ -425,7 +425,7 @@ func TestCodingStyles(t *testing.T) {
 
 		// Create system under test
 		updateCodingStyles := NewCodeBeautifier(logger, runner, composer)
-		postCodeUpdate := services.NewPostCodeUpdateEvent(context.Background(), "/tmp", worktree)
+		postCodeUpdate := workflow.NewPostCodeUpdateEvent(context.Background(), "/tmp", worktree)
 
 		// Execute and verify
 		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
@@ -471,7 +471,7 @@ func TestCodingStyles(t *testing.T) {
 			Return(plumbing.NewHash(""), nil)
 
 		updateCodingStyles := NewCodeBeautifier(logger, runner, composer)
-		postCodeUpdate := services.NewPostCodeUpdateEvent(t.Context(), "/tmp", worktree)
+		postCodeUpdate := workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", worktree)
 		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
 		require.NoError(t, err)
 		runner.AssertExpectations(t)
@@ -496,7 +496,7 @@ func TestCodingStyles(t *testing.T) {
 		composer.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/coder").Return(true, nil)
 
 		updateCodingStyles := NewCodeBeautifier(logger, runner, composer)
-		postCodeUpdate := services.NewPostCodeUpdateEvent(t.Context(), "/tmp", worktree)
+		postCodeUpdate := workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", worktree)
 		require.NoError(t, updateCodingStyles.postCodeUpdateHandler(postCodeUpdate))
 		composer.AssertExpectations(t)
 	})
@@ -523,7 +523,7 @@ func TestCodingStyles(t *testing.T) {
 		composer.EXPECT().IsPackageInstalled(anyCtx, "/path/to/repo", "drupal/coder").Return(true, nil)
 
 		updateCodingStyles := NewCodeBeautifier(logger, runner, composer)
-		postCodeUpdate := services.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", worktree)
+		postCodeUpdate := workflow.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", worktree)
 		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
 		require.NoError(t, err)
 		runner.AssertExpectations(t)
@@ -602,7 +602,7 @@ func TestCodingStyles(t *testing.T) {
 		worktree.EXPECT().Commit("Update coding styles", &git.CommitOptions{}).Return(plumbing.NewHash(""), nil)
 
 		updateCodingStyles := NewCodeBeautifier(logger, runner, composer)
-		postCodeUpdate := services.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", worktree)
+		postCodeUpdate := workflow.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", worktree)
 		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
 
 		require.NoError(t, err)
@@ -633,7 +633,7 @@ func TestCodingStyles(t *testing.T) {
 		// No Commit expectation: an empty index must not trigger a commit.
 
 		updateCodingStyles := NewCodeBeautifier(logger, runner, composer)
-		postCodeUpdate := services.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", worktree)
+		postCodeUpdate := workflow.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", worktree)
 		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
 
 		require.NoError(t, err)
@@ -680,7 +680,7 @@ func TestCodingStyles(t *testing.T) {
 		composer.EXPECT().IsPackageInstalled(anyCtx, "/path/to/repo", "drupal/coder").Return(true, nil)
 
 		updateCodingStyles := NewCodeBeautifier(logger, runner, composer)
-		postCodeUpdate := services.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", worktree)
+		postCodeUpdate := workflow.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", worktree)
 		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
 
 		require.Error(t, err)
@@ -793,7 +793,7 @@ func TestCoderRemovalErrorDoesNotMaskTheRealFailure(t *testing.T) {
 	worktree.EXPECT().Commit("Install drupal/coder", &git.CommitOptions{}).Return(plumbing.NewHash(""), nil)
 
 	cb := NewCodeBeautifier(logger, runner, composer)
-	err := cb.postCodeUpdateHandler(services.NewPostCodeUpdateEvent(t.Context(), "/tmp", worktree))
+	err := cb.postCodeUpdateHandler(workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", worktree))
 
 	require.ErrorIs(t, err, phpcsErr)
 	require.NotErrorIs(t, err, assert.AnError)
@@ -825,7 +825,7 @@ func TestCoderRemovalFailureSurfacesOnAnOtherwiseCleanRun(t *testing.T) {
 	worktree.EXPECT().Commit("Install drupal/coder", &git.CommitOptions{}).Return(plumbing.NewHash(""), nil)
 
 	cb := NewCodeBeautifier(logger, runner, composer)
-	err := cb.postCodeUpdateHandler(services.NewPostCodeUpdateEvent(t.Context(), "/tmp", worktree))
+	err := cb.postCodeUpdateHandler(workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", worktree))
 
 	require.ErrorIs(t, err, assert.AnError)
 }
@@ -869,7 +869,7 @@ func TestCoderIsRemovedFromTheSectionItWasInstalledInto(t *testing.T) {
 		Return(plumbing.NewHash(""), nil)
 
 	cb := NewCodeBeautifier(logger, runner, composer)
-	require.NoError(t, cb.postCodeUpdateHandler(services.NewPostCodeUpdateEvent(t.Context(), "/tmp", worktree)))
+	require.NoError(t, cb.postCodeUpdateHandler(workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", worktree)))
 
 	assert.Contains(t, requireArgs, "drupal/coder")
 	assert.Contains(t, removeArgs, "drupal/coder")
