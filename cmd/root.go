@@ -120,6 +120,7 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	// In checkout mode the URL and target branch come from the checkout; --branch is --clone only.
 	if !config.Clone {
 		if err := resolveCheckoutSettings(git, &config); err != nil {
+			logger.Error("cannot use the checkout", zap.Error(err))
 			return err
 		}
 		logger.Info("using checkout", zap.String("url", config.RepositoryURL), zap.String("branch", config.Branch))
@@ -293,7 +294,7 @@ func resolveCheckoutSettings(git *repo.GitRepositoryService, cfg *internal.Confi
 	if cfg.RepositoryURL == "" {
 		remoteURL, err := git.GetRemoteURL(cfg.WorkingDir)
 		if err != nil {
-			return fmt.Errorf("failed to determine repository URL from checkout (pass --repository-url or run inside a checkout): %w", err)
+			return fmt.Errorf("failed to determine repository URL from checkout (pass --repository-url or fix the checkout): %w", err)
 		}
 		cfg.RepositoryURL = remoteURL
 	}
