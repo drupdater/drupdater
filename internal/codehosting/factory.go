@@ -27,14 +27,8 @@ type MergeRequest struct {
 	URL string `json:"url"`
 }
 
-type DefaultVcsProviderFactory struct{}
-
-func NewDefaultVcsProviderFactory() *DefaultVcsProviderFactory {
-	return &DefaultVcsProviderFactory{}
-}
-
-// Create returns the Platform implementation for a repository URL.
-func (vpf *DefaultVcsProviderFactory) Create(repositoryURL string, token string, logger *zap.Logger) (Platform, error) {
+// New returns the Platform implementation for a repository URL.
+func New(repositoryURL string, token string, logger *zap.Logger) (Platform, error) {
 	host, path, err := parseGitURL(repositoryURL)
 	if err != nil {
 		return nil, err
@@ -78,7 +72,7 @@ func providerFromHost(host string) string {
 	}
 }
 
-// ValidateRepositoryURL validates against exactly what Create accepts, SCP-style URLs included.
+// ValidateRepositoryURL validates against exactly what New accepts, SCP-style URLs included.
 func ValidateRepositoryURL(raw string) error {
 	_, _, err := parseGitURL(raw)
 	return err

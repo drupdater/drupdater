@@ -4,7 +4,7 @@ import (
 	"cmp"
 	"slices"
 
-	"github.com/drupdater/drupdater/internal/services"
+	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/drupdater/drupdater/pkg/rector"
 	"github.com/gookit/event"
 
@@ -45,7 +45,7 @@ func (dr *DeprecationsRemover) RenderTemplate() (string, error) {
 }
 
 func (dr *DeprecationsRemover) postCodeUpdateHandler(e event.Event) error {
-	evt := e.(*services.PostCodeUpdateEvent)
+	evt := e.(*workflow.PostCodeUpdateEvent)
 
 	dr.logger.Info("removing deprecations")
 

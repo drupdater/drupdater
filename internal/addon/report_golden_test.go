@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/golden"
 	"github.com/drupdater/drupdater/internal/report"
+	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/drush"
 	"github.com/stretchr/testify/require"
@@ -28,7 +28,7 @@ var fixedTime = time.Date(2026, 3, 14, 9, 30, 0, 0, time.UTC)
 
 // reportingAddons builds one of every addon that contributes a section, populated so no field is
 // left at its zero value — an omitempty field that is never set cannot be pinned.
-func reportingAddons() []internal.Addon {
+func reportingAddons() []workflow.Addon {
 	beforeAudit := composer.Audit{
 		Advisories: []composer.Advisory{
 			{
@@ -52,7 +52,7 @@ func reportingAddons() []internal.Addon {
 		},
 	}
 
-	return []internal.Addon{
+	return []workflow.Addon{
 		&ComposerAudit{beforeAudit: beforeAudit, afterAudit: afterAudit},
 		&UpdateHooks{hooks: UpdateHooksPerSite{
 			"default": {"token_update_8002": {Module: "token", UpdateID: 8002, Description: "Rebuild the token cache", Type: "hook_update_n"}},
@@ -103,7 +103,7 @@ func normaliseTimes(rep *report.Report) {
 }
 
 func TestRunReportMatchesItsGoldenFile(t *testing.T) {
-	// The real recorder rather than a hand-built struct, so the golden also pins how AddAddons
+	// The real recorder rather than a hand-built struct, so the golden also pins how AddReporter
 	// keys the sections and what Finish fills in.
 	rec := report.NewRecorder("v1.4.0", report.ModeSecurity, false,
 		"https://oauth2:token@github.com/org/site.git", "main", []string{"default", "second"})
@@ -121,7 +121,9 @@ func TestRunReportMatchesItsGoldenFile(t *testing.T) {
 	rec.SetMergeRequestContent("Drupal Security Update", "## 🔒 **Security Report**\n")
 	rec.SetMergeRequest("https://github.com/org/site/pull/42")
 	rec.SetAutoMerge(nil)
-	rec.AddAddons(reportingAddons())
+	for _, a := range reportingAddons() {
+		rec.AddReporter(a)
+	}
 
 	rep := rec.Finish()
 	normaliseTimes(&rep)
@@ -137,7 +139,9 @@ func TestRunReportMatchesItsGoldenFile(t *testing.T) {
 func TestRunReportGoldenCarriesNoCredential(t *testing.T) {
 	rec := report.NewRecorder("v1.4.0", report.ModeSecurity, false,
 		"https://oauth2:token@github.com/org/site.git", "main", []string{"default"})
-	rec.AddAddons(reportingAddons())
+	for _, a := range reportingAddons() {
+		rec.AddReporter(a)
+	}
 
 	encoded, err := json.Marshal(rec.Finish())
 	require.NoError(t, err)

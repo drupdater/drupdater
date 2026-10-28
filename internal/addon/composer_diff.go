@@ -3,14 +3,12 @@ package addon
 import (
 	"fmt"
 
-	"github.com/drupdater/drupdater/internal"
-	"github.com/drupdater/drupdater/internal/services"
+	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/gookit/event"
 	"go.uber.org/zap"
 )
 
 type ComposerDiff struct {
-	internal.BasicAddon
 	logger   *zap.Logger
 	composer Composer
 
@@ -38,11 +36,11 @@ func (cd *ComposerDiff) RenderTemplate() (string, error) {
 	if cd.table == "" {
 		return "", nil
 	}
-	return cd.Render("composer_diff.go.tmpl", cd.table)
+	return render("composer_diff.go.tmpl", cd.table)
 }
 
 func (cd *ComposerDiff) postComposerUpdateHandler(e event.Event) error {
-	evt := e.(*services.PostComposerUpdateEvent)
+	evt := e.(*workflow.PostComposerUpdateEvent)
 
 	table, err := cd.composer.Diff(evt.Context(), evt.Path(), true)
 	if err != nil {

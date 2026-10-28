@@ -22,7 +22,7 @@ import (
 	"github.com/drupdater/drupdater/internal/codehosting"
 	"github.com/drupdater/drupdater/internal/logging"
 	"github.com/drupdater/drupdater/internal/report"
-	"github.com/drupdater/drupdater/internal/services"
+	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/drupal"
 	"github.com/drupdater/drupdater/pkg/drupalorg"
@@ -132,8 +132,7 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	// Built only for a run that clones or publishes; see tokenRequired.
 	var platform codehosting.Platform
 	if tokenRequired(config) {
-		vcsProviderFactory := codehosting.NewDefaultVcsProviderFactory()
-		platform, err = vcsProviderFactory.Create(config.RepositoryURL, config.Token, logger)
+		platform, err = codehosting.New(config.RepositoryURL, config.Token, logger)
 		if err != nil {
 			logger.Error("failed to create VCS provider", zap.Error(err))
 			return err
@@ -146,13 +145,13 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	}
 	dispatcher := createDispatcher(addons)
 
-	var opts []services.Option
+	var opts []workflow.Option
 	if config.ReportPath != "" {
-		opts = append(opts, services.WithReportSink(reportSink(logger, redactor, config.ReportPath)))
+		opts = append(opts, workflow.WithReportSink(reportSink(logger, redactor, config.ReportPath)))
 	}
-	workflow := newWorkflowService(logger, config, drush, platform, git, installer, composer, dispatcher, opts...)
+	runner := newRunner(logger, config, drush, platform, git, installer, composer, dispatcher, opts...)
 
-	err = workflow.StartUpdate(cmd.Context(), addons)
+	err = runner.Run(cmd.Context(), addons)
 	if err != nil {
 		if err := handleWorkflowError(logger, err); err != nil {
 			return err
@@ -163,24 +162,24 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// updateWorkflow is narrow so a test can drive runUpdate without a real repository or subprocesses.
-type updateWorkflow interface {
-	StartUpdate(ctx context.Context, addons []internal.Addon) error
+// updateRunner is narrow so a test can drive runUpdate without a real repository or subprocesses.
+type updateRunner interface {
+	Run(ctx context.Context, addons []workflow.Addon) error
 }
 
-// newWorkflowService is a variable purely as a test seam: only the run itself gets replaced.
-var newWorkflowService = func(
+// newRunner is a variable purely as a test seam: only the run itself gets replaced.
+var newRunner = func(
 	logger *zap.Logger,
 	cfg internal.Config,
-	drushSvc services.Drush,
+	drushSvc workflow.Drush,
 	platform codehosting.Platform,
-	gitSvc services.Repository,
-	installerSvc services.Installer,
-	composerSvc services.Composer,
-	dispatcher services.EventDispatcher,
-	opts ...services.Option,
-) updateWorkflow {
-	return services.NewWorkflowBaseService(logger, cfg, drushSvc, platform, gitSvc, installerSvc, composerSvc, dispatcher, opts...)
+	gitSvc workflow.Repository,
+	installerSvc workflow.Installer,
+	composerSvc workflow.Composer,
+	dispatcher workflow.EventDispatcher,
+	opts ...workflow.Option,
+) updateRunner {
+	return workflow.New(logger, cfg, drushSvc, platform, gitSvc, installerSvc, composerSvc, dispatcher, opts...)
 }
 
 // reportSink writes the run report to path. A write failure is logged, never returned: on the
@@ -357,25 +356,25 @@ type addonDeps struct {
 }
 
 // addonRegistry maps the names used in .drupdater.yaml to their constructors.
-var addonRegistry = map[string]func(addonDeps) internal.Addon{
-	"composer_audit": func(d addonDeps) internal.Addon {
+var addonRegistry = map[string]func(addonDeps) workflow.Addon{
+	"composer_audit": func(d addonDeps) workflow.Addon {
 		return addon.NewComposerAudit(d.logger, d.composer, d.security)
 	},
-	"code_beautifier": func(d addonDeps) internal.Addon {
+	"code_beautifier": func(d addonDeps) workflow.Addon {
 		return addon.NewCodeBeautifier(d.logger, phpcs.NewCLI(d.logger), d.composer)
 	},
-	"deprecations_remover": func(d addonDeps) internal.Addon {
+	"deprecations_remover": func(d addonDeps) workflow.Addon {
 		return addon.NewDeprecationsRemover(d.logger, rector.NewCLI(d.logger), d.composer)
 	},
-	"translations_updater":   func(d addonDeps) internal.Addon { return addon.NewTranslationsUpdater(d.logger, d.drush, d.git) },
-	"composer_allow_plugins": func(d addonDeps) internal.Addon { return addon.NewComposerAllowPlugins(d.logger, d.composer) },
-	"composer_normalizer":    func(d addonDeps) internal.Addon { return addon.NewComposerNormalizer(d.logger, d.composer) },
-	"composer_patches": func(d addonDeps) internal.Addon {
+	"translations_updater":   func(d addonDeps) workflow.Addon { return addon.NewTranslationsUpdater(d.logger, d.drush, d.git) },
+	"composer_allow_plugins": func(d addonDeps) workflow.Addon { return addon.NewComposerAllowPlugins(d.logger, d.composer) },
+	"composer_normalizer":    func(d addonDeps) workflow.Addon { return addon.NewComposerNormalizer(d.logger, d.composer) },
+	"composer_patches": func(d addonDeps) workflow.Addon {
 		return addon.NewComposerPatches1(d.logger, d.composer, d.drupalOrg, http.DefaultClient)
 	},
-	"composer_diff":       func(d addonDeps) internal.Addon { return addon.NewComposerDiff(d.logger, d.composer) },
-	"update_hooks":        func(d addonDeps) internal.Addon { return addon.NewUpdateHooks(d.logger, d.drush) },
-	"unsupported_modules": func(d addonDeps) internal.Addon { return addon.NewUnsupportedModules(d.logger, d.drush) },
+	"composer_diff":       func(d addonDeps) workflow.Addon { return addon.NewComposerDiff(d.logger, d.composer) },
+	"update_hooks":        func(d addonDeps) workflow.Addon { return addon.NewUpdateHooks(d.logger, d.drush) },
+	"unsupported_modules": func(d addonDeps) workflow.Addon { return addon.NewUnsupportedModules(d.logger, d.drush) },
 }
 
 // mandatoryAddons always run, regardless of the .drupdater.yaml addon lists. composer_audit and
@@ -397,12 +396,12 @@ func createAddons(
 	composer addon.Composer,
 	drupalOrg addon.DrupalOrg,
 	git addon.Repository,
-) ([]internal.Addon, error) {
+) ([]workflow.Addon, error) {
 	deps := addonDeps{logger: logger, drush: drush, composer: composer, drupalOrg: drupalOrg, git: git, security: config.Security}
 
 	names := config.ActiveRunType().Addons
 
-	var addons []internal.Addon
+	var addons []workflow.Addon
 	added := map[string]bool{}
 	build := func(name string) error {
 		if added[name] {
@@ -461,7 +460,7 @@ var addonsCmd = &cobra.Command{
 }
 
 // createDispatcher subscribes every addon to a new event manager.
-func createDispatcher(addons []internal.Addon) services.EventDispatcher {
+func createDispatcher(addons []workflow.Addon) workflow.EventDispatcher {
 	dispatcher := event.NewManager("")
 	for _, addon := range addons {
 		dispatcher.AddSubscriber(addon)
@@ -471,7 +470,7 @@ func createDispatcher(addons []internal.Addon) services.EventDispatcher {
 
 // handleWorkflowError logs AbortErrors as warnings (non-fatal) and all others as errors (fatal).
 func handleWorkflowError(logger *zap.Logger, err error) error {
-	if errors.As(err, &services.AbortError{}) {
+	if errors.As(err, &workflow.AbortError{}) {
 		logger.Warn("update aborted", zap.Error(err))
 		return nil
 	}

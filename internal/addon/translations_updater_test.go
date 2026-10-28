@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/drupdater/drupdater/internal/services"
+	"github.com/drupdater/drupdater/internal/workflow"
 
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -44,7 +44,7 @@ func TestUpdateTranslationsEventHandlerWithoutLocaleDeploy(t *testing.T) {
 
 	mockDrush.EXPECT().IsModuleEnabled(anyCtx, "/tmp", "example.com", "locale_deploy").Return(false, nil)
 
-	event := services.NewPostSiteUpdateEvent(ctx, path, worktree, "example.com")
+	event := workflow.NewPostSiteUpdateEvent(ctx, path, worktree, "example.com")
 	err := handler.postSiteUpdateHandler(event)
 
 	require.NoError(t, err)
@@ -77,7 +77,7 @@ func TestUpdateTranslationsEventHandlerWithLocaleDeploy(t *testing.T) {
 	worktree.EXPECT().Commit("Update translations", &git.CommitOptions{}).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().Status().Return(git.Status{}, nil)
 
-	event := services.NewPostSiteUpdateEvent(ctx, path, worktree, "example.com")
+	event := workflow.NewPostSiteUpdateEvent(ctx, path, worktree, "example.com")
 	err := handler.postSiteUpdateHandler(event)
 
 	require.NoError(t, err)
@@ -105,7 +105,7 @@ func TestUpdateTranslationsEventHandlerSkipsWhenTranslationPathUnavailable(t *te
 	mockDrush.EXPECT().LocalizeTranslations(anyCtx, "/tmp", "example.com").Return(nil)
 	mockDrush.EXPECT().GetTranslationPath(anyCtx, "/tmp", "example.com", true).Return("", assert.AnError)
 
-	event := services.NewPostSiteUpdateEvent(ctx, path, worktree, "example.com")
+	event := workflow.NewPostSiteUpdateEvent(ctx, path, worktree, "example.com")
 	err := handler.postSiteUpdateHandler(event)
 
 	require.NoError(t, err)
@@ -136,7 +136,7 @@ func TestUpdateTranslationsEventHandlerRecordsNothingToCommit(t *testing.T) {
 	worktree.EXPECT().Status().Return(git.Status{}, nil)
 	mockRepository.EXPECT().IsSomethingStagedInPath(worktree, "translations").Return(false)
 
-	event := services.NewPostSiteUpdateEvent(context.Background(), "/tmp", worktree, "example.com")
+	event := workflow.NewPostSiteUpdateEvent(context.Background(), "/tmp", worktree, "example.com")
 	require.NoError(t, handler.postSiteUpdateHandler(event))
 
 	assert.Equal(t, map[string]TranslationResult{

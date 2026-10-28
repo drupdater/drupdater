@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/drupdater/drupdater/internal/golden"
-	"github.com/drupdater/drupdater/internal/services"
+	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/gookit/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -41,7 +41,7 @@ func TestComposerDiff_PostComposerUpdateHandler_Success(t *testing.T) {
 	testPath := "/test/path"
 	expectedDiff := "package diff table"
 
-	mockEvent := services.NewPostComposerUpdateEvent(ctx, testPath, nil)
+	mockEvent := workflow.NewPostComposerUpdateEvent(ctx, testPath, nil)
 
 	mockComposer.EXPECT().Diff(ctx, testPath, true).Return(expectedDiff, nil)
 	mockComposer.EXPECT().Diff(ctx, testPath, false).Return("plain text diff", nil)

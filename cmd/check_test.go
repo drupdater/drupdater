@@ -10,7 +10,7 @@ import (
 
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/logging"
-	"github.com/drupdater/drupdater/internal/services"
+	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -115,7 +115,7 @@ func TestCheckVCS(t *testing.T) {
 
 func TestPrintCheckResults(t *testing.T) {
 	var buf bytes.Buffer
-	printCheckResults(&buf, []services.CheckResult{
+	printCheckResults(&buf, []workflow.CheckResult{
 		{Name: "a", OK: true},
 		{Name: "b", OK: false, Detail: "went wrong"},
 		{Name: "c", OK: false},
@@ -133,7 +133,7 @@ func TestPrintCheckResultsRedactsDetail(t *testing.T) {
 	redactor.Register("s3cr3t-token")
 
 	var buf bytes.Buffer
-	printCheckResults(&buf, []services.CheckResult{
+	printCheckResults(&buf, []workflow.CheckResult{
 		{Name: "composer install", OK: false, Detail: "fetch failed: https://s3cr3t-token@example.com/repo.git: 403"},
 	}, redactor)
 
@@ -143,8 +143,8 @@ func TestPrintCheckResultsRedactsDetail(t *testing.T) {
 }
 
 func TestAnyCheckFailed(t *testing.T) {
-	assert.False(t, anyCheckFailed([]services.CheckResult{{OK: true}, {OK: true}}))
-	assert.True(t, anyCheckFailed([]services.CheckResult{{OK: true}, {OK: false}}))
+	assert.False(t, anyCheckFailed([]workflow.CheckResult{{OK: true}, {OK: true}}))
+	assert.True(t, anyCheckFailed([]workflow.CheckResult{{OK: true}, {OK: false}}))
 	assert.False(t, anyCheckFailed(nil))
 }
 

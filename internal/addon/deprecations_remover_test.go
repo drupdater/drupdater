@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/drupdater/drupdater/internal/services"
+	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/drupdater/drupdater/pkg/rector"
 
 	git "github.com/go-git/go-git/v5"
@@ -78,7 +78,7 @@ func TestRemoveDeprecations(t *testing.T) {
 		worktree.EXPECT().Status().Return(git.Status{}, nil).Once()
 
 		updateRemoveDeprecations := NewDeprecationsRemover(logger, runner, composer)
-		postCodeUpdate := services.NewPostCodeUpdateEvent(context.Background(), "/path/to/repo", worktree)
+		postCodeUpdate := workflow.NewPostCodeUpdateEvent(context.Background(), "/path/to/repo", worktree)
 		err := updateRemoveDeprecations.postCodeUpdateHandler(postCodeUpdate)
 
 		require.NoError(t, err)
@@ -107,7 +107,7 @@ func TestRemoveDeprecations(t *testing.T) {
 		wt.EXPECT().Commit("Remove temporary drupal-rector installation", mock.Anything).Return(plumbing.NewHash(""), nil).Once()
 
 		updateRemoveDeprecations := NewDeprecationsRemover(logger, runner, composer)
-		postCodeUpdate := services.NewPostCodeUpdateEvent(context.Background(), "/path/to/repo", wt)
+		postCodeUpdate := workflow.NewPostCodeUpdateEvent(context.Background(), "/path/to/repo", wt)
 		err := updateRemoveDeprecations.postCodeUpdateHandler(postCodeUpdate)
 
 		require.NoError(t, err)
@@ -144,7 +144,7 @@ func TestRemoveDeprecations(t *testing.T) {
 		worktree.EXPECT().Commit("Remove deprecations", mock.Anything).Return(plumbing.NewHash(""), nil)
 
 		updateRemoveDeprecations := NewDeprecationsRemover(logger, runner, composer)
-		postCodeUpdate := services.NewPostCodeUpdateEvent(context.Background(), "/path/to/repo", worktree)
+		postCodeUpdate := workflow.NewPostCodeUpdateEvent(context.Background(), "/path/to/repo", worktree)
 		err := updateRemoveDeprecations.postCodeUpdateHandler(postCodeUpdate)
 
 		require.NoError(t, err)
@@ -169,7 +169,7 @@ func TestRemoveDeprecations(t *testing.T) {
 		}, nil)
 
 		updateRemoveDeprecations := NewDeprecationsRemover(logger, runner, composer)
-		postCodeUpdate := services.NewPostCodeUpdateEvent(context.Background(), "/path/to/repo", worktree)
+		postCodeUpdate := workflow.NewPostCodeUpdateEvent(context.Background(), "/path/to/repo", worktree)
 		err := updateRemoveDeprecations.postCodeUpdateHandler(postCodeUpdate)
 
 		require.NoError(t, err)
@@ -187,7 +187,7 @@ func TestRemoveDeprecations(t *testing.T) {
 		runner.EXPECT().Run(anyCtx, "/path/to/repo", []string{"web/modules/custom"}).Return(rector.ReturnOutput{}, assert.AnError)
 
 		updateRemoveDeprecations := NewDeprecationsRemover(logger, runner, composer)
-		postCodeUpdate := services.NewPostCodeUpdateEvent(context.Background(), "/path/to/repo", worktree)
+		postCodeUpdate := workflow.NewPostCodeUpdateEvent(context.Background(), "/path/to/repo", worktree)
 		err := updateRemoveDeprecations.postCodeUpdateHandler(postCodeUpdate)
 
 		require.Error(t, err)

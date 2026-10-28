@@ -1,4 +1,4 @@
-package internal
+package addon
 
 import (
 	"testing"
@@ -7,17 +7,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestBasicAddon_Render(t *testing.T) {
-	ba := &BasicAddon{}
-
+func TestRender(t *testing.T) {
 	t.Run("renders a known template", func(t *testing.T) {
-		out, err := ba.Render("update_hooks.go.tmpl", map[string]any{})
+		out, err := render("update_hooks.go.tmpl", map[string]any{})
 		require.NoError(t, err)
 		assert.NotEmpty(t, out)
 	})
 
 	t.Run("unknown template returns error", func(t *testing.T) {
-		_, err := ba.Render("nonexistent.go.tmpl", nil)
+		_, err := render("nonexistent.go.tmpl", nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to execute template")
 	})

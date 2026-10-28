@@ -8,7 +8,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func TestDefaultVcsProviderFactory_Create(t *testing.T) {
+func TestNew(t *testing.T) {
 	tests := []struct {
 		name          string
 		repositoryURL string
@@ -48,9 +48,7 @@ func TestDefaultVcsProviderFactory_Create(t *testing.T) {
 			t.Setenv("GITHUB_ACTIONS", "")
 			t.Setenv("GITLAB_CI", "")
 
-			factory := NewDefaultVcsProviderFactory()
-
-			provider, err := factory.Create(tt.repositoryURL, "dummy-token", zap.NewNop())
+			provider, err := New(tt.repositoryURL, "dummy-token", zap.NewNop())
 
 			require.NoError(t, err)
 			assert.IsType(t, tt.expectedType, provider)
@@ -58,7 +56,7 @@ func TestDefaultVcsProviderFactory_Create(t *testing.T) {
 	}
 }
 
-func TestDefaultVcsProviderFactory_Create_CIEnvVars(t *testing.T) {
+func TestNew_CIEnvVars(t *testing.T) {
 	tests := []struct {
 		name          string
 		repositoryURL string
@@ -102,8 +100,7 @@ func TestDefaultVcsProviderFactory_Create_CIEnvVars(t *testing.T) {
 			t.Setenv("GITLAB_CI", "")
 			t.Setenv(tt.envKey, tt.envValue)
 
-			factory := NewDefaultVcsProviderFactory()
-			provider, err := factory.Create(tt.repositoryURL, "dummy-token", zap.NewNop())
+			provider, err := New(tt.repositoryURL, "dummy-token", zap.NewNop())
 
 			require.NoError(t, err)
 			assert.IsType(t, tt.expectedType, provider)
@@ -162,13 +159,11 @@ func TestProviderFromEnv(t *testing.T) {
 	}
 }
 
-func TestDefaultVcsProviderFactory_Create_InvalidURL(t *testing.T) {
+func TestNew_InvalidURL(t *testing.T) {
 	t.Setenv("GITHUB_ACTIONS", "")
 	t.Setenv("GITLAB_CI", "")
 
-	factory := NewDefaultVcsProviderFactory()
-
-	_, err := factory.Create("", "dummy-token", zap.NewNop())
+	_, err := New("", "dummy-token", zap.NewNop())
 	require.Error(t, err)
 }
 
