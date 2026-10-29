@@ -16,8 +16,8 @@ Runs immediately before each site's update hooks are executed, and asks Drush fo
 pending hook list. It runs at the **Inspect** stage on `pre-site-update`, so it observes the state after any
 addon that changes the site on that event has finished.
 
-Sites are processed concurrently, so the collected map is mutex-guarded and keyed by
-site: the same module can have different pending hooks on different sites.
+The hooks are kept per site: the same module can have different pending hooks on different
+sites.
 
 ## Why it exists
 

@@ -33,22 +33,6 @@ func initRepoWithCommit(t *testing.T) (string, *git.Repository) {
 	return dir, r
 }
 
-func TestOpenRepositoryRemovesPrepareCommitMsgHook(t *testing.T) {
-	service := NewGitRepositoryService(zap.NewNop())
-
-	dir, _ := initRepoWithCommit(t)
-	hookPath := filepath.Join(dir, ".git", "hooks", "prepare-commit-msg")
-	require.NoError(t, os.MkdirAll(filepath.Dir(hookPath), 0o755))
-	require.NoError(t, os.WriteFile(hookPath, []byte("#!/bin/sh\nexit 1\n"), 0o600))
-
-	_, worktree, _, err := service.OpenRepository(dir, "Bot", "bot@example.com")
-	require.NoError(t, err)
-	assert.NotNil(t, worktree)
-
-	// The hook is removed because it cannot be bypassed with --no-verify.
-	assert.NoFileExists(t, hookPath)
-}
-
 func TestGetRemoteURLFallsBackForSCPStyleURLs(t *testing.T) {
 	service := NewGitRepositoryService(zap.NewNop())
 
@@ -90,14 +74,6 @@ func TestGetRemoteURLErrorsWhenOriginMissing(t *testing.T) {
 	require.ErrorIs(t, err, git.ErrRemoteNotFound)
 }
 
-func TestOpenRepositoryErrorsOnNonRepository(t *testing.T) {
-	service := NewGitRepositoryService(zap.NewNop())
-
-	_, _, _, err := service.OpenRepository(t.TempDir(), "Bot", "bot@example.com")
-	require.Error(t, err)
-	require.ErrorIs(t, err, git.ErrRepositoryNotExists)
-}
-
 func TestIsShallowCloneErrorsOnNonRepository(t *testing.T) {
 	service := NewGitRepositoryService(zap.NewNop())
 
@@ -114,11 +90,13 @@ func TestCloneRepository(t *testing.T) {
 		head, err := r.Head()
 		require.NoError(t, err)
 
-		repository, worktree, path, err := service.CloneRepository(source, head.Name().Short(), "", "Bot", "bot@example.com")
+		checkout, err := service.CloneRepository(source, head.Name().Short(), "", "Bot", "bot@example.com")
 		require.NoError(t, err)
-		assert.NotNil(t, repository)
-		assert.NotNil(t, worktree)
+		path := checkout.Path
+		assert.NotNil(t, checkout.Repository)
+		assert.NotNil(t, checkout.Worktree)
 		require.NotEmpty(t, path)
+		assert.Equal(t, Identity{Name: "Bot", Email: "bot@example.com"}, checkout.Author)
 
 		// The clone lives under a per-URL directory in the temp dir, which is what lets the
 		// workflow's cleanup remove just this run's clone.
@@ -129,8 +107,7 @@ func TestCloneRepository(t *testing.T) {
 		require.NoError(t, err)
 		cfg, err := cloned.Config()
 		require.NoError(t, err)
-		assert.Equal(t, "Bot", cfg.User.Name)
-		assert.Equal(t, "bot@example.com", cfg.User.Email)
+		assert.Empty(t, cfg.User.Name, "the identity travels with each commit, not in git config")
 
 		t.Cleanup(func() { _ = os.RemoveAll(path) })
 	})
@@ -158,8 +135,9 @@ func TestCloneRepository(t *testing.T) {
 		head, err := r.Head()
 		require.NoError(t, err)
 
-		_, _, path, err := service.CloneRepository(source, head.Name().Short(), "", "Bot", "bot@example.com")
+		checkout, err := service.CloneRepository(source, head.Name().Short(), "", "Bot", "bot@example.com")
 		require.NoError(t, err)
+		path := checkout.Path
 		t.Cleanup(func() { _ = os.RemoveAll(path) })
 
 		shallow, err := service.IsShallowClone(path)
@@ -188,7 +166,7 @@ func TestCloneRepository(t *testing.T) {
 	})
 
 	t.Run("returns the clone error for an unreachable repository", func(t *testing.T) {
-		_, _, _, err := service.CloneRepository(t.TempDir(), "main", "", "Bot", "bot@example.com")
+		_, err := service.CloneRepository(t.TempDir(), "main", "", "Bot", "bot@example.com")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "git clone")
 		require.ErrorIs(t, err, transport.ErrRepositoryNotFound)
@@ -197,50 +175,16 @@ func TestCloneRepository(t *testing.T) {
 	t.Run("returns the clone error for a branch that does not exist", func(t *testing.T) {
 		source, _ := initRepoWithCommit(t)
 
-		_, _, _, err := service.CloneRepository(source, "no-such-branch", "", "Bot", "bot@example.com")
+		_, err := service.CloneRepository(source, "no-such-branch", "", "Bot", "bot@example.com")
 		require.Error(t, err)
 	})
 
 	t.Run("returns the error when the project directory cannot be created", func(t *testing.T) {
 		roService := &GitRepositoryService{logger: zap.NewNop(), fs: afero.NewReadOnlyFs(afero.NewMemMapFs())}
 
-		_, _, _, err := roService.CloneRepository("https://example.com/repo.git", "main", "", "Bot", "bot@example.com")
+		_, err := roService.CloneRepository("https://example.com/repo.git", "main", "", "Bot", "bot@example.com")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to create project directory")
-	})
-}
-
-func TestHead(t *testing.T) {
-	// Head() is what StartUpdate uses to capture a checkout-mode run's original state before
-	// creating drupdater's own throwaway work branch, so it can restore it if the run fails.
-	service := NewGitRepositoryService(zap.NewNop())
-
-	t.Run("resolves to the checked-out branch", func(t *testing.T) {
-		dir, _ := initRepoWithCommit(t)
-
-		repository, _, _, err := service.OpenRepository(dir, "Bot", "bot@example.com")
-		require.NoError(t, err)
-
-		ref, err := repository.Head()
-		require.NoError(t, err)
-		assert.True(t, ref.Name().IsBranch())
-	})
-
-	t.Run("resolves directly to a commit hash when detached", func(t *testing.T) {
-		dir, r := initRepoWithCommit(t)
-		head, err := r.Head()
-		require.NoError(t, err)
-		wt, err := r.Worktree()
-		require.NoError(t, err)
-		require.NoError(t, wt.Checkout(&git.CheckoutOptions{Hash: head.Hash()}))
-
-		repository, _, _, err := service.OpenRepository(dir, "Bot", "bot@example.com")
-		require.NoError(t, err)
-
-		ref, err := repository.Head()
-		require.NoError(t, err)
-		assert.False(t, ref.Name().IsBranch())
-		assert.Equal(t, head.Hash(), ref.Hash())
 	})
 }
 
@@ -268,8 +212,9 @@ func TestIsShallowClone(t *testing.T) {
 		head, err := r.Head()
 		require.NoError(t, err)
 
-		_, _, path, err := service.CloneRepository(source, head.Name().Short(), "", "Bot", "bot@example.com")
+		checkout, err := service.CloneRepository(source, head.Name().Short(), "", "Bot", "bot@example.com")
 		require.NoError(t, err)
+		path := checkout.Path
 		t.Cleanup(func() { _ = os.RemoveAll(path) })
 
 		shallow, err := service.IsShallowClone(path)
@@ -280,167 +225,5 @@ func TestIsShallowClone(t *testing.T) {
 	t.Run("errors on a non-repository path", func(t *testing.T) {
 		_, err := service.IsShallowClone(t.TempDir())
 		require.Error(t, err)
-	})
-}
-
-// isolateGitConfig gives these tests a CI runner's identity-less environment, not the
-// developer's own ~/.gitconfig.
-func isolateGitConfig(t *testing.T) string {
-	t.Helper()
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
-	return home
-}
-
-func TestPrepareCheckoutKeepsExistingGlobalIdentity(t *testing.T) {
-	service := NewGitRepositoryService(zap.NewNop())
-
-	// The fallback fires only when nothing supplies an identity: overwriting a developer's
-	// global one would attribute their later commits to drupdater.
-	home := isolateGitConfig(t)
-	require.NoError(t, os.WriteFile(filepath.Join(home, ".gitconfig"),
-		[]byte("[user]\n\tname = Real Person\n\temail = real@example.com\n"), 0o600))
-
-	dir := t.TempDir()
-	_, err := git.PlainInit(dir, false)
-	require.NoError(t, err)
-
-	_, _, _, err = service.OpenRepository(dir, "", "")
-	require.NoError(t, err)
-
-	r, err := git.PlainOpen(dir)
-	require.NoError(t, err)
-	cfg, err := r.Config()
-	require.NoError(t, err)
-	assert.NotEqual(t, defaultCommitName, cfg.User.Name)
-	assert.NotEqual(t, defaultCommitEmail, cfg.User.Email)
-}
-
-func TestPrepareCheckoutKeepsExplicitIdentity(t *testing.T) {
-	service := NewGitRepositoryService(zap.NewNop())
-
-	// A caller-supplied identity must win over the fallback, or every commit is attributed to
-	// the generic default instead of the bot account the run authenticated as.
-	isolateGitConfig(t)
-
-	dir := t.TempDir()
-	_, err := git.PlainInit(dir, false)
-	require.NoError(t, err)
-
-	_, _, _, err = service.OpenRepository(dir, "Bot", "bot@example.com")
-	require.NoError(t, err)
-
-	r, err := git.PlainOpen(dir)
-	require.NoError(t, err)
-	cfg, err := r.Config()
-	require.NoError(t, err)
-	assert.Equal(t, "Bot", cfg.User.Name)
-	assert.Equal(t, "bot@example.com", cfg.User.Email)
-}
-
-func TestPrepareCheckoutReportsHookRemovalFailure(t *testing.T) {
-	isolateGitConfig(t)
-
-	dir := t.TempDir()
-	_, err := git.PlainInit(dir, false)
-	require.NoError(t, err)
-	hooks := filepath.Join(dir, ".git", "hooks")
-	require.NoError(t, os.MkdirAll(hooks, 0o750))
-	require.NoError(t, os.WriteFile(filepath.Join(hooks, "prepare-commit-msg"), []byte("#!/bin/sh\n"), 0o600))
-
-	// Stat succeeds but Remove cannot: a hook that is found and then left in place would let
-	// `drush config:export --commit` run it, which is exactly what the removal prevents.
-	roService := &GitRepositoryService{logger: zap.NewNop(), fs: afero.NewReadOnlyFs(afero.NewOsFs())}
-
-	_, _, _, err = roService.OpenRepository(dir, "Bot", "bot@example.com")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to remove prepare-commit-msg hook")
-}
-
-func TestPrepareCheckoutCommitIdentityFallback(t *testing.T) {
-	service := NewGitRepositoryService(zap.NewNop())
-
-	t.Run("falls back when nothing supplies an identity", func(t *testing.T) {
-		// A tokenless dry run has no platform to ask and a CI checkout no identity of its own,
-		// so without a fallback the first commit dies on "author field is required".
-		isolateGitConfig(t)
-		dir := t.TempDir()
-		_, err := git.PlainInit(dir, false)
-		require.NoError(t, err)
-
-		_, _, _, err = service.OpenRepository(dir, "", "")
-		require.NoError(t, err)
-
-		r, err := git.PlainOpen(dir)
-		require.NoError(t, err)
-		cfg, err := r.Config()
-		require.NoError(t, err)
-		assert.Equal(t, defaultCommitName, cfg.User.Name)
-		assert.Equal(t, defaultCommitEmail, cfg.User.Email)
-	})
-
-	t.Run("a commit actually succeeds with only the fallback", func(t *testing.T) {
-		// The regression this guards is not the config value but the commit itself.
-		isolateGitConfig(t)
-		dir := t.TempDir()
-		_, err := git.PlainInit(dir, false)
-		require.NoError(t, err)
-		require.NoError(t, os.WriteFile(filepath.Join(dir, "file.txt"), []byte("hi"), 0o600))
-
-		_, worktree, _, err := service.OpenRepository(dir, "", "")
-		require.NoError(t, err)
-		_, err = worktree.Add("file.txt")
-		require.NoError(t, err)
-
-		hash, err := worktree.Commit("initial", &git.CommitOptions{})
-		require.NoError(t, err)
-		assert.False(t, hash.IsZero())
-	})
-
-	t.Run("a global identity wins over the fallback", func(t *testing.T) {
-		// go-git resolves the author from the scoped config, so a developer's global
-		// user.name is a perfectly good identity and must not be shadowed by a local default.
-		home := isolateGitConfig(t)
-		require.NoError(t, os.WriteFile(filepath.Join(home, ".gitconfig"),
-			[]byte("[user]\n\tname = Global User\n\temail = global@example.com\n"), 0o600))
-
-		dir := t.TempDir()
-		_, err := git.PlainInit(dir, false)
-		require.NoError(t, err)
-
-		_, _, _, err = service.OpenRepository(dir, "", "")
-		require.NoError(t, err)
-
-		r, err := git.PlainOpen(dir)
-		require.NoError(t, err)
-		cfg, err := r.Config()
-		require.NoError(t, err)
-		assert.Empty(t, cfg.User.Name, "no local override should have been written")
-		assert.Empty(t, cfg.User.Email)
-
-		scoped, err := r.ConfigScoped(gitConfig.SystemScope)
-		require.NoError(t, err)
-		assert.Equal(t, "Global User", scoped.User.Name)
-	})
-
-	t.Run("an explicit identity wins over both", func(t *testing.T) {
-		home := isolateGitConfig(t)
-		require.NoError(t, os.WriteFile(filepath.Join(home, ".gitconfig"),
-			[]byte("[user]\n\tname = Global User\n\temail = global@example.com\n"), 0o600))
-
-		dir := t.TempDir()
-		_, err := git.PlainInit(dir, false)
-		require.NoError(t, err)
-
-		_, _, _, err = service.OpenRepository(dir, "Bot", "bot@example.com")
-		require.NoError(t, err)
-
-		r, err := git.PlainOpen(dir)
-		require.NoError(t, err)
-		cfg, err := r.Config()
-		require.NoError(t, err)
-		assert.Equal(t, "Bot", cfg.User.Name)
-		assert.Equal(t, "bot@example.com", cfg.User.Email)
 	})
 }

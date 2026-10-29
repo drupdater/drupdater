@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"os/exec"
 	"testing"
 
@@ -417,13 +418,18 @@ func TestExportConfiguration(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
 		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
+		var args []string
 		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+			args = arg
 			cs := []string{"-test.run=TestHelperProcess", "--", "ok"}
 			cs = append(cs, arg...)
 			return exec.CommandContext(ctx, os.Args[0], cs...)
 		}
 		defer func() { execCommand = exec.CommandContext }()
 		require.NoError(t, cli.ExportConfiguration(t.Context(), "/tmp", "site1"))
+		// No --commit: the runner commits the export, so Drush never runs git in the repository.
+		assert.Equal(t, []string{"config:export", "--yes"}, args[len(args)-2:])
+		assert.NotContains(t, args, "--commit")
 	})
 
 	t.Run("error", func(t *testing.T) {
@@ -669,4 +675,22 @@ func TestHelperProcess(*testing.T) {
 	}
 	fmt.Fprintf(os.Stdout, "%v\n", os.Args[3:])
 	os.Exit(0)
+}
+
+// PHP's realpath() resolves symlinks, so the project directory has to be resolved before the
+// prefix can match — on macOS every temporary directory sits behind the /tmp symlink.
+func TestRelativeToResolvesTheProjectDirectory(t *testing.T) {
+	resolved := t.TempDir()
+	link := filepath.Join(t.TempDir(), "project")
+	require.NoError(t, os.Symlink(resolved, link))
+
+	assert.Equal(t, filepath.Join("config", "sync"), relativeTo(link, filepath.Join(resolved, "config", "sync")))
+	assert.Equal(t, filepath.Join("config", "sync"), relativeTo(resolved, filepath.Join(resolved, "config", "sync")))
+}
+
+func TestRelativeToFallsBack(t *testing.T) {
+	assert.Equal(t, "config/sync", relativeTo("/does/not/exist", "/does/not/exist/config/sync"),
+		"an unresolvable directory is compared as given")
+	assert.Empty(t, relativeTo("/project", ""), "realpath() of a missing directory stays empty")
+	assert.Equal(t, "config/sync", relativeTo("/project", "config/sync"), "a relative path is already relative")
 }

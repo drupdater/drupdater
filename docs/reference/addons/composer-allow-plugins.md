@@ -12,13 +12,20 @@ new plugins for you to review.
 
 ## What it does
 
-**Before the update**, it saves the project's current `allow-plugins` configuration and
-replaces it with `allow-plugins: true`, permitting everything for the duration of the
-update.
+**Before the update**, it appends a temporary rule, `"*": true`, after the project's own
+`allow-plugins` entries. Composer applies the first rule that matches a plugin, so every
+plugin the project already allows or denies — by name or by a pattern such as `drupal/*` —
+is still decided by the project. Only a plugin none of them names is let through, for the
+duration of the update.
 
-**After the update**, it restores the saved configuration, compares the installed plugin
-list against it, and appends any newly-introduced plugin with the value `false`. The
-project ends up back where it started, plus explicit `false` entries for anything new.
+A setting that already decides every plugin is left alone: `allow-plugins: true`,
+`allow-plugins: false`, or an object with its own `"*"` rule.
+
+**After the update**, it adds `false` for each installed plugin that no rule of the project
+matches, then removes the temporary rule. The denials go in first because Composer refuses
+to run any command while an installed plugin is undecided. The project ends up exactly where
+it started — same rules, same order — plus one explicit `false` per new plugin. A project
+that had no `allow-plugins` at all gets none back unless a new plugin needed an entry.
 
 The result is that new plugins are **not** silently trusted. They are recorded, disabled,
 and surfaced in the pull request for a human to decide on.
@@ -53,8 +60,8 @@ allow.
 
 ## Notes
 
-- If a run fails partway through, the temporary `allow-plugins: true` could in principle
-  be left in `composer.json`. It is not: a failing run restores the original checkout,
-  discarding that change along with any commits on the throwaway work branch.
+- If a run fails partway through, the temporary `"*": true` rule could in principle be
+  left in `composer.json`. It is not: the run edits a worktree or clone of its own, which
+  is removed whichever way the run ends, and the checkout itself is never changed.
 - The new plugins are also in the [run report](../run-report.md), which the pull request
   section is rendered from.

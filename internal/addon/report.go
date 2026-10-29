@@ -104,20 +104,15 @@ func (uh *UpdateHooks) ReportKey() string { return "update_hooks" }
 // ReportData implements report.Reporter. Keyed by site, like the merge request description:
 // in a multisite run the same module can have different pending hooks per site.
 func (uh *UpdateHooks) ReportData() any {
-	uh.mu.Lock()
-	defer uh.mu.Unlock()
-
-	if len(uh.hooks) == 0 {
+	hooks := uh.hooks.All()
+	if len(hooks) == 0 {
 		return nil
 	}
-
-	// Deep copy: the caller has no way to know these maps are mutex-guarded state.
-	out := make(map[string]map[string]drush.UpdateHook, len(uh.hooks))
-	for site, hooks := range uh.hooks {
-		out[site] = maps.Clone(hooks)
+	// The values are maps too, which All's copy shares with the addon.
+	for site, siteHooks := range hooks {
+		hooks[site] = maps.Clone(siteHooks)
 	}
-
-	return out
+	return hooks
 }
 
 // --- unsupported_modules ---
@@ -125,16 +120,20 @@ func (uh *UpdateHooks) ReportData() any {
 // ReportKey implements report.Reporter.
 func (um *UnsupportedModules) ReportKey() string { return "unsupported_modules" }
 
-// ReportData implements report.Reporter. Sorted so an unchanged site reports byte-identically.
+// ReportData implements report.Reporter. One entry per module, however many sites have it, and
+// sorted so an unchanged project reports byte-identically.
 func (um *UnsupportedModules) ReportData() any {
-	um.mu.Lock()
-	defer um.mu.Unlock()
-
-	if len(um.modules) == 0 {
+	byName := map[string]drush.UnsupportedModule{}
+	for _, modules := range um.modules.All() {
+		for _, module := range modules {
+			byName[module.Name] = module
+		}
+	}
+	if len(byName) == 0 {
 		return nil
 	}
 
-	modules := slices.Collect(maps.Values(um.modules))
+	modules := slices.Collect(maps.Values(byName))
 	slices.SortFunc(modules, func(a, b drush.UnsupportedModule) int { return strings.Compare(a.Name, b.Name) })
 
 	return modules
@@ -220,13 +219,9 @@ func (tu *TranslationsUpdater) ReportKey() string { return "translations_updater
 
 // ReportData implements report.Reporter. Keyed by site: each has its own translation directory.
 func (tu *TranslationsUpdater) ReportData() any {
-	tu.mu.Lock()
-	defer tu.mu.Unlock()
-
-	if len(tu.results) == 0 {
+	results := tu.results.All()
+	if len(results) == 0 {
 		return nil
 	}
-
-	// Copy: the caller has no way to know this map is mutex-guarded state.
-	return maps.Clone(tu.results)
+	return results
 }

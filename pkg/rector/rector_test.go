@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -82,9 +83,17 @@ func TestRectorRun(t *testing.T) {
 
 		// A real directory, because the command actually chdir's into it.
 		workDir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(workDir, "test.php"), []byte(misplacedDocBlock), 0o600))
 
 		result, err := cli.Run(t.Context(), workDir, []string{"web/modules/custom", "web/themes/custom"})
 		require.NoError(t, err)
+
+		fixed, err := os.ReadFile(filepath.Join(workDir, "test.php"))
+		require.NoError(t, err)
+		assert.Equal(t, restoredDocBlock, string(fixed), "each changed file gets its @file docblock back on top")
+		info, err := os.Stat(filepath.Join(workDir, "test.php"))
+		require.NoError(t, err)
+		assert.Equal(t, os.FileMode(0o600), info.Mode().Perm(), "the rewrite keeps the file's mode")
 
 		// rector runs through composer, in the project directory rather than the process's
 		// own working directory.

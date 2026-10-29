@@ -523,41 +523,64 @@ func (s *CLI) GetInstalledPackageVersion(ctx context.Context, dir string, packag
 	return composerShow.Versions[0], nil
 }
 
-// GetAllowPlugins returns composer's allow-plugins config as a package -> allowed map. The
-// setting is polymorphic and only its object form carries entries, so every other shape yields
-// an empty map — never nil, since callers add newly discovered plugins to it.
-func (s *CLI) GetAllowPlugins(ctx context.Context, dir string) (map[string]bool, error) {
-	allowPluginsJSON, err := s.GetConfig(ctx, dir, "allow-plugins")
-	if err != nil {
-		// Composer exits non-zero when the key is unset — a legitimate state, not a failure.
-		s.logger.Debug("no composer allow-plugins config found", zap.Error(err))
-		return map[string]bool{}, nil
-	}
-
-	allowPlugins := map[string]bool{}
-	if err := json.Unmarshal([]byte(allowPluginsJSON), &allowPlugins); err != nil {
-		switch strings.TrimSpace(allowPluginsJSON) {
-		case "true", "false", "[]", "":
-			return map[string]bool{}, nil
-		}
-		return nil, fmt.Errorf("failed to parse composer allow-plugins config %q: %w", allowPluginsJSON, err)
-	}
-	if allowPlugins == nil {
-		// JSON null decodes successfully but sets the map to nil.
-		return map[string]bool{}, nil
-	}
-
-	return allowPlugins, nil
+// AllowPlugins is composer.json's config.allow-plugins as the project wrote it.
+type AllowPlugins struct {
+	// Set is false when composer.json has no allow-plugins at all.
+	Set bool
+	// All is the value when it is a boolean, which decides every plugin at once.
+	All *bool
+	// Rules maps package patterns, in which * matches anything, to whether they may run.
+	Rules map[string]bool
 }
 
-func (s *CLI) SetAllowPlugins(ctx context.Context, dir string, plugins map[string]bool) error {
-	for key, value := range plugins {
-		err := s.SetConfig(ctx, dir, "allow-plugins."+key, fmt.Sprintf("%t", value))
-		if err != nil {
-			return err
+// Decides reports whether the setting already allows or denies plugin, matching patterns the way
+// Composer's PluginManager does: anchored, case-insensitive, * for any characters.
+func (a AllowPlugins) Decides(plugin string) bool {
+	if a.All != nil {
+		return true
+	}
+	for pattern := range a.Rules {
+		re := "(?i)^" + strings.ReplaceAll(regexp.QuoteMeta(pattern), `\*`, ".*") + "$"
+		if regexp.MustCompile(re).MatchString(plugin) {
+			return true
 		}
 	}
-	return nil
+	return false
+}
+
+// GetAllowPlugins reads composer.json itself: `composer config` prints {} both for an empty
+// object and for no setting at all, and the two must be restored differently.
+func (s *CLI) GetAllowPlugins(dir string) (AllowPlugins, error) {
+	content, err := afero.ReadFile(s.fs, filepath.Join(dir, "composer.json"))
+	if err != nil {
+		return AllowPlugins{}, fmt.Errorf("failed to read composer.json: %w", err)
+	}
+
+	var manifest struct {
+		Config struct {
+			AllowPlugins json.RawMessage `json:"allow-plugins"`
+		} `json:"config"`
+	}
+	if err := json.Unmarshal(content, &manifest); err != nil {
+		return AllowPlugins{}, fmt.Errorf("failed to parse composer.json: %w", err)
+	}
+
+	raw := strings.TrimSpace(string(manifest.Config.AllowPlugins))
+	switch raw {
+	case "", "null":
+		return AllowPlugins{}, nil
+	case "true", "false":
+		all := raw == "true"
+		return AllowPlugins{Set: true, All: &all}, nil
+	case "[]":
+		return AllowPlugins{Set: true, Rules: map[string]bool{}}, nil
+	}
+
+	rules := map[string]bool{}
+	if err := json.Unmarshal(manifest.Config.AllowPlugins, &rules); err != nil {
+		return AllowPlugins{}, fmt.Errorf("failed to parse composer allow-plugins config %s: %w", raw, err)
+	}
+	return AllowPlugins{Set: true, Rules: rules}, nil
 }
 
 func (s *CLI) GetConfig(ctx context.Context, dir string, key string) (string, error) {
@@ -567,6 +590,11 @@ func (s *CLI) GetConfig(ctx context.Context, dir string, key string) (string, er
 
 func (s *CLI) SetConfig(ctx context.Context, dir string, key string, value string) error {
 	_, err := s.execComposer(ctx, dir, "config", "--json", key, value)
+	return err
+}
+
+func (s *CLI) UnsetConfig(ctx context.Context, dir string, key string) error {
+	_, err := s.execComposer(ctx, dir, "config", "--unset", key)
 	return err
 }
 

@@ -2,16 +2,23 @@ package addon
 
 import (
 	"fmt"
+	"maps"
+	"slices"
 
 	"github.com/drupdater/drupdater/internal/workflow"
+	"github.com/drupdater/drupdater/pkg/composer"
 	"go.uber.org/zap"
 )
 
+// ComposerAllowPlugins lets an unattended update install plugins Composer would otherwise block,
+// and records each new one as denied for a human to decide on.
 type ComposerAllowPlugins struct {
 	logger   *zap.Logger
 	composer Composer
 
-	allowPlugins    map[string]bool
+	original composer.AllowPlugins
+	// wildcard is set while the temporary trailing "*": true rule is in composer.json.
+	wildcard        bool
 	newAllowPlugins []string
 }
 
@@ -29,37 +36,59 @@ func (ap *ComposerAllowPlugins) Hooks() workflow.Hooks {
 	}
 }
 
+// preComposerUpdateHandler appends a "*": true rule. Composer applies the first matching rule, so
+// the project's own rules, denials included, still decide every plugin they name.
 func (ap *ComposerAllowPlugins) preComposerUpdateHandler(evt *workflow.PreComposerUpdateEvent) error {
-
 	var err error
-	ap.allowPlugins, err = ap.composer.GetAllowPlugins(evt.Context(), evt.Path())
+	ap.original, err = ap.composer.GetAllowPlugins(evt.Path())
 	if err != nil {
 		return fmt.Errorf("failed to get composer allow plugins: %w", err)
 	}
 
-	return ap.composer.SetConfig(evt.Context(), evt.Path(), "allow-plugins", "true")
+	if _, hasWildcard := ap.original.Rules["*"]; ap.original.All != nil || hasWildcard {
+		return nil
+	}
+	if err := ap.composer.SetConfig(evt.Context(), evt.Path(), "allow-plugins.*", "true"); err != nil {
+		return fmt.Errorf("failed to allow plugins for the update: %w", err)
+	}
+	ap.wildcard = true
+	return nil
 }
 
+// postComposerUpdateHandler denies each plugin no rule of the project's decides, then removes the
+// wildcard, so composer.json ends as it began plus one explicit entry per new plugin. In that order
+// because Composer refuses to run at all while an installed plugin is undecided.
 func (ap *ComposerAllowPlugins) postComposerUpdateHandler(evt *workflow.PostComposerUpdateEvent) error {
+	ctx, path := evt.Context(), evt.Path()
 
-	allPlugins, err := ap.composer.GetInstalledPlugins(evt.Context(), evt.Path())
+	installed, err := ap.composer.GetInstalledPlugins(ctx, path)
 	if err != nil {
 		return err
 	}
 
-	// Written to below, so it must never be nil: assigning into a nil map panics.
-	if ap.allowPlugins == nil {
-		ap.allowPlugins = map[string]bool{}
+	for _, plugin := range slices.Sorted(maps.Keys(installed)) {
+		if ap.original.Decides(plugin) {
+			continue
+		}
+		if err := ap.composer.SetConfig(ctx, path, "allow-plugins."+plugin, "false"); err != nil {
+			return fmt.Errorf("failed to deny new plugin %s: %w", plugin, err)
+		}
+		ap.newAllowPlugins = append(ap.newAllowPlugins, plugin)
 	}
 
-	for key := range allPlugins {
-		if _, ok := ap.allowPlugins[key]; !ok {
-			ap.allowPlugins[key] = false
-			ap.newAllowPlugins = append(ap.newAllowPlugins, key)
-		}
+	if !ap.wildcard {
+		return nil
 	}
-	if err := ap.composer.SetAllowPlugins(evt.Context(), evt.Path(), ap.allowPlugins); err != nil {
-		return err
+	if err := ap.composer.UnsetConfig(ctx, path, "allow-plugins.*"); err != nil {
+		return fmt.Errorf("failed to remove the temporary plugin rule: %w", err)
+	}
+	ap.wildcard = false
+
+	// Removing the wildcard leaves {} where the project had no setting at all.
+	if !ap.original.Set && len(ap.newAllowPlugins) == 0 {
+		if err := ap.composer.UnsetConfig(ctx, path, "allow-plugins"); err != nil {
+			return fmt.Errorf("failed to remove the temporary plugin config: %w", err)
+		}
 	}
 
 	return nil

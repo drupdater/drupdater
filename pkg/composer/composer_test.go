@@ -980,62 +980,6 @@ func TestUpdateLockHash(t *testing.T) {
 	})
 }
 
-func TestGetAllowPlugins(t *testing.T) {
-	service := &CLI{logger: zap.NewNop()}
-
-	t.Run("success", func(t *testing.T) {
-		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
-			cs := []string{"-test.run=TestHelperProcess", "--", `{"drupal/core-composer-scaffold":true,"phpro/grumphp-shim":false}`}
-			cs = append(cs, arg...)
-			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
-			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
-			return cmd
-		}
-		defer func() { execCommand = exec.CommandContext }()
-		plugins, err := service.GetAllowPlugins(t.Context(), "/tmp")
-		require.NoError(t, err)
-		assert.Equal(t, map[string]bool{
-			"drupal/core-composer-scaffold": true,
-			"phpro/grumphp-shim":            false,
-		}, plugins)
-	})
-
-	t.Run("invalid JSON", func(t *testing.T) {
-		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
-			cs := []string{"-test.run=TestHelperProcess", "--", "not-json"}
-			cs = append(cs, arg...)
-			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
-			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
-			return cmd
-		}
-		defer func() { execCommand = exec.CommandContext }()
-		_, err := service.GetAllowPlugins(t.Context(), "/tmp")
-		require.Error(t, err)
-	})
-}
-
-func TestSetAllowPlugins(t *testing.T) {
-	service := &CLI{logger: zap.NewNop()}
-
-	t.Run("success", func(t *testing.T) {
-		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
-			cs := []string{"-test.run=TestHelperProcess", "--", "ok"}
-			cs = append(cs, arg...)
-			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
-			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
-			return cmd
-		}
-		defer func() { execCommand = exec.CommandContext }()
-		err := service.SetAllowPlugins(t.Context(), "/tmp", map[string]bool{"drupal/core-composer-scaffold": true})
-		require.NoError(t, err)
-	})
-
-	t.Run("empty map", func(t *testing.T) {
-		err := service.SetAllowPlugins(t.Context(), "/tmp", map[string]bool{})
-		require.NoError(t, err)
-	})
-}
-
 func TestGetCustomCodeDirectories(t *testing.T) {
 	t.Run("returns existing directories", func(t *testing.T) {
 		fs := afero.NewMemMapFs()

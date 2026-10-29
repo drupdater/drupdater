@@ -21,8 +21,7 @@ func TestNewUpdateHooks(t *testing.T) {
 	assert.NotNil(t, updateHooks)
 	assert.Equal(t, logger, updateHooks.logger)
 	assert.Equal(t, mockDrush, updateHooks.drush)
-	assert.NotNil(t, updateHooks.hooks)
-	assert.Empty(t, updateHooks.hooks)
+	assert.Empty(t, updateHooks.hooks.All())
 }
 
 func TestUpdateHooks_PreSiteUpdateHandler_Success(t *testing.T) {
@@ -48,8 +47,7 @@ func TestUpdateHooks_PreSiteUpdateHandler_Success(t *testing.T) {
 	err := updateHooks.preSiteUpdateHandler(mockEvent)
 
 	require.NoError(t, err)
-	assert.Contains(t, updateHooks.hooks, testSite)
-	assert.Equal(t, mockHooks, updateHooks.hooks[testSite])
+	assert.Equal(t, map[string]map[string]drush.UpdateHook{testSite: mockHooks}, updateHooks.hooks.All())
 }
 
 func TestUpdateHooks_PreSiteUpdateHandler_NoHooks(t *testing.T) {
@@ -70,7 +68,7 @@ func TestUpdateHooks_PreSiteUpdateHandler_NoHooks(t *testing.T) {
 	err := updateHooks.preSiteUpdateHandler(mockEvent)
 
 	require.NoError(t, err)
-	assert.NotContains(t, updateHooks.hooks, testSite)
+	assert.NotContains(t, updateHooks.hooks.All(), testSite)
 }
 
 func TestUpdateHooks_PreSiteUpdateHandler_Error(t *testing.T) {

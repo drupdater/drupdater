@@ -14,32 +14,45 @@ import (
 	"go.uber.org/zap"
 )
 
+// newTestGitlab talks to a local server that fails the test on any request: the tests using it
+// assert that nothing is sent, and no test may reach gitlab.com.
 func newTestGitlab(t *testing.T) *Gitlab {
 	t.Helper()
-	g, err := newGitlab("gitlab.com", "user/repo", "dummy-token", zap.NewNop())
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
+		w.WriteHeader(http.StatusTeapot)
+	}))
+	t.Cleanup(server.Close)
+
+	client, err := gitlab.NewClient("dummy-token", gitlab.WithBaseURL(server.URL))
 	require.NoError(t, err)
-	return g
+	return &Gitlab{client: client, projectPath: "user/repo", logger: zap.NewNop(), retryInterval: time.Millisecond}
 }
 
-func TestGitlab_CreateMergeRequest(t *testing.T) {
+func TestGitlab_CreateMergeRequest_Rejected(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusConflict)
+		_, _ = w.Write([]byte(`{"message": ["Another open merge request already exists for this source branch: !7"]}`))
+	}))
+	t.Cleanup(server.Close)
+	client, err := gitlab.NewClient("dummy-token", gitlab.WithBaseURL(server.URL))
+	require.NoError(t, err)
+	g := &Gitlab{client: client, projectPath: "user/repo", logger: zap.NewNop()}
 
-	gitlab := newTestGitlab(t)
+	mr, err := g.CreateMergeRequest(t.Context(), "Test MR", "Test MR description", "feature-branch", "main")
 
-	title := "Test MR"
-	sourceBranch := "feature-branch"
-	targetBranch := "main"
-	description := "Test MR description"
-
-	t.Run("failed to get create mr", func(t *testing.T) {
-
-		_, err := gitlab.CreateMergeRequest(context.Background(), title, description, sourceBranch, targetBranch)
-		require.Error(t, err)
-	})
-
+	require.ErrorContains(t, err, "failed to create merge request")
+	require.ErrorContains(t, err, "Another open merge request already exists")
+	var apiErr *gitlab.ErrorResponse
+	require.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, http.StatusConflict, apiErr.Response.StatusCode)
+	assert.Equal(t, MergeRequest{}, mr)
 }
 
 func TestGitlab_getBaseUrl(t *testing.T) {
-	g := newTestGitlab(t)
+	g, err := newGitlab("gitlab.com", "user/repo", "dummy-token", zap.NewNop())
+	require.NoError(t, err)
 	assert.Equal(t, "gitlab.com", g.client.BaseURL().Host)
 }
 

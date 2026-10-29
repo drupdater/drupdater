@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/drupdater/drupdater/pkg/repo"
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/format/index"
 )
@@ -22,12 +23,13 @@ type Committer interface {
 
 type gitCommitter struct {
 	worktree Worktree
+	author   repo.Identity
 	// Sites update concurrently and addons commit from their events, all into one index.
 	mu sync.Mutex
 }
 
-func newGitCommitter(worktree Worktree) *gitCommitter {
-	return &gitCommitter{worktree: worktree}
+func newGitCommitter(worktree Worktree, author repo.Identity) *gitCommitter {
+	return &gitCommitter{worktree: worktree, author: author}
 }
 
 func (c *gitCommitter) Commit(message string, paths ...string) (bool, error) {
@@ -66,10 +68,16 @@ func (c *gitCommitter) Commit(message string, paths ...string) (bool, error) {
 		return false, nil
 	}
 
-	if _, err := c.worktree.Commit(message, &git.CommitOptions{}); err != nil {
+	if _, err := c.worktree.Commit(message, commitOptions(c.author)); err != nil {
 		return false, fmt.Errorf("failed to commit %q: %w", message, err)
 	}
 	return true, nil
+}
+
+// commitOptions signs a commit explicitly, so no identity has to be written into git config.
+func commitOptions(author repo.Identity) *git.CommitOptions {
+	signature := author.Signature()
+	return &git.CommitOptions{Author: signature, Committer: signature}
 }
 
 // pathWithin reports whether filePath is dir or lives under it — not a substring test, which

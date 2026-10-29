@@ -25,7 +25,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-
 type Runner struct {
 	logger     *zap.Logger
 	config     internal.Config
@@ -34,10 +33,13 @@ type Runner struct {
 	repository Repository
 	installer  Installer
 	composer   Composer
-	current    time.Time
 
 	// committer is the one addons commit through, set once the working copy is acquired.
 	committer Committer
+	// author signs the runner's own commits, as committer signs the addons'.
+	author repo.Identity
+	// updateBranch is the branch this run created, removed again if the run then fails.
+	updateBranch string
 
 	// hooks are the run's addons' hooks, set when the run starts.
 	hooks *Pipeline
@@ -78,7 +80,6 @@ func New(
 		repository: repository,
 		installer:  installer,
 		composer:   composerService,
-		current:    time.Now(),
 	}
 	for _, opt := range opts {
 		opt(r)
@@ -131,44 +132,32 @@ func (r *Runner) Run(ctx context.Context, addons []Addon) (err error) {
 
 	// One working directory for the whole run. A phase because a bad token or unreachable host
 	// fails here, one of the most common ways a run fails.
-	var (
-		repository GitRepository
-		worktree   Worktree
-		path       string
-	)
+	var checkout repo.Checkout
 	if err = rec.Run("acquire working copy", func() error {
 		var acquireErr error
-		repository, worktree, path, acquireErr = r.acquireWorkingCopy(username, email)
+		checkout, acquireErr = r.acquireWorkingCopy(ctx, username, email)
 		return acquireErr
 	}); err != nil {
 		return err
 	}
 
-	// Before any branch is created, so a failed run can be put back — see captureOriginalHead.
-	originalRef := r.captureOriginalHead(repository)
-
 	defer func() {
 		r.logger.Info("update run finished", zap.Duration("duration", time.Since(start)))
-		if err != nil && originalRef != nil {
-			r.restoreOriginalCheckout(worktree, originalRef)
+		if err != nil {
+			r.removeUpdateBranch(checkout.Repository)
 		}
-		r.cleanup(path)
+		r.cleanup(context.WithoutCancel(ctx), checkout.Path)
 	}()
 
-	return r.runPhases(ctx, rec, repository, worktree, path, addons)
+	return r.runPhases(ctx, rec, checkout, addons)
 }
 
 // runPhases executes the update, one recorded phase at a time. Separate from Run so the
 // run's setup and teardown stay readable next to each other.
-func (r *Runner) runPhases(
-	ctx context.Context,
-	rec *report.Recorder,
-	repository GitRepository,
-	worktree Worktree,
-	path string,
-	addons []Addon,
-) error {
-	r.committer = newGitCommitter(worktree)
+func (r *Runner) runPhases(ctx context.Context, rec *report.Recorder, checkout repo.Checkout, addons []Addon) error {
+	repository, worktree, path := checkout.Repository, checkout.Worktree, checkout.Path
+	r.author = checkout.Author
+	r.committer = newGitCommitter(worktree, checkout.Author)
 
 	// Fail fast on the prerequisites "drupdater check" shares. Extension requirements are
 	// deliberately not among them — see CheckPlatformReqs.
@@ -198,7 +187,7 @@ func (r *Runner) runPhases(
 	var updateBranchName string
 	if err := rec.Run("resolve update", func() error {
 		var err error
-		updateBranchName, err = r.resolveUpdate(ctx, repository, worktree, path, rec)
+		updateBranchName, err = r.resolveUpdate(ctx, repository, path, rec)
 		return err
 	}); err != nil {
 		return err
@@ -216,19 +205,23 @@ func (r *Runner) runPhases(
 		return err
 	}
 
-	// Update the shared code: install the resolved update, commit, and create the update branch.
+	// Update the shared code: install the resolved update and commit it.
 	if err := rec.Run("update shared code", func() error {
-		return r.updateSharedCode(ctx, worktree, path, updateBranchName)
+		return r.updateSharedCode(ctx, worktree, path)
 	}); err != nil {
 		return err
 	}
 	rec.SetUpdateBranch(updateBranchName)
 
-	// Run the update hooks and export config per site against the now-updated code.
+	// Run the update hooks and export config per site against the now-updated code, then point the
+	// update branch at the result.
 	if err := rec.Run("site update", func() error {
-		return r.forEachSite(ctx, func(ctx context.Context, site string) error {
+		if err := r.forEachSite(ctx, func(ctx context.Context, site string) error {
 			return r.updateSite(ctx, path, site)
-		})
+		}); err != nil {
+			return err
+		}
+		return r.createUpdateBranch(repository, updateBranchName)
 	}); err != nil {
 		return err
 	}
@@ -269,42 +262,14 @@ func renderMergeRequest(rec *report.Recorder, addons []Addon) (string, string, e
 	return mergerequest.Title(snapshot), description, nil
 }
 
-// captureOriginalHead returns the checkout's HEAD so a failed run can be put back rather than
-// left on drupdater's throwaway work branch. A safety net: nil in clone mode or on failure.
-func (r *Runner) captureOriginalHead(repository GitRepository) *plumbing.Reference {
-	if r.config.Clone {
-		return nil
-	}
-	ref, err := repository.Head()
-	if err != nil {
-		r.logger.Warn("failed to determine current HEAD, checkout will not be restored if the run fails", zap.Error(err))
-		return nil
-	}
-	return ref
-}
-
-// restoreOriginalCheckout switches worktree back to originalRef, discarding whatever the work
-// branch accumulated. Errors are logged, never returned: this must not mask the real failure.
-func (r *Runner) restoreOriginalCheckout(worktree Worktree, originalRef *plumbing.Reference) {
-	opts := &git.CheckoutOptions{Force: true}
-	if originalRef.Name().IsBranch() {
-		opts.Branch = originalRef.Name()
-	} else {
-		opts.Hash = originalRef.Hash()
-	}
-	if err := worktree.Checkout(opts); err != nil {
-		r.logger.Warn("failed to restore checkout to its original state", zap.Error(err))
-	}
-}
-
-// acquireWorkingCopy returns the single working directory the run operates on. By default it
-// opens the existing checkout in place; with --clone it clones the repository to a temp dir.
-func (r *Runner) acquireWorkingCopy(username, email string) (GitRepository, Worktree, string, error) {
+// acquireWorkingCopy clones in clone mode. In checkout mode it adds a linked worktree of the
+// checkout, so the run never changes the user's own working tree, branch or git config.
+func (r *Runner) acquireWorkingCopy(ctx context.Context, username, email string) (repo.Checkout, error) {
 	if r.config.Clone {
 		r.logger.Info("cloning repository", zap.String("url", r.config.RepositoryURL), zap.String("branch", r.config.Branch))
 		return r.repository.CloneRepository(r.config.RepositoryURL, r.config.Branch, r.config.Token, username, email)
 	}
-	return r.repository.OpenRepository(r.config.WorkingDir, username, email)
+	return r.repository.AddWorktree(ctx, r.config.WorkingDir, username, email)
 }
 
 // stageScaffoldChanges stages the web-root files drupal-scaffold rewrites on a core update --
@@ -372,32 +337,37 @@ func (r *Runner) forEachSite(ctx context.Context, fn func(context.Context, strin
 
 // cleanup removes a clone-mode run's temp clone. Site databases live in the installer's own
 // directory, which its owner removes.
-func (r *Runner) cleanup(path string) {
-	if r.config.Clone {
-		// This run's own directory, not the shared per-URL parent, so a concurrent run of the
-		// same repository isn't wiped out. The Rel guard keeps the temp dir itself safe.
-		if rel, err := filepath.Rel(os.TempDir(), path); err == nil && rel != "." && !strings.HasPrefix(rel, "..") {
-			os.RemoveAll(path)
+// cleanup removes the run's working copy, whichever mode made it. Errors only warn: a run's
+// outcome is already decided, and a leftover temporary directory must not change it.
+func (r *Runner) cleanup(ctx context.Context, path string) {
+	if !r.config.Clone {
+		if err := r.repository.RemoveWorktree(ctx, r.config.WorkingDir, path); err != nil {
+			r.logger.Warn("failed to remove the run's worktree", zap.String("path", path), zap.Error(err))
 		}
+		return
+	}
+	// This run's own directory, not the shared per-URL parent, so a concurrent run of the
+	// same repository isn't wiped out. The Rel guard keeps the temp dir itself safe.
+	if rel, err := filepath.Rel(os.TempDir(), path); err == nil && rel != "." && !strings.HasPrefix(rel, "..") {
+		os.RemoveAll(path)
+	}
+}
+
+// removeUpdateBranch deletes the update branch a failed run created, or the next run would find
+// it and stop as if there were nothing to do.
+func (r *Runner) removeUpdateBranch(repository GitRepository) {
+	if r.updateBranch == "" {
+		return
+	}
+	if err := repository.RemoveBranch(r.updateBranch); err != nil {
+		r.logger.Warn("failed to remove the failed run's update branch", zap.String("branch", r.updateBranch), zap.Error(err))
 	}
 }
 
 // resolveUpdate settles what the update changes and what its branch is called, touching only
 // composer.json and composer.lock: vendor/ keeps the old code for the baseline install.
-func (r *Runner) resolveUpdate(ctx context.Context, repository GitRepository, worktree Worktree, path string, rec *report.Recorder) (string, error) {
+func (r *Runner) resolveUpdate(ctx context.Context, repository GitRepository, path string, rec *report.Recorder) (string, error) {
 	r.logger.Info("resolving dependency updates")
-
-	// A dedicated branch: the addons commit as they go, and a mid-run failure would otherwise
-	// strand those commits on the user's own branch. Flat name, not "drupdater/work-<ts>":
-	// a branch named "drupdater" makes refs/heads/drupdater a file, blocking nested refs.
-	workBranch := fmt.Sprintf("drupdater-work-%d", r.current.UnixNano())
-	if err := worktree.Checkout(&git.CheckoutOptions{
-		Branch: plumbing.NewBranchReferenceName(workBranch),
-		Create: true,
-		Keep:   true,
-	}); err != nil {
-		return "", fmt.Errorf("failed to create work branch: %w", err)
-	}
 
 	preComposerUpdateEvent := NewPreComposerUpdateEvent(ctx, path, r.committer, []string{}, []string{}, false)
 	if err := r.hooks.PreComposerUpdate(preComposerUpdateEvent); err != nil {
@@ -439,9 +409,8 @@ func (r *Runner) resolveUpdate(ctx context.Context, repository GitRepository, wo
 	return updateBranchName, nil
 }
 
-// updateSharedCode brings vendor/ to the resolved lock, lets the addons work on the new code, and
-// moves the accumulated commits onto updateBranchName.
-func (r *Runner) updateSharedCode(ctx context.Context, worktree Worktree, path string, updateBranchName string) error {
+// updateSharedCode brings vendor/ to the resolved lock and lets the addons work on the new code.
+func (r *Runner) updateSharedCode(ctx context.Context, worktree Worktree, path string) error {
 	r.logger.Info("installing updated dependencies")
 	if err := r.composer.Install(ctx, path); err != nil {
 		return fmt.Errorf("failed to install updated dependencies: %w", err)
@@ -458,7 +427,7 @@ func (r *Runner) updateSharedCode(ctx context.Context, worktree Worktree, path s
 	if err := r.stageScaffoldChanges(ctx, path, worktree); err != nil {
 		return err
 	}
-	if _, err := worktree.Commit("Update composer.json and composer.lock", &git.CommitOptions{}); err != nil {
+	if _, err := worktree.Commit("Update composer.json and composer.lock", commitOptions(r.author)); err != nil {
 		return fmt.Errorf("failed to commit composer.json and composer.lock: %w", err)
 	}
 
@@ -467,16 +436,20 @@ func (r *Runner) updateSharedCode(ctx context.Context, worktree Worktree, path s
 		return err
 	}
 
-	// Create the final branch from the work branch's tip (carrying the accumulated commits).
-	if err := worktree.Checkout(&git.CheckoutOptions{
-		Branch: plumbing.NewBranchReferenceName(updateBranchName),
-		Create: true,
-		Force:  false,
-		Keep:   true,
-	}); err != nil {
-		return fmt.Errorf("failed to checkout branch: %w", err)
-	}
+	return nil
+}
 
+// createUpdateBranch points updateBranchName at HEAD. Only once the last commit is made: the run
+// commits on a detached HEAD, which a branch created earlier would not follow.
+func (r *Runner) createUpdateBranch(repository GitRepository, updateBranchName string) error {
+	head, err := repository.Head()
+	if err != nil {
+		return fmt.Errorf("failed to read HEAD: %w", err)
+	}
+	if err := repository.SetBranch(updateBranchName, head.Hash()); err != nil {
+		return fmt.Errorf("failed to create branch %s: %w", updateBranchName, err)
+	}
+	r.updateBranch = updateBranchName
 	return nil
 }
 
@@ -552,6 +525,17 @@ func (r *Runner) commitSiteChanges(ctx context.Context, path string, site string
 	r.logger.Info("exporting configuration", zap.String("site", site))
 	if err := r.drush.ExportConfiguration(ctx, path, site); err != nil {
 		return fmt.Errorf("failed to export configuration: %w", err)
+	}
+	configDir, err := r.drush.GetConfigSyncDir(ctx, path, site, true)
+	if err != nil {
+		return fmt.Errorf("failed to locate the exported configuration: %w", err)
+	}
+	// The committer reads an empty path as the whole tree, which would sweep in unrelated changes.
+	if configDir == "" {
+		return fmt.Errorf("failed to locate the exported configuration: site %s has no config sync directory", site)
+	}
+	if _, err := r.committer.Commit("Update configuration "+site, configDir); err != nil {
+		return fmt.Errorf("failed to commit the exported configuration: %w", err)
 	}
 
 	return nil

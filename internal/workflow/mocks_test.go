@@ -811,6 +811,84 @@ func (_c *MockDrush_ExportConfiguration_Call) RunAndReturn(run func(ctx context.
 	return _c
 }
 
+// GetConfigSyncDir provides a mock function for the type MockDrush
+func (_mock *MockDrush) GetConfigSyncDir(ctx context.Context, dir string, site string, relative bool) (string, error) {
+	ret := _mock.Called(ctx, dir, site, relative)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetConfigSyncDir")
+	}
+
+	var r0 string
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, bool) (string, error)); ok {
+		return returnFunc(ctx, dir, site, relative)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, bool) string); ok {
+		r0 = returnFunc(ctx, dir, site, relative)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string, bool) error); ok {
+		r1 = returnFunc(ctx, dir, site, relative)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockDrush_GetConfigSyncDir_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetConfigSyncDir'
+type MockDrush_GetConfigSyncDir_Call struct {
+	*mock.Call
+}
+
+// GetConfigSyncDir is a helper method to define mock.On call
+//   - ctx context.Context
+//   - dir string
+//   - site string
+//   - relative bool
+func (_e *MockDrush_Expecter) GetConfigSyncDir(ctx any, dir any, site any, relative any) *MockDrush_GetConfigSyncDir_Call {
+	return &MockDrush_GetConfigSyncDir_Call{Call: _e.mock.On("GetConfigSyncDir", ctx, dir, site, relative)}
+}
+
+func (_c *MockDrush_GetConfigSyncDir_Call) Run(run func(ctx context.Context, dir string, site string, relative bool)) *MockDrush_GetConfigSyncDir_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 bool
+		if args[3] != nil {
+			arg3 = args[3].(bool)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *MockDrush_GetConfigSyncDir_Call) Return(s string, err error) *MockDrush_GetConfigSyncDir_Call {
+	_c.Call.Return(s, err)
+	return _c
+}
+
+func (_c *MockDrush_GetConfigSyncDir_Call) RunAndReturn(run func(ctx context.Context, dir string, site string, relative bool) (string, error)) *MockDrush_GetConfigSyncDir_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // UpdateSite provides a mock function for the type MockDrush
 func (_mock *MockDrush) UpdateSite(ctx context.Context, dir string, site string) error {
 	ret := _mock.Called(ctx, dir, site)
@@ -910,6 +988,84 @@ func (_m *MockRepository) EXPECT() *MockRepository_Expecter {
 	return &MockRepository_Expecter{mock: &_m.Mock}
 }
 
+// AddWorktree provides a mock function for the type MockRepository
+func (_mock *MockRepository) AddWorktree(ctx context.Context, source string, username string, email string) (repo.Checkout, error) {
+	ret := _mock.Called(ctx, source, username, email)
+
+	if len(ret) == 0 {
+		panic("no return value specified for AddWorktree")
+	}
+
+	var r0 repo.Checkout
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string) (repo.Checkout, error)); ok {
+		return returnFunc(ctx, source, username, email)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string) repo.Checkout); ok {
+		r0 = returnFunc(ctx, source, username, email)
+	} else {
+		r0 = ret.Get(0).(repo.Checkout)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string, string) error); ok {
+		r1 = returnFunc(ctx, source, username, email)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockRepository_AddWorktree_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'AddWorktree'
+type MockRepository_AddWorktree_Call struct {
+	*mock.Call
+}
+
+// AddWorktree is a helper method to define mock.On call
+//   - ctx context.Context
+//   - source string
+//   - username string
+//   - email string
+func (_e *MockRepository_Expecter) AddWorktree(ctx any, source any, username any, email any) *MockRepository_AddWorktree_Call {
+	return &MockRepository_AddWorktree_Call{Call: _e.mock.On("AddWorktree", ctx, source, username, email)}
+}
+
+func (_c *MockRepository_AddWorktree_Call) Run(run func(ctx context.Context, source string, username string, email string)) *MockRepository_AddWorktree_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 string
+		if args[3] != nil {
+			arg3 = args[3].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_AddWorktree_Call) Return(checkout repo.Checkout, err error) *MockRepository_AddWorktree_Call {
+	_c.Call.Return(checkout, err)
+	return _c
+}
+
+func (_c *MockRepository_AddWorktree_Call) RunAndReturn(run func(ctx context.Context, source string, username string, email string) (repo.Checkout, error)) *MockRepository_AddWorktree_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // BranchExists provides a mock function for the type MockRepository
 func (_mock *MockRepository) BranchExists(repository repo.Repository, branch string, token string) (bool, error) {
 	ret := _mock.Called(repository, branch, token)
@@ -983,45 +1139,29 @@ func (_c *MockRepository_BranchExists_Call) RunAndReturn(run func(repository rep
 }
 
 // CloneRepository provides a mock function for the type MockRepository
-func (_mock *MockRepository) CloneRepository(repository string, branch string, token string, username string, email string) (repo.Repository, repo.Worktree, string, error) {
+func (_mock *MockRepository) CloneRepository(repository string, branch string, token string, username string, email string) (repo.Checkout, error) {
 	ret := _mock.Called(repository, branch, token, username, email)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CloneRepository")
 	}
 
-	var r0 repo.Repository
-	var r1 repo.Worktree
-	var r2 string
-	var r3 error
-	if returnFunc, ok := ret.Get(0).(func(string, string, string, string, string) (repo.Repository, repo.Worktree, string, error)); ok {
+	var r0 repo.Checkout
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(string, string, string, string, string) (repo.Checkout, error)); ok {
 		return returnFunc(repository, branch, token, username, email)
 	}
-	if returnFunc, ok := ret.Get(0).(func(string, string, string, string, string) repo.Repository); ok {
+	if returnFunc, ok := ret.Get(0).(func(string, string, string, string, string) repo.Checkout); ok {
 		r0 = returnFunc(repository, branch, token, username, email)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(repo.Repository)
-		}
+		r0 = ret.Get(0).(repo.Checkout)
 	}
-	if returnFunc, ok := ret.Get(1).(func(string, string, string, string, string) repo.Worktree); ok {
+	if returnFunc, ok := ret.Get(1).(func(string, string, string, string, string) error); ok {
 		r1 = returnFunc(repository, branch, token, username, email)
 	} else {
-		if ret.Get(1) != nil {
-			r1 = ret.Get(1).(repo.Worktree)
-		}
+		r1 = ret.Error(1)
 	}
-	if returnFunc, ok := ret.Get(2).(func(string, string, string, string, string) string); ok {
-		r2 = returnFunc(repository, branch, token, username, email)
-	} else {
-		r2 = ret.Get(2).(string)
-	}
-	if returnFunc, ok := ret.Get(3).(func(string, string, string, string, string) error); ok {
-		r3 = returnFunc(repository, branch, token, username, email)
-	} else {
-		r3 = ret.Error(3)
-	}
-	return r0, r1, r2, r3
+	return r0, r1
 }
 
 // MockRepository_CloneRepository_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CloneRepository'
@@ -1072,12 +1212,12 @@ func (_c *MockRepository_CloneRepository_Call) Run(run func(repository string, b
 	return _c
 }
 
-func (_c *MockRepository_CloneRepository_Call) Return(repository1 repo.Repository, worktree repo.Worktree, s string, err error) *MockRepository_CloneRepository_Call {
-	_c.Call.Return(repository1, worktree, s, err)
+func (_c *MockRepository_CloneRepository_Call) Return(checkout repo.Checkout, err error) *MockRepository_CloneRepository_Call {
+	_c.Call.Return(checkout, err)
 	return _c
 }
 
-func (_c *MockRepository_CloneRepository_Call) RunAndReturn(run func(repository string, branch string, token string, username string, email string) (repo.Repository, repo.Worktree, string, error)) *MockRepository_CloneRepository_Call {
+func (_c *MockRepository_CloneRepository_Call) RunAndReturn(run func(repository string, branch string, token string, username string, email string) (repo.Checkout, error)) *MockRepository_CloneRepository_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1262,66 +1402,41 @@ func (_c *MockRepository_IsShallowClone_Call) RunAndReturn(run func(path string)
 	return _c
 }
 
-// OpenRepository provides a mock function for the type MockRepository
-func (_mock *MockRepository) OpenRepository(path string, username string, email string) (repo.Repository, repo.Worktree, string, error) {
-	ret := _mock.Called(path, username, email)
+// RemoveWorktree provides a mock function for the type MockRepository
+func (_mock *MockRepository) RemoveWorktree(ctx context.Context, source string, path string) error {
+	ret := _mock.Called(ctx, source, path)
 
 	if len(ret) == 0 {
-		panic("no return value specified for OpenRepository")
+		panic("no return value specified for RemoveWorktree")
 	}
 
-	var r0 repo.Repository
-	var r1 repo.Worktree
-	var r2 string
-	var r3 error
-	if returnFunc, ok := ret.Get(0).(func(string, string, string) (repo.Repository, repo.Worktree, string, error)); ok {
-		return returnFunc(path, username, email)
-	}
-	if returnFunc, ok := ret.Get(0).(func(string, string, string) repo.Repository); ok {
-		r0 = returnFunc(path, username, email)
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = returnFunc(ctx, source, path)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(repo.Repository)
-		}
+		r0 = ret.Error(0)
 	}
-	if returnFunc, ok := ret.Get(1).(func(string, string, string) repo.Worktree); ok {
-		r1 = returnFunc(path, username, email)
-	} else {
-		if ret.Get(1) != nil {
-			r1 = ret.Get(1).(repo.Worktree)
-		}
-	}
-	if returnFunc, ok := ret.Get(2).(func(string, string, string) string); ok {
-		r2 = returnFunc(path, username, email)
-	} else {
-		r2 = ret.Get(2).(string)
-	}
-	if returnFunc, ok := ret.Get(3).(func(string, string, string) error); ok {
-		r3 = returnFunc(path, username, email)
-	} else {
-		r3 = ret.Error(3)
-	}
-	return r0, r1, r2, r3
+	return r0
 }
 
-// MockRepository_OpenRepository_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'OpenRepository'
-type MockRepository_OpenRepository_Call struct {
+// MockRepository_RemoveWorktree_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RemoveWorktree'
+type MockRepository_RemoveWorktree_Call struct {
 	*mock.Call
 }
 
-// OpenRepository is a helper method to define mock.On call
+// RemoveWorktree is a helper method to define mock.On call
+//   - ctx context.Context
+//   - source string
 //   - path string
-//   - username string
-//   - email string
-func (_e *MockRepository_Expecter) OpenRepository(path any, username any, email any) *MockRepository_OpenRepository_Call {
-	return &MockRepository_OpenRepository_Call{Call: _e.mock.On("OpenRepository", path, username, email)}
+func (_e *MockRepository_Expecter) RemoveWorktree(ctx any, source any, path any) *MockRepository_RemoveWorktree_Call {
+	return &MockRepository_RemoveWorktree_Call{Call: _e.mock.On("RemoveWorktree", ctx, source, path)}
 }
 
-func (_c *MockRepository_OpenRepository_Call) Run(run func(path string, username string, email string)) *MockRepository_OpenRepository_Call {
+func (_c *MockRepository_RemoveWorktree_Call) Run(run func(ctx context.Context, source string, path string)) *MockRepository_RemoveWorktree_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 string
+		var arg0 context.Context
 		if args[0] != nil {
-			arg0 = args[0].(string)
+			arg0 = args[0].(context.Context)
 		}
 		var arg1 string
 		if args[1] != nil {
@@ -1340,12 +1455,12 @@ func (_c *MockRepository_OpenRepository_Call) Run(run func(path string, username
 	return _c
 }
 
-func (_c *MockRepository_OpenRepository_Call) Return(repository repo.Repository, worktree repo.Worktree, s string, err error) *MockRepository_OpenRepository_Call {
-	_c.Call.Return(repository, worktree, s, err)
+func (_c *MockRepository_RemoveWorktree_Call) Return(err error) *MockRepository_RemoveWorktree_Call {
+	_c.Call.Return(err)
 	return _c
 }
 
-func (_c *MockRepository_OpenRepository_Call) RunAndReturn(run func(path string, username string, email string) (repo.Repository, repo.Worktree, string, error)) *MockRepository_OpenRepository_Call {
+func (_c *MockRepository_RemoveWorktree_Call) RunAndReturn(run func(ctx context.Context, source string, path string) error) *MockRepository_RemoveWorktree_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1622,6 +1737,114 @@ func (_c *MockGitRepository_Remote_Call) RunAndReturn(run func(name string) (*gi
 	return _c
 }
 
+// RemoveBranch provides a mock function for the type MockGitRepository
+func (_mock *MockGitRepository) RemoveBranch(name string) error {
+	ret := _mock.Called(name)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RemoveBranch")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(string) error); ok {
+		r0 = returnFunc(name)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockGitRepository_RemoveBranch_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RemoveBranch'
+type MockGitRepository_RemoveBranch_Call struct {
+	*mock.Call
+}
+
+// RemoveBranch is a helper method to define mock.On call
+//   - name string
+func (_e *MockGitRepository_Expecter) RemoveBranch(name any) *MockGitRepository_RemoveBranch_Call {
+	return &MockGitRepository_RemoveBranch_Call{Call: _e.mock.On("RemoveBranch", name)}
+}
+
+func (_c *MockGitRepository_RemoveBranch_Call) Run(run func(name string)) *MockGitRepository_RemoveBranch_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockGitRepository_RemoveBranch_Call) Return(err error) *MockGitRepository_RemoveBranch_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockGitRepository_RemoveBranch_Call) RunAndReturn(run func(name string) error) *MockGitRepository_RemoveBranch_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SetBranch provides a mock function for the type MockGitRepository
+func (_mock *MockGitRepository) SetBranch(name string, hash plumbing.Hash) error {
+	ret := _mock.Called(name, hash)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetBranch")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(string, plumbing.Hash) error); ok {
+		r0 = returnFunc(name, hash)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockGitRepository_SetBranch_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetBranch'
+type MockGitRepository_SetBranch_Call struct {
+	*mock.Call
+}
+
+// SetBranch is a helper method to define mock.On call
+//   - name string
+//   - hash plumbing.Hash
+func (_e *MockGitRepository_Expecter) SetBranch(name any, hash any) *MockGitRepository_SetBranch_Call {
+	return &MockGitRepository_SetBranch_Call{Call: _e.mock.On("SetBranch", name, hash)}
+}
+
+func (_c *MockGitRepository_SetBranch_Call) Run(run func(name string, hash plumbing.Hash)) *MockGitRepository_SetBranch_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		var arg1 plumbing.Hash
+		if args[1] != nil {
+			arg1 = args[1].(plumbing.Hash)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockGitRepository_SetBranch_Call) Return(err error) *MockGitRepository_SetBranch_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockGitRepository_SetBranch_Call) RunAndReturn(run func(name string, hash plumbing.Hash) error) *MockGitRepository_SetBranch_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // NewMockWorktree creates a new instance of MockWorktree. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockWorktree(t interface {
@@ -1767,57 +1990,6 @@ func (_c *MockWorktree_AddGlob_Call) Return(err error) *MockWorktree_AddGlob_Cal
 }
 
 func (_c *MockWorktree_AddGlob_Call) RunAndReturn(run func(pattern string) error) *MockWorktree_AddGlob_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// Checkout provides a mock function for the type MockWorktree
-func (_mock *MockWorktree) Checkout(opts *git.CheckoutOptions) error {
-	ret := _mock.Called(opts)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Checkout")
-	}
-
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*git.CheckoutOptions) error); ok {
-		r0 = returnFunc(opts)
-	} else {
-		r0 = ret.Error(0)
-	}
-	return r0
-}
-
-// MockWorktree_Checkout_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Checkout'
-type MockWorktree_Checkout_Call struct {
-	*mock.Call
-}
-
-// Checkout is a helper method to define mock.On call
-//   - opts *git.CheckoutOptions
-func (_e *MockWorktree_Expecter) Checkout(opts any) *MockWorktree_Checkout_Call {
-	return &MockWorktree_Checkout_Call{Call: _e.mock.On("Checkout", opts)}
-}
-
-func (_c *MockWorktree_Checkout_Call) Run(run func(opts *git.CheckoutOptions)) *MockWorktree_Checkout_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *git.CheckoutOptions
-		if args[0] != nil {
-			arg0 = args[0].(*git.CheckoutOptions)
-		}
-		run(
-			arg0,
-		)
-	})
-	return _c
-}
-
-func (_c *MockWorktree_Checkout_Call) Return(err error) *MockWorktree_Checkout_Call {
-	_c.Call.Return(err)
-	return _c
-}
-
-func (_c *MockWorktree_Checkout_Call) RunAndReturn(run func(opts *git.CheckoutOptions) error) *MockWorktree_Checkout_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -1,8 +1,6 @@
 package addon
 
 import (
-	"sync"
-
 	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/drupdater/drupdater/pkg/drush"
 	"go.uber.org/zap"
@@ -14,18 +12,14 @@ type UnsupportedModules struct {
 	logger *zap.Logger
 	drush  Drush
 
-	// mu guards modules: preSiteUpdateHandler runs concurrently for each site. Keyed by name,
-	// so multisite results are deduplicated.
-	mu      sync.Mutex
-	modules map[string]drush.UnsupportedModule
+	modules workflow.PerSite[[]drush.UnsupportedModule]
 }
 
 // NewUnsupportedModules creates an unsupported modules detector.
 func NewUnsupportedModules(logger *zap.Logger, drushClient Drush) *UnsupportedModules {
 	return &UnsupportedModules{
-		logger:  logger,
-		drush:   drushClient,
-		modules: make(map[string]drush.UnsupportedModule),
+		logger: logger,
+		drush:  drushClient,
 	}
 }
 
@@ -47,11 +41,7 @@ func (um *UnsupportedModules) preSiteUpdateHandler(evt *workflow.PreSiteUpdateEv
 		return nil
 	}
 
-	um.mu.Lock()
-	for _, module := range modules {
-		um.modules[module.Name] = module
-	}
-	um.mu.Unlock()
+	um.modules.Set(evt.Site(), modules)
 
 	um.logger.Info("unsupported modules found", zap.String("site", evt.Site()), zap.Int("count", len(modules)))
 

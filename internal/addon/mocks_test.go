@@ -355,27 +355,25 @@ func (_c *MockComposer_Diff_Call) RunAndReturn(run func(ctx context.Context, pat
 }
 
 // GetAllowPlugins provides a mock function for the type MockComposer
-func (_mock *MockComposer) GetAllowPlugins(ctx context.Context, dir string) (map[string]bool, error) {
-	ret := _mock.Called(ctx, dir)
+func (_mock *MockComposer) GetAllowPlugins(dir string) (composer.AllowPlugins, error) {
+	ret := _mock.Called(dir)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetAllowPlugins")
 	}
 
-	var r0 map[string]bool
+	var r0 composer.AllowPlugins
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (map[string]bool, error)); ok {
-		return returnFunc(ctx, dir)
+	if returnFunc, ok := ret.Get(0).(func(string) (composer.AllowPlugins, error)); ok {
+		return returnFunc(dir)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) map[string]bool); ok {
-		r0 = returnFunc(ctx, dir)
+	if returnFunc, ok := ret.Get(0).(func(string) composer.AllowPlugins); ok {
+		r0 = returnFunc(dir)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(map[string]bool)
-		}
+		r0 = ret.Get(0).(composer.AllowPlugins)
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = returnFunc(ctx, dir)
+	if returnFunc, ok := ret.Get(1).(func(string) error); ok {
+		r1 = returnFunc(dir)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -388,36 +386,30 @@ type MockComposer_GetAllowPlugins_Call struct {
 }
 
 // GetAllowPlugins is a helper method to define mock.On call
-//   - ctx context.Context
 //   - dir string
-func (_e *MockComposer_Expecter) GetAllowPlugins(ctx any, dir any) *MockComposer_GetAllowPlugins_Call {
-	return &MockComposer_GetAllowPlugins_Call{Call: _e.mock.On("GetAllowPlugins", ctx, dir)}
+func (_e *MockComposer_Expecter) GetAllowPlugins(dir any) *MockComposer_GetAllowPlugins_Call {
+	return &MockComposer_GetAllowPlugins_Call{Call: _e.mock.On("GetAllowPlugins", dir)}
 }
 
-func (_c *MockComposer_GetAllowPlugins_Call) Run(run func(ctx context.Context, dir string)) *MockComposer_GetAllowPlugins_Call {
+func (_c *MockComposer_GetAllowPlugins_Call) Run(run func(dir string)) *MockComposer_GetAllowPlugins_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 context.Context
+		var arg0 string
 		if args[0] != nil {
-			arg0 = args[0].(context.Context)
-		}
-		var arg1 string
-		if args[1] != nil {
-			arg1 = args[1].(string)
+			arg0 = args[0].(string)
 		}
 		run(
 			arg0,
-			arg1,
 		)
 	})
 	return _c
 }
 
-func (_c *MockComposer_GetAllowPlugins_Call) Return(stringToBool map[string]bool, err error) *MockComposer_GetAllowPlugins_Call {
-	_c.Call.Return(stringToBool, err)
+func (_c *MockComposer_GetAllowPlugins_Call) Return(allowPlugins composer.AllowPlugins, err error) *MockComposer_GetAllowPlugins_Call {
+	_c.Call.Return(allowPlugins, err)
 	return _c
 }
 
-func (_c *MockComposer_GetAllowPlugins_Call) RunAndReturn(run func(ctx context.Context, dir string) (map[string]bool, error)) *MockComposer_GetAllowPlugins_Call {
+func (_c *MockComposer_GetAllowPlugins_Call) RunAndReturn(run func(dir string) (composer.AllowPlugins, error)) *MockComposer_GetAllowPlugins_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -908,69 +900,6 @@ func (_c *MockComposer_Normalize_Call) RunAndReturn(run func(ctx context.Context
 	return _c
 }
 
-// SetAllowPlugins provides a mock function for the type MockComposer
-func (_mock *MockComposer) SetAllowPlugins(ctx context.Context, dir string, plugins map[string]bool) error {
-	ret := _mock.Called(ctx, dir, plugins)
-
-	if len(ret) == 0 {
-		panic("no return value specified for SetAllowPlugins")
-	}
-
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, map[string]bool) error); ok {
-		r0 = returnFunc(ctx, dir, plugins)
-	} else {
-		r0 = ret.Error(0)
-	}
-	return r0
-}
-
-// MockComposer_SetAllowPlugins_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetAllowPlugins'
-type MockComposer_SetAllowPlugins_Call struct {
-	*mock.Call
-}
-
-// SetAllowPlugins is a helper method to define mock.On call
-//   - ctx context.Context
-//   - dir string
-//   - plugins map[string]bool
-func (_e *MockComposer_Expecter) SetAllowPlugins(ctx any, dir any, plugins any) *MockComposer_SetAllowPlugins_Call {
-	return &MockComposer_SetAllowPlugins_Call{Call: _e.mock.On("SetAllowPlugins", ctx, dir, plugins)}
-}
-
-func (_c *MockComposer_SetAllowPlugins_Call) Run(run func(ctx context.Context, dir string, plugins map[string]bool)) *MockComposer_SetAllowPlugins_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 context.Context
-		if args[0] != nil {
-			arg0 = args[0].(context.Context)
-		}
-		var arg1 string
-		if args[1] != nil {
-			arg1 = args[1].(string)
-		}
-		var arg2 map[string]bool
-		if args[2] != nil {
-			arg2 = args[2].(map[string]bool)
-		}
-		run(
-			arg0,
-			arg1,
-			arg2,
-		)
-	})
-	return _c
-}
-
-func (_c *MockComposer_SetAllowPlugins_Call) Return(err error) *MockComposer_SetAllowPlugins_Call {
-	_c.Call.Return(err)
-	return _c
-}
-
-func (_c *MockComposer_SetAllowPlugins_Call) RunAndReturn(run func(ctx context.Context, dir string, plugins map[string]bool) error) *MockComposer_SetAllowPlugins_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // SetConfig provides a mock function for the type MockComposer
 func (_mock *MockComposer) SetConfig(ctx context.Context, dir string, key string, value string) error {
 	ret := _mock.Called(ctx, dir, key, value)
@@ -1036,6 +965,69 @@ func (_c *MockComposer_SetConfig_Call) Return(err error) *MockComposer_SetConfig
 }
 
 func (_c *MockComposer_SetConfig_Call) RunAndReturn(run func(ctx context.Context, dir string, key string, value string) error) *MockComposer_SetConfig_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UnsetConfig provides a mock function for the type MockComposer
+func (_mock *MockComposer) UnsetConfig(ctx context.Context, dir string, key string) error {
+	ret := _mock.Called(ctx, dir, key)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UnsetConfig")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = returnFunc(ctx, dir, key)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockComposer_UnsetConfig_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UnsetConfig'
+type MockComposer_UnsetConfig_Call struct {
+	*mock.Call
+}
+
+// UnsetConfig is a helper method to define mock.On call
+//   - ctx context.Context
+//   - dir string
+//   - key string
+func (_e *MockComposer_Expecter) UnsetConfig(ctx any, dir any, key any) *MockComposer_UnsetConfig_Call {
+	return &MockComposer_UnsetConfig_Call{Call: _e.mock.On("UnsetConfig", ctx, dir, key)}
+}
+
+func (_c *MockComposer_UnsetConfig_Call) Run(run func(ctx context.Context, dir string, key string)) *MockComposer_UnsetConfig_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockComposer_UnsetConfig_Call) Return(err error) *MockComposer_UnsetConfig_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockComposer_UnsetConfig_Call) RunAndReturn(run func(ctx context.Context, dir string, key string) error) *MockComposer_UnsetConfig_Call {
 	_c.Call.Return(run)
 	return _c
 }

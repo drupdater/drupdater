@@ -117,11 +117,9 @@ func TestComposerAuditReportDataOnEitherHalfAlone(t *testing.T) {
 }
 
 func TestUpdateHooksReportData(t *testing.T) {
-	uh := &UpdateHooks{
-		hooks: UpdateHooksPerSite{
-			"default": {"foo_update_9001": drush.UpdateHook{Module: "foo", Description: "Add a field"}},
-		},
-	}
+	uh := updateHooksFor(map[string]map[string]drush.UpdateHook{
+		"default": {"foo_update_9001": drush.UpdateHook{Module: "foo", Description: "Add a field"}},
+	})
 
 	assert.Equal(t, "update_hooks", uh.ReportKey())
 
@@ -131,33 +129,27 @@ func TestUpdateHooksReportData(t *testing.T) {
 	assert.Equal(t, "foo", data["default"]["foo_update_9001"].Module)
 }
 
-// ReportData must hand back a copy: the live map is mutex-guarded state that keeps being written
-// while sites update concurrently, and the caller cannot know that.
+// ReportData must hand back a copy all the way down: what a site found stays the addon's.
 func TestUpdateHooksReportDataCopiesTheLiveMap(t *testing.T) {
-	uh := &UpdateHooks{
-		hooks: UpdateHooksPerSite{
-			"default": {"foo_update_9001": drush.UpdateHook{Module: "foo"}},
-		},
-	}
+	uh := updateHooksFor(map[string]map[string]drush.UpdateHook{
+		"default": {"foo_update_9001": drush.UpdateHook{Module: "foo"}},
+	})
 
 	data := uh.ReportData().(map[string]map[string]drush.UpdateHook)
 	data["default"]["injected"] = drush.UpdateHook{Module: "bar"}
 
-	assert.NotContains(t, uh.hooks["default"], "injected")
+	assert.NotContains(t, uh.hooks.All()["default"], "injected")
 }
 
 func TestUpdateHooksReportDataNilWhenEmpty(t *testing.T) {
-	assert.Nil(t, (&UpdateHooks{hooks: UpdateHooksPerSite{}}).ReportData())
+	assert.Nil(t, (&UpdateHooks{}).ReportData())
 }
 
 func TestUnsupportedModulesReportDataIsSortedByName(t *testing.T) {
-	um := &UnsupportedModules{
-		modules: map[string]drush.UnsupportedModule{
-			"zebra": {Name: "zebra"},
-			"alpha": {Name: "alpha"},
-			"mango": {Name: "mango"},
-		},
-	}
+	um := unsupportedModulesFor(map[string][]drush.UnsupportedModule{
+		"default": {{Name: "zebra"}, {Name: "alpha"}},
+		"second":  {{Name: "mango"}, {Name: "alpha"}},
+	})
 
 	assert.Equal(t, "unsupported_modules", um.ReportKey())
 
@@ -169,7 +161,9 @@ func TestUnsupportedModulesReportDataIsSortedByName(t *testing.T) {
 }
 
 func TestUnsupportedModulesReportDataNilWhenEmpty(t *testing.T) {
-	assert.Nil(t, (&UnsupportedModules{modules: map[string]drush.UnsupportedModule{}}).ReportData())
+	assert.Nil(t, (&UnsupportedModules{}).ReportData())
+	assert.Nil(t, unsupportedModulesFor(map[string][]drush.UnsupportedModule{"default": nil}).ReportData(),
+		"a site that found none adds nothing")
 }
 
 func TestComposerPatchesReportData(t *testing.T) {
@@ -311,4 +305,30 @@ func TestTranslationsUpdaterReportData(t *testing.T) {
 		out["default"] = TranslationResult{}
 		assert.True(t, tu.ReportData().(map[string]TranslationResult)["default"].Updated)
 	})
+}
+
+// updateHooksFor, unsupportedModulesFor and translationsFor build an addon holding what its
+// per-site hook would have recorded for each site.
+func updateHooksFor(perSite map[string]map[string]drush.UpdateHook) *UpdateHooks {
+	uh := &UpdateHooks{}
+	for site, hooks := range perSite {
+		uh.hooks.Set(site, hooks)
+	}
+	return uh
+}
+
+func unsupportedModulesFor(perSite map[string][]drush.UnsupportedModule) *UnsupportedModules {
+	um := &UnsupportedModules{}
+	for site, modules := range perSite {
+		um.modules.Set(site, modules)
+	}
+	return um
+}
+
+func translationsFor(perSite map[string]TranslationResult) *TranslationsUpdater {
+	tu := &TranslationsUpdater{}
+	for site, result := range perSite {
+		tu.results.Set(site, result)
+	}
+	return tu
 }

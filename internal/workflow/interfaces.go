@@ -27,13 +27,15 @@ type Composer interface {
 type Drush interface {
 	UpdateSite(ctx context.Context, dir string, site string) error
 	ExportConfiguration(ctx context.Context, dir string, site string) error
+	GetConfigSyncDir(ctx context.Context, dir string, site string, relative bool) (string, error)
 	ConfigResave(ctx context.Context, dir string, site string) error
 }
 
 type Repository interface {
 	BranchExists(repository repo.Repository, branch string, token string) (bool, error)
-	CloneRepository(repository string, branch string, token string, username string, email string) (repo.Repository, repo.Worktree, string, error)
-	OpenRepository(path string, username string, email string) (repo.Repository, repo.Worktree, string, error)
+	CloneRepository(repository string, branch string, token string, username string, email string) (repo.Checkout, error)
+	AddWorktree(ctx context.Context, source string, username string, email string) (repo.Checkout, error)
+	RemoveWorktree(ctx context.Context, source string, path string) error
 	GetRemoteURL(path string) (string, error)
 	GetCurrentBranch(path string) (string, error)
 	IsShallowClone(path string) (bool, error)

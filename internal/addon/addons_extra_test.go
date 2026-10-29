@@ -76,51 +76,6 @@ func TestPatchRemovalFailuresAreLogged(t *testing.T) {
 	}
 }
 
-func TestComposerAllowPluginsNilMapIsNotAPanic(t *testing.T) {
-	// A project with no per-package allow-plugins entries yields an empty map. If the addon
-	// ever holds a nil map, assigning a newly discovered plugin into it panics.
-	composerService := NewMockComposer(t)
-	composerService.EXPECT().GetInstalledPlugins(anyCtx, "/tmp").Return(map[string]any{"new/plugin": nil}, nil)
-	composerService.EXPECT().SetAllowPlugins(anyCtx, "/tmp", map[string]bool{"new/plugin": false}).Return(nil)
-
-	ap := NewComposerAllowPlugins(zap.NewNop(), composerService)
-	ap.allowPlugins = nil // as if GetAllowPlugins had produced nothing
-
-	err := ap.postComposerUpdateHandler(workflow.NewPostComposerUpdateEvent(t.Context(), "/tmp", nil))
-	require.NoError(t, err)
-	assert.Equal(t, []string{"new/plugin"}, ap.newAllowPlugins)
-}
-
-func TestComposerAllowPluginsErrors(t *testing.T) {
-	t.Run("reading the config fails", func(t *testing.T) {
-		composerService := NewMockComposer(t)
-		composerService.EXPECT().GetAllowPlugins(anyCtx, "/tmp").Return(nil, assert.AnError)
-
-		ap := NewComposerAllowPlugins(zap.NewNop(), composerService)
-		err := ap.preComposerUpdateHandler(workflow.NewPreComposerUpdateEvent(t.Context(), "/tmp", nil, nil, nil, false))
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to get composer allow plugins")
-	})
-
-	t.Run("listing installed plugins fails", func(t *testing.T) {
-		composerService := NewMockComposer(t)
-		composerService.EXPECT().GetInstalledPlugins(anyCtx, "/tmp").Return(nil, assert.AnError)
-
-		ap := NewComposerAllowPlugins(zap.NewNop(), composerService)
-		require.Error(t, ap.postComposerUpdateHandler(workflow.NewPostComposerUpdateEvent(t.Context(), "/tmp", nil)))
-	})
-
-	t.Run("writing the config back fails", func(t *testing.T) {
-		composerService := NewMockComposer(t)
-		composerService.EXPECT().GetInstalledPlugins(anyCtx, "/tmp").Return(map[string]any{}, nil)
-		composerService.EXPECT().SetAllowPlugins(anyCtx, "/tmp", mock.Anything).Return(assert.AnError)
-
-		ap := NewComposerAllowPlugins(zap.NewNop(), composerService)
-		ap.allowPlugins = map[string]bool{}
-		require.Error(t, ap.postComposerUpdateHandler(workflow.NewPostComposerUpdateEvent(t.Context(), "/tmp", nil)))
-	})
-}
-
 func TestComposerDiffFailure(t *testing.T) {
 	composerService := NewMockComposer(t)
 	composerService.EXPECT().Diff(anyCtx, "/tmp").Return(nil, assert.AnError)
@@ -223,7 +178,7 @@ func TestTranslationsUpdaterErrors(t *testing.T) {
 		err := tu.postSiteUpdateHandler(newEvent(&fakeCommitter{err: assert.AnError}))
 		require.ErrorIs(t, err, assert.AnError)
 		assert.Contains(t, err.Error(), "failed to commit translation path")
-		assert.Empty(t, tu.results, "a site whose commit failed has no outcome to report")
+		assert.Empty(t, tu.results.All(), "a site whose commit failed has no outcome to report")
 	})
 }
 

@@ -31,7 +31,7 @@ func TestUpdateTranslationsEventHandlerWithoutLocaleDeploy(t *testing.T) {
 	// locale_deploy is off" and "ran and changed nothing" are indistinguishable to a reader.
 	assert.Equal(t, map[string]TranslationResult{
 		"example.com": {Skipped: "locale_deploy not enabled"},
-	}, handler.results)
+	}, handler.results.All())
 	assert.Empty(t, committer.commits)
 	mockDrush.AssertExpectations(t)
 }
@@ -56,7 +56,7 @@ func TestUpdateTranslationsEventHandlerWithLocaleDeploy(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, map[string]TranslationResult{
 		"example.com": {Path: "translations", Updated: true},
-	}, handler.results, "a committed translation update has to be reported as updated")
+	}, handler.results.All(), "a committed translation update has to be reported as updated")
 	assert.Equal(t, []recordedCommit{{message: "Update translations", paths: []string{"translations"}}}, committer.commits)
 	mockDrush.AssertExpectations(t)
 }
@@ -82,11 +82,11 @@ func TestUpdateTranslationsEventHandlerSkipsWhenTranslationPathUnavailable(t *te
 	require.NoError(t, err)
 	// The skip reason carries the underlying error, so the report says why translations were
 	// left alone rather than silently omitting the site.
-	require.Len(t, handler.results, 1)
-	assert.Empty(t, handler.results["example.com"].Path)
-	assert.False(t, handler.results["example.com"].Updated)
-	assert.Contains(t, handler.results["example.com"].Skipped, "translation path not available")
-	assert.Contains(t, handler.results["example.com"].Skipped, assert.AnError.Error())
+	require.Len(t, handler.results.All(), 1)
+	assert.Empty(t, handler.results.All()["example.com"].Path)
+	assert.False(t, handler.results.All()["example.com"].Updated)
+	assert.Contains(t, handler.results.All()["example.com"].Skipped, "translation path not available")
+	assert.Contains(t, handler.results.All()["example.com"].Skipped, assert.AnError.Error())
 	mockDrush.AssertExpectations(t)
 	assert.Empty(t, committer.commits)
 }
@@ -107,5 +107,5 @@ func TestUpdateTranslationsEventHandlerRecordsNothingToCommit(t *testing.T) {
 
 	assert.Equal(t, map[string]TranslationResult{
 		"example.com": {Path: "translations"},
-	}, handler.results)
+	}, handler.results.All())
 }

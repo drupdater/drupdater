@@ -113,13 +113,14 @@ Where things live. For *how they work*, read `docs/explanation/` rather than dup
 ### Invariants worth knowing before editing
 
 - **Addons never call each other.** They communicate only through mutable event payloads (`PackagesToUpdate`, `PackagesToKeep`, `MinimalChanges`).
+- **A run never touches the user's checkout.** Checkout mode works in a linked worktree (`repo.AddWorktree`), commits are signed explicitly, and nothing writes the repository's git config or shells out to git there; the update branch is the only thing a run adds.
 - **Addons never touch git.** They name the paths they changed to the event's `Commit`; the runner's committer (`internal/workflow/commit.go`) commits exactly those, and refuses when something else is already staged.
 - **Hook stages are load-bearing** on `pre-composer-update` and `post-code-update`. See `docs/explanation/addon-architecture.md` before changing one.
 - **The MR is rendered from the report**, through its JSON. An addon reaches the description only via its report section; findings from two addons are joined there, never handed between them.
 - **`internal/addon/report.go` is a published contract.** Renaming a field there is a breaking change to `schema_version`, and `internal/addon/testdata/run_report.json` is what makes such a rename fail rather than ship. A new reporting addon belongs in that golden's `reportingAddons()`.
 - **Report types mirror rather than reuse internal types** (`report.PackageChange` vs `composer.PackageChange`) so an internal refactor can't rename a published field.
 - **The report's deferred write is registered first**, so it runs last and is emitted on every exit path.
-- **Per-site events fire concurrently.** Addon state accumulated across sites must be mutex-guarded, and maps handed to the report must be copies. `-race` only catches a missing guard if a test drives the handler from several sites at once — when you add cross-site state, add it to `internal/addon/concurrency_test.go` too.
+- **Per-site events fire concurrently.** An addon with a per-site hook keeps what it finds in a `workflow.PerSite` — one value per site, locked inside, copied on read — and has no map, slice or mutex field of its own; `TestPerSiteHooksShareStateOnlyThroughPerSite` fails the build otherwise. Add the addon to `internal/addon/concurrency_test.go` too, which drives it from many sites at once under `-race`.
 
 ## Comments
 

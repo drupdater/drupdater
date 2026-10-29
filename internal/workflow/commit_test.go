@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/drupdater/drupdater/pkg/repo"
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -38,6 +39,8 @@ func writeFile(t *testing.T, dir string, name string, content string) {
 }
 
 // headFiles lists what HEAD's commit changed relative to its parent, with its message.
+var testAuthor = repo.Identity{Name: "Drupdater Bot", Email: "bot@example.com"}
+
 func headFiles(t *testing.T, repository *git.Repository) (string, []string) {
 	t.Helper()
 	ref, err := repository.Head()
@@ -85,7 +88,7 @@ func TestCommitterCommitsExactlyThePathsNamed(t *testing.T) {
 	writeFile(t, dir, "translations-backup/x", "changed but not named")
 	writeFile(t, dir, "scratch.txt", "untracked and not named")
 
-	committer := newGitCommitter(worktree)
+	committer := newGitCommitter(worktree, testAuthor)
 	committed, err := committer.Commit("Update patches",
 		"composer.json", "composer.lock", "patches/old.patch", "patches/new.patch", "translations")
 
@@ -95,6 +98,14 @@ func TestCommitterCommitsExactlyThePathsNamed(t *testing.T) {
 	assert.Equal(t, "Update patches", message)
 	assert.ElementsMatch(t, []string{"composer.json", "patches/old.patch", "patches/new.patch", "translations/fr.po"}, files,
 		"a deletion, a new file and a directory are staged; an unnamed sibling and a missing path are not")
+	head, err := repository.Head()
+	require.NoError(t, err)
+	commit, err := repository.CommitObject(head.Hash())
+	require.NoError(t, err)
+	author := repo.Identity{Name: commit.Author.Name, Email: commit.Author.Email}
+	committedBy := repo.Identity{Name: commit.Committer.Name, Email: commit.Committer.Email}
+	assert.Equal(t, testAuthor, author)
+	assert.Equal(t, testAuthor, committedBy, "signed explicitly, so no identity has to be in git config")
 
 	status, err := worktree.Status()
 	require.NoError(t, err)
@@ -116,7 +127,7 @@ func TestCommitterSkipsPathsWithoutChanges(t *testing.T) {
 	before, err := repository.Head()
 	require.NoError(t, err)
 
-	committed, err := newGitCommitter(worktree).Commit("Update patches", "composer.json", "composer.lock")
+	committed, err := newGitCommitter(worktree, testAuthor).Commit("Update patches", "composer.json", "composer.lock")
 
 	require.NoError(t, err)
 	assert.False(t, committed)
@@ -135,7 +146,7 @@ func TestCommitterRefusesToCarryAnotherStagedChange(t *testing.T) {
 	require.NoError(t, err)
 	writeFile(t, dir, "web/a.php", "fixed")
 
-	committed, err := newGitCommitter(worktree).Commit("Update coding styles", "web/a.php")
+	committed, err := newGitCommitter(worktree, testAuthor).Commit("Update coding styles", "web/a.php")
 
 	require.ErrorContains(t, err, `refusing to commit "Update coding styles": composer.json already staged`)
 	assert.False(t, committed)
@@ -149,7 +160,7 @@ func TestCommitterFailures(t *testing.T) {
 		worktree := NewMockWorktree(t)
 		worktree.EXPECT().Add("web/a.php").Return(plumbing.ZeroHash, assert.AnError)
 
-		_, err := newGitCommitter(worktree).Commit("Remove deprecations", "web/a.php")
+		_, err := newGitCommitter(worktree, testAuthor).Commit("Remove deprecations", "web/a.php")
 		require.ErrorIs(t, err, assert.AnError)
 		assert.Contains(t, err.Error(), "failed to stage web/a.php")
 	})
@@ -159,7 +170,7 @@ func TestCommitterFailures(t *testing.T) {
 		worktree.EXPECT().Add("web/a.php").Return(plumbing.ZeroHash, nil)
 		worktree.EXPECT().Status().Return(nil, assert.AnError)
 
-		_, err := newGitCommitter(worktree).Commit("Remove deprecations", "web/a.php")
+		_, err := newGitCommitter(worktree, testAuthor).Commit("Remove deprecations", "web/a.php")
 		require.ErrorIs(t, err, assert.AnError)
 		assert.Contains(t, err.Error(), "failed to read worktree status")
 	})
@@ -170,7 +181,7 @@ func TestCommitterFailures(t *testing.T) {
 		worktree.EXPECT().Status().Return(git.Status{"web/a.php": {Staging: git.Modified}}, nil)
 		worktree.EXPECT().Commit("Remove deprecations", mock.Anything).Return(plumbing.ZeroHash, assert.AnError)
 
-		committed, err := newGitCommitter(worktree).Commit("Remove deprecations", "web/a.php")
+		committed, err := newGitCommitter(worktree, testAuthor).Commit("Remove deprecations", "web/a.php")
 		require.ErrorIs(t, err, assert.AnError)
 		assert.False(t, committed)
 		assert.Contains(t, err.Error(), `failed to commit "Remove deprecations"`)

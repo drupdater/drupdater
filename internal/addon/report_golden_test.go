@@ -65,14 +65,17 @@ func reportingAddons() []workflow.Addon {
 				CompareURL: "https://github.com/sebastianbergmann/phpunit/compare/10.5.30...10.5.31"},
 		}},
 		&ComposerAudit{beforeAudit: beforeAudit, afterAudit: afterAudit},
-		&UpdateHooks{hooks: UpdateHooksPerSite{
+		updateHooksFor(map[string]map[string]drush.UpdateHook{
 			"default": {"token_update_8002": {Module: "token", UpdateID: 8002, Description: "Rebuild the token cache", Type: "hook_update_n"}},
 			"second":  {"node_post_update_index": {Module: "node", UpdateID: "index", Description: "Reindex nodes", Type: "post_update"}},
-		}},
-		&UnsupportedModules{modules: map[string]drush.UnsupportedModule{
-			"legacy_feature": {Name: "legacy_feature", InstalledVersion: "1.2.0", RecommendedVersion: "None"},
-			"old_widget":     {Name: "old_widget", InstalledVersion: "2.0.0", RecommendedVersion: "3.1.0"},
-		}},
+		}),
+		unsupportedModulesFor(map[string][]drush.UnsupportedModule{
+			"default": {{Name: "legacy_feature", InstalledVersion: "1.2.0", RecommendedVersion: "None"}},
+			"second": {
+				{Name: "old_widget", InstalledVersion: "2.0.0", RecommendedVersion: "3.1.0"},
+				{Name: "legacy_feature", InstalledVersion: "1.2.0", RecommendedVersion: "None"},
+			},
+		}),
 		&ComposerPatches1{patchUpdates: PatchUpdates{
 			Removed: []RemovedPatch{{
 				Package: "drupal/core", PatchDescription: "Fix the thing",
@@ -94,10 +97,10 @@ func reportingAddons() []workflow.Addon {
 			File:           "web/modules/custom/acme/src/Plugin/Block/AcmeBlock.php",
 			AppliedRectors: []string{"Drupal\\Rector\\Rector\\Deprecation\\DrupalSetMessageRector"},
 		}}},
-		&TranslationsUpdater{results: map[string]TranslationResult{
+		translationsFor(map[string]TranslationResult{
 			"default": {Path: "translations", Updated: true},
 			"second":  {Skipped: "locale_deploy not enabled"},
-		}},
+		}),
 	}
 }
 
