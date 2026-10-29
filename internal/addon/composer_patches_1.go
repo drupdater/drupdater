@@ -98,16 +98,16 @@ func NewComposerPatches1(logger *zap.Logger, composer Composer, drupalOrg Drupal
 
 func (h *ComposerPatches1) Hooks() workflow.Hooks {
 	return workflow.Hooks{
-		PreComposerUpdate: workflow.On(workflow.Change, h.preComposerUpdateHandler),
+		PreComposerUpdate: workflow.Propose(workflow.Change, h.preComposerUpdateHandler),
 	}
 }
 
-func (h *ComposerPatches1) preComposerUpdateHandler(evt *workflow.PreComposerUpdateEvent) error {
+// preComposerUpdateHandler checks the patches against the update as earlier stages planned it,
+// and proposes pinning each package whose patch cannot be made to apply.
+func (h *ComposerPatches1) preComposerUpdateHandler(evt *workflow.PreComposerUpdateEvent) (workflow.UpdatePlan, error) {
 	ctx := evt.Context()
 	path := evt.Path()
-	packagesToUpdate := evt.PackagesToUpdate
-	minimalChanges := evt.MinimalChanges
-	packagesToKeep := evt.PackagesToKeep
+	plan := evt.Plan()
 
 	patches := make(map[string]map[string]string)
 	patchesString, err := h.composer.GetConfig(ctx, path, "extra.patches")
@@ -117,12 +117,12 @@ func (h *ComposerPatches1) preComposerUpdateHandler(evt *workflow.PreComposerUpd
 	}
 
 	if err := json.Unmarshal([]byte(patchesString), &patches); err != nil {
-		return fmt.Errorf("failed to unmarshal patches: %w", err)
+		return workflow.UpdatePlan{}, fmt.Errorf("failed to unmarshal patches: %w", err)
 	}
 
-	operations, err := h.composer.Update(ctx, path, packagesToUpdate, packagesToKeep, minimalChanges, true)
+	operations, err := h.composer.Update(ctx, path, plan.Only, plan.KeepConstraints(), plan.MinimalChanges, true)
 	if err != nil {
-		return fmt.Errorf("failed to get composer updates: %w", err)
+		return workflow.UpdatePlan{}, fmt.Errorf("failed to get composer updates: %w", err)
 	}
 
 	patchUpdates, newPatches := h.updatePatches(ctx, path, operations, patches)
@@ -137,27 +137,28 @@ func (h *ComposerPatches1) preComposerUpdateHandler(evt *workflow.PreComposerUpd
 
 		jsonBytes, err := json.Marshal(newPatches)
 		if err != nil {
-			return fmt.Errorf("failed to marshal patches: %w", err)
+			return workflow.UpdatePlan{}, fmt.Errorf("failed to marshal patches: %w", err)
 		}
 
 		if err := h.composer.SetConfig(ctx, path, "extra.patches", string(jsonBytes)); err != nil {
-			return fmt.Errorf("failed to set composer config: %w", err)
+			return workflow.UpdatePlan{}, fmt.Errorf("failed to set composer config: %w", err)
 		}
 
 		if err := h.composer.UpdateLockHash(ctx, path); err != nil {
-			return fmt.Errorf("failed to update composer lock hash: %w", err)
+			return workflow.UpdatePlan{}, fmt.Errorf("failed to update composer lock hash: %w", err)
 		}
 
 		if _, err := evt.Commit("Update patches", h.patchUpdates.changedPaths("composer.json", "composer.lock")...); err != nil {
-			return fmt.Errorf("failed to commit patches: %w", err)
+			return workflow.UpdatePlan{}, fmt.Errorf("failed to commit patches: %w", err)
 		}
 	}
 
+	var proposal workflow.UpdatePlan
 	for _, patchUpdate := range patchUpdates.Conflicts {
-		evt.PackagesToKeep = append(evt.PackagesToKeep, fmt.Sprintf("%s:%s", patchUpdate.Package, patchUpdate.FixedVersion))
+		proposal.Keep = append(proposal.Keep, workflow.Pin{Package: patchUpdate.Package, Version: patchUpdate.FixedVersion})
 	}
 
-	return nil
+	return proposal, nil
 }
 
 func (h *ComposerPatches1) updatePatches(ctx context.Context, path string, operations []composer.PackageChange, patches map[string]map[string]string) (PatchUpdates, map[string]map[string]string) {

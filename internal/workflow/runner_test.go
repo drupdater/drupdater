@@ -394,8 +394,8 @@ func TestRunAbortedByAnAddonInstallsNoSite(t *testing.T) {
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil).Once()
 
-	aborts := hookAddon{Hooks{PreComposerUpdate: On(Prepare, func(*PreComposerUpdateEvent) error {
-		return AbortError{Msg: "No security advisories found"}
+	aborts := hookAddon{Hooks{PreComposerUpdate: Propose(Prepare, func(*PreComposerUpdateEvent) (UpdatePlan, error) {
+		return UpdatePlan{}, AbortError{Msg: "No security advisories found"}
 	})}}
 
 	err := New(zap.NewNop(), config, NewMockDrush(t), vcsProvider, repositoryService, installer, mockComposer).Run(t.Context(), []Addon{aborts})
@@ -404,6 +404,39 @@ func TestRunAbortedByAnAddonInstallsNoSite(t *testing.T) {
 	require.True(t, aborted, "got %v", err)
 	installer.AssertNotCalled(t, "Install", mock.Anything, mock.Anything, mock.Anything)
 	mockComposer.AssertNotCalled(t, "Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestRunUpdatesAsTheAddonsPlanned(t *testing.T) {
+	installer := NewMockInstaller(t)
+	repositoryService := NewMockRepository(t)
+	vcsProvider := NewMockPlatform(t)
+	repository := NewMockGitRepository(t)
+	expectUpdateBranch(repository)
+	mockComposer := NewMockComposer(t)
+	expectVersionLookup(mockComposer)
+
+	config := internal.Config{RepositoryURL: "https://example.com/repo.git", Branch: "main", Token: "token", Clone: true, Sites: []string{"site1"}}
+
+	worktree := NewMockWorktree(t)
+	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
+	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
+	repositoryService.EXPECT().IsShallowClone(testCheckout).Return(false, nil)
+	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
+	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil).Once()
+	mockComposer.EXPECT().Update(anyCtx, testCheckout, []string{"drupal/core"}, []string{"drupal/core:10.2.0"}, true, false).
+		Return(nil, nil)
+
+	narrows := hookAddon{Hooks{PreComposerUpdate: Propose(Prepare, func(*PreComposerUpdateEvent) (UpdatePlan, error) {
+		return UpdatePlan{Only: []string{"drupal/core"}, MinimalChanges: true}, nil
+	})}}
+	pins := hookAddon{Hooks{PreComposerUpdate: Propose(Change, func(*PreComposerUpdateEvent) (UpdatePlan, error) {
+		return UpdatePlan{Keep: []Pin{{Package: "drupal/core", Version: "10.2.0"}}}, nil
+	})}}
+
+	err := New(zap.NewNop(), config, NewMockDrush(t), vcsProvider, repositoryService, installer, mockComposer).Run(t.Context(), []Addon{pins, narrows})
+
+	_, aborted := errors.AsType[AbortError](err)
+	require.True(t, aborted, "an update that changes nothing aborts; got %v", err)
 }
 
 func TestRunInstallsSitesAtTheOldCode(t *testing.T) {
@@ -1553,8 +1586,8 @@ func TestRunFireEventError(t *testing.T) {
 	repositoryService.EXPECT().IsShallowClone(testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
 
-	fails := hookAddon{Hooks{PreComposerUpdate: On(Change, func(*PreComposerUpdateEvent) error {
-		return errors.New("audit unavailable")
+	fails := hookAddon{Hooks{PreComposerUpdate: Propose(Change, func(*PreComposerUpdateEvent) (UpdatePlan, error) {
+		return UpdatePlan{}, errors.New("audit unavailable")
 	})}}
 
 	// installSite may or may not run before the context is cancelled.
@@ -2211,9 +2244,9 @@ func TestRunHandsAddonsTheRunsContextAndCommitter(t *testing.T) {
 		seen[name] = e.Context().Value(runKey{}) == "this run"
 	}
 	observer := hookAddon{Hooks{
-		PreComposerUpdate: On(Change, func(e *PreComposerUpdateEvent) error {
+		PreComposerUpdate: Propose(Change, func(e *PreComposerUpdateEvent) (UpdatePlan, error) {
 			carriesRun("pre-composer-update", e)
-			return nil
+			return UpdatePlan{}, nil
 		}),
 		PostComposerUpdate: On(Change, func(e *PostComposerUpdateEvent) error {
 			carriesRun("post-composer-update", e)

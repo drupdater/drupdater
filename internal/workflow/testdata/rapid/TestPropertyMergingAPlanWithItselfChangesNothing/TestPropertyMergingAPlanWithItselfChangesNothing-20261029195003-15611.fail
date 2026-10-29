@@ -1,0 +1,22 @@
+# 2026/10/29 19:50:03.566505 [TestPropertyMergingAPlanWithItselfChangesNothing] [rapid] draw plan: workflow.UpdatePlan{Only:[]string{"other/package", "drupal/webform"}, Keep:[]workflow.Pin{}, MinimalChanges:true}
+# 2026/10/29 19:50:03.566538 [TestPropertyMergingAPlanWithItselfChangesNothing] 
+# 	Error Trace:	/home/user/drupdater/internal/workflow/plan_property_test.go:81
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:458
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:467
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:292
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:207
+# 	            				/home/user/drupdater/internal/workflow/plan_property_test.go:74
+# 	Error:      	Received unexpected error:
+# 	            	the update is restricted to disjoint package sets: other/package, drupal/webform and other/package, drupal/webform
+# 	Test:       	TestPropertyMergingAPlanWithItselfChangesNothing
+# 
+v0.4.8#12244865403440325489
+0x17deb975ddbaa1
+0x4ac81e4ba68e5
+0x3
+0x17a6a403a2de8c
+0x6190ed825bdf7
+0x2
+0xa5f981cc43386
+0x89d324123a572
+0x1

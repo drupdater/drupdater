@@ -33,12 +33,13 @@ happens to close a CVE says so — without the audit dictating what that update 
 ### Before the update — deciding the scope
 
 **`--security` only.** Runs `composer audit` and collects the packages with known
-advisories. It then sets, on the `pre-composer-update` event:
+advisories. It then proposes, on the `pre-composer-update` event, an [update
+plan](../../explanation/addon-architecture.md#steering-the-update-through-proposals) with:
 
-- **`PackagesToUpdate`** — only the affected packages. When `drupal/core` is affected,
+- **`Only`**: only the affected packages. When `drupal/core` is affected,
   `drupal/core-recommended` and `drupal/core-composer-scaffold` are added too, since core
   cannot move without them.
-- **`MinimalChanges: true`** — Composer is asked to disturb as little else as possible.
+- **`MinimalChanges: true`**: Composer is asked to disturb as little else as possible.
 
 A security run also turns off Composer's policy blocking (`COMPOSER_NO_BLOCKING=1`) for every
 Composer command it runs. Composer 2.9 and later otherwise refuse to resolve to any version

@@ -1,0 +1,65 @@
+# 2026/10/29 19:49:54.603131 [TestPropertyMergeIsAssociative] [rapid] draw a: workflow.UpdatePlan{Only:[]string{}, Keep:[]workflow.Pin{workflow.Pin{Package:"other/package", Version:"1.0.0"}, workflow.Pin{Package:"drupal/token", Version:"2.0.0"}, workflow.Pin{Package:"drupal/webform", Version:"1.0.0"}}, MinimalChanges:false}
+# 2026/10/29 19:49:54.603140 [TestPropertyMergeIsAssociative] [rapid] draw b: workflow.UpdatePlan{Only:[]string{"drupal/webform", "other/package"}, Keep:[]workflow.Pin{}, MinimalChanges:true}
+# 2026/10/29 19:49:54.603146 [TestPropertyMergeIsAssociative] [rapid] draw c: workflow.UpdatePlan{Only:[]string{}, Keep:[]workflow.Pin{workflow.Pin{Package:"drupal/core", Version:"1.0.0"}}, MinimalChanges:false}
+# 2026/10/29 19:49:54.603232 [TestPropertyMergeIsAssociative] 
+# 	Error Trace:	/home/user/drupdater/internal/workflow/plan_property_test.go:68
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:458
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:467
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:292
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:207
+# 	            				/home/user/drupdater/internal/workflow/plan_property_test.go:57
+# 	            				/root/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.1.linux-amd64/src/runtime/asm_amd64.s:1264
+# 	Error:      	Not equal: 
+# 	            	expected: workflow.UpdatePlan{Only:[]string{"drupal/webform", "other/package"}, Keep:[]workflow.Pin{workflow.Pin{Package:"drupal/core", Version:"1.0.0"}, workflow.Pin{Package:"drupal/token", Version:"2.0.0"}, workflow.Pin{Package:"drupal/webform", Version:"1.0.0"}, workflow.Pin{Package:"other/package", Version:"1.0.0"}}, MinimalChanges:true}
+# 	            	actual  : workflow.UpdatePlan{Only:[]string{"drupal/webform", "other/package"}, Keep:[]workflow.Pin{workflow.Pin{Package:"drupal/token", Version:"2.0.0"}, workflow.Pin{Package:"drupal/webform", Version:"1.0.0"}, workflow.Pin{Package:"other/package", Version:"1.0.0"}}, MinimalChanges:true}
+# 	            	
+# 	            	Diff:
+# 	            	--- Expected
+# 	            	+++ Actual
+# 	            	@@ -5,7 +5,3 @@
+# 	            	  },
+# 	            	- Keep: ([]workflow.Pin) (len=4) {
+# 	            	-  (workflow.Pin) {
+# 	            	-   Package: (string) (len=11) "drupal/core",
+# 	            	-   Version: (string) (len=5) "1.0.0"
+# 	            	-  },
+# 	            	+ Keep: ([]workflow.Pin) (len=3) {
+# 	            	   (workflow.Pin) {
+# 	Test:       	TestPropertyMergeIsAssociative
+# 
+v0.4.8#4783587430656717290
+0x89bd8ad6bf096
+0x1724490f0c3559
+0xc3a9ca466d552
+0x3
+0xd1336d90593b
+0x0
+0x18558b8058904e
+0x7c90054e814e2
+0x1
+0x5d49e61fd646e
+0x1
+0x15b7a666486379
+0xfe4c58503bb21
+0x2
+0x1bd681bb03a77b
+0x0
+0x7dedcb279c306
+0x0
+0xc81dfa42a1ea3
+0x1429b78b13198a
+0x2
+0x1cce225427133b
+0x1fac125f5de559
+0xffffffffffffffff
+0x1461d01b306c8
+0x43b023050a26c
+0x1
+0x524ca23f50207
+0xea7db91463220
+0x1cf8c13d2e16ed
+0x0
+0xeda81f149a22e
+0x0
+0x9360b2bd3d9ab
+0x0

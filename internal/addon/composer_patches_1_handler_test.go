@@ -2,6 +2,7 @@ package addon
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 
@@ -26,7 +27,7 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 
 		composerService.EXPECT().GetConfig(anyCtx, path, "extra.patches").
 			Return(`{"drupal/core":{"Issue #1: [t](u)":"`+depPatch+`"}}`, nil)
-		composerService.EXPECT().Update(anyCtx, path, []string{}, []string{}, false, true).
+		composerService.EXPECT().Update(anyCtx, path, []string(nil), []string(nil), false, true).
 			Return([]composer.PackageChange{}, nil)
 		composerService.EXPECT().IsPackageInstalled(anyCtx, path, "drupal/core").Return(true, nil)
 		composerService.EXPECT().GetDependencyPatches(anyCtx, path).
@@ -38,23 +39,25 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 		composerService.EXPECT().UpdateLockHash(anyCtx, path).Return(nil)
 
 		h := &ComposerPatches1{logger: logger, composer: composerService, drupalOrg: drupalOrgService}
-		e := workflow.NewPreComposerUpdateEvent(t.Context(), path, committer, []string{}, []string{}, false)
+		e := workflow.NewPreComposerUpdateEvent(t.Context(), path, committer, workflow.UpdatePlan{})
 
-		require.NoError(t, h.preComposerUpdateHandler(e))
+		plan, err := h.preComposerUpdateHandler(e)
+		require.NoError(t, err)
+		assert.Zero(t, plan, "a removed patch pins nothing")
 		assert.JSONEq(t, `{}`, written)
 		assert.True(t, h.patchUpdates.Changes())
 		assert.Equal(t, []recordedCommit{{message: "Update patches", paths: []string{"composer.json", "composer.lock"}}}, committer.commits,
 			"a remote patch has no file to commit")
 	})
 
-	t.Run("appends conflicting package to PackagesToKeep", func(t *testing.T) {
+	t.Run("proposes pinning a package whose patch conflicts", func(t *testing.T) {
 		composerService := NewMockComposer(t)
 		drupalOrgService := NewMockDrupalOrg(t)
 		committer := &fakeCommitter{}
 
 		composerService.EXPECT().GetConfig(anyCtx, path, "extra.patches").
 			Return(`{"drupal/core":{"local patch":"patches/x.patch"}}`, nil)
-		composerService.EXPECT().Update(anyCtx, path, []string{}, []string{}, false, true).
+		composerService.EXPECT().Update(anyCtx, path, []string(nil), []string(nil), false, true).
 			Return([]composer.PackageChange{{Action: "Upgrade", Package: "drupal/core", From: "8.7.0", To: "8.8.0"}}, nil)
 		composerService.EXPECT().IsPackageInstalled(anyCtx, path, "drupal/core").Return(true, nil)
 		composerService.EXPECT().GetDependencyPatches(anyCtx, path).Return(nil, nil)
@@ -66,10 +69,11 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 		composerService.EXPECT().UpdateLockHash(anyCtx, path).Return(nil)
 
 		h := &ComposerPatches1{logger: logger, composer: composerService, drupalOrg: drupalOrgService}
-		e := workflow.NewPreComposerUpdateEvent(t.Context(), path, committer, []string{}, []string{}, false)
+		e := workflow.NewPreComposerUpdateEvent(t.Context(), path, committer, workflow.UpdatePlan{})
 
-		require.NoError(t, h.preComposerUpdateHandler(e))
-		assert.Contains(t, e.PackagesToKeep, "drupal/core:8.7.0")
+		plan, err := h.preComposerUpdateHandler(e)
+		require.NoError(t, err)
+		assert.Equal(t, workflow.UpdatePlan{Keep: []workflow.Pin{{Package: "drupal/core", Version: "8.7.0"}}}, plan)
 		assert.Equal(t, []recordedCommit{{message: "Update patches", paths: []string{"composer.json", "composer.lock"}}}, committer.commits,
 			"a conflicting patch stays where it is")
 	})
@@ -81,7 +85,7 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 
 		composerService.EXPECT().GetConfig(anyCtx, path, "extra.patches").
 			Return(`{"drupal/core":{"local patch":"patches/x.patch"}}`, nil)
-		composerService.EXPECT().Update(anyCtx, path, []string{}, []string{}, false, true).
+		composerService.EXPECT().Update(anyCtx, path, []string(nil), []string(nil), false, true).
 			Return([]composer.PackageChange{{Action: "Upgrade", Package: "drupal/core", To: "8.8.0"}}, nil)
 		composerService.EXPECT().IsPackageInstalled(anyCtx, path, "drupal/core").Return(true, nil)
 		composerService.EXPECT().GetDependencyPatches(anyCtx, path).Return(nil, nil)
@@ -90,10 +94,12 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 		composerService.EXPECT().CheckIfPatchApplies(anyCtx, mock.Anything, "drupal/core", "8.8.0", path+"/patches/x.patch").Return(true, nil)
 
 		h := &ComposerPatches1{logger: logger, composer: composerService, drupalOrg: drupalOrgService}
-		e := workflow.NewPreComposerUpdateEvent(t.Context(), path, committer, []string{}, []string{}, false)
+		e := workflow.NewPreComposerUpdateEvent(t.Context(), path, committer, workflow.UpdatePlan{})
 
 		// No SetConfig/UpdateLockHash expectations: the mock fails if they are called.
-		require.NoError(t, h.preComposerUpdateHandler(e))
+		plan, err := h.preComposerUpdateHandler(e)
+		require.NoError(t, err)
+		assert.Zero(t, plan)
 		assert.False(t, h.patchUpdates.Changes())
 		assert.Empty(t, committer.commits)
 	})
@@ -103,14 +109,15 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 		committer := &fakeCommitter{}
 
 		composerService.EXPECT().GetConfig(anyCtx, path, "extra.patches").Return("", errors.New("not defined"))
-		composerService.EXPECT().Update(anyCtx, path, []string{}, []string{}, false, true).
+		composerService.EXPECT().Update(anyCtx, path, []string(nil), []string(nil), false, true).
 			Return([]composer.PackageChange{}, nil)
 		composerService.EXPECT().GetDependencyPatches(anyCtx, path).Return(nil, nil)
 
 		h := &ComposerPatches1{logger: logger, composer: composerService}
-		e := workflow.NewPreComposerUpdateEvent(t.Context(), path, committer, []string{}, []string{}, false)
+		e := workflow.NewPreComposerUpdateEvent(t.Context(), path, committer, workflow.UpdatePlan{})
 
-		require.NoError(t, h.preComposerUpdateHandler(e))
+		_, err := h.preComposerUpdateHandler(e)
+		require.NoError(t, err)
 	})
 
 	t.Run("returns error on invalid patches JSON", func(t *testing.T) {
@@ -120,9 +127,11 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 		composerService.EXPECT().GetConfig(anyCtx, path, "extra.patches").Return("not-json", nil)
 
 		h := &ComposerPatches1{logger: logger, composer: composerService}
-		e := workflow.NewPreComposerUpdateEvent(t.Context(), path, committer, []string{}, []string{}, false)
+		e := workflow.NewPreComposerUpdateEvent(t.Context(), path, committer, workflow.UpdatePlan{})
 
-		err := h.preComposerUpdateHandler(e)
+		_, err := h.preComposerUpdateHandler(e)
+		var syntaxErr *json.SyntaxError
+		require.ErrorAs(t, err, &syntaxErr)
 		require.ErrorContains(t, err, "failed to unmarshal patches")
 	})
 
@@ -138,7 +147,7 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 			{
 				name: "SetConfig",
 				arrange: func(c *MockComposer, _ *fakeCommitter) {
-					c.EXPECT().SetConfig(anyCtx, path, "extra.patches", mock.Anything).Return(errors.New("x"))
+					c.EXPECT().SetConfig(anyCtx, path, "extra.patches", mock.Anything).Return(assert.AnError)
 				},
 				wantErr: "failed to set composer config",
 			},
@@ -146,7 +155,7 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 				name: "UpdateLockHash",
 				arrange: func(c *MockComposer, _ *fakeCommitter) {
 					c.EXPECT().SetConfig(anyCtx, path, "extra.patches", mock.Anything).Return(nil)
-					c.EXPECT().UpdateLockHash(anyCtx, path).Return(errors.New("x"))
+					c.EXPECT().UpdateLockHash(anyCtx, path).Return(assert.AnError)
 				},
 				wantErr: "failed to update composer lock hash",
 			},
@@ -155,7 +164,7 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 				arrange: func(c *MockComposer, cm *fakeCommitter) {
 					c.EXPECT().SetConfig(anyCtx, path, "extra.patches", mock.Anything).Return(nil)
 					c.EXPECT().UpdateLockHash(anyCtx, path).Return(nil)
-					cm.err = errors.New("x")
+					cm.err = assert.AnError
 				},
 				wantErr: "failed to commit patches",
 			},
@@ -168,7 +177,7 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 
 				composerService.EXPECT().GetConfig(anyCtx, path, "extra.patches").
 					Return(`{"drupal/core":{"Issue #1: [t](u)":"`+depPatch+`"}}`, nil)
-				composerService.EXPECT().Update(anyCtx, path, []string{}, []string{}, false, true).
+				composerService.EXPECT().Update(anyCtx, path, []string(nil), []string(nil), false, true).
 					Return([]composer.PackageChange{}, nil)
 				composerService.EXPECT().IsPackageInstalled(anyCtx, path, "drupal/core").Return(true, nil)
 				composerService.EXPECT().GetDependencyPatches(anyCtx, path).
@@ -176,9 +185,11 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 				tc.arrange(composerService, committer)
 
 				h := &ComposerPatches1{logger: logger, composer: composerService}
-				e := workflow.NewPreComposerUpdateEvent(t.Context(), path, committer, []string{}, []string{}, false)
+				e := workflow.NewPreComposerUpdateEvent(t.Context(), path, committer, workflow.UpdatePlan{})
 
-				require.ErrorContains(t, h.preComposerUpdateHandler(e), tc.wantErr)
+				_, err := h.preComposerUpdateHandler(e)
+				require.ErrorIs(t, err, assert.AnError)
+				require.ErrorContains(t, err, tc.wantErr)
 			})
 		}
 	})
@@ -188,14 +199,35 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 		committer := &fakeCommitter{}
 
 		composerService.EXPECT().GetConfig(anyCtx, path, "extra.patches").Return("{}", nil)
-		composerService.EXPECT().Update(anyCtx, path, []string{}, []string{}, false, true).
-			Return(nil, errors.New("boom"))
+		composerService.EXPECT().Update(anyCtx, path, []string(nil), []string(nil), false, true).
+			Return(nil, assert.AnError)
 
 		h := &ComposerPatches1{logger: logger, composer: composerService}
-		e := workflow.NewPreComposerUpdateEvent(t.Context(), path, committer, []string{}, []string{}, false)
+		e := workflow.NewPreComposerUpdateEvent(t.Context(), path, committer, workflow.UpdatePlan{})
 
-		err := h.preComposerUpdateHandler(e)
+		_, err := h.preComposerUpdateHandler(e)
+		require.ErrorIs(t, err, assert.AnError)
 		require.ErrorContains(t, err, "failed to get composer updates")
+	})
+
+	t.Run("dry-runs the update as earlier stages planned it", func(t *testing.T) {
+		composerService := NewMockComposer(t)
+
+		composerService.EXPECT().GetConfig(anyCtx, path, "extra.patches").Return("{}", nil)
+		composerService.EXPECT().Update(anyCtx, path, []string{"drupal/core"}, []string{"drupal/token:1.13.0"}, true, true).
+			Return(nil, nil)
+		composerService.EXPECT().GetDependencyPatches(anyCtx, path).Return(nil, nil)
+
+		h := &ComposerPatches1{logger: logger, composer: composerService}
+		e := workflow.NewPreComposerUpdateEvent(t.Context(), path, &fakeCommitter{}, workflow.UpdatePlan{
+			Only:           []string{"drupal/core"},
+			Keep:           []workflow.Pin{{Package: "drupal/token", Version: "1.13.0"}},
+			MinimalChanges: true,
+		})
+
+		plan, err := h.preComposerUpdateHandler(e)
+		require.NoError(t, err)
+		assert.Zero(t, plan, "the settled plan is not proposed again")
 	})
 }
 

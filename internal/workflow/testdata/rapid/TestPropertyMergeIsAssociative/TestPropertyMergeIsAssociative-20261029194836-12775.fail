@@ -1,0 +1,47 @@
+# 2026/10/29 19:48:36.275248 [TestPropertyMergeIsAssociative] [rapid] draw a: workflow.UpdatePlan{Only:[]string{"drupal/token", "drupal/webform"}, Keep:[]workflow.Pin{}, MinimalChanges:false}
+# 2026/10/29 19:48:36.275259 [TestPropertyMergeIsAssociative] [rapid] draw b: workflow.UpdatePlan{Only:[]string{"drupal/webform", "drupal/webform", "drupal/token", "drupal/webform"}, Keep:[]workflow.Pin{}, MinimalChanges:false}
+# 2026/10/29 19:48:36.275264 [TestPropertyMergeIsAssociative] [rapid] draw c: workflow.UpdatePlan{Only:[]string{"drupal/token"}, Keep:[]workflow.Pin{}, MinimalChanges:false}
+# 2026/10/29 19:48:36.275304 [TestPropertyMergeIsAssociative] 
+# 	Error Trace:	/home/user/drupdater/internal/workflow/plan_property_test.go:66
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:458
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:467
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:292
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:207
+# 	            				/home/user/drupdater/internal/workflow/plan_property_test.go:57
+# 	Error:      	Not equal: 
+# 	            	expected: false
+# 	            	actual  : true
+# 	Test:       	TestPropertyMergeIsAssociative
+# 	Messages:   	grouping decides whether the merge fails: the update is restricted to disjoint package sets:  and drupal/token, drupal/webform / <nil>
+# 
+v0.4.8#3910108544019649710
+0xf24df2a4b45c5
+0x7c75f84091329
+0x1
+0x1c7ce97f1f1c41
+0xc9aa0ca2e3f01
+0x2
+0x99b0e62dc4d86
+0xb8dd1bd62843d
+0x0
+0x1a97a1c466935e
+0x1c5b54acc11c70
+0x2
+0x1ff3180e2ee45e
+0xa5244c80cbe78
+0x2
+0x128fa622aa1aa6
+0x9301311c4f5b0
+0x1
+0x147ea280abbc94
+0x1bbe20986601c0
+0x2
+0x2e9d20295a784
+0xc2719399f1a17
+0x0
+0x12fe761945c5c5
+0xc58a2cabb977
+0x1
+0x952fba66347d3
+0x3aacafd7b104
+0x0

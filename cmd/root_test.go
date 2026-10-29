@@ -179,7 +179,7 @@ func TestCreateAddons(t *testing.T) {
 			require.NoError(t, err)
 
 			audit := addons[slices.Index(mandatoryAddons, "composer_audit")]
-			err = audit.Hooks().PreComposerUpdate.Run(workflow.NewPreComposerUpdateEvent(t.Context(), "/repo", nil, nil, nil, false))
+			_, err = audit.Hooks().PreComposerUpdate.Run(workflow.NewPreComposerUpdateEvent(t.Context(), "/repo", nil, workflow.UpdatePlan{}))
 
 			_, aborted := errors.AsType[workflow.AbortError](err)
 			assert.Equal(t, tt.aborts, aborted, "error: %v", err)

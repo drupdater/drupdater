@@ -1,0 +1,47 @@
+# 2026/10/29 19:50:03.565182 [TestPropertyMergeIsCommutative] [rapid] draw a: workflow.UpdatePlan{Only:[]string{"drupal/webform", "other/package", "drupal/webform", "drupal/token"}, Keep:[]workflow.Pin{workflow.Pin{Package:"drupal/core", Version:"1.0.0"}}, MinimalChanges:true}
+# 2026/10/29 19:50:03.565199 [TestPropertyMergeIsCommutative] [rapid] draw b: workflow.UpdatePlan{Only:[]string{"drupal/token"}, Keep:[]workflow.Pin{workflow.Pin{Package:"drupal/core", Version:"1.0.0"}}, MinimalChanges:true}
+# 2026/10/29 19:50:03.565240 [TestPropertyMergeIsCommutative] 
+# 	Error Trace:	/home/user/drupdater/internal/workflow/plan_property_test.go:51
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:458
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:467
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:292
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:207
+# 	            				/home/user/drupdater/internal/workflow/plan_property_test.go:45
+# 	Error:      	Not equal: 
+# 	            	expected: true
+# 	            	actual  : false
+# 	Test:       	TestPropertyMergeIsCommutative
+# 	Messages:   	one order fails and the other does not: <nil> / the update is restricted to disjoint package sets: drupal/token and drupal/webform, other/package, drupal/webform, drupal/token
+# 
+v0.4.8#14451772461951921428
+0x103f7a29bcd596
+0x4bfd3bacf18d7
+0x2
+0xb93b592c82778
+0x130e1da4601f16
+0x3
+0x10d29cd602fca9
+0x1a8494b5d14164
+0x2
+0x1bbf83040ee336
+0xf0c726a55f61a
+0x1
+0x1eb41b8b269401
+0x15342bb1b1fc4a
+0xb27e5124cecca
+0x0
+0x161eaed42610e3
+0x0
+0xb3aa9a8d862b7
+0x1
+0x16add1a66b2d84
+0xc5b8f1a609ceb
+0x1
+0x7d70d9943b59a
+0xe6fa82142f562
+0x1d097fec4ac741
+0x0
+0xb523985f0851d
+0x0
+0x3ef00205af84a
+0x1

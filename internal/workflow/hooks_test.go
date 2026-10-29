@@ -64,7 +64,7 @@ func TestPipelineCoversEveryEvent(t *testing.T) {
 	hooks := func(name string, stage Stage) Hooks {
 		r := record(name)
 		return Hooks{
-			PreComposerUpdate:  On(stage, func(*PreComposerUpdateEvent) error { return r() }),
+			PreComposerUpdate:  Propose(stage, func(*PreComposerUpdateEvent) (UpdatePlan, error) { return UpdatePlan{}, r() }),
 			PostComposerUpdate: On(stage, func(*PostComposerUpdateEvent) error { return r() }),
 			PostCodeUpdate:     On(stage, func(*PostCodeUpdateEvent) error { return r() }),
 			PreSiteUpdate:      On(stage, func(*PreSiteUpdateEvent) error { return r() }),
@@ -73,7 +73,7 @@ func TestPipelineCoversEveryEvent(t *testing.T) {
 	}
 	p := NewPipeline([]Addon{hookAddon{hooks("late", Inspect)}, hookAddon{hooks("early", Prepare)}})
 	broken := NewPipeline([]Addon{hookAddon{Hooks{
-		PreComposerUpdate:  On(Change, failing[*PreComposerUpdateEvent]),
+		PreComposerUpdate:  Propose(Change, func(*PreComposerUpdateEvent) (UpdatePlan, error) { return UpdatePlan{}, assert.AnError }),
 		PostComposerUpdate: On(Change, failing[*PostComposerUpdateEvent]),
 		PostCodeUpdate:     On(Change, failing[*PostCodeUpdateEvent]),
 		PreSiteUpdate:      On(Change, failing[*PreSiteUpdateEvent]),
@@ -81,7 +81,10 @@ func TestPipelineCoversEveryEvent(t *testing.T) {
 	}}})
 
 	fires := map[string]func(*Pipeline) error{
-		"pre-composer-update":  func(p *Pipeline) error { return p.PreComposerUpdate(&PreComposerUpdateEvent{}) },
+		"pre-composer-update": func(p *Pipeline) error {
+			_, err := p.PreComposerUpdate(&PreComposerUpdateEvent{})
+			return err
+		},
 		"post-composer-update": func(p *Pipeline) error { return p.PostComposerUpdate(&PostComposerUpdateEvent{}) },
 		"post-code-update":     func(p *Pipeline) error { return p.PostCodeUpdate(&PostCodeUpdateEvent{}) },
 		"pre-site-update":      func(p *Pipeline) error { return p.PreSiteUpdate(&PreSiteUpdateEvent{}) },
@@ -96,4 +99,99 @@ func TestPipelineCoversEveryEvent(t *testing.T) {
 			require.EqualError(t, fire(broken), event+" hook failed: "+assert.AnError.Error())
 		})
 	}
+}
+
+func proposing(stage Stage, proposal UpdatePlan, saw *UpdatePlan) Hooks {
+	return Hooks{PreComposerUpdate: Propose(stage, func(e *PreComposerUpdateEvent) (UpdatePlan, error) {
+		if saw != nil {
+			*saw = e.Plan()
+		}
+		return proposal, nil
+	})}
+}
+
+func TestPreComposerUpdateMergesEveryProposal(t *testing.T) {
+	addons := []Addon{
+		hookAddon{proposing(Prepare, UpdatePlan{Only: []string{"drupal/core", "drupal/token"}, MinimalChanges: true}, nil)},
+		hookAddon{proposing(Change, UpdatePlan{Keep: []Pin{pin("drupal/token", "1.13.0")}}, nil)},
+		hookAddon{},
+	}
+
+	plan, err := NewPipeline(addons).PreComposerUpdate(NewPreComposerUpdateEvent(t.Context(), "/p", nil, UpdatePlan{}))
+
+	require.NoError(t, err)
+	assert.Equal(t, UpdatePlan{
+		Only:           []string{"drupal/core", "drupal/token"},
+		Keep:           []Pin{pin("drupal/token", "1.13.0")},
+		MinimalChanges: true,
+	}, plan)
+}
+
+func TestPreComposerUpdateStartsFromTheEventsPlan(t *testing.T) {
+	var saw UpdatePlan
+	start := UpdatePlan{Only: []string{"drupal/core"}}
+
+	plan, err := NewPipeline([]Addon{hookAddon{proposing(Change, UpdatePlan{}, &saw)}}).
+		PreComposerUpdate(NewPreComposerUpdateEvent(t.Context(), "/p", nil, start))
+
+	require.NoError(t, err)
+	assert.Equal(t, start, saw)
+	assert.Equal(t, start, plan)
+}
+
+func TestPreComposerUpdateHooksSeeOnlyEarlierStages(t *testing.T) {
+	var firstChange, secondChange, inspect UpdatePlan
+	narrow := UpdatePlan{Only: []string{"drupal/core"}}
+	pinned := UpdatePlan{Keep: []Pin{pin("drupal/core", "10.2.0")}}
+	addons := []Addon{
+		hookAddon{proposing(Change, pinned, &firstChange)},
+		hookAddon{proposing(Inspect, UpdatePlan{}, &inspect)},
+		hookAddon{proposing(Prepare, narrow, nil)},
+		hookAddon{proposing(Change, UpdatePlan{}, &secondChange)},
+	}
+
+	_, err := NewPipeline(addons).PreComposerUpdate(NewPreComposerUpdateEvent(t.Context(), "/p", nil, UpdatePlan{}))
+	require.NoError(t, err)
+
+	assert.Equal(t, narrow, firstChange, "Change sees what Prepare settled")
+	assert.Equal(t, narrow, secondChange, "a stage-mate's proposal is not visible within the stage")
+	assert.Equal(t, UpdatePlan{Only: narrow.Only, Keep: pinned.Keep}, inspect, "a later stage sees every earlier proposal")
+}
+
+func TestPreComposerUpdateResultIsIndependentOfAddonOrder(t *testing.T) {
+	a := hookAddon{proposing(Change, UpdatePlan{Only: []string{"drupal/token", "drupal/core"}}, nil)}
+	b := hookAddon{proposing(Change, UpdatePlan{Only: []string{"drupal/core"}, Keep: []Pin{pin("drupal/token", "1.0.0")}}, nil)}
+
+	ab, err := NewPipeline([]Addon{a, b}).PreComposerUpdate(NewPreComposerUpdateEvent(t.Context(), "/p", nil, UpdatePlan{}))
+	require.NoError(t, err)
+	ba, err := NewPipeline([]Addon{b, a}).PreComposerUpdate(NewPreComposerUpdateEvent(t.Context(), "/p", nil, UpdatePlan{}))
+	require.NoError(t, err)
+
+	assert.Equal(t, ab, ba)
+}
+
+func TestPreComposerUpdateFailsWhenProposalsDisagree(t *testing.T) {
+	addons := []Addon{
+		hookAddon{proposing(Change, UpdatePlan{Keep: []Pin{pin("drupal/core", "10.2.0")}}, nil)},
+		hookAddon{proposing(Change, UpdatePlan{Keep: []Pin{pin("drupal/core", "10.3.0")}}, nil)},
+	}
+
+	plan, err := NewPipeline(addons).PreComposerUpdate(NewPreComposerUpdateEvent(t.Context(), "/p", nil, UpdatePlan{}))
+
+	require.EqualError(t, err, "pre-composer-update hooks disagree: drupal/core is pinned at both 10.2.0 and 10.3.0")
+	assert.Zero(t, plan)
+}
+
+func TestPreComposerUpdateFailureReturnsNoPlan(t *testing.T) {
+	addons := []Addon{
+		hookAddon{proposing(Prepare, UpdatePlan{Only: []string{"drupal/core"}}, nil)},
+		hookAddon{Hooks{PreComposerUpdate: Propose(Change, func(*PreComposerUpdateEvent) (UpdatePlan, error) {
+			return UpdatePlan{Only: []string{"drupal/core"}}, assert.AnError
+		})}},
+	}
+
+	plan, err := NewPipeline(addons).PreComposerUpdate(NewPreComposerUpdateEvent(t.Context(), "/p", nil, UpdatePlan{}))
+
+	require.ErrorIs(t, err, assert.AnError)
+	assert.Zero(t, plan)
 }

@@ -44,14 +44,27 @@ func TestAbortError(t *testing.T) {
 func TestNewPreComposerUpdateEvent(t *testing.T) {
 	ctx := context.Background()
 	committer := &fakeCommitter{result: true, err: assert.AnError}
-	evt := NewPreComposerUpdateEvent(ctx, "/repo", committer, []string{"drupal/core"}, []string{"keep/me"}, true)
+	plan := UpdatePlan{Only: []string{"drupal/core"}, Keep: []Pin{{Package: "keep/me", Version: "1.0.0"}}, MinimalChanges: true}
+	evt := NewPreComposerUpdateEvent(ctx, "/repo", committer, plan)
 
 	assert.Equal(t, ctx, evt.Context())
 	assert.Equal(t, "/repo", evt.Path())
 	assertCommitsThrough(t, evt, committer)
-	assert.Equal(t, []string{"drupal/core"}, evt.PackagesToUpdate)
-	assert.Equal(t, []string{"keep/me"}, evt.PackagesToKeep)
-	assert.True(t, evt.MinimalChanges)
+	assert.Equal(t, plan, evt.Plan())
+}
+
+func TestPlanIsACopyAHookCannotEdit(t *testing.T) {
+	evt := NewPreComposerUpdateEvent(context.Background(), "/repo", nil, UpdatePlan{
+		Only: []string{"drupal/core"},
+		Keep: []Pin{{Package: "keep/me", Version: "1.0.0"}},
+	})
+
+	edited := evt.Plan()
+	edited.Only[0] = "drupal/other"
+	edited.Keep[0].Version = "2.0.0"
+
+	assert.Equal(t, []string{"drupal/core"}, evt.Plan().Only)
+	assert.Equal(t, "1.0.0", evt.Plan().Keep[0].Version)
 }
 
 func TestNewPostComposerUpdateEvent(t *testing.T) {

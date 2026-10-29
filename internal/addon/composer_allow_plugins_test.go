@@ -24,7 +24,9 @@ func TestNewDefaultAllowPlugins(t *testing.T) {
 
 func preUpdate(t *testing.T, ap *ComposerAllowPlugins) error {
 	t.Helper()
-	return ap.preComposerUpdateHandler(workflow.NewPreComposerUpdateEvent(t.Context(), "/p", nil, nil, nil, false))
+	plan, err := ap.preComposerUpdateHandler(workflow.NewPreComposerUpdateEvent(t.Context(), "/p", nil, workflow.UpdatePlan{}))
+	assert.Zero(t, plan, "allowing plugins never changes what the update touches")
+	return err
 }
 
 func postUpdate(t *testing.T, ap *ComposerAllowPlugins) error {

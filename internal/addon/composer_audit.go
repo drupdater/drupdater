@@ -34,33 +34,28 @@ func NewComposerAudit(logger *zap.Logger, composer Composer, security bool) *Com
 
 func (ca *ComposerAudit) Hooks() workflow.Hooks {
 	return workflow.Hooks{
-		PreComposerUpdate: workflow.On(workflow.Prepare, ca.preComposerUpdateHandler),
+		PreComposerUpdate: workflow.Propose(workflow.Prepare, ca.preComposerUpdateHandler),
 		PostCodeUpdate:    workflow.On(workflow.Inspect, ca.postCodeUpdateHandler),
 	}
 }
 
 // preComposerUpdateHandler audits the pre-update code. A security run narrows the update to the
 // affected packages and aborts when there are none; a normal run only records the audit.
-func (ca *ComposerAudit) preComposerUpdateHandler(evt *workflow.PreComposerUpdateEvent) error {
+func (ca *ComposerAudit) preComposerUpdateHandler(evt *workflow.PreComposerUpdateEvent) (workflow.UpdatePlan, error) {
 	var err error
 
 	ca.beforeAudit, err = ca.composer.Audit(evt.Context(), evt.Path())
 	if err != nil {
-		return fmt.Errorf("failed to run composer audit: %w", err)
+		return workflow.UpdatePlan{}, fmt.Errorf("failed to run composer audit: %w", err)
 	}
 
 	if !ca.security {
-		return nil
+		return workflow.UpdatePlan{}, nil
 	}
 
-	// Deduplicated: several advisories often name one package, and this becomes composer's args.
-	packagesToUpdate := make([]string, 0)
-	seen := make(map[string]bool, len(ca.beforeAudit.Advisories))
+	// Several advisories often name one package; merging the plan deduplicates them.
+	packagesToUpdate := make([]string, 0, len(ca.beforeAudit.Advisories))
 	for _, advisory := range ca.beforeAudit.Advisories {
-		if seen[advisory.PackageName] {
-			continue
-		}
-		seen[advisory.PackageName] = true
 		packagesToUpdate = append(packagesToUpdate, advisory.PackageName)
 	}
 
@@ -69,14 +64,11 @@ func (ca *ComposerAudit) preComposerUpdateHandler(evt *workflow.PreComposerUpdat
 		packagesToUpdate = append(packagesToUpdate, "drupal/core-composer-scaffold")
 	}
 
-	evt.PackagesToUpdate = packagesToUpdate
-	evt.MinimalChanges = true
-
 	if len(packagesToUpdate) == 0 {
-		return workflow.AbortError{Msg: "No security advisories found"}
+		return workflow.UpdatePlan{}, workflow.AbortError{Msg: "No security advisories found"}
 	}
 
-	return nil
+	return workflow.UpdatePlan{Only: packagesToUpdate, MinimalChanges: true}, nil
 }
 
 func (ca *ComposerAudit) postCodeUpdateHandler(evt *workflow.PostCodeUpdateEvent) error {

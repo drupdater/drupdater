@@ -1,0 +1,35 @@
+# 2026/10/29 19:50:21.915938 [TestPropertyMergeNeverWidensARestriction] [rapid] draw a: workflow.UpdatePlan{Only:[]string{"drupal/webform", "drupal/token", "drupal/token", "drupal/webform"}, Keep:[]workflow.Pin{}, MinimalChanges:true}
+# 2026/10/29 19:50:21.915949 [TestPropertyMergeNeverWidensARestriction] [rapid] draw b: workflow.UpdatePlan{Only:[]string{"drupal/webform"}, Keep:[]workflow.Pin{}, MinimalChanges:true}
+# 2026/10/29 19:50:21.915983 [TestPropertyMergeNeverWidensARestriction] 
+# 	Error Trace:	/home/user/drupdater/internal/workflow/plan_property_test.go:98
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:458
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:467
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:292
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:207
+# 	            				/home/user/drupdater/internal/workflow/plan_property_test.go:87
+# 	Error:      	Should NOT be empty, but was []
+# 	Test:       	TestPropertyMergeNeverWidensARestriction
+# 	Messages:   	a restricted proposal must never turn into "update everything"
+# 
+v0.4.8#13935618131181614852
+0x1affa975f8f281
+0x60d3eda5c0b11
+0x2
+0xbc30b3eba88f8
+0xcc868a7f0fe72
+0x1
+0x18b2852ee0eb5d
+0x16beff71241317
+0x1
+0xc9cebc68cd478
+0xfb4ade58531f3
+0x2
+0x11efba026de0d7
+0x4e3012cb6e981
+0x1
+0x1d72578120b723
+0x16fbcc3ad802db
+0x2
+0xa25d94217b847
+0xb8530a4dff724
+0x1

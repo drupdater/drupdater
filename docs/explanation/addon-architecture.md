@@ -19,9 +19,9 @@ other one is disabled" — because none of them ever depended on another being t
 
 ## The events
 
-| Event | Fired | Mutable payload |
+| Event | Fired | Payload |
 |---|---|---|
-| `pre-composer-update` | Before `composer update`, which only writes the lock — before any site is installed | `PackagesToUpdate`, `PackagesToKeep`, `MinimalChanges` |
+| `pre-composer-update` | Before `composer update`, which only writes the lock — before any site is installed | The update plan, read-only; hooks return proposals |
 | `post-composer-update` | After the resolved update is installed into `vendor/`, before the commit | — |
 | `post-code-update` | After `composer.json`/`.lock` are committed | — |
 | `pre-site-update` | Before each site's update hooks | — (carries the site name) |
@@ -34,25 +34,39 @@ There is no event for the merge request. It is rendered from the [run
 report](../reference/run-report.md) once every addon has finished — see [Rendering the
 request description](#rendering-the-request-description).
 
-## Steering the update through the payload
+## Steering the update through proposals
 
-One event carries **mutable** fields, and that is how addons influence the workflow without
-calling into it.
+One event lets addons influence the workflow without calling into it. A
+`pre-composer-update` hook reads the **update plan** from the event and *returns* a
+proposal. It never edits the event.
 
-On `pre-composer-update`:
+A plan has three parts:
 
-- **`PackagesToUpdate`** — restrict the update to a specific set.
-  [`composer_audit`](../reference/addons/composer-audit.md) sets this to the packages with
+- **`Only`**: restrict the update to these packages. Empty means every package.
+  [`composer_audit`](../reference/addons/composer-audit.md) proposes the packages with
   advisories on a `--security` run, which is what makes it a security run. On a normal run
-  it leaves the field alone.
-- **`PackagesToKeep`** — pin packages at their current version.
-  [`composer_patches`](../reference/addons/composer-patches.md) adds a package here when
-  its patch cannot be made to apply against the new version.
-- **`MinimalChanges`** — ask Composer to disturb as little else as possible.
+  it proposes nothing.
+- **`Keep`**: pin packages at a version.
+  [`composer_patches`](../reference/addons/composer-patches.md) proposes a pin when a
+  package's patch cannot be made to apply against the new version.
+- **`MinimalChanges`**: ask Composer to disturb as little else as possible.
 
-Addons can therefore cooperate — the audit narrows the update and the patch handler pins one
-of the packages within it — without either one referencing the other. They both just write
-to the same event.
+The runner merges the proposals by fixed rules:
+
+| Part | Rule | Disagreement |
+|---|---|---|
+| `Only` | Restrictions intersect: a proposal can narrow the update, never widen it | Two restrictions with no package in common fail the run |
+| `Keep` | Pins accumulate | One package pinned at two versions fails the run |
+| `MinimalChanges` | Set if any proposal sets it | — |
+
+These rules don't depend on order: merging A then B gives the same plan as B then A. Each
+hook sees the plan as the [earlier stages](#stages) settled it. Hooks that share a stage
+see the same plan, so neither sees the other's proposal. The proposals of a stage are
+merged before the next stage starts.
+
+Addons can therefore cooperate without either one referencing the other. The audit
+narrows the update at `Prepare`. The patch handler, at `Change`, checks its patches against
+that narrower update and proposes a pin for one of the packages in it.
 
 Findings never travel this way. An addon that finds something reports it, and anything that
 combines two addons' findings does so from the report: see [Rendering the request
@@ -104,8 +118,9 @@ Two of those orders are load bearing rather than incidental.
 
 `composer_audit` prepares, because on a security run it decides the scope everything else
 works within. `composer_patches` then evaluates patches against an update whose shape is
-already fixed. Reversed, the patch handler would analyse an update far larger than the one
-that actually runs.
+already fixed: at `Change`, its hook reads the plan with the audit's restriction merged in.
+Reversed, the patch handler would analyse an update far larger than the one that actually
+runs.
 
 ### `post-code-update`
 

@@ -369,12 +369,12 @@ func (r *Runner) removeUpdateBranch(repository GitRepository) {
 func (r *Runner) resolveUpdate(ctx context.Context, repository GitRepository, path string, rec *report.Recorder) (string, error) {
 	r.logger.Info("resolving dependency updates")
 
-	preComposerUpdateEvent := NewPreComposerUpdateEvent(ctx, path, r.committer, []string{}, []string{}, false)
-	if err := r.hooks.PreComposerUpdate(preComposerUpdateEvent); err != nil {
+	plan, err := r.hooks.PreComposerUpdate(NewPreComposerUpdateEvent(ctx, path, r.committer, UpdatePlan{}))
+	if err != nil {
 		return "", err
 	}
 
-	changes, err := r.composer.Update(ctx, path, preComposerUpdateEvent.PackagesToUpdate, preComposerUpdateEvent.PackagesToKeep, preComposerUpdateEvent.MinimalChanges, false)
+	changes, err := r.composer.Update(ctx, path, plan.Only, plan.KeepConstraints(), plan.MinimalChanges, false)
 	if err != nil {
 		return "", fmt.Errorf("failed to update dependencies: %w", err)
 	}

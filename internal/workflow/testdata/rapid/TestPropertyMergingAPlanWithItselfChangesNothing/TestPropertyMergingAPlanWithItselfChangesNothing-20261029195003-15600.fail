@@ -1,0 +1,50 @@
+# 2026/10/29 19:50:03.131204 [TestPropertyMergingAPlanWithItselfChangesNothing] [rapid] draw plan: workflow.UpdatePlan{Only:[]string{"drupal/token", "drupal/token"}, Keep:[]workflow.Pin{workflow.Pin{Package:"drupal/token", Version:"1.0.0"}, workflow.Pin{Package:"drupal/token", Version:"1.0.0"}, workflow.Pin{Package:"drupal/core", Version:"1.0.0"}}, MinimalChanges:false}
+# 2026/10/29 19:50:03.131294 [TestPropertyMergingAPlanWithItselfChangesNothing] 
+# 	Error Trace:	/home/user/drupdater/internal/workflow/plan_property_test.go:82
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:458
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:467
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:292
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:207
+# 	            				/home/user/drupdater/internal/workflow/plan_property_test.go:74
+# 	            				/root/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.1.linux-amd64/src/runtime/asm_amd64.s:1264
+# 	Error:      	Not equal: 
+# 	            	expected: workflow.UpdatePlan{Only:[]string{"drupal/token"}, Keep:[]workflow.Pin{workflow.Pin{Package:"drupal/core", Version:"1.0.0"}, workflow.Pin{Package:"drupal/token", Version:"1.0.0"}}, MinimalChanges:false}
+# 	            	actual  : workflow.UpdatePlan{Only:[]string(nil), Keep:[]workflow.Pin{workflow.Pin{Package:"drupal/core", Version:"1.0.0"}, workflow.Pin{Package:"drupal/token", Version:"1.0.0"}}, MinimalChanges:false}
+# 	            	
+# 	            	Diff:
+# 	            	--- Expected
+# 	            	+++ Actual
+# 	            	@@ -1,5 +1,3 @@
+# 	            	 (workflow.UpdatePlan) {
+# 	            	- Only: ([]string) (len=1) {
+# 	            	-  (string) (len=12) "drupal/token"
+# 	            	- },
+# 	            	+ Only: ([]string) <nil>,
+# 	            	  Keep: ([]workflow.Pin) (len=2) {
+# 	Test:       	TestPropertyMergingAPlanWithItselfChangesNothing
+# 
+v0.4.8#17326128150969701510
+0xf205a84b0bca6
+0x1940dbfe7ce8d4
+0x1
+0x198ab461cb4a6e
+0x353860410517
+0x1
+0x710abd6df7c6e
+0x1623e3c643dccf
+0x5a59383baf157
+0x1
+0x2a5228d17e0b6
+0x0
+0x1a58612d4ee53a
+0x1c6860c397aa62
+0x1
+0x7a1fe428db518
+0x0
+0x114319d5b8764d
+0x102f1e6def94c7
+0x0
+0xf94df559c9ae4
+0x0
+0x13f58f9aba8cdc
+0x0

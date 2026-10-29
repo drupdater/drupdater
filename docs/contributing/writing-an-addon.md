@@ -9,7 +9,9 @@ workflow.
 
 **Addons never call each other.** If your addon needs another one to have run first,
 express that as the stage of its hook, not as a reference. If it needs to influence what another
-addon does, do it through the mutable event payload.
+addon does, and the event is `pre-composer-update`, return an [update
+plan](../explanation/addon-architecture.md#steering-the-update-through-proposals) from the
+hook. Your addon proposes. It never edits what another addon reads.
 
 **Addons swallow their own failures** where the work is optional. A transient failure in
 translation updates should not throw away an otherwise complete dependency update. This is
@@ -60,7 +62,7 @@ changes](../explanation/addon-architecture.md#committing-changes).
 
 | Event | Use for |
 |---|---|
-| `pre-composer-update` | Influencing what the update touches (mutable payload) |
+| `pre-composer-update` | Influencing what the update touches: build the hook with `workflow.Propose` and return a plan |
 | `post-composer-update` | Reacting to the new lock file and installed code, before it is committed |
 | `post-code-update` | Changing code — Rector, PHPCBF, and similar |
 | `pre-site-update` | Inspecting a site before its update hooks run |

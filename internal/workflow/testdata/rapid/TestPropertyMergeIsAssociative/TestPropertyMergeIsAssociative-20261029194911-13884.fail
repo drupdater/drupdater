@@ -1,0 +1,61 @@
+# 2026/10/29 19:49:11.843282 [TestPropertyMergeIsAssociative] [rapid] draw a: workflow.UpdatePlan{Only:[]string{}, Keep:[]workflow.Pin{workflow.Pin{Package:"drupal/core", Version:"2.0.0"}}, MinimalChanges:false}
+# 2026/10/29 19:49:11.843295 [TestPropertyMergeIsAssociative] [rapid] draw b: workflow.UpdatePlan{Only:[]string{"drupal/token", "other/package", "drupal/webform", "drupal/webform"}, Keep:[]workflow.Pin{workflow.Pin{Package:"drupal/webform", Version:"2.0.0"}, workflow.Pin{Package:"other/package", Version:"2.0.0"}}, MinimalChanges:false}
+# 2026/10/29 19:49:11.843302 [TestPropertyMergeIsAssociative] [rapid] draw c: workflow.UpdatePlan{Only:[]string{"drupal/token"}, Keep:[]workflow.Pin{workflow.Pin{Package:"other/package", Version:"1.0.0"}}, MinimalChanges:false}
+# 2026/10/29 19:49:11.843338 [TestPropertyMergeIsAssociative] 
+# 	Error Trace:	/home/user/drupdater/internal/workflow/plan_property_test.go:66
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:458
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:467
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:292
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:207
+# 	            				/home/user/drupdater/internal/workflow/plan_property_test.go:57
+# 	Error:      	Not equal: 
+# 	            	expected: true
+# 	            	actual  : false
+# 	Test:       	TestPropertyMergeIsAssociative
+# 	Messages:   	grouping decides whether the merge fails: <nil> / other/package is pinned at both 1.0.0 and 2.0.0
+# 
+v0.4.8#13843642204162003225
+0x5015326722b76
+0x13f2a91adace88
+0x9876f1eb65bf7
+0x0
+0x837b219b4e50c
+0x1
+0x23ac002b8ffcb
+0x0
+0x10d7977b246797
+0xecd42bff83fb6
+0x1
+0x1634109fa8b827
+0x6f0ffab2ab656
+0x3
+0xdbd2cf456ddeb
+0x14b8e74e907dfb
+0x2
+0x1095f133b0195e
+0xfa44867be9c7d
+0x2
+0x1eb3a4c87b483b
+0x1a37b2e17a46e1
+0x8617b44d466e0
+0x2
+0x2c3630bea6a87
+0x1
+0x1f74f6ab747fa9
+0x1e5d7f9f11fa81
+0x3
+0xa58809a24269c
+0x1
+0xc7f9684812416
+0x0
+0xc91568f2ad16c
+0x3049afb1fa3e4
+0x1
+0x144ab87d51fb3
+0x1751d9c451ff03
+0x114f70723adfd4
+0x3
+0xac32378281c68
+0x0
+0x319608b7a1d3a
+0x0
