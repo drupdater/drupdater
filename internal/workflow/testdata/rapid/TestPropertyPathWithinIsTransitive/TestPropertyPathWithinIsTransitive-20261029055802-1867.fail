@@ -1,0 +1,103 @@
+# 2026/10/29 05:58:02.199715 [TestPropertyPathWithinIsTransitive] [rapid] draw outer: []string{"y4"}
+# 2026/10/29 05:58:02.199769 [TestPropertyPathWithinIsTransitive] [rapid] draw middle: []string{"z.0d0h8q"}
+# 2026/10/29 05:58:02.199774 [TestPropertyPathWithinIsTransitive] [rapid] draw inner: []string{"v1h"}
+# 2026/10/29 05:58:02.199874 [TestPropertyPathWithinIsTransitive] 
+# 	Error Trace:	/home/user/drupdater/internal/workflow/commit_property_test.go:63
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:458
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:467
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:292
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:207
+# 	            				/home/user/drupdater/internal/workflow/commit_property_test.go:58
+# 	            				/root/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.1.linux-amd64/src/runtime/asm_amd64.s:1264
+# 	Error:      	Should be true
+# 	Test:       	TestPropertyPathWithinIsTransitive
+# 2026/10/29 05:58:02.199909 [TestPropertyPathWithinIsTransitive] 
+# 	Error Trace:	/home/user/drupdater/internal/workflow/commit_property_test.go:64
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:458
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:467
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:292
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:207
+# 	            				/home/user/drupdater/internal/workflow/commit_property_test.go:58
+# 	            				/root/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.1.linux-amd64/src/runtime/asm_amd64.s:1264
+# 	Error:      	Should be true
+# 	Test:       	TestPropertyPathWithinIsTransitive
+# 2026/10/29 05:58:02.199992 [TestPropertyPathWithinIsTransitive] 
+# 	Error Trace:	/home/user/drupdater/internal/workflow/commit_property_test.go:65
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:458
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:467
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:292
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:207
+# 	            				/home/user/drupdater/internal/workflow/commit_property_test.go:58
+# 	            				/root/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.1.linux-amd64/src/runtime/asm_amd64.s:1264
+# 	Error:      	Should be true
+# 	Test:       	TestPropertyPathWithinIsTransitive
+# 	Messages:   	containment has to compose
+# 
+v0.4.8#14564355530013556874
+0xbbf6085c52e39
+0x0
+0x1f14b6245cf650
+0x22
+0x13fb81d5a16a62
+0x0
+0x11e7be55ae9ccd
+0x6
+0x50f207c18f8c0
+0x4475e8f5077f1
+0x16b8b327ed5465
+0x0
+0x153c181516e0a0
+0x24
+0x26
+0x2b
+0x2f
+0x34
+0x2c
+0x23
+0xe3d5286352f08
+0x0
+0x236909be90de
+0x1
+0x1ef390a7319aee
+0x0
+0x47cb8229fc8bd
+0x2
+0x12d441bca04359
+0x0
+0xc9a2d69e5c562
+0x10
+0x1a2145170af7eb
+0x0
+0x1dfebf1161b01e
+0x32
+0x34
+0x2
+0x17b9ccdb677b49
+0x0
+0x1695928960b655
+0x14
+0x1cbbf0d69bf3eb
+0x0
+0x1ca3e9b927ffef
+0xa
+0x13e7cf6c4021d4
+0x0
+0x1a354923d9a3be
+0x1d
+0x15d518d56916d7
+0x78a6c15ae7117
+0x2d81b4b450fd3
+0x0
+0xf07242618f2d5
+0x1f
+0x1c9ba4df900290
+0x0
+0x40857c5405511
+0x3
+0x14ef7018150797
+0x0
+0x1e43c31291f37b
+0x34
+0x14
+0x1b8136936eb26
+0xd5055e13363d6

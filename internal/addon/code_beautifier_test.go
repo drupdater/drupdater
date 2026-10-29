@@ -11,8 +11,6 @@ import (
 	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/drupdater/drupdater/pkg/phpcs"
 
-	git "github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/gookit/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -41,7 +39,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 
 	t.Run("Returns error when os.Create fails", func(t *testing.T) {
 		composer := NewMockComposer(t)
-		worktree := NewMockWorktree(t)
+		committer := &fakeCommitter{}
 
 		// Use a path that cannot be written to (root-owned directory)
 		const badPath = "/proc/nonexistent"
@@ -50,42 +48,22 @@ func TestCreatePHPCSConfig(t *testing.T) {
 
 		cb := NewCodeBeautifier(logger, nil, composer)
 
-		_, err := cb.CreatePHPCSConfig(context.Background(), badPath, worktree)
+		_, err := cb.CreatePHPCSConfig(context.Background(), badPath, committer)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to create phpcs.xml")
 	})
 
-	t.Run("Returns error when staging phpcs.xml fails", func(t *testing.T) {
-		composer := NewMockComposer(t)
-		worktree := NewMockWorktree(t)
-		tmpDir := t.TempDir()
-
-		composer.EXPECT().GetInstalledPackageVersion(anyCtx, tmpDir, "drupal/core").Return("10.1.0", nil)
-		composer.EXPECT().GetCustomCodeDirectories(anyCtx, tmpDir).Return([]string{"web/modules/custom"}, nil)
-		worktree.EXPECT().Add("phpcs.xml").Return(plumbing.ZeroHash, assert.AnError)
-
-		cb := NewCodeBeautifier(logger, nil, composer)
-
-		created, err := cb.CreatePHPCSConfig(context.Background(), tmpDir, worktree)
-		require.Error(t, err)
-		assert.False(t, created, "an unstaged config must not be reported as created")
-		assert.Contains(t, err.Error(), "failed to add file to commit")
-		require.ErrorIs(t, err, assert.AnError)
-	})
-
 	t.Run("Returns error when committing phpcs.xml fails", func(t *testing.T) {
 		composer := NewMockComposer(t)
-		worktree := NewMockWorktree(t)
+		committer := &fakeCommitter{err: assert.AnError}
 		tmpDir := t.TempDir()
 
 		composer.EXPECT().GetInstalledPackageVersion(anyCtx, tmpDir, "drupal/core").Return("10.1.0", nil)
 		composer.EXPECT().GetCustomCodeDirectories(anyCtx, tmpDir).Return([]string{"web/modules/custom"}, nil)
-		worktree.EXPECT().Add("phpcs.xml").Return(plumbing.ZeroHash, nil)
-		worktree.EXPECT().Commit("Add PHPCS config", mock.Anything).Return(plumbing.ZeroHash, assert.AnError)
 
 		cb := NewCodeBeautifier(logger, nil, composer)
 
-		created, err := cb.CreatePHPCSConfig(context.Background(), tmpDir, worktree)
+		created, err := cb.CreatePHPCSConfig(context.Background(), tmpDir, committer)
 		require.Error(t, err)
 		assert.False(t, created)
 		require.ErrorIs(t, err, assert.AnError)
@@ -93,7 +71,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 
 	t.Run("Returns false and no error when no custom code directories found", func(t *testing.T) {
 		composer := NewMockComposer(t)
-		worktree := NewMockWorktree(t)
+		committer := &fakeCommitter{}
 
 		tmpDir := t.TempDir()
 
@@ -102,9 +80,10 @@ func TestCreatePHPCSConfig(t *testing.T) {
 
 		cb := NewCodeBeautifier(logger, nil, composer)
 
-		created, err := cb.CreatePHPCSConfig(context.Background(), tmpDir, worktree)
+		created, err := cb.CreatePHPCSConfig(context.Background(), tmpDir, committer)
 		require.NoError(t, err)
 		assert.False(t, created)
+		assert.Empty(t, committer.commits)
 
 		// No phpcs.xml may be left behind on this path. An empty one would be picked up by the
 		// next run as an existing config and fail hasPHPCSPathDefinitions with an XML error.
@@ -113,7 +92,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 
 	t.Run("Leaves no phpcs.xml behind when GetCustomCodeDirectories fails", func(t *testing.T) {
 		composer := NewMockComposer(t)
-		worktree := NewMockWorktree(t)
+		committer := &fakeCommitter{}
 
 		tmpDir := t.TempDir()
 
@@ -122,32 +101,31 @@ func TestCreatePHPCSConfig(t *testing.T) {
 
 		cb := NewCodeBeautifier(logger, nil, composer)
 
-		_, err := cb.CreatePHPCSConfig(context.Background(), tmpDir, worktree)
+		_, err := cb.CreatePHPCSConfig(context.Background(), tmpDir, committer)
 		require.Error(t, err)
 		assert.NoFileExists(t, filepath.Join(tmpDir, "phpcs.xml"))
 	})
 
 	t.Run("Creates phpcs.xml and commits when custom code directories found", func(t *testing.T) {
 		composer := NewMockComposer(t)
-		worktree := NewMockWorktree(t)
+		committer := &fakeCommitter{}
 
 		tmpDir := t.TempDir()
 
 		composer.EXPECT().GetInstalledPackageVersion(anyCtx, tmpDir, "drupal/core").Return("10.1.0", nil)
 		composer.EXPECT().GetCustomCodeDirectories(anyCtx, tmpDir).Return([]string{"web/modules/custom"}, nil)
-		worktree.EXPECT().Add("phpcs.xml").Return(plumbing.NewHash(""), nil)
-		worktree.EXPECT().Commit("Add PHPCS config", &git.CommitOptions{}).Return(plumbing.NewHash(""), nil)
 
 		cb := NewCodeBeautifier(logger, nil, composer)
 
-		created, err := cb.CreatePHPCSConfig(context.Background(), tmpDir, worktree)
+		created, err := cb.CreatePHPCSConfig(context.Background(), tmpDir, committer)
 		require.NoError(t, err)
 		assert.True(t, created)
+		assert.Equal(t, []recordedCommit{{message: "Add PHPCS config", paths: []string{"phpcs.xml"}}}, committer.commits)
 	})
 
 	t.Run("Returns error when template parsing fails", func(t *testing.T) {
 		composer := NewMockComposer(t)
-		worktree := NewMockWorktree(t)
+		committer := &fakeCommitter{}
 
 		tmpDir := t.TempDir()
 
@@ -157,14 +135,14 @@ func TestCreatePHPCSConfig(t *testing.T) {
 
 		cb := NewCodeBeautifier(logger, nil, composer)
 
-		_, err := cb.CreatePHPCSConfig(context.Background(), tmpDir, worktree)
+		_, err := cb.CreatePHPCSConfig(context.Background(), tmpDir, committer)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to parse phpcs template")
 	})
 
 	t.Run("Returns error when template execution fails", func(t *testing.T) {
 		composer := NewMockComposer(t)
-		worktree := NewMockWorktree(t)
+		committer := &fakeCommitter{}
 
 		tmpDir := t.TempDir()
 
@@ -178,7 +156,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 
 		cb := NewCodeBeautifier(logger, nil, composer)
 
-		_, err := cb.CreatePHPCSConfig(context.Background(), tmpDir, worktree)
+		_, err := cb.CreatePHPCSConfig(context.Background(), tmpDir, committer)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to execute phpcs template")
 		// A failed render must not leave a partially written file for the next run to trip on.
@@ -191,7 +169,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 		}
 
 		composer := NewMockComposer(t)
-		worktree := NewMockWorktree(t)
+		committer := &fakeCommitter{}
 
 		tmpDir := t.TempDir()
 
@@ -205,14 +183,14 @@ func TestCreatePHPCSConfig(t *testing.T) {
 
 		cb := NewCodeBeautifier(logger, nil, composer)
 
-		_, err := cb.CreatePHPCSConfig(context.Background(), tmpDir, worktree)
+		_, err := cb.CreatePHPCSConfig(context.Background(), tmpDir, committer)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to write phpcs.xml")
 	})
 
 	t.Run("Returns error when GetCustomCodeDirectories fails", func(t *testing.T) {
 		composer := NewMockComposer(t)
-		worktree := NewMockWorktree(t)
+		committer := &fakeCommitter{}
 
 		tmpDir := t.TempDir()
 
@@ -221,45 +199,11 @@ func TestCreatePHPCSConfig(t *testing.T) {
 
 		cb := NewCodeBeautifier(logger, nil, composer)
 
-		_, err := cb.CreatePHPCSConfig(context.Background(), tmpDir, worktree)
+		_, err := cb.CreatePHPCSConfig(context.Background(), tmpDir, committer)
 		require.Error(t, err)
 		assert.Equal(t, assert.AnError, err)
 	})
 
-	t.Run("Returns error when worktree.Add fails", func(t *testing.T) {
-		composer := NewMockComposer(t)
-		worktree := NewMockWorktree(t)
-
-		tmpDir := t.TempDir()
-
-		composer.EXPECT().GetInstalledPackageVersion(anyCtx, tmpDir, "drupal/core").Return("10.1.0", nil)
-		composer.EXPECT().GetCustomCodeDirectories(anyCtx, tmpDir).Return([]string{"web/modules/custom"}, nil)
-		worktree.EXPECT().Add("phpcs.xml").Return(plumbing.NewHash(""), assert.AnError)
-
-		cb := NewCodeBeautifier(logger, nil, composer)
-
-		_, err := cb.CreatePHPCSConfig(context.Background(), tmpDir, worktree)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to add file to commit")
-	})
-
-	t.Run("Returns error when worktree.Commit fails", func(t *testing.T) {
-		composer := NewMockComposer(t)
-		worktree := NewMockWorktree(t)
-
-		tmpDir := t.TempDir()
-
-		composer.EXPECT().GetInstalledPackageVersion(anyCtx, tmpDir, "drupal/core").Return("10.1.0", nil)
-		composer.EXPECT().GetCustomCodeDirectories(anyCtx, tmpDir).Return([]string{"web/modules/custom"}, nil)
-		worktree.EXPECT().Add("phpcs.xml").Return(plumbing.NewHash(""), nil)
-		worktree.EXPECT().Commit("Add PHPCS config", &git.CommitOptions{}).Return(plumbing.NewHash(""), assert.AnError)
-
-		cb := NewCodeBeautifier(logger, nil, composer)
-
-		_, err := cb.CreatePHPCSConfig(context.Background(), tmpDir, worktree)
-		require.Error(t, err)
-		assert.Equal(t, assert.AnError, err)
-	})
 }
 
 func TestHasPHPCSPathDefinitions(t *testing.T) {
@@ -352,7 +296,6 @@ func TestHasPHPCSPathDefinitions(t *testing.T) {
 func TestCodingStyles(t *testing.T) {
 	// Create reusable test dependencies
 	logger := zap.NewNop()
-	worktree := NewMockWorktree(t)
 
 	// Subtests using table-driven approach
 	t.Run("Config file exists but no path definitions", func(t *testing.T) {
@@ -368,8 +311,9 @@ func TestCodingStyles(t *testing.T) {
 		runner := NewMockPHPCS(t)
 		composer := NewMockComposer(t)
 
+		committer := &fakeCommitter{}
 		updateCodingStyles := NewCodeBeautifier(logger, runner, composer)
-		postCodeUpdate := workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", worktree)
+		postCodeUpdate := workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", committer)
 
 		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
 		require.NoError(t, err)
@@ -391,8 +335,9 @@ func TestCodingStyles(t *testing.T) {
 		runner := NewMockPHPCS(t)
 		composer := NewMockComposer(t)
 
+		committer := &fakeCommitter{}
 		updateCodingStyles := NewCodeBeautifier(logger, runner, composer)
-		postCodeUpdate := workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", worktree)
+		postCodeUpdate := workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", committer)
 
 		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
 		require.Error(t, err)
@@ -420,18 +365,16 @@ func TestCodingStyles(t *testing.T) {
 		composer.EXPECT().GetCustomCodeDirectories(anyCtx, "/tmp").Return([]string{"web/modules/custom", "web/themes/custom"}, nil)
 		composer.EXPECT().GetInstalledPackageVersion(anyCtx, "/tmp", "drupal/core").Return("9.2.1", nil)
 
-		worktree.EXPECT().Add("phpcs.xml").Return(plumbing.NewHash(""), nil)
-		worktree.EXPECT().Commit("Add PHPCS config", &git.CommitOptions{}).Return(plumbing.NewHash(""), nil)
-
 		// Create system under test
+		committer := &fakeCommitter{}
 		updateCodingStyles := NewCodeBeautifier(logger, runner, composer)
-		postCodeUpdate := workflow.NewPostCodeUpdateEvent(context.Background(), "/tmp", worktree)
+		postCodeUpdate := workflow.NewPostCodeUpdateEvent(context.Background(), "/tmp", committer)
 
 		// Execute and verify
 		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
 		require.NoError(t, err)
 
-		// Verify all expectations were met
+		assert.Equal(t, []recordedCommit{{message: "Add PHPCS config", paths: []string{"phpcs.xml"}}}, committer.commits)
 		runner.AssertExpectations(t)
 		composer.AssertExpectations(t)
 	})
@@ -462,18 +405,16 @@ func TestCodingStyles(t *testing.T) {
 		// nobody asked for.
 		composer.EXPECT().Remove(anyCtx, "/tmp", []string{"--dev", "drupal/coder"}).Return("", nil)
 
-		worktree.EXPECT().AddGlob("composer.*").Return(nil)
-		worktree.EXPECT().Commit("Install drupal/coder", &git.CommitOptions{}).Return(plumbing.NewHash(""), nil)
-		worktree.EXPECT().Status().Return(git.Status{
-			"composer.lock": {Staging: git.Modified},
-		}, nil).Once()
-		worktree.EXPECT().Commit("Remove temporary drupal/coder installation", &git.CommitOptions{}).
-			Return(plumbing.NewHash(""), nil)
-
+		committer := &fakeCommitter{}
 		updateCodingStyles := NewCodeBeautifier(logger, runner, composer)
-		postCodeUpdate := workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", worktree)
+		postCodeUpdate := workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", committer)
 		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
 		require.NoError(t, err)
+		composerFiles := []string{"composer.json", "composer.lock"}
+		assert.Equal(t, []recordedCommit{
+			{message: "Install drupal/coder", paths: composerFiles},
+			{message: "Remove temporary drupal/coder installation", paths: composerFiles},
+		}, committer.commits)
 		runner.AssertExpectations(t)
 		composer.AssertExpectations(t)
 	})
@@ -495,8 +436,9 @@ func TestCodingStyles(t *testing.T) {
 		composer := NewMockComposer(t)
 		composer.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/coder").Return(true, nil)
 
+		committer := &fakeCommitter{}
 		updateCodingStyles := NewCodeBeautifier(logger, runner, composer)
-		postCodeUpdate := workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", worktree)
+		postCodeUpdate := workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", committer)
 		require.NoError(t, updateCodingStyles.postCodeUpdateHandler(postCodeUpdate))
 		composer.AssertExpectations(t)
 	})
@@ -522,40 +464,13 @@ func TestCodingStyles(t *testing.T) {
 		composer := NewMockComposer(t)
 		composer.EXPECT().IsPackageInstalled(anyCtx, "/path/to/repo", "drupal/coder").Return(true, nil)
 
+		committer := &fakeCommitter{}
 		updateCodingStyles := NewCodeBeautifier(logger, runner, composer)
-		postCodeUpdate := workflow.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", worktree)
+		postCodeUpdate := workflow.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", committer)
 		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
 		require.NoError(t, err)
 		runner.AssertExpectations(t)
 		composer.AssertExpectations(t)
-	})
-
-	t.Run("stagedAnyOf reports staged changes and propagates errors, scoped to given paths", func(t *testing.T) {
-		wt := NewMockWorktree(t)
-		wt.EXPECT().Status().Return(git.Status{"a": &git.FileStatus{Staging: git.Unmodified}}, nil).Once()
-		staged, err := stagedAnyOf(wt, []string{"a"})
-		require.NoError(t, err)
-		assert.False(t, staged)
-
-		wt.EXPECT().Status().Return(git.Status{"a": &git.FileStatus{Staging: git.Modified}}, nil).Once()
-		staged, err = stagedAnyOf(wt, []string{"a"})
-		require.NoError(t, err)
-		assert.True(t, staged)
-
-		// A staged change to a path the caller didn't ask about must not count.
-		wt.EXPECT().Status().Return(git.Status{"b": &git.FileStatus{Staging: git.Modified}}, nil).Once()
-		staged, err = stagedAnyOf(wt, []string{"a"})
-		require.NoError(t, err)
-		assert.False(t, staged)
-
-		wt.EXPECT().Status().Return(nil, assert.AnError).Once()
-		_, err = stagedAnyOf(wt, []string{"a"})
-		require.Error(t, err)
-
-		// An empty path list short-circuits without even querying git status.
-		staged, err = stagedAnyOf(wt, nil)
-		require.NoError(t, err)
-		assert.False(t, staged)
 	})
 
 	t.Run("Fixable", func(t *testing.T) {
@@ -597,20 +512,19 @@ func TestCodingStyles(t *testing.T) {
 		composer := NewMockComposer(t)
 		composer.EXPECT().IsPackageInstalled(anyCtx, "/path/to/repo", "drupal/coder").Return(true, nil)
 
-		worktree.EXPECT().Add("file1.php").Return(plumbing.NewHash(""), nil)
-		worktree.EXPECT().Status().Return(git.Status{"file1.php": &git.FileStatus{Staging: git.Modified}}, nil)
-		worktree.EXPECT().Commit("Update coding styles", &git.CommitOptions{}).Return(plumbing.NewHash(""), nil)
-
+		committer := &fakeCommitter{}
 		updateCodingStyles := NewCodeBeautifier(logger, runner, composer)
-		postCodeUpdate := workflow.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", worktree)
+		postCodeUpdate := workflow.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", committer)
 		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
 
 		require.NoError(t, err)
+		assert.Equal(t, []recordedCommit{{message: "Update coding styles", paths: []string{"file1.php"}}}, committer.commits)
+		assert.Equal(t, []string{"file1.php"}, updateCodingStyles.fixedFiles)
 		runner.AssertExpectations(t)
 		composer.AssertExpectations(t)
 	})
 
-	t.Run("Fixable but nothing staged skips the commit", func(t *testing.T) {
+	t.Run("Fixable but nothing changed reports no fixes", func(t *testing.T) {
 		fileExists = func(_ string) bool { return true }
 		oldFn := hasPHPCSPathDefinitions
 		hasPHPCSPathDefinitions = func(_ string) (bool, error) { return true, nil }
@@ -628,15 +542,13 @@ func TestCodingStyles(t *testing.T) {
 		composer := NewMockComposer(t)
 		composer.EXPECT().IsPackageInstalled(anyCtx, "/path/to/repo", "drupal/coder").Return(true, nil)
 
-		worktree.EXPECT().Add("file1.php").Return(plumbing.NewHash(""), nil)
-		worktree.EXPECT().Status().Return(git.Status{}, nil)
-		// No Commit expectation: an empty index must not trigger a commit.
-
+		committer := &fakeCommitter{unchanged: true}
 		updateCodingStyles := NewCodeBeautifier(logger, runner, composer)
-		postCodeUpdate := workflow.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", worktree)
+		postCodeUpdate := workflow.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", committer)
 		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
 
 		require.NoError(t, err)
+		assert.Empty(t, updateCodingStyles.fixedFiles, "phpcbf changed nothing, so nothing was fixed")
 		runner.AssertExpectations(t)
 		composer.AssertExpectations(t)
 	})
@@ -679,8 +591,9 @@ func TestCodingStyles(t *testing.T) {
 		composer := NewMockComposer(t)
 		composer.EXPECT().IsPackageInstalled(anyCtx, "/path/to/repo", "drupal/coder").Return(true, nil)
 
+		committer := &fakeCommitter{}
 		updateCodingStyles := NewCodeBeautifier(logger, runner, composer)
-		postCodeUpdate := workflow.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", worktree)
+		postCodeUpdate := workflow.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", committer)
 		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
 
 		require.Error(t, err)
@@ -692,80 +605,42 @@ func TestCodingStyles(t *testing.T) {
 
 func TestRemoveCoder(t *testing.T) {
 	logger := zap.NewNop()
+	composerFiles := []string{"composer.json", "composer.lock"}
 
-	t.Run("commits the leftover lock diff", func(t *testing.T) {
+	t.Run("commits whatever the removal left in composer.*", func(t *testing.T) {
 		composer := NewMockComposer(t)
 		composer.EXPECT().Remove(anyCtx, "/tmp", []string{"--dev", "drupal/coder"}).Return("", nil)
 
-		worktree := NewMockWorktree(t)
-		worktree.EXPECT().AddGlob("composer.*").Return(nil)
-		worktree.EXPECT().Status().Return(git.Status{"composer.lock": {Staging: git.Modified}}, nil)
-		worktree.EXPECT().Commit("Remove temporary drupal/coder installation", &git.CommitOptions{}).
-			Return(plumbing.NewHash(""), nil)
-
+		committer := &fakeCommitter{}
 		cb := NewCodeBeautifier(logger, nil, composer)
-		require.NoError(t, cb.removeCoder(context.Background(), "/tmp", worktree))
+		require.NoError(t, cb.removeCoder(context.Background(), "/tmp", committer))
+		assert.Equal(t, []recordedCommit{{message: "Remove temporary drupal/coder installation", paths: composerFiles}}, committer.commits)
 	})
 
-	t.Run("commits nothing when the removal restored the lock", func(t *testing.T) {
-		// go-git rejects an empty commit, so a removal that happened to leave composer.json and
-		// composer.lock byte-for-byte identical must not try to make one.
+	t.Run("a removal that restored composer.* is not an error", func(t *testing.T) {
 		composer := NewMockComposer(t)
 		composer.EXPECT().Remove(anyCtx, "/tmp", []string{"--dev", "drupal/coder"}).Return("", nil)
 
-		worktree := NewMockWorktree(t)
-		worktree.EXPECT().AddGlob("composer.*").Return(nil)
-		worktree.EXPECT().Status().Return(git.Status{"composer.lock": {Staging: git.Unmodified}}, nil)
-
 		cb := NewCodeBeautifier(logger, nil, composer)
-		require.NoError(t, cb.removeCoder(context.Background(), "/tmp", worktree))
+		require.NoError(t, cb.removeCoder(context.Background(), "/tmp", &fakeCommitter{unchanged: true}))
 	})
 
 	t.Run("propagates a removal failure", func(t *testing.T) {
 		composer := NewMockComposer(t)
 		composer.EXPECT().Remove(anyCtx, "/tmp", []string{"--dev", "drupal/coder"}).Return("", assert.AnError)
 
+		committer := &fakeCommitter{}
 		cb := NewCodeBeautifier(logger, nil, composer)
-		require.ErrorIs(t, cb.removeCoder(context.Background(), "/tmp", NewMockWorktree(t)), assert.AnError)
-	})
-
-	t.Run("propagates a staging failure", func(t *testing.T) {
-		composer := NewMockComposer(t)
-		composer.EXPECT().Remove(anyCtx, "/tmp", []string{"--dev", "drupal/coder"}).Return("", nil)
-
-		worktree := NewMockWorktree(t)
-		worktree.EXPECT().AddGlob("composer.*").Return(assert.AnError)
-
-		cb := NewCodeBeautifier(logger, nil, composer)
-		err := cb.removeCoder(context.Background(), "/tmp", worktree)
-		require.ErrorIs(t, err, assert.AnError)
-		assert.Contains(t, err.Error(), "failed to add file to commit")
-	})
-
-	t.Run("propagates a status failure", func(t *testing.T) {
-		composer := NewMockComposer(t)
-		composer.EXPECT().Remove(anyCtx, "/tmp", []string{"--dev", "drupal/coder"}).Return("", nil)
-
-		worktree := NewMockWorktree(t)
-		worktree.EXPECT().AddGlob("composer.*").Return(nil)
-		worktree.EXPECT().Status().Return(nil, assert.AnError)
-
-		cb := NewCodeBeautifier(logger, nil, composer)
-		require.ErrorIs(t, cb.removeCoder(context.Background(), "/tmp", worktree), assert.AnError)
+		require.ErrorIs(t, cb.removeCoder(context.Background(), "/tmp", committer), assert.AnError)
+		assert.Empty(t, committer.commits)
 	})
 
 	t.Run("propagates a commit failure", func(t *testing.T) {
 		composer := NewMockComposer(t)
 		composer.EXPECT().Remove(anyCtx, "/tmp", []string{"--dev", "drupal/coder"}).Return("", nil)
 
-		worktree := NewMockWorktree(t)
-		worktree.EXPECT().AddGlob("composer.*").Return(nil)
-		worktree.EXPECT().Status().Return(git.Status{"composer.json": {Staging: git.Modified}}, nil)
-		worktree.EXPECT().Commit("Remove temporary drupal/coder installation", &git.CommitOptions{}).
-			Return(plumbing.ZeroHash, assert.AnError)
-
 		cb := NewCodeBeautifier(logger, nil, composer)
-		require.ErrorIs(t, cb.removeCoder(context.Background(), "/tmp", worktree), assert.AnError)
+		require.ErrorIs(t, cb.removeCoder(context.Background(), "/tmp", &fakeCommitter{err: assert.AnError}), assert.AnError)
 	})
 }
 
@@ -788,12 +663,10 @@ func TestCoderRemovalErrorDoesNotMaskTheRealFailure(t *testing.T) {
 	composer.EXPECT().Require(anyCtx, "/tmp", []string{"--dev", "drupal/coder"}).Return("", nil)
 	composer.EXPECT().Remove(anyCtx, "/tmp", []string{"--dev", "drupal/coder"}).Return("", assert.AnError)
 
-	worktree := NewMockWorktree(t)
-	worktree.EXPECT().AddGlob("composer.*").Return(nil)
-	worktree.EXPECT().Commit("Install drupal/coder", &git.CommitOptions{}).Return(plumbing.NewHash(""), nil)
+	committer := &fakeCommitter{}
 
 	cb := NewCodeBeautifier(logger, runner, composer)
-	err := cb.postCodeUpdateHandler(workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", worktree))
+	err := cb.postCodeUpdateHandler(workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", committer))
 
 	require.ErrorIs(t, err, phpcsErr)
 	require.NotErrorIs(t, err, assert.AnError)
@@ -820,12 +693,10 @@ func TestCoderRemovalFailureSurfacesOnAnOtherwiseCleanRun(t *testing.T) {
 	composer.EXPECT().Require(anyCtx, "/tmp", []string{"--dev", "drupal/coder"}).Return("", nil)
 	composer.EXPECT().Remove(anyCtx, "/tmp", []string{"--dev", "drupal/coder"}).Return("", assert.AnError)
 
-	worktree := NewMockWorktree(t)
-	worktree.EXPECT().AddGlob("composer.*").Return(nil)
-	worktree.EXPECT().Commit("Install drupal/coder", &git.CommitOptions{}).Return(plumbing.NewHash(""), nil)
+	committer := &fakeCommitter{}
 
 	cb := NewCodeBeautifier(logger, runner, composer)
-	err := cb.postCodeUpdateHandler(workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", worktree))
+	err := cb.postCodeUpdateHandler(workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", committer))
 
 	require.ErrorIs(t, err, assert.AnError)
 }
@@ -861,15 +732,10 @@ func TestCoderIsRemovedFromTheSectionItWasInstalledInto(t *testing.T) {
 			return "", nil
 		})
 
-	worktree := NewMockWorktree(t)
-	worktree.EXPECT().AddGlob("composer.*").Return(nil)
-	worktree.EXPECT().Commit("Install drupal/coder", &git.CommitOptions{}).Return(plumbing.NewHash(""), nil)
-	worktree.EXPECT().Status().Return(git.Status{"composer.lock": {Staging: git.Modified}}, nil)
-	worktree.EXPECT().Commit("Remove temporary drupal/coder installation", &git.CommitOptions{}).
-		Return(plumbing.NewHash(""), nil)
+	committer := &fakeCommitter{}
 
 	cb := NewCodeBeautifier(logger, runner, composer)
-	require.NoError(t, cb.postCodeUpdateHandler(workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", worktree)))
+	require.NoError(t, cb.postCodeUpdateHandler(workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", committer)))
 
 	assert.Contains(t, requireArgs, "drupal/coder")
 	assert.Contains(t, removeArgs, "drupal/coder")
@@ -877,4 +743,20 @@ func TestCoderIsRemovedFromTheSectionItWasInstalledInto(t *testing.T) {
 		slices.Contains(requireArgs, "--dev"), slices.Contains(removeArgs, "--dev"),
 		"coder must be removed from the same section it was installed into: require=%v remove=%v",
 		requireArgs, removeArgs)
+}
+
+func TestCoderInstallCommitFailureStopsTheHandler(t *testing.T) {
+	fileExists = func(_ string) bool { return true }
+	oldFn := hasPHPCSPathDefinitions
+	hasPHPCSPathDefinitions = func(_ string) (bool, error) { return true, nil }
+	defer func() { hasPHPCSPathDefinitions = oldFn }()
+
+	composer := NewMockComposer(t)
+	composer.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/coder").Return(false, nil)
+	composer.EXPECT().Require(anyCtx, "/tmp", []string{"--dev", "drupal/coder"}).Return("", nil)
+
+	// No phpcs expectations: running the sniffer after a failed install fails the mock.
+	cb := NewCodeBeautifier(zap.NewNop(), NewMockPHPCS(t), composer)
+	err := cb.postCodeUpdateHandler(workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", &fakeCommitter{err: assert.AnError}))
+	require.ErrorIs(t, err, assert.AnError)
 }

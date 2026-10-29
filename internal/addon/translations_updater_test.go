@@ -6,11 +6,8 @@ import (
 
 	"github.com/drupdater/drupdater/internal/workflow"
 
-	git "github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/gookit/event"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
@@ -34,17 +31,16 @@ func TestTranslationsUpdater_RenderTemplate(t *testing.T) {
 func TestUpdateTranslationsEventHandlerWithoutLocaleDeploy(t *testing.T) {
 	// Setup - Create mocks and system under test
 	mockDrush := NewMockDrush(t)
-	mockRepository := NewMockRepository(t)
 	logger := zap.NewNop()
-	handler := NewTranslationsUpdater(logger, mockDrush, mockRepository)
+	handler := NewTranslationsUpdater(logger, mockDrush)
 
-	worktree := NewMockWorktree(t)
+	committer := &fakeCommitter{}
 	path := "/tmp"
 	ctx := context.Background()
 
 	mockDrush.EXPECT().IsModuleEnabled(anyCtx, "/tmp", "example.com", "locale_deploy").Return(false, nil)
 
-	event := workflow.NewPostSiteUpdateEvent(ctx, path, worktree, "example.com")
+	event := workflow.NewPostSiteUpdateEvent(ctx, path, committer, "example.com")
 	err := handler.postSiteUpdateHandler(event)
 
 	require.NoError(t, err)
@@ -53,17 +49,17 @@ func TestUpdateTranslationsEventHandlerWithoutLocaleDeploy(t *testing.T) {
 	assert.Equal(t, map[string]TranslationResult{
 		"example.com": {Skipped: "locale_deploy not enabled"},
 	}, handler.results)
+	assert.Empty(t, committer.commits)
 	mockDrush.AssertExpectations(t)
 }
 
 func TestUpdateTranslationsEventHandlerWithLocaleDeploy(t *testing.T) {
 	// Setup - Create mocks and system under test
 	mockDrush := NewMockDrush(t)
-	mockRepository := NewMockRepository(t)
 	logger := zap.NewNop()
-	handler := NewTranslationsUpdater(logger, mockDrush, mockRepository)
+	handler := NewTranslationsUpdater(logger, mockDrush)
 
-	worktree := NewMockWorktree(t)
+	committer := &fakeCommitter{}
 	path := "/tmp"
 	ctx := context.Background()
 
@@ -71,33 +67,25 @@ func TestUpdateTranslationsEventHandlerWithLocaleDeploy(t *testing.T) {
 	mockDrush.EXPECT().LocalizeTranslations(anyCtx, "/tmp", "example.com").Return(nil)
 	mockDrush.EXPECT().GetTranslationPath(anyCtx, "/tmp", "example.com", true).Return("translations", nil)
 
-	mockRepository.EXPECT().IsSomethingStagedInPath(worktree, "translations").Return(true)
-
-	worktree.EXPECT().Add("translations").Return(plumbing.NewHash(""), nil)
-	worktree.EXPECT().Commit("Update translations", &git.CommitOptions{}).Return(plumbing.NewHash(""), nil)
-	worktree.EXPECT().Status().Return(git.Status{}, nil)
-
-	event := workflow.NewPostSiteUpdateEvent(ctx, path, worktree, "example.com")
+	event := workflow.NewPostSiteUpdateEvent(ctx, path, committer, "example.com")
 	err := handler.postSiteUpdateHandler(event)
 
 	require.NoError(t, err)
 	assert.Equal(t, map[string]TranslationResult{
 		"example.com": {Path: "translations", Updated: true},
 	}, handler.results, "a committed translation update has to be reported as updated")
+	assert.Equal(t, []recordedCommit{{message: "Update translations", paths: []string{"translations"}}}, committer.commits)
 	mockDrush.AssertExpectations(t)
-	mockRepository.AssertExpectations(t)
-	worktree.AssertExpectations(t)
 }
 
 func TestUpdateTranslationsEventHandlerSkipsWhenTranslationPathUnavailable(t *testing.T) {
-	// A soft skip, not a fatal error — and nothing staged: an empty path handed to
-	// Worktree.Add stages the entire working tree.
+	// A soft skip, not a fatal error — and nothing committed: an empty path would commit the
+	// entire working tree.
 	mockDrush := NewMockDrush(t)
-	mockRepository := NewMockRepository(t)
 	logger := zap.NewNop()
-	handler := NewTranslationsUpdater(logger, mockDrush, mockRepository)
+	handler := NewTranslationsUpdater(logger, mockDrush)
 
-	worktree := NewMockWorktree(t)
+	committer := &fakeCommitter{}
 	path := "/tmp"
 	ctx := context.Background()
 
@@ -105,7 +93,7 @@ func TestUpdateTranslationsEventHandlerSkipsWhenTranslationPathUnavailable(t *te
 	mockDrush.EXPECT().LocalizeTranslations(anyCtx, "/tmp", "example.com").Return(nil)
 	mockDrush.EXPECT().GetTranslationPath(anyCtx, "/tmp", "example.com", true).Return("", assert.AnError)
 
-	event := workflow.NewPostSiteUpdateEvent(ctx, path, worktree, "example.com")
+	event := workflow.NewPostSiteUpdateEvent(ctx, path, committer, "example.com")
 	err := handler.postSiteUpdateHandler(event)
 
 	require.NoError(t, err)
@@ -117,30 +105,24 @@ func TestUpdateTranslationsEventHandlerSkipsWhenTranslationPathUnavailable(t *te
 	assert.Contains(t, handler.results["example.com"].Skipped, "translation path not available")
 	assert.Contains(t, handler.results["example.com"].Skipped, assert.AnError.Error())
 	mockDrush.AssertExpectations(t)
-	worktree.AssertNotCalled(t, "Add", mock.Anything)
-	worktree.AssertNotCalled(t, "Commit", mock.Anything, mock.Anything)
+	assert.Empty(t, committer.commits)
 }
 
 func TestUpdateTranslationsEventHandlerRecordsNothingToCommit(t *testing.T) {
 	// Localized but unchanged: the site still appears in the report, explicitly not updated.
 	mockDrush := NewMockDrush(t)
-	mockRepository := NewMockRepository(t)
-	handler := NewTranslationsUpdater(zap.NewNop(), mockDrush, mockRepository)
+	handler := NewTranslationsUpdater(zap.NewNop(), mockDrush)
 
-	worktree := NewMockWorktree(t)
+	committer := &fakeCommitter{unchanged: true}
 
 	mockDrush.EXPECT().IsModuleEnabled(anyCtx, "/tmp", "example.com", "locale_deploy").Return(true, nil)
 	mockDrush.EXPECT().LocalizeTranslations(anyCtx, "/tmp", "example.com").Return(nil)
 	mockDrush.EXPECT().GetTranslationPath(anyCtx, "/tmp", "example.com", true).Return("translations", nil)
-	worktree.EXPECT().Add("translations").Return(plumbing.NewHash(""), nil)
-	worktree.EXPECT().Status().Return(git.Status{}, nil)
-	mockRepository.EXPECT().IsSomethingStagedInPath(worktree, "translations").Return(false)
 
-	event := workflow.NewPostSiteUpdateEvent(context.Background(), "/tmp", worktree, "example.com")
+	event := workflow.NewPostSiteUpdateEvent(context.Background(), "/tmp", committer, "example.com")
 	require.NoError(t, handler.postSiteUpdateHandler(event))
 
 	assert.Equal(t, map[string]TranslationResult{
 		"example.com": {Path: "translations"},
 	}, handler.results)
-	worktree.AssertNotCalled(t, "Commit", mock.Anything, mock.Anything)
 }

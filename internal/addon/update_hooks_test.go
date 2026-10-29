@@ -86,8 +86,8 @@ func TestUpdateHooks_PreSiteUpdateHandler_Success(t *testing.T) {
 		},
 	}
 
-	worktree := NewMockWorktree(t)
-	mockEvent := workflow.NewPreSiteUpdateEvent(ctx, testPath, worktree, testSite)
+	committer := &fakeCommitter{}
+	mockEvent := workflow.NewPreSiteUpdateEvent(ctx, testPath, committer, testSite)
 
 	mockDrush.EXPECT().GetUpdateHooks(ctx, testPath, testSite).Return(mockHooks, nil)
 
@@ -108,8 +108,8 @@ func TestUpdateHooks_PreSiteUpdateHandler_NoHooks(t *testing.T) {
 	testSite := "default"
 	emptyHooks := map[string]drush.UpdateHook{}
 
-	worktree := NewMockWorktree(t)
-	mockEvent := workflow.NewPreSiteUpdateEvent(ctx, testPath, worktree, testSite)
+	committer := &fakeCommitter{}
+	mockEvent := workflow.NewPreSiteUpdateEvent(ctx, testPath, committer, testSite)
 
 	mockDrush.EXPECT().GetUpdateHooks(ctx, testPath, testSite).Return(emptyHooks, nil)
 
@@ -129,8 +129,8 @@ func TestUpdateHooks_PreSiteUpdateHandler_Error(t *testing.T) {
 	testSite := "default"
 	expectedError := errors.New("drush error")
 
-	worktree := NewMockWorktree(t)
-	mockEvent := workflow.NewPreSiteUpdateEvent(ctx, testPath, worktree, testSite)
+	committer := &fakeCommitter{}
+	mockEvent := workflow.NewPreSiteUpdateEvent(ctx, testPath, committer, testSite)
 
 	mockDrush.EXPECT().GetUpdateHooks(ctx, testPath, testSite).Return(nil, expectedError)
 

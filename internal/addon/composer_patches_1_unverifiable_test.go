@@ -43,7 +43,7 @@ func TestUpdatePatchesLeavesUnverifiablePatchesUnpinned(t *testing.T) {
 		updater := &ComposerPatches1{logger: logger, composer: composerService, drupalOrg: drupalOrgService}
 		patches := map[string]map[string]string{"drupal/core": {"local patch": "patches/x.patch"}}
 
-		report, newPatches := updater.updatePatches(t.Context(), path, NewMockWorktree(t), operations, patches)
+		report, newPatches := updater.updatePatches(t.Context(), path, operations, patches)
 
 		assert.Empty(t, report.Conflicts, "an unverifiable patch must not be reported as a conflict")
 		assert.False(t, report.Changes())
@@ -117,9 +117,9 @@ func TestUpdatePatchesLeavesUnverifiablePatchesUnpinned(t *testing.T) {
 			"drupal/core": {`Issue #123456 "With problems"`: "patches/remote/0001-remote.patch"},
 		}
 
-		// No worktree expectations: the replacement is neither staged nor swapped in, so the old
+		// No removal expected: the replacement is not swapped in, so the old
 		// patch file must not be removed either.
-		report, newPatches := updater.updatePatches(t.Context(), path, NewMockWorktree(t), operations, patches)
+		report, newPatches := updater.updatePatches(t.Context(), path, operations, patches)
 
 		assert.Empty(t, report.Conflicts, "an unverifiable replacement must not be reported as a conflict")
 		assert.Empty(t, report.Updated)

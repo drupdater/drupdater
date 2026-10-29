@@ -10,7 +10,6 @@ import (
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/drupalorg"
 	"github.com/drupdater/drupdater/pkg/drush"
-	"github.com/drupdater/drupdater/pkg/repo"
 	"github.com/spf13/cobra"
 
 	"github.com/drupdater/drupdater/internal"
@@ -276,15 +275,13 @@ func TestCreateAddonsPassesEveryDependency(t *testing.T) {
 	composerSvc := composer.NewCLI(logger)
 	t.Cleanup(composerSvc.Cleanup)
 	drupalOrgSvc := drupalorg.NewHTTPClient(logger)
-	gitSvc := repo.NewGitRepositoryService(logger)
 
-	_, err = createAddons(logger, internal.Config{}, drushSvc, composerSvc, drupalOrgSvc, gitSvc)
+	_, err = createAddons(logger, internal.Config{}, drushSvc, composerSvc, drupalOrgSvc)
 	require.NoError(t, err)
 
 	assert.Same(t, logger, got.logger)
 	assert.Equal(t, drushSvc, got.drush)
 	assert.Equal(t, composerSvc, got.composer)
 	assert.Equal(t, drupalOrgSvc, got.drupalOrg)
-	assert.Equal(t, gitSvc, got.git)
 	assert.Equal(t, got, second, "every addon receives the same dependency set")
 }

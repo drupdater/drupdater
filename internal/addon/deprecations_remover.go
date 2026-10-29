@@ -8,7 +8,6 @@ import (
 	"github.com/drupdater/drupdater/pkg/rector"
 	"github.com/gookit/event"
 
-	"github.com/go-git/go-git/v5"
 	"go.uber.org/zap"
 )
 
@@ -72,9 +71,8 @@ func (dr *DeprecationsRemover) postCodeUpdateHandler(e event.Event) error {
 		if _, err := dr.composer.Remove(evt.Context(), evt.Path(), "palantirnet/drupal-rector"); err != nil {
 			return err
 		}
-		// Removing rector rarely restores composer.lock byte-for-byte; commit the remainder
-		// here so no other listener's AddGlob("composer.*") sweeps it up.
-		if err := dr.commitTemporaryRectorCleanup(evt.Worktree()); err != nil {
+		// Removing rector rarely restores composer.lock byte-for-byte; the remainder gets its own commit.
+		if _, err := evt.Commit("Remove temporary drupal-rector installation", "composer.json", "composer.lock"); err != nil {
 			return err
 		}
 	}
@@ -86,31 +84,8 @@ func (dr *DeprecationsRemover) postCodeUpdateHandler(e event.Event) error {
 
 	dr.recordFixes(deprecationRemovalResult)
 
-	for _, file := range deprecationRemovalResult.ChangedFiles {
-		if _, err := evt.Worktree().Add(file); err != nil {
-			return err
-		}
-	}
-
 	dr.logger.Debug("committing deprecation removals")
-	_, err = evt.Worktree().Commit("Remove deprecations", &git.CommitOptions{})
-
-	return err
-}
-
-// commitTemporaryRectorCleanup commits whatever composer.* diff removing drupal-rector left behind.
-func (dr *DeprecationsRemover) commitTemporaryRectorCleanup(worktree Worktree) error {
-	if err := worktree.AddGlob("composer.*"); err != nil {
-		return err
-	}
-	staged, err := stagedAnyOf(worktree, []string{"composer.json", "composer.lock"})
-	if err != nil {
-		return err
-	}
-	if !staged {
-		return nil
-	}
-	_, err = worktree.Commit("Remove temporary drupal-rector installation", &git.CommitOptions{})
+	_, err = evt.Commit("Remove deprecations", deprecationRemovalResult.ChangedFiles...)
 	return err
 }
 

@@ -143,7 +143,7 @@ func TestCreateDispatcher(t *testing.T) {
 
 	t.Run("returns a non-nil dispatcher with addons subscribed", func(t *testing.T) {
 		config := internal.Config{RunTypes: internal.RunTypesConfig{Normal: internal.RunTypeConfig{Addons: []string{"composer_normalizer"}}}}
-		addons, err := createAddons(logger, config, nil, nil, nil, nil)
+		addons, err := createAddons(logger, config, nil, nil, nil)
 		require.NoError(t, err)
 		dispatcher := createDispatcher(addons)
 		assert.NotNil(t, dispatcher)
@@ -162,7 +162,7 @@ func TestCreateAddons(t *testing.T) {
 		config := internal.Config{
 			RunTypes: internal.RunTypesConfig{Normal: internal.RunTypeConfig{Addons: []string{"code_beautifier"}}},
 		}
-		addons, err := createAddons(logger, config, nil, nil, nil, nil)
+		addons, err := createAddons(logger, config, nil, nil, nil)
 		require.NoError(t, err)
 		assert.Len(t, addons, len(mandatoryAddons)+1)
 	})
@@ -170,7 +170,7 @@ func TestCreateAddons(t *testing.T) {
 	t.Run("composer_audit and unsupported_modules run on a normal update", func(t *testing.T) {
 		// Both are mandatory: they render one list, so either alone publishes half of it.
 		config := internal.Config{RunTypes: internal.RunTypesConfig{Normal: internal.RunTypeConfig{}}}
-		addons, err := createAddons(logger, config, nil, nil, nil, nil)
+		addons, err := createAddons(logger, config, nil, nil, nil)
 		require.NoError(t, err)
 		assert.Len(t, addons, len(mandatoryAddons))
 		assert.Contains(t, mandatoryAddons, "composer_audit")
@@ -181,7 +181,7 @@ func TestCreateAddons(t *testing.T) {
 	// the one difference visible here: only a security run relabels the merge request.
 	t.Run("security mode lets composer_audit relabel the merge request", func(t *testing.T) {
 		config := internal.Config{Security: true, RunTypes: internal.RunTypesConfig{Security: internal.RunTypeConfig{}}}
-		addons, err := createAddons(logger, config, nil, nil, nil, nil)
+		addons, err := createAddons(logger, config, nil, nil, nil)
 		require.NoError(t, err)
 
 		evt := workflow.NewPreMergeRequestCreateEvent("July 2026: Drupal Maintenance Updates")
@@ -191,7 +191,7 @@ func TestCreateAddons(t *testing.T) {
 
 	t.Run("a normal run keeps the maintenance title", func(t *testing.T) {
 		config := internal.Config{RunTypes: internal.RunTypesConfig{Normal: internal.RunTypeConfig{}}}
-		addons, err := createAddons(logger, config, nil, nil, nil, nil)
+		addons, err := createAddons(logger, config, nil, nil, nil)
 		require.NoError(t, err)
 
 		evt := workflow.NewPreMergeRequestCreateEvent("July 2026: Drupal Maintenance Updates")
@@ -201,14 +201,14 @@ func TestCreateAddons(t *testing.T) {
 
 	t.Run("a mandatory addon listed in the YAML is not duplicated", func(t *testing.T) {
 		config := internal.Config{RunTypes: internal.RunTypesConfig{Normal: internal.RunTypeConfig{Addons: []string{"update_hooks"}}}}
-		addons, err := createAddons(logger, config, nil, nil, nil, nil)
+		addons, err := createAddons(logger, config, nil, nil, nil)
 		require.NoError(t, err)
 		assert.Len(t, addons, len(mandatoryAddons)) // update_hooks is already mandatory
 	})
 
 	t.Run("an unknown addon name is an error", func(t *testing.T) {
 		config := internal.Config{RunTypes: internal.RunTypesConfig{Normal: internal.RunTypeConfig{Addons: []string{"does_not_exist"}}}}
-		_, err := createAddons(logger, config, nil, nil, nil, nil)
+		_, err := createAddons(logger, config, nil, nil, nil)
 		require.Error(t, err)
 	})
 }

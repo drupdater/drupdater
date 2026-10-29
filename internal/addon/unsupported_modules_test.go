@@ -87,8 +87,8 @@ func TestUnsupportedModules_PreSiteUpdateHandler_Success(t *testing.T) {
 		{Name: "module_a", InstalledVersion: "1.0.0", RecommendedVersion: "None"},
 	}
 
-	worktree := NewMockWorktree(t)
-	mockEvent := workflow.NewPreSiteUpdateEvent(ctx, testPath, worktree, testSite)
+	committer := &fakeCommitter{}
+	mockEvent := workflow.NewPreSiteUpdateEvent(ctx, testPath, committer, testSite)
 
 	mockDrush.EXPECT().GetUnsupportedModules(ctx, testPath, testSite).Return(mockModules, nil)
 
@@ -104,15 +104,15 @@ func TestUnsupportedModules_PreSiteUpdateHandler_Dedupe(t *testing.T) {
 	um := NewUnsupportedModules(logger, mockDrush)
 
 	ctx := context.Background()
-	worktree := NewMockWorktree(t)
+	committer := &fakeCommitter{}
 
 	shared := drush.UnsupportedModule{Name: "module_a", InstalledVersion: "1.0.0", RecommendedVersion: "None"}
 
 	mockDrush.EXPECT().GetUnsupportedModules(ctx, "/test/path", "site1").Return([]drush.UnsupportedModule{shared}, nil)
 	mockDrush.EXPECT().GetUnsupportedModules(ctx, "/test/path", "site2").Return([]drush.UnsupportedModule{shared}, nil)
 
-	require.NoError(t, um.preSiteUpdateHandler(workflow.NewPreSiteUpdateEvent(ctx, "/test/path", worktree, "site1")))
-	require.NoError(t, um.preSiteUpdateHandler(workflow.NewPreSiteUpdateEvent(ctx, "/test/path", worktree, "site2")))
+	require.NoError(t, um.preSiteUpdateHandler(workflow.NewPreSiteUpdateEvent(ctx, "/test/path", committer, "site1")))
+	require.NoError(t, um.preSiteUpdateHandler(workflow.NewPreSiteUpdateEvent(ctx, "/test/path", committer, "site2")))
 
 	assert.Len(t, um.modules, 1)
 	assert.Equal(t, shared, um.modules["module_a"])
@@ -127,8 +127,8 @@ func TestUnsupportedModules_PreSiteUpdateHandler_NoModules(t *testing.T) {
 	testPath := "/test/path"
 	testSite := "default"
 
-	worktree := NewMockWorktree(t)
-	mockEvent := workflow.NewPreSiteUpdateEvent(ctx, testPath, worktree, testSite)
+	committer := &fakeCommitter{}
+	mockEvent := workflow.NewPreSiteUpdateEvent(ctx, testPath, committer, testSite)
 
 	mockDrush.EXPECT().GetUnsupportedModules(ctx, testPath, testSite).Return(nil, nil)
 
@@ -148,8 +148,8 @@ func TestUnsupportedModules_PreSiteUpdateHandler_Error(t *testing.T) {
 	testSite := "default"
 	expectedError := errors.New("drush error")
 
-	worktree := NewMockWorktree(t)
-	mockEvent := workflow.NewPreSiteUpdateEvent(ctx, testPath, worktree, testSite)
+	committer := &fakeCommitter{}
+	mockEvent := workflow.NewPreSiteUpdateEvent(ctx, testPath, committer, testSite)
 
 	mockDrush.EXPECT().GetUnsupportedModules(ctx, testPath, testSite).Return(nil, expectedError)
 

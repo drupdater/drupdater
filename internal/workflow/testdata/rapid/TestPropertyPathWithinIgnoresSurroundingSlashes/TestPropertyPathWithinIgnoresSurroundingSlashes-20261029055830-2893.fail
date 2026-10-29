@@ -1,0 +1,86 @@
+# 2026/10/29 05:58:30.301574 [TestPropertyPathWithinIgnoresSurroundingSlashes] [rapid] draw dir: []string{"rvrp2.p3"}
+# 2026/10/29 05:58:30.301594 [TestPropertyPathWithinIgnoresSurroundingSlashes] [rapid] draw file: []string{"1u-f-"}
+# 2026/10/29 05:58:30.301596 [TestPropertyPathWithinIgnoresSurroundingSlashes] [rapid] draw lead: 1
+# 2026/10/29 05:58:30.301597 [TestPropertyPathWithinIgnoresSurroundingSlashes] [rapid] draw trail: 1
+# 2026/10/29 05:58:30.301650 [TestPropertyPathWithinIgnoresSurroundingSlashes] 
+# 	Error Trace:	/home/user/drupdater/internal/workflow/commit_property_test.go:78
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:458
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:467
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:292
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:207
+# 	            				/home/user/drupdater/internal/workflow/commit_property_test.go:70
+# 	            				/root/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.1.linux-amd64/src/runtime/asm_amd64.s:1264
+# 	Error:      	Not equal: 
+# 	            	expected: true
+# 	            	actual  : false
+# 	Test:       	TestPropertyPathWithinIgnoresSurroundingSlashes
+# 
+v0.4.8#3257148169529893246
+0x14292de3f188ef
+0x0
+0x1d71ebf92bcbc2
+0x1b
+0x18e68d1f3d13d1
+0x0
+0x135fd805b7c66d
+0x22
+0x16070d8775994a
+0x0
+0x11a7deb6b92a37
+0x31
+0x1e
+0x1707851c7b3c52
+0x0
+0x11e2ee633abf47
+0x1c
+0x103c5287e9c1a5
+0x0
+0x1106a72e7208df
+0x30
+0x35
+0x2e
+0x4
+0x7f90de83d8f96
+0x0
+0x8cc3469462e1f
+0x1
+0xd48e5dc16c671
+0x0
+0x140c0a152760be
+0x1c
+0x192037bd03a66f
+0x0
+0x84394316176c5
+0x5
+0x197e8abc45841a
+0xe581bfa23048a
+0x62083baf2fffd
+0x0
+0x240102c0bfd80
+0x1
+0xe73491a0a97b4
+0x0
+0x1cd8dcc986e557
+0x3b
+0x21
+0xbab3b4175d2c9
+0x0
+0x1912fa4fbb710f
+0x2e
+0x0
+0x12a0a480682784
+0x0
+0x1dc8bec5129dda
+0x12
+0x15d7b51f421910
+0x0
+0x50d8389041393
+0x0
+0x34198d8c443df
+0x12c0a875434d68
+0x1c6d03b24524e0
+0x1ecec360713991
+0x1
+0x1d6af1116cfda6
+0x1196023990d250
+0x1

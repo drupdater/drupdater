@@ -41,6 +41,9 @@ type Runner struct {
 	dispatcher EventDispatcher
 	current    time.Time
 
+	// committer is the one addons commit through, set once the working copy is acquired.
+	committer Committer
+
 	// siteCommitMu serializes the git-committing tail of updateSite: sites update concurrently
 	// but share one working tree and index.
 	siteCommitMu sync.Mutex
@@ -168,6 +171,8 @@ func (r *Runner) runPhases(
 	path string,
 	addons []Addon,
 ) error {
+	r.committer = newGitCommitter(worktree)
+
 	// Fail fast on the prerequisites "drupdater check" shares. Extension requirements are
 	// deliberately not among them — see CheckPlatformReqs.
 	if err := rec.Run("preflight", func() error {
@@ -225,7 +230,7 @@ func (r *Runner) runPhases(
 	// Run the update hooks and export config per site against the now-updated code.
 	if err := rec.Run("site update", func() error {
 		return r.forEachSite(ctx, func(ctx context.Context, site string) error {
-			return r.updateSite(ctx, path, worktree, site)
+			return r.updateSite(ctx, path, site)
 		})
 	}); err != nil {
 		return err
@@ -397,7 +402,7 @@ func (r *Runner) resolveUpdate(ctx context.Context, repository GitRepository, wo
 		return "", fmt.Errorf("failed to create work branch: %w", err)
 	}
 
-	preComposerUpdateEvent := NewPreComposerUpdateEvent(ctx, path, worktree, []string{}, []string{}, false)
+	preComposerUpdateEvent := NewPreComposerUpdateEvent(ctx, path, r.committer, []string{}, []string{}, false)
 	if err := r.dispatcher.FireEvent(preComposerUpdateEvent); err != nil {
 		return "", fmt.Errorf("failed to fire event: %w", err)
 	}
@@ -445,7 +450,7 @@ func (r *Runner) updateSharedCode(ctx context.Context, worktree Worktree, path s
 		return fmt.Errorf("failed to install updated dependencies: %w", err)
 	}
 
-	postComposerUpdateEvent := NewPostComposerUpdateEvent(ctx, path, worktree)
+	postComposerUpdateEvent := NewPostComposerUpdateEvent(ctx, path, r.committer)
 	if err := r.dispatcher.FireEvent(postComposerUpdateEvent); err != nil {
 		return fmt.Errorf("failed to fire event: %w", err)
 	}
@@ -460,7 +465,7 @@ func (r *Runner) updateSharedCode(ctx context.Context, worktree Worktree, path s
 		return fmt.Errorf("failed to commit composer.json and composer.lock: %w", err)
 	}
 
-	postCodeUpdateEvent := NewPostCodeUpdateEvent(ctx, path, worktree)
+	postCodeUpdateEvent := NewPostCodeUpdateEvent(ctx, path, r.committer)
 	if err := r.dispatcher.FireEvent(postCodeUpdateEvent); err != nil {
 		return fmt.Errorf("failed to fire event: %w", err)
 	}
@@ -505,7 +510,7 @@ func (r *Runner) ensureUpdateBranchAvailable(repository GitRepository, updateBra
 	return nil
 }
 
-func (r *Runner) updateSite(ctx context.Context, path string, worktree Worktree, site string) (err error) {
+func (r *Runner) updateSite(ctx context.Context, path string, site string) (err error) {
 	r.logger.Info("updating site", zap.String("site", site))
 
 	if err := r.installer.ConfigureDatabase(ctx, path, site); err != nil {
@@ -518,7 +523,7 @@ func (r *Runner) updateSite(ctx context.Context, path string, worktree Worktree,
 		}
 	}()
 
-	preSiteUpdateEvent := NewPreSiteUpdateEvent(ctx, path, worktree, site)
+	preSiteUpdateEvent := NewPreSiteUpdateEvent(ctx, path, r.committer, site)
 	if err := r.dispatcher.FireEvent(preSiteUpdateEvent); err != nil {
 		return fmt.Errorf("failed to fire event: %w", err)
 	}
@@ -534,15 +539,15 @@ func (r *Runner) updateSite(ctx context.Context, path string, worktree Worktree,
 	}
 
 	// The remaining steps commit into the shared working tree, so one site at a time.
-	return r.commitSiteChanges(ctx, path, worktree, site)
+	return r.commitSiteChanges(ctx, path, site)
 }
 
 // commitSiteChanges holds a lock so concurrently-updated sites don't race on the shared index.
-func (r *Runner) commitSiteChanges(ctx context.Context, path string, worktree Worktree, site string) error {
+func (r *Runner) commitSiteChanges(ctx context.Context, path string, site string) error {
 	r.siteCommitMu.Lock()
 	defer r.siteCommitMu.Unlock()
 
-	postSiteUpdateEvent := NewPostSiteUpdateEvent(ctx, path, worktree, site)
+	postSiteUpdateEvent := NewPostSiteUpdateEvent(ctx, path, r.committer, site)
 	if err := r.dispatcher.FireEvent(postSiteUpdateEvent); err != nil {
 		return fmt.Errorf("failed to fire event: %w", err)
 	}

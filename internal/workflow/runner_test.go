@@ -1841,7 +1841,7 @@ func TestUpdateSiteRestoresSettings(t *testing.T) {
 		drush.EXPECT().UpdateSite(anyCtx, "/project", "site1").Return(assert.AnError)
 		installer.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(nil).Once()
 
-		err := ws.updateSite(t.Context(), "/project", nil, "site1")
+		err := ws.updateSite(t.Context(), "/project", "site1")
 		require.ErrorIs(t, err, assert.AnError)
 		assert.NotContains(t, err.Error(), "restore")
 	})
@@ -1856,7 +1856,7 @@ func TestUpdateSiteRestoresSettings(t *testing.T) {
 		})
 		installer.EXPECT().RestoreSettings(mock.MatchedBy(func(ctx context.Context) bool { return ctx.Err() == nil }), "/project", "site1").Return(nil).Once()
 
-		require.ErrorIs(t, ws.updateSite(ctx, "/project", nil, "site1"), context.Canceled)
+		require.ErrorIs(t, ws.updateSite(ctx, "/project", "site1"), context.Canceled)
 	})
 
 	t.Run("a failed restore fails the site", func(t *testing.T) {
@@ -1867,7 +1867,7 @@ func TestUpdateSiteRestoresSettings(t *testing.T) {
 		drush.EXPECT().ExportConfiguration(anyCtx, "/project", "site1").Return(nil)
 		installer.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(assert.AnError)
 
-		err := ws.updateSite(t.Context(), "/project", nil, "site1")
+		err := ws.updateSite(t.Context(), "/project", "site1")
 		require.ErrorIs(t, err, assert.AnError)
 		assert.Contains(t, err.Error(), "failed to restore settings")
 	})
@@ -1876,7 +1876,7 @@ func TestUpdateSiteRestoresSettings(t *testing.T) {
 		ws, installer, _ := newRunner(t)
 		installer.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(assert.AnError)
 
-		require.ErrorIs(t, ws.updateSite(t.Context(), "/project", nil, "site1"), assert.AnError)
+		require.ErrorIs(t, ws.updateSite(t.Context(), "/project", "site1"), assert.AnError)
 	})
 }
 
@@ -2120,4 +2120,70 @@ func TestRunFailsWhenScaffoldChangesCannotBeStaged(t *testing.T) {
 
 	require.ErrorIs(t, err, assert.AnError)
 	assert.Contains(t, err.Error(), "failed to read worktree status")
+}
+
+type runKey struct{}
+
+func TestRunHandsAddonsTheRunsContextAndCommitter(t *testing.T) {
+	installer := NewMockInstaller(t)
+	repositoryService := NewMockRepository(t)
+	vcsProvider := NewMockPlatform(t)
+	repository := NewMockGitRepository(t)
+	mockComposer := NewMockComposer(t)
+	expectVersionLookup(mockComposer)
+	drush := NewMockDrush(t)
+
+	config := internal.Config{RepositoryURL: "https://example.com/repo.git", Branch: "main", Token: "token", Clone: true, Sites: []string{"site1"}, DryRun: true}
+
+	worktree := NewMockWorktree(t)
+	worktree.EXPECT().Checkout(workBranchCheckout).Return(nil)
+	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil).Once()
+	worktree.EXPECT().Commit("Update composer.json and composer.lock", mock.Anything).Return(plumbing.ZeroHash, nil)
+	// What an addon committing from post-code-update reaches: the run's own worktree.
+	worktree.EXPECT().Add("web/modules/custom/a.php").Return(plumbing.ZeroHash, nil)
+	worktree.EXPECT().Status().Return(git.Status{"web/modules/custom/a.php": {Staging: git.Modified}}, nil).Once()
+	worktree.EXPECT().Commit("Remove deprecations", mock.Anything).Return(plumbing.ZeroHash, nil)
+
+	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
+	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, testCheckout, nil)
+	repositoryService.EXPECT().IsShallowClone(testCheckout).Return(false, nil)
+	repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound)
+	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
+	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
+	mockComposer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).
+		Return([]composer.PackageChange{{Action: "Upgrade", Package: "drupal/core", From: "9.0.0", To: "9.1.0"}}, nil)
+	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
+	installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil)
+	installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil)
+	installer.EXPECT().RestoreSettings(anyCtx, testCheckout, "site1").Return(nil)
+	drush.EXPECT().UpdateSite(anyCtx, testCheckout, "site1").Return(nil)
+	drush.EXPECT().ConfigResave(anyCtx, testCheckout, "site1").Return(nil)
+	drush.EXPECT().ExportConfiguration(anyCtx, testCheckout, "site1").Return(nil)
+
+	ctx := context.WithValue(t.Context(), runKey{}, "this run")
+	dispatcher := event.NewManager("")
+	seen := map[string]bool{}
+	for _, name := range []string{"pre-composer-update", "post-composer-update", "post-code-update", "pre-site-update", "post-site-update"} {
+		dispatcher.On(name, event.ListenerFunc(func(e event.Event) error {
+			addonEvent := e.(interface {
+				Context() context.Context
+				Commit(string, ...string) (bool, error)
+			})
+			seen[name] = addonEvent.Context().Value(runKey{}) == "this run"
+			if name == "post-code-update" {
+				_, err := addonEvent.Commit("Remove deprecations", "web/modules/custom/a.php")
+				return err
+			}
+			return nil
+		}))
+	}
+
+	err := New(zap.NewNop(), config, drush, vcsProvider, repositoryService, installer, mockComposer, dispatcher).Run(ctx, nil)
+
+	require.NoError(t, err)
+	assert.Equal(t, map[string]bool{
+		"pre-composer-update": true, "post-composer-update": true, "post-code-update": true,
+		"pre-site-update": true, "post-site-update": true,
+	}, seen, "every addon event carries the run's context")
 }

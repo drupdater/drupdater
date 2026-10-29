@@ -9,7 +9,6 @@ import (
 	"github.com/drupdater/drupdater/pkg/drush"
 	"github.com/drupdater/drupdater/pkg/phpcs"
 	"github.com/drupdater/drupdater/pkg/rector"
-	"github.com/drupdater/drupdater/pkg/repo"
 )
 
 type Composer interface {
@@ -48,10 +47,6 @@ type PHPCS interface {
 	RunCBF(ctx context.Context, path string) error
 }
 
-type Repository interface {
-	IsSomethingStagedInPath(worktree repo.Worktree, dir string) bool
-}
-
 type DrupalOrg interface {
 	GetIssue(ctx context.Context, issueID string) (*drupalorg.Issue, error)
 	FindIssueNumber(text string) (string, bool)
@@ -60,9 +55,6 @@ type DrupalOrg interface {
 type Rector interface {
 	Run(ctx context.Context, dir string, customCodeDirectories []string) (rector.ReturnOutput, error)
 }
-
-// Worktree is an alias for repo.Worktree to avoid duplication.
-type Worktree = repo.Worktree
 
 type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)

@@ -1,0 +1,19 @@
+# 2026/10/29 05:57:38.126009 [TestPropertyPathWithinIsReflexive] [rapid] draw dir: []string{"0"}
+# 2026/10/29 05:57:38.126067 [TestPropertyPathWithinIsReflexive] 
+# 	Error Trace:	/home/user/drupdater/internal/workflow/commit_property_test.go:53
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:458
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:467
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:292
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:207
+# 	            				/home/user/drupdater/internal/workflow/commit_property_test.go:48
+# 	            				/root/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.1.linux-amd64/src/runtime/asm_amd64.s:1264
+# 	Error:      	Should be true
+# 	Test:       	TestPropertyPathWithinIsReflexive
+# 
+v0.4.8#1551962484894337412
+0xedd8817a30cc8
+0x0
+0x1d00582143fefd
+0x0
+0x57f83ba1dcd88
+0x4a93ed641a6fa
