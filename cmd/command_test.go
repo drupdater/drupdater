@@ -224,7 +224,10 @@ func TestRootCommandFailsWithoutPrintingUsage(t *testing.T) {
 }
 
 func TestBuildingTheCommandLeavesGOMAXPROCSAlone(t *testing.T) {
-	want := runtime.GOMAXPROCS(0)
+	// Above 1, so a command that set GOMAXPROCS to 1 shows however many CPUs the host has.
+	const want = 2
+	previous := runtime.GOMAXPROCS(want)
+	t.Cleanup(func() { runtime.GOMAXPROCS(previous) })
 
 	flags := testApp().newRootCmd().PersistentFlags()
 
