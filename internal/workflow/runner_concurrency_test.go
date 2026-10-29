@@ -129,7 +129,7 @@ func TestRunWithConcurrentSites(t *testing.T) {
 
 // turnsRunner is a Runner whose sites each export to config/<site>, and which records the order
 // the exports happen in. stub sets what each site's update hooks do.
-func turnsRunner(t *testing.T, sites []string, concurrency int, stub func(site string) error) (*Runner, *fakeCommitter, func() []string) {
+func turnsRunner(t *testing.T, sites []string, concurrency int, stub func(site string) error) (*run, *fakeCommitter, func() []string) {
 	t.Helper()
 	installer := NewMockInstaller(t)
 	drush := NewMockDrush(t)
@@ -153,11 +153,13 @@ func turnsRunner(t *testing.T, sites []string, concurrency int, stub func(site s
 	}
 
 	committer := &fakeCommitter{result: true}
-	r := &Runner{
-		logger:    zap.NewNop(),
-		config:    internal.Config{Sites: sites, Concurrency: concurrency},
-		installer: installer,
-		drush:     drush,
+	r := &run{
+		Runner: &Runner{
+			logger:    zap.NewNop(),
+			config:    internal.Config{Sites: sites, Concurrency: concurrency},
+			installer: installer,
+			drush:     drush,
+		},
 		hooks:     NewPipeline(nil),
 		committer: committer,
 	}

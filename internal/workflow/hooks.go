@@ -108,19 +108,19 @@ func (p *Pipeline) PreComposerUpdate(e *PreComposerUpdateEvent) (UpdatePlan, err
 }
 
 func (p *Pipeline) PostComposerUpdate(e *PostComposerUpdateEvent) error {
-	return run("post-composer-update", p.postComposerUpdate, e)
+	return runHooks("post-composer-update", p.postComposerUpdate, e)
 }
 
 func (p *Pipeline) PostCodeUpdate(e *PostCodeUpdateEvent) error {
-	return run("post-code-update", p.postCodeUpdate, e)
+	return runHooks("post-code-update", p.postCodeUpdate, e)
 }
 
 func (p *Pipeline) PreSiteUpdate(e *PreSiteUpdateEvent) error {
-	return run("pre-site-update", p.preSiteUpdate, e)
+	return runHooks("pre-site-update", p.preSiteUpdate, e)
 }
 
 func (p *Pipeline) PostSiteUpdate(e *PostSiteUpdateEvent) error {
-	return run("post-site-update", p.postSiteUpdate, e)
+	return runHooks("post-site-update", p.postSiteUpdate, e)
 }
 
 func appendHook[H comparable](hooks []H, h H) []H {
@@ -136,7 +136,7 @@ func sortByStage[H interface{ stage() Stage }](hooks []H) {
 	slices.SortStableFunc(hooks, func(a, b H) int { return cmp.Compare(a.stage(), b.stage()) })
 }
 
-func run[E any](event string, hooks []*Hook[E], e E) error {
+func runHooks[E any](event string, hooks []*Hook[E], e E) error {
 	for _, h := range hooks {
 		if err := h.Run(e); err != nil {
 			return fmt.Errorf("%s hook failed: %w", event, err)

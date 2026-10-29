@@ -33,18 +33,21 @@ type Runner struct {
 	installer  Installer
 	composer   Composer
 
+	// reportSink receives the run report on every exit path. nil when --report was not given.
+	reportSink func(report.Report)
+}
+
+// run is one call to Run: the state a Runner would otherwise carry from one run into the next.
+type run struct {
+	*Runner
+	hooks *Pipeline
+
 	// committer is the one addons commit through, set once the working copy is acquired.
 	committer Committer
 	// author signs the runner's own commits, as committer signs the addons'.
 	author repo.Identity
 	// updateBranch is the branch this run created, removed again if the run then fails.
 	updateBranch string
-
-	// hooks are the run's addons' hooks, set when the run starts.
-	hooks *Pipeline
-
-	// reportSink receives the run report on every exit path. nil when --report was not given.
-	reportSink func(report.Report)
 }
 
 // Option configures a Runner. Variadic so adding one does not disturb call sites.
@@ -84,8 +87,11 @@ func New(
 }
 
 func (r *Runner) Run(ctx context.Context, addons []Addon) (err error) {
+	return (&run{Runner: r, hooks: NewPipeline(addons)}).execute(ctx, addons)
+}
+
+func (r *run) execute(ctx context.Context, addons []Addon) (err error) {
 	start := time.Now()
-	r.hooks = NewPipeline(addons)
 
 	mode := report.ModeNormal
 	if r.config.Security {
@@ -147,9 +153,9 @@ func (r *Runner) Run(ctx context.Context, addons []Addon) (err error) {
 	return r.runPhases(ctx, rec, checkout, addons)
 }
 
-// runPhases executes the update, one recorded phase at a time. Separate from Run so the
+// runPhases executes the update, one recorded phase at a time. Separate from execute so the
 // run's setup and teardown stay readable next to each other.
-func (r *Runner) runPhases(ctx context.Context, rec *report.Recorder, checkout repo.Checkout, addons []Addon) error {
+func (r *run) runPhases(ctx context.Context, rec *report.Recorder, checkout repo.Checkout, addons []Addon) error {
 	repository, worktree, path := checkout.Repository, checkout.Worktree, checkout.Path
 	r.author = checkout.Author
 	r.committer = newGitCommitter(worktree, checkout.Author)
@@ -348,7 +354,7 @@ func (r *Runner) cleanup(ctx context.Context, path string) {
 
 // removeUpdateBranch deletes the update branch a failed run created, or the next run would find
 // it and stop as if there were nothing to do.
-func (r *Runner) removeUpdateBranch(repository GitRepository) {
+func (r *run) removeUpdateBranch(repository GitRepository) {
 	if r.updateBranch == "" {
 		return
 	}
@@ -359,7 +365,7 @@ func (r *Runner) removeUpdateBranch(repository GitRepository) {
 
 // resolveUpdate settles what the update changes and what its branch is called, touching only
 // composer.json and composer.lock: vendor/ keeps the old code for the baseline install.
-func (r *Runner) resolveUpdate(ctx context.Context, repository GitRepository, path string, rec *report.Recorder) (string, error) {
+func (r *run) resolveUpdate(ctx context.Context, repository GitRepository, path string, rec *report.Recorder) (string, error) {
 	r.logger.Info("resolving dependency updates")
 
 	plan, err := r.hooks.PreComposerUpdate(NewPreComposerUpdateEvent(ctx, path, r.committer, UpdatePlan{}))
@@ -403,7 +409,7 @@ func (r *Runner) resolveUpdate(ctx context.Context, repository GitRepository, pa
 }
 
 // updateSharedCode brings vendor/ to the resolved lock and lets the addons work on the new code.
-func (r *Runner) updateSharedCode(ctx context.Context, worktree Worktree, path string) error {
+func (r *run) updateSharedCode(ctx context.Context, worktree Worktree, path string) error {
 	r.logger.Info("installing updated dependencies")
 	if err := r.composer.Install(ctx, path); err != nil {
 		return fmt.Errorf("failed to install updated dependencies: %w", err)
@@ -434,7 +440,7 @@ func (r *Runner) updateSharedCode(ctx context.Context, worktree Worktree, path s
 
 // createUpdateBranch points updateBranchName at HEAD. Only once the last commit is made: the run
 // commits on a detached HEAD, which a branch created earlier would not follow.
-func (r *Runner) createUpdateBranch(repository GitRepository, updateBranchName string) error {
+func (r *run) createUpdateBranch(repository GitRepository, updateBranchName string) error {
 	head, err := repository.Head()
 	if err != nil {
 		return fmt.Errorf("failed to read HEAD: %w", err)
@@ -475,7 +481,7 @@ func (r *Runner) ensureUpdateBranchAvailable(repository GitRepository, updateBra
 
 // updateSites runs updateSite for every site, handing each its turn: turns[i] closes once site i
 // may write into the working tree, which happens only after every earlier site has.
-func (r *Runner) updateSites(ctx context.Context, path string) error {
+func (r *run) updateSites(ctx context.Context, path string) error {
 	turns := make([]chan struct{}, len(r.config.Sites)+1)
 	for i := range turns {
 		turns[i] = make(chan struct{})
@@ -489,7 +495,7 @@ func (r *Runner) updateSites(ctx context.Context, path string) error {
 // updateSite updates the site's database concurrently with the other sites, then waits for its
 // turn to write into the shared working tree: two sites may share a config or translation
 // directory, and the commits land in --sites order however the sites finish.
-func (r *Runner) updateSite(ctx context.Context, path string, site string, turn <-chan struct{}, next chan<- struct{}) (err error) {
+func (r *run) updateSite(ctx context.Context, path string, site string, turn <-chan struct{}, next chan<- struct{}) (err error) {
 	r.logger.Info("updating site", zap.String("site", site))
 
 	if err := r.installer.ConfigureDatabase(ctx, path, site); err != nil {
@@ -529,7 +535,7 @@ func (r *Runner) updateSite(ctx context.Context, path string, site string, turn 
 	return nil
 }
 
-func (r *Runner) commitSiteChanges(ctx context.Context, path string, site string) error {
+func (r *run) commitSiteChanges(ctx context.Context, path string, site string) error {
 	postSiteUpdateEvent := NewPostSiteUpdateEvent(ctx, path, r.committer, site)
 	if err := r.hooks.PostSiteUpdate(postSiteUpdateEvent); err != nil {
 		return err

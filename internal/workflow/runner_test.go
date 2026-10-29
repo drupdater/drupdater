@@ -509,11 +509,11 @@ func TestRunInstallsSitesAtTheOldCode(t *testing.T) {
 }
 
 func TestUpdateSharedCodeFailures(t *testing.T) {
-	newRunner := func(t *testing.T, hooks Hooks) (*Runner, *MockComposer, *MockWorktree) {
+	newRunner := func(t *testing.T, hooks Hooks) (*run, *MockComposer, *MockWorktree) {
 		t.Helper()
 		mockComposer := NewMockComposer(t)
 		worktree := NewMockWorktree(t)
-		return &Runner{logger: zap.NewNop(), composer: mockComposer, hooks: NewPipeline([]Addon{hookAddon{hooks}})}, mockComposer, worktree
+		return &run{Runner: &Runner{logger: zap.NewNop(), composer: mockComposer}, hooks: NewPipeline([]Addon{hookAddon{hooks}})}, mockComposer, worktree
 	}
 
 	t.Run("installing the resolved lock", func(t *testing.T) {
@@ -572,7 +572,7 @@ func TestUpdateSharedCodeFailures(t *testing.T) {
 
 func TestCreateUpdateBranch(t *testing.T) {
 	t.Run("points the branch at HEAD and remembers it", func(t *testing.T) {
-		ws := &Runner{logger: zap.NewNop()}
+		ws := &run{Runner: &Runner{logger: zap.NewNop()}}
 		repository := NewMockGitRepository(t)
 		repository.EXPECT().Head().Return(testHead, nil)
 		repository.EXPECT().SetBranch("update-x", testHead.Hash()).Return(nil)
@@ -582,7 +582,7 @@ func TestCreateUpdateBranch(t *testing.T) {
 	})
 
 	t.Run("reading HEAD fails", func(t *testing.T) {
-		ws := &Runner{logger: zap.NewNop()}
+		ws := &run{Runner: &Runner{logger: zap.NewNop()}}
 		repository := NewMockGitRepository(t)
 		repository.EXPECT().Head().Return(nil, assert.AnError)
 
@@ -593,7 +593,7 @@ func TestCreateUpdateBranch(t *testing.T) {
 	})
 
 	t.Run("creating the branch fails", func(t *testing.T) {
-		ws := &Runner{logger: zap.NewNop()}
+		ws := &run{Runner: &Runner{logger: zap.NewNop()}}
 		repository := NewMockGitRepository(t)
 		repository.EXPECT().Head().Return(testHead, nil)
 		repository.EXPECT().SetBranch("update-x", testHead.Hash()).Return(assert.AnError)
@@ -609,7 +609,7 @@ func TestCreateUpdateBranch(t *testing.T) {
 func TestUpdateSharedCodeSignsItsCommit(t *testing.T) {
 	mockComposer := NewMockComposer(t)
 	worktree := NewMockWorktree(t)
-	ws := &Runner{logger: zap.NewNop(), composer: mockComposer, author: testAuthor, hooks: NewPipeline(nil)}
+	ws := &run{Runner: &Runner{logger: zap.NewNop(), composer: mockComposer}, author: testAuthor, hooks: NewPipeline(nil)}
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
 	worktree.EXPECT().AddGlob("composer.*").Return(nil)
 	worktree.EXPECT().Status().Return(git.Status{}, nil)
@@ -889,6 +889,57 @@ func TestRunWithDryRun(t *testing.T) {
 	// A --dry-run never pushes, so ensureUpdateBranchAvailable deliberately skips the remote
 	// branch check -- reaching it used to make this configuration fail without a token.
 	repositoryService.AssertNotCalled(t, "BranchExists", mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestASecondRunLeavesTheFirstRunsBranchAlone(t *testing.T) {
+	installer := NewMockInstaller(t)
+	repositoryService := NewMockRepository(t)
+	vcsProvider := NewMockPlatform(t)
+	first := NewMockGitRepository(t)
+	expectUpdateBranch(first)
+	mockComposer := NewMockComposer(t)
+	expectVersionLookup(mockComposer)
+	drush := NewMockDrush(t)
+
+	config := internal.Config{RepositoryURL: "https://example.com/repo.git", Branch: "main", Token: "token", Clone: true, Sites: []string{"site1"}, DryRun: true}
+
+	worktree := NewMockWorktree(t)
+	worktree.EXPECT().Add("config/sync").Return(plumbing.ZeroHash, nil).Maybe()
+	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
+	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
+	installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil)
+	installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil)
+	installer.EXPECT().RestoreSettings(anyCtx, testCheckout, "site1").Return(nil)
+	drush.EXPECT().UpdateSite(anyCtx, testCheckout, "site1").Return(nil)
+	drush.EXPECT().ExportConfiguration(anyCtx, testCheckout, "site1").Return(nil)
+	drush.EXPECT().GetConfigSyncDir(anyCtx, testCheckout, "site1", true).Return("config/sync", nil)
+	drush.EXPECT().ConfigResave(anyCtx, testCheckout, "site1").Return(nil)
+	first.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound)
+	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
+	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
+	mockComposer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).
+		Return([]composer.PackageChange{{Package: "drupal/core", From: "9.0.0", To: "9.1.0"}}, nil)
+	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
+	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
+
+	// The second run gets a repository of its own and fails in preflight, after the first run
+	// created update-dummy-hash. No RemoveBranch expectation: the mock fails if it is called.
+	second := NewMockGitRepository(t)
+	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").
+		Return(repo.Checkout{Repository: first, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil).Once()
+	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").
+		Return(repo.Checkout{Repository: second, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil).Once()
+	repositoryService.EXPECT().IsShallowClone(testCheckout).Return(false, nil).Once()
+	repositoryService.EXPECT().IsShallowClone(testCheckout).Return(true, nil).Once()
+
+	runner := New(zap.NewNop(), config, drush, vcsProvider, repositoryService, installer, mockComposer)
+
+	require.NoError(t, runner.Run(t.Context(), nil))
+	require.Error(t, runner.Run(t.Context(), nil), "the second run fails in preflight")
+
+	first.AssertCalled(t, "SetBranch", "update-dummy-hash", testHead.Hash())
+	first.AssertNotCalled(t, "RemoveBranch", mock.Anything)
 }
 
 func TestRunCheckoutDryRunWithoutPlatform(t *testing.T) {
@@ -1707,14 +1758,14 @@ func TestRunRemovesItsWorktreeEvenWhenCancelled(t *testing.T) {
 
 func TestRemoveUpdateBranch(t *testing.T) {
 	t.Run("nothing to remove before a branch was created", func(t *testing.T) {
-		ws := &Runner{logger: zap.NewNop()}
+		ws := &run{Runner: &Runner{logger: zap.NewNop()}}
 
 		ws.removeUpdateBranch(NewMockGitRepository(t))
 	})
 
 	t.Run("a failure to remove only warns", func(t *testing.T) {
 		core, logs := observer.New(zap.WarnLevel)
-		ws := &Runner{logger: zap.New(core), updateBranch: "update-x"}
+		ws := &run{Runner: &Runner{logger: zap.New(core)}, updateBranch: "update-x"}
 		repository := NewMockGitRepository(t)
 		repository.EXPECT().RemoveBranch("update-x").Return(assert.AnError)
 
@@ -1824,11 +1875,11 @@ func TestCleanup(t *testing.T) {
 }
 
 func TestUpdateSiteRestoresSettings(t *testing.T) {
-	newRunner := func(t *testing.T, addons ...Addon) (*Runner, *MockInstaller, *MockDrush) {
+	newRunner := func(t *testing.T, addons ...Addon) (*run, *MockInstaller, *MockDrush) {
 		t.Helper()
 		installer := NewMockInstaller(t)
 		drush := NewMockDrush(t)
-		return &Runner{logger: zap.NewNop(), installer: installer, drush: drush, hooks: NewPipeline(addons)}, installer, drush
+		return &run{Runner: &Runner{logger: zap.NewNop(), installer: installer, drush: drush}, hooks: NewPipeline(addons)}, installer, drush
 	}
 
 	t.Run("after a failed pre-site-update hook, which stops the update", func(t *testing.T) {
@@ -1905,12 +1956,12 @@ func TestUpdateSiteRestoresSettings(t *testing.T) {
 // Drupdater commits the exported configuration itself, as it does an addon's changes: Drush's own
 // --commit would run git, its hooks and its identity, in the user's repository.
 func TestCommitSiteChangesCommitsTheExportedConfiguration(t *testing.T) {
-	newRunner := func(t *testing.T) (*Runner, *MockDrush, *MockCommitter) {
+	newRunner := func(t *testing.T) (*run, *MockDrush, *MockCommitter) {
 		t.Helper()
 		drush := NewMockDrush(t)
 		committer := NewMockCommitter(t)
 		drush.EXPECT().ExportConfiguration(anyCtx, "/project", "site1").Return(nil)
-		return &Runner{logger: zap.NewNop(), drush: drush, committer: committer, hooks: NewPipeline(nil)}, drush, committer
+		return &run{Runner: &Runner{logger: zap.NewNop(), drush: drush}, committer: committer, hooks: NewPipeline(nil)}, drush, committer
 	}
 
 	t.Run("the site's sync directory, under its own message", func(t *testing.T) {
