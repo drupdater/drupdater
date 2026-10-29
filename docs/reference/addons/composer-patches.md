@@ -55,6 +55,11 @@ If no working patch can be found, the package is **pinned to its currently insta
 version** rather than updated. The rest of the update proceeds. The pin is reported as a
 conflict so you know a package was deliberately held back and why.
 
+The pin is this addon's proposal for the [update
+plan](../../explanation/addon-architecture.md#steering-the-update-through-proposals). The
+patches are checked against the plan as `Prepare` settled it, so on a `--security` run only
+the packages the audit selected are checked.
+
 A pin means *the patch was tested and rejected*. When the test cannot be carried out at
 all — the package could not be downloaded, a registry was unreachable, a credential was
 refused — the package is **not** pinned and no conflict is reported; the run logs a

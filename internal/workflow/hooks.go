@@ -32,9 +32,25 @@ func On[E any](stage Stage, fn func(E) error) *Hook[E] {
 	return &Hook[E]{Stage: stage, Run: fn}
 }
 
+func (h *Hook[E]) stage() Stage { return h.Stage }
+
+// PlanHook is a pre-composer-update hook: it reads the event's Plan and returns its proposal,
+// which the zero UpdatePlan leaves unchanged.
+type PlanHook struct {
+	Stage Stage
+	Run   func(*PreComposerUpdateEvent) (UpdatePlan, error)
+}
+
+// Propose builds the pre-composer-update hook running fn at stage.
+func Propose(stage Stage, fn func(*PreComposerUpdateEvent) (UpdatePlan, error)) *PlanHook {
+	return &PlanHook{Stage: stage, Run: fn}
+}
+
+func (h *PlanHook) stage() Stage { return h.Stage }
+
 // Hooks is what an addon runs on each workflow event; a nil field means the addon sits it out.
 type Hooks struct {
-	PreComposerUpdate  *Hook[*PreComposerUpdateEvent]
+	PreComposerUpdate  *PlanHook
 	PostComposerUpdate *Hook[*PostComposerUpdateEvent]
 	PostCodeUpdate     *Hook[*PostCodeUpdateEvent]
 	PreSiteUpdate      *Hook[*PreSiteUpdateEvent]
@@ -44,7 +60,7 @@ type Hooks struct {
 // Pipeline runs a set of addons' hooks, one method per event. Each method stops at the first
 // failing hook, so a later one never sees a half-done event.
 type Pipeline struct {
-	preComposerUpdate  []*Hook[*PreComposerUpdateEvent]
+	preComposerUpdate  []*PlanHook
 	postComposerUpdate []*Hook[*PostComposerUpdateEvent]
 	postCodeUpdate     []*Hook[*PostCodeUpdateEvent]
 	preSiteUpdate      []*Hook[*PreSiteUpdateEvent]
@@ -70,8 +86,25 @@ func NewPipeline(addons []Addon) *Pipeline {
 	return p
 }
 
-func (p *Pipeline) PreComposerUpdate(e *PreComposerUpdateEvent) error {
-	return run("pre-composer-update", p.preComposerUpdate, e)
+// PreComposerUpdate returns the event's plan merged with every hook's proposal. Each hook sees
+// the plan as earlier stages left it, so hooks sharing a stage cannot see each other's proposals.
+func (p *Pipeline) PreComposerUpdate(e *PreComposerUpdateEvent) (UpdatePlan, error) {
+	plan := e.plan.clone()
+	settled := plan
+	for i, h := range p.preComposerUpdate {
+		if i > 0 && h.Stage != p.preComposerUpdate[i-1].Stage {
+			settled = plan
+		}
+		e.plan = settled
+		proposal, err := h.Run(e)
+		if err != nil {
+			return UpdatePlan{}, fmt.Errorf("pre-composer-update hook failed: %w", err)
+		}
+		if plan, err = plan.merge(proposal); err != nil {
+			return UpdatePlan{}, fmt.Errorf("pre-composer-update hooks disagree: %w", err)
+		}
+	}
+	return plan, nil
 }
 
 func (p *Pipeline) PostComposerUpdate(e *PostComposerUpdateEvent) error {
@@ -90,16 +123,17 @@ func (p *Pipeline) PostSiteUpdate(e *PostSiteUpdateEvent) error {
 	return run("post-site-update", p.postSiteUpdate, e)
 }
 
-func appendHook[E any](hooks []*Hook[E], h *Hook[E]) []*Hook[E] {
-	if h == nil {
+func appendHook[H comparable](hooks []H, h H) []H {
+	var none H
+	if h == none {
 		return hooks
 	}
 	return append(hooks, h)
 }
 
 // sortByStage is stable, so hooks sharing a stage keep addon order.
-func sortByStage[E any](hooks []*Hook[E]) {
-	slices.SortStableFunc(hooks, func(a, b *Hook[E]) int { return cmp.Compare(a.Stage, b.Stage) })
+func sortByStage[H interface{ stage() Stage }](hooks []H) {
+	slices.SortStableFunc(hooks, func(a, b H) int { return cmp.Compare(a.stage(), b.stage()) })
 }
 
 func run[E any](event string, hooks []*Hook[E], e E) error {

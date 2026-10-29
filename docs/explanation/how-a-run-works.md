@@ -60,7 +60,8 @@ Installs the current dependency tree, establishing the "before" state.
 Settles what the update changes and what its branch will be called, while touching only
 `composer.json` and `composer.lock`:
 
-1. Fire **`pre-composer-update`**. Addons mutate the event to steer what follows —
+1. Fire **`pre-composer-update`**. Each addon returns a proposal for the update plan, and the
+   runner [merges them](addon-architecture.md#steering-the-update-through-proposals) —
    [`composer_audit`](../reference/addons/composer-audit.md) restricts a `--security` run to
    the vulnerable packages, or aborts it when there are none;
    [`composer_patches`](../reference/addons/composer-patches.md) pins packages whose

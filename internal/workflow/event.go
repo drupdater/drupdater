@@ -36,18 +36,20 @@ func newBasicAddonEvent(ctx context.Context, path string, committer Committer) B
 
 type PreComposerUpdateEvent struct {
 	BasicAddonEvent
-	PackagesToUpdate []string
-	PackagesToKeep   []string
-	MinimalChanges   bool
+	plan UpdatePlan
 }
 
-func NewPreComposerUpdateEvent(ctx context.Context, path string, committer Committer, packagesToUpdate []string, packagesToKeep []string, minimalChanges bool) *PreComposerUpdateEvent {
+func NewPreComposerUpdateEvent(ctx context.Context, path string, committer Committer, plan UpdatePlan) *PreComposerUpdateEvent {
 	return &PreComposerUpdateEvent{
-		BasicAddonEvent:  newBasicAddonEvent(ctx, path, committer),
-		PackagesToUpdate: packagesToUpdate,
-		PackagesToKeep:   packagesToKeep,
-		MinimalChanges:   minimalChanges,
+		BasicAddonEvent: newBasicAddonEvent(ctx, path, committer),
+		plan:            plan,
 	}
+}
+
+// Plan is the update as the event's earlier stages settled it. A hook proposes changes to it by
+// returning them, never by editing this copy.
+func (e *PreComposerUpdateEvent) Plan() UpdatePlan {
+	return e.plan.clone()
 }
 
 type PostComposerUpdateEvent struct {

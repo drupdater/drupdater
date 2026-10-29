@@ -16,7 +16,9 @@ func stages(h workflow.Hooks) map[string]workflow.Stage {
 			got[name] = *stage
 		}
 	}
-	add("pre-composer-update", stageOf(h.PreComposerUpdate))
+	if h.PreComposerUpdate != nil {
+		add("pre-composer-update", &h.PreComposerUpdate.Stage)
+	}
 	add("post-composer-update", stageOf(h.PostComposerUpdate))
 	add("post-code-update", stageOf(h.PostCodeUpdate))
 	add("pre-site-update", stageOf(h.PreSiteUpdate))

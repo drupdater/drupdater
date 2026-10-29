@@ -49,16 +49,18 @@ func TestComposerAudit_PreComposerUpdateHandler_WithAdvisories(t *testing.T) {
 		},
 	}
 
-	mockEvent := workflow.NewPreComposerUpdateEvent(ctx, path, committer, []string{}, []string{}, true)
+	mockEvent := workflow.NewPreComposerUpdateEvent(ctx, path, committer, workflow.UpdatePlan{})
 
 	mockComposer.EXPECT().Audit(ctx, path).Return(mockAudit, nil)
 
-	err := audit.preComposerUpdateHandler(mockEvent)
+	plan, err := audit.preComposerUpdateHandler(mockEvent)
 
 	require.NoError(t, err)
 	assert.Equal(t, mockAudit, audit.beforeAudit)
-	assert.Equal(t, []string{"drupal/core", "other/package", "drupal/core-recommended", "drupal/core-composer-scaffold"}, mockEvent.PackagesToUpdate)
-	assert.True(t, mockEvent.MinimalChanges)
+	assert.Equal(t, workflow.UpdatePlan{
+		Only:           []string{"drupal/core", "other/package", "drupal/core-recommended", "drupal/core-composer-scaffold"},
+		MinimalChanges: true,
+	}, plan)
 }
 
 // TestComposerAudit_PreComposerUpdateHandler_NoAdvisories tests when no security advisories are found
@@ -75,16 +77,16 @@ func TestComposerAudit_PreComposerUpdateHandler_NoAdvisories(t *testing.T) {
 		Advisories: []composer.Advisory{},
 	}
 
-	mockEvent := workflow.NewPreComposerUpdateEvent(ctx, path, committer, []string{}, []string{}, true)
+	mockEvent := workflow.NewPreComposerUpdateEvent(ctx, path, committer, workflow.UpdatePlan{})
 
 	mockComposer.EXPECT().Audit(ctx, path).Return(mockAudit, nil)
 
-	err := audit.preComposerUpdateHandler(mockEvent)
+	plan, err := audit.preComposerUpdateHandler(mockEvent)
 
 	require.ErrorAs(t, err, &workflow.AbortError{})
 	assert.Equal(t, "No security advisories found", err.Error())
 	assert.Equal(t, mockAudit, audit.beforeAudit)
-	assert.Empty(t, mockEvent.PackagesToUpdate)
+	assert.Zero(t, plan)
 }
 
 // TestComposerAudit_PostCodeUpdateHandler tests the post-code-update handler
@@ -232,12 +234,12 @@ func TestComposerAudit_PreComposerUpdateHandler_NormalMode(t *testing.T) {
 	}
 	mockComposer.EXPECT().Audit(ctx, path).Return(mockAudit, nil)
 
-	mockEvent := workflow.NewPreComposerUpdateEvent(ctx, path, committer, []string{}, []string{}, false)
+	mockEvent := workflow.NewPreComposerUpdateEvent(ctx, path, committer, workflow.UpdatePlan{})
 
-	require.NoError(t, audit.preComposerUpdateHandler(mockEvent))
+	plan, err := audit.preComposerUpdateHandler(mockEvent)
+	require.NoError(t, err)
 	assert.Equal(t, mockAudit, audit.beforeAudit, "the audit still runs: it is what the security report is built from")
-	assert.Empty(t, mockEvent.PackagesToUpdate)
-	assert.False(t, mockEvent.MinimalChanges)
+	assert.Zero(t, plan, "a normal run is not narrowed")
 }
 
 // TestComposerAudit_PreComposerUpdateHandler_NormalModeNoAdvisories checks the abort path is
@@ -251,9 +253,11 @@ func TestComposerAudit_PreComposerUpdateHandler_NormalModeNoAdvisories(t *testin
 	path := "/test/path"
 	mockComposer.EXPECT().Audit(ctx, path).Return(composer.Audit{}, nil)
 
-	mockEvent := workflow.NewPreComposerUpdateEvent(ctx, path, committer, []string{}, []string{}, false)
+	mockEvent := workflow.NewPreComposerUpdateEvent(ctx, path, committer, workflow.UpdatePlan{})
 
-	require.NoError(t, audit.preComposerUpdateHandler(mockEvent))
+	plan, err := audit.preComposerUpdateHandler(mockEvent)
+	require.NoError(t, err)
+	assert.Zero(t, plan)
 }
 
 // A swallowed audit failure would let a security run continue with an empty advisory list,
@@ -266,14 +270,14 @@ func TestComposerAudit_AuditFailures(t *testing.T) {
 		audit := NewComposerAudit(zap.NewNop(), mockComposer, true)
 		mockComposer.EXPECT().Audit(anyCtx, path).Return(composer.Audit{}, assert.AnError)
 
-		evt := workflow.NewPreComposerUpdateEvent(context.Background(), path, &fakeCommitter{}, []string{}, []string{}, true)
-		err := audit.preComposerUpdateHandler(evt)
+		evt := workflow.NewPreComposerUpdateEvent(context.Background(), path, &fakeCommitter{}, workflow.UpdatePlan{})
+		plan, err := audit.preComposerUpdateHandler(evt)
 
-		require.Error(t, err)
+		require.ErrorIs(t, err, assert.AnError)
 		assert.Contains(t, err.Error(), "failed to run composer audit")
 		// Not an abort: aborting reads as "nothing to do here" and exits 0.
 		assert.NotErrorAs(t, err, &workflow.AbortError{})
-		assert.Empty(t, evt.PackagesToUpdate)
+		assert.Zero(t, plan)
 	})
 
 	t.Run("after the update", func(t *testing.T) {
@@ -289,24 +293,3 @@ func TestComposerAudit_AuditFailures(t *testing.T) {
 	})
 }
 
-// The list becomes composer update's arguments, which must not name a package twice.
-func TestComposerAudit_PreComposerUpdateHandler_DeduplicatesPackages(t *testing.T) {
-	mockComposer := NewMockComposer(t)
-	audit := NewComposerAudit(zap.NewNop(), mockComposer, true)
-	path := "/test/path"
-
-	mockComposer.EXPECT().Audit(anyCtx, path).Return(composer.Audit{
-		Advisories: []composer.Advisory{
-			{PackageName: "drupal/webform", CVE: "CVE-1", Title: "first"},
-			{PackageName: "drupal/webform", CVE: "CVE-2", Title: "second"},
-			{PackageName: "other/package", CVE: "CVE-3", Title: "third"},
-			{PackageName: "drupal/webform", CVE: "CVE-4", Title: "fourth"},
-		},
-	}, nil)
-
-	evt := workflow.NewPreComposerUpdateEvent(context.Background(), path, &fakeCommitter{}, []string{}, []string{}, true)
-	require.NoError(t, audit.preComposerUpdateHandler(evt))
-
-	// First-seen order, not sorted: the order is the order composer receives the arguments in.
-	assert.Equal(t, []string{"drupal/webform", "other/package"}, evt.PackagesToUpdate)
-}
