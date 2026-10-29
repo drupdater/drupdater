@@ -23,13 +23,12 @@ import (
 	"go.uber.org/zap"
 )
 
-// checkFull adds the expensive tier: clone, composer install and a real site install per site.
-var checkFull bool
-
-var checkCmd = &cobra.Command{
-	Use:   "check",
-	Short: "Validate prerequisites without running an update",
-	Long: `Validates the things a real run depends on, without running composer update, without
+// newCheckCmd shares opts with the root command, whose persistent flags it reads.
+func newCheckCmd(opts *options) *cobra.Command {
+	check := &cobra.Command{
+		Use:   "check",
+		Short: "Validate prerequisites without running an update",
+		Long: `Validates the things a real run depends on, without running composer update, without
 creating a branch, and without opening a merge/pull request.
 
 By default only cheap, near-instant checks run: .drupdater.yaml and its addon names, git
@@ -39,50 +38,60 @@ from its exported configuration (drush site-install --existing-config) -- most o
 cost, so it stays opt-in.
 
 Exits non-zero if any check fails, so it can gate a pipeline.`,
-	Args: cobra.MaximumNArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		cmd.SilenceUsage = true
-		cmd.SilenceErrors = true
+		Args: cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
+			cmd.SilenceErrors = true
 
-		redactor := logging.NewRedactor()
-		registerEnvSecrets(redactor)
-		logger, err := NewLogger(config, redactor)
-		if err != nil {
-			fmt.Fprintln(cmd.ErrOrStderr(), "failed to initialize logger:", err)
-			return err
-		}
+			return runCheck(cmd, args, opts.config, opts.configFile, opts.checkFull)
+		},
+	}
+	check.Flags().BoolVar(&opts.checkFull, "full", false,
+		"Additionally clone the repository and verify each site installs from its exported "+
+			"configuration (drush site-install --existing-config). Expensive: most of a real run's cost.")
+	return check
+}
 
-		// Optional: without a token the VCS authentication check is skipped.
-		token := checkToken(args)
-		redactor.Register(token)
+// runCheck is the body of the check command's RunE; full adds the expensive tier: clone,
+// composer install and a real site install per site.
+func runCheck(cmd *cobra.Command, args []string, cfg internal.Config, configFile string, full bool) error {
+	redactor := logging.NewRedactor()
+	registerEnvSecrets(redactor)
+	logger, err := NewLogger(cfg, redactor)
+	if err != nil {
+		fmt.Fprintln(cmd.ErrOrStderr(), "failed to initialize logger:", err)
+		return err
+	}
 
-		cfg := config
-		gitSvc := repo.NewGitRepositoryService(logger)
-		var resolveErr error
-		if !cfg.Clone {
-			resolveErr = resolveCheckoutSettings(gitSvc, &cfg)
-		}
+	// Optional: without a token the VCS authentication check is skipped.
+	token := checkToken(args)
+	redactor.Register(token)
 
-		composerCLI := composer.NewCLI(logger)
-		defer composerCLI.Cleanup()
+	gitSvc := repo.NewGitRepositoryService(logger)
+	var resolveErr error
+	if !cfg.Clone {
+		resolveErr = resolveCheckoutSettings(gitSvc, &cfg)
+	}
 
-		ctx := cmd.Context()
-		results := runCheapChecks(ctx, logger, configFilePath(configFile, cfg.WorkingDir), &cfg, gitSvc, composerCLI, afero.NewOsFs(), token, resolveErr)
+	composerCLI := composer.NewCLI(logger)
+	defer composerCLI.Cleanup()
 
-		if checkFull {
-			results = append(results, runFullChecks(ctx, logger, cfg, token)...)
-		}
+	ctx := cmd.Context()
+	results := runCheapChecks(ctx, logger, configFilePath(configFile, cfg.WorkingDir), &cfg, gitSvc, composerCLI, afero.NewOsFs(), token, resolveErr)
 
-		printCheckResults(cmd.OutOrStdout(), results, redactor)
+	if full {
+		results = append(results, runFullChecks(ctx, logger, cfg, token)...)
+	}
 
-		writeCheckReport(logger, redactor, config.ReportPath,
-			workflow.LookupToolVersions(ctx, logger, composerCLI), results)
+	printCheckResults(cmd.OutOrStdout(), results, redactor)
 
-		if anyCheckFailed(results) {
-			return errors.New("preflight check failed")
-		}
-		return nil
-	},
+	writeCheckReport(logger, redactor, cfg.ReportPath,
+		workflow.LookupToolVersions(ctx, logger, composerCLI), results)
+
+	if anyCheckFailed(results) {
+		return errors.New("preflight check failed")
+	}
+	return nil
 }
 
 // cheapChecksComposer is narrow so tests can supply a fake; *composer.CLI satisfies it as-is.
@@ -305,11 +314,4 @@ func printCheckResults(w io.Writer, results []workflow.CheckResult, redactor *lo
 
 func anyCheckFailed(results []workflow.CheckResult) bool {
 	return slices.ContainsFunc(results, func(r workflow.CheckResult) bool { return !r.OK })
-}
-
-func init() {
-	checkCmd.Flags().BoolVar(&checkFull, "full", false,
-		"Additionally clone the repository and verify each site installs from its exported "+
-			"configuration (drush site-install --existing-config). Expensive: most of a real run's cost.")
-	rootCmd.AddCommand(checkCmd)
 }

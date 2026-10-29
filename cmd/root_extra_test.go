@@ -344,46 +344,28 @@ func TestEnsureGitSafeDirectory(t *testing.T) {
 	})
 }
 
-func TestRootCommandPreRunE(t *testing.T) {
-	reset := func() {
-		config = internal.Config{}
-	}
-	t.Cleanup(reset)
-
+func TestValidateFlags(t *testing.T) {
 	t.Run("--clone without a repository URL is rejected", func(t *testing.T) {
-		reset()
-		config.Clone = true
-
-		err := rootCmd.PreRunE(rootCmd, nil)
+		err := validateFlags(internal.Config{Clone: true})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "--repository-url is required")
 	})
 
 	t.Run("an SCP-style repository URL is accepted", func(t *testing.T) {
-		reset()
-		config.RepositoryURL = "git@github.com:drupdater/drupdater.git"
-
-		require.NoError(t, rootCmd.PreRunE(rootCmd, nil))
+		require.NoError(t, validateFlags(internal.Config{RepositoryURL: "git@github.com:drupdater/drupdater.git"}))
 	})
 
 	t.Run("an HTTPS repository URL is accepted", func(t *testing.T) {
-		reset()
-		config.RepositoryURL = "https://github.com/drupdater/drupdater.git"
-
-		require.NoError(t, rootCmd.PreRunE(rootCmd, nil))
+		require.NoError(t, validateFlags(internal.Config{RepositoryURL: "https://github.com/drupdater/drupdater.git"}))
 	})
 
 	t.Run("a malformed repository URL is rejected", func(t *testing.T) {
-		reset()
-		config.RepositoryURL = "not a url"
-
-		err := rootCmd.PreRunE(rootCmd, nil)
+		err := validateFlags(internal.Config{RepositoryURL: "not a url"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid repository URL")
 	})
 
 	t.Run("no repository URL is fine in checkout mode", func(t *testing.T) {
-		reset()
-		require.NoError(t, rootCmd.PreRunE(rootCmd, nil))
+		require.NoError(t, validateFlags(internal.Config{}))
 	})
 }

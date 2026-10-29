@@ -13,30 +13,22 @@ import (
 
 	"github.com/drupdater/drupdater/internal"
 	git "github.com/go-git/go-git/v5"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// withCheckCmdState saves and restores the package-level flag state the check command reads,
-// so a test can drive it without leaking configuration into the next one.
-func withCheckCmdState(t *testing.T, cfg internal.Config, cfgFile string, full bool) {
-	t.Helper()
-	oldConfig, oldFile, oldFull := config, configFile, checkFull
-	config, configFile, checkFull = cfg, cfgFile, full
-	t.Cleanup(func() { config, configFile, checkFull = oldConfig, oldFile, oldFull })
-}
-
-// runCheckCmd executes the check command's RunE the way cobra does, capturing its output.
-func runCheckCmd(t *testing.T, args ...string) (string, error) {
+// runCheckCmd runs the check command's body the way cobra does, capturing its output.
+func runCheckCmd(t *testing.T, cfg internal.Config, cfgFile string, full bool, args ...string) (string, error) {
 	t.Helper()
 	var out bytes.Buffer
-	checkCmd.SetOut(&out)
-	checkCmd.SetErr(&out)
-	// RunE reads cmd.Context(); cobra only populates it via Execute, which the test bypasses.
-	checkCmd.SetContext(t.Context())
-	t.Cleanup(func() { checkCmd.SetOut(nil); checkCmd.SetErr(nil) })
+	cmd := &cobra.Command{}
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	// runCheck reads cmd.Context(); cobra only populates it via Execute, which the test bypasses.
+	cmd.SetContext(t.Context())
 
-	err := checkCmd.RunE(checkCmd, args)
+	err := runCheck(cmd, args, cfg, cfgFile, full)
 	return out.String(), err
 }
 
@@ -48,9 +40,7 @@ func TestCheckCommandReportsFailuresAndExitsNonZero(t *testing.T) {
 	require.NoError(t, err)
 
 	reportPath := filepath.Join(t.TempDir(), "check.json")
-	withCheckCmdState(t, internal.Config{WorkingDir: dir, Sites: []string{"default"}, ReportPath: reportPath}, "", false)
-
-	out, err := runCheckCmd(t)
+	out, err := runCheckCmd(t, internal.Config{WorkingDir: dir, Sites: []string{"default"}, ReportPath: reportPath}, "", false)
 
 	require.Error(t, err, "a failing check has to gate the pipeline")
 	assert.Contains(t, err.Error(), "preflight check failed")
@@ -85,9 +75,7 @@ func TestCheckCommandWithoutReportPathWritesNoReport(t *testing.T) {
 
 	// An empty ReportPath must not write anything, rather than defaulting to some file in the
 	// working directory.
-	withCheckCmdState(t, internal.Config{WorkingDir: dir, Sites: []string{"default"}}, "", false)
-
-	_, err = runCheckCmd(t)
+	_, err = runCheckCmd(t, internal.Config{WorkingDir: dir, Sites: []string{"default"}}, "", false)
 	require.Error(t, err)
 
 	entries, readErr := os.ReadDir(dir)

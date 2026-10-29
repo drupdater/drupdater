@@ -23,33 +23,23 @@ import (
 	"go.uber.org/zap"
 )
 
-// withRootCmdState saves and restores the package-level state runUpdate reads.
-func withRootCmdState(t *testing.T, cfg internal.Config, cfgFile string) {
-	t.Helper()
-	oldConfig, oldFile := config, configFile
-	config, configFile = cfg, cfgFile
-	t.Cleanup(func() { config, configFile = oldConfig, oldFile })
-}
-
 // runUpdateWith calls runUpdate the way cobra would, with its output discarded so a failing
 // run does not scribble over the test log.
-func runUpdateWith(t *testing.T, args ...string) error {
+func runUpdateWith(t *testing.T, cfg internal.Config, cfgFile string, args ...string) error {
 	t.Helper()
 	var out bytes.Buffer
-	rootCmd.SetOut(&out)
-	rootCmd.SetErr(&out)
-	rootCmd.SetContext(t.Context())
-	t.Cleanup(func() { rootCmd.SetOut(nil); rootCmd.SetErr(nil) })
+	cmd := &cobra.Command{}
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetContext(t.Context())
 
-	return runUpdate(rootCmd, args)
+	return runUpdate(cmd, args, cfg, cfgFile)
 }
 
 func TestRunUpdateRequiresATokenWhenItWillPublish(t *testing.T) {
 	// A publishing run must fail up front, not after doing all the work it cannot deliver.
 	t.Setenv("DRUPDATER_TOKEN", "")
-	withRootCmdState(t, internal.Config{WorkingDir: t.TempDir()}, "")
-
-	err := runUpdateWith(t)
+	err := runUpdateWith(t, internal.Config{WorkingDir: t.TempDir()}, "")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no token provided")
 }
@@ -58,9 +48,7 @@ func TestRunUpdateTakesTheTokenFromTheArgument(t *testing.T) {
 	// The positional argument wins over the environment. This gets past token resolution and
 	// then fails on the checkout, which is what proves the token was accepted.
 	t.Setenv("DRUPDATER_TOKEN", "")
-	withRootCmdState(t, internal.Config{WorkingDir: t.TempDir()}, "")
-
-	err := runUpdateWith(t, "token-from-argument")
+	err := runUpdateWith(t, internal.Config{WorkingDir: t.TempDir()}, "", "token-from-argument")
 	require.Error(t, err)
 	assert.NotContains(t, err.Error(), "no token provided",
 		"the argument has to satisfy the token requirement")
@@ -74,9 +62,7 @@ func TestRunUpdateRejectsAnUnreadableConfigFile(t *testing.T) {
 	require.NoError(t, os.WriteFile(cfgPath, []byte("\tnot: [valid yaml"), 0o600))
 
 	t.Setenv("DRUPDATER_TOKEN", "dummy-token")
-	withRootCmdState(t, internal.Config{WorkingDir: dir, DryRun: true}, cfgPath)
-
-	err := runUpdateWith(t)
+	err := runUpdateWith(t, internal.Config{WorkingDir: dir, DryRun: true}, cfgPath)
 	require.Error(t, err)
 	assert.NotContains(t, err.Error(), "no token provided")
 }
@@ -90,9 +76,7 @@ func TestRunUpdateFailsOnACheckoutWithoutAnOrigin(t *testing.T) {
 
 	// A checkout-mode dry run needs no token at all, so this reaches the checkout resolution.
 	t.Setenv("DRUPDATER_TOKEN", "")
-	withRootCmdState(t, internal.Config{WorkingDir: dir, DryRun: true, Sites: []string{"default"}}, "")
-
-	err = runUpdateWith(t)
+	err = runUpdateWith(t, internal.Config{WorkingDir: dir, DryRun: true, Sites: []string{"default"}}, "")
 	require.Error(t, err)
 	assert.NotContains(t, err.Error(), "no token provided",
 		"a checkout-mode dry run must not demand credentials it will never use")
@@ -156,13 +140,11 @@ func TestRunUpdateWiresUpAndStartsTheWorkflow(t *testing.T) {
 	withFakeWorkflow(t, fake)
 
 	t.Setenv("DRUPDATER_TOKEN", "dummy-token")
-	withRootCmdState(t, internal.Config{
+	require.NoError(t, runUpdateWith(t, internal.Config{
 		WorkingDir: checkoutWithOrigin(t),
 		DryRun:     true,
 		Sites:      []string{"default"},
-	}, "")
-
-	require.NoError(t, runUpdateWith(t))
+	}, ""))
 	assert.True(t, fake.called, "the workflow has to actually be started")
 	assert.Positive(t, fake.addons, "the mandatory addons must reach the workflow")
 }
@@ -174,13 +156,11 @@ func TestRunUpdateReportsAWorkflowFailure(t *testing.T) {
 	withFakeWorkflow(t, fake)
 
 	t.Setenv("DRUPDATER_TOKEN", "dummy-token")
-	withRootCmdState(t, internal.Config{
+	err := runUpdateWith(t, internal.Config{
 		WorkingDir: checkoutWithOrigin(t),
 		DryRun:     true,
 		Sites:      []string{"default"},
 	}, "")
-
-	err := runUpdateWith(t)
 	require.Error(t, err)
 	require.ErrorIs(t, err, assert.AnError)
 }
@@ -191,15 +171,28 @@ func TestRunUpdateWritesTheRunReport(t *testing.T) {
 	withFakeWorkflow(t, fake)
 
 	t.Setenv("DRUPDATER_TOKEN", "dummy-token")
-	withRootCmdState(t, internal.Config{
+	require.NoError(t, runUpdateWith(t, internal.Config{
 		WorkingDir: checkoutWithOrigin(t),
 		DryRun:     true,
 		Sites:      []string{"default"},
 		ReportPath: filepath.Join(t.TempDir(), "run.json"),
-	}, "")
-
-	require.NoError(t, runUpdateWith(t))
+	}, ""))
 	assert.True(t, fake.called)
+}
+
+// withCommand makes Execute run a command whose RunE is runE, with no arguments and no output.
+func withCommand(t *testing.T, runE func(*cobra.Command, []string) error) {
+	t.Helper()
+	old := newCommand
+	newCommand = func() *cobra.Command {
+		cmd := &cobra.Command{Args: cobra.ArbitraryArgs, RunE: runE}
+		cmd.SetOut(&bytes.Buffer{})
+		cmd.SetErr(&bytes.Buffer{})
+		// Without this cobra parses os.Args, which are the test binary's flags.
+		cmd.SetArgs([]string{})
+		return cmd
+	}
+	t.Cleanup(func() { newCommand = old })
 }
 
 func TestExecuteExitsNonZeroOnFailure(t *testing.T) {
@@ -210,19 +203,7 @@ func TestExecuteExitsNonZeroOnFailure(t *testing.T) {
 	osExit = func(code int) { codes = append(codes, code) }
 	t.Cleanup(func() { osExit = oldExit })
 
-	oldArgs := rootCmd.Args
-	oldRunE := rootCmd.RunE
-	rootCmd.Args = cobra.ArbitraryArgs
-	rootCmd.RunE = func(*cobra.Command, []string) error { return assert.AnError }
-	rootCmd.SetOut(&bytes.Buffer{})
-	rootCmd.SetErr(&bytes.Buffer{})
-	rootCmd.SetArgs([]string{})
-	t.Cleanup(func() {
-		rootCmd.Args, rootCmd.RunE = oldArgs, oldRunE
-		rootCmd.SetOut(nil)
-		rootCmd.SetErr(nil)
-		rootCmd.SetArgs(nil)
-	})
+	withCommand(t, func(*cobra.Command, []string) error { return assert.AnError })
 
 	Execute()
 	assert.Equal(t, []int{1}, codes)
@@ -234,19 +215,7 @@ func TestExecuteDoesNotExitOnSuccess(t *testing.T) {
 	osExit = func(code int) { codes = append(codes, code) }
 	t.Cleanup(func() { osExit = oldExit })
 
-	oldArgs := rootCmd.Args
-	oldRunE := rootCmd.RunE
-	rootCmd.Args = cobra.ArbitraryArgs
-	rootCmd.RunE = func(*cobra.Command, []string) error { return nil }
-	rootCmd.SetOut(&bytes.Buffer{})
-	rootCmd.SetErr(&bytes.Buffer{})
-	rootCmd.SetArgs([]string{})
-	t.Cleanup(func() {
-		rootCmd.Args, rootCmd.RunE = oldArgs, oldRunE
-		rootCmd.SetOut(nil)
-		rootCmd.SetErr(nil)
-		rootCmd.SetArgs(nil)
-	})
+	withCommand(t, func(*cobra.Command, []string) error { return nil })
 
 	Execute()
 	assert.Empty(t, codes, "a successful run must not exit non-zero")

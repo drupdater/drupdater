@@ -37,15 +37,22 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-var config internal.Config
+// options is what the command line sets, one per command tree, so neither the flags nor a run
+// carry anything into the next tree.
+type options struct {
+	config internal.Config
+	// configFile is the path to .drupdater.yaml; empty means <working-dir>/.drupdater.yaml.
+	configFile string
+	// checkFull adds the check command's expensive tier.
+	checkFull bool
+}
 
-// configFile is the path to .drupdater.yaml; empty means <working-dir>/.drupdater.yaml.
-var configFile string
-
-var rootCmd = &cobra.Command{
-	Use:   "drupdater [token]",
-	Short: "Drupal Updater",
-	Long: `Drupal Updater is a tool to update Drupal dependencies and create merge requests.
+func newRootCmd() *cobra.Command {
+	opts := &options{}
+	root := &cobra.Command{
+		Use:   "drupdater [token]",
+		Short: "Drupal Updater",
+		Long: `Drupal Updater is a tool to update Drupal dependencies and create merge requests.
 
 The access token is read from the first argument, or from the DRUPDATER_TOKEN environment
 variable when no argument is given (which keeps it out of the process list and shell history).
@@ -53,31 +60,55 @@ variable when no argument is given (which keeps it out of the process list and s
 Project settings (sites, timeout, and which addons run) are read from .drupdater.yaml in the
 working directory; override the path with --config. Run "drupdater addons" to list the addon
 names you can set there. See the README for the full file format.`,
-	Args: cobra.MaximumNArgs(1),
-	PreRunE: func(_ *cobra.Command, _ []string) error {
-		// --clone needs an explicit repository URL; checkout mode derives it from origin.
-		if config.Clone && config.RepositoryURL == "" {
-			return errors.New("--repository-url is required with --clone")
-		}
-		// Validated against what the provider factory accepts, so git@host:owner/repo.git passes.
-		if config.RepositoryURL != "" {
-			if err := codehosting.ValidateRepositoryURL(config.RepositoryURL); err != nil {
-				return fmt.Errorf("invalid repository URL: %w", err)
-			}
-		}
-		return nil
-	},
-	RunE: func(cmd *cobra.Command, args []string) error {
-		cmd.SilenceUsage = true
-		cmd.SilenceErrors = true
+		Args: cobra.MaximumNArgs(1),
+		PreRunE: func(*cobra.Command, []string) error {
+			return validateFlags(opts.config)
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
+			cmd.SilenceErrors = true
 
-		return runUpdate(cmd, args)
-	},
+			return runUpdate(cmd, args, opts.config, opts.configFile)
+		},
+	}
+
+	flags := root.PersistentFlags()
+	flags.StringVar(&opts.config.Branch, "branch", "main", "Branch to update and target for the MR. Only used with --clone; in checkout mode it's taken from the checkout (or CI branch variable).")
+	flags.StringVar(&opts.config.WorkingDir, "working-dir", ".", "Path to the existing checkout to update in place.")
+	flags.BoolVar(&opts.config.Clone, "clone", false, "Clone the repository instead of using the existing checkout. Requires --repository-url. Intended for local testing.")
+	flags.StringVar(&opts.config.RepositoryURL, "repository-url", "", "Repository URL. Required with --clone; otherwise derived from the checkout's origin remote.")
+	flags.BoolVar(&opts.config.Security, "security", false, "Only security updates. If true, only security updates will be applied.")
+	flags.BoolVar(&opts.config.DryRun, "dry-run", false, "Do not push the update branch or create a merge request. The branch and commits are still created locally.")
+	flags.BoolVar(&opts.config.Verbose, "verbose", false, "Verbose")
+	flags.StringVar(&opts.configFile, "config", "", "Path to the config file (default: <working-dir>/.drupdater.yaml).")
+	// Equivalent mutant: GOMAXPROCS with any n < 1 only reads the setting, as 0 does.
+	// mutator-disable-next-line numbers/decrementer
+	flags.IntVar(&opts.config.Concurrency, "concurrency", runtime.GOMAXPROCS(0), "Maximum number of sites to install/update concurrently. Defaults to GOMAXPROCS(0), which reflects the container's CPU quota, not just the host's core count.")
+	flags.StringVar(&opts.config.ReportPath, "report", "", "Write a machine-readable JSON report of the run to this path. Written on every outcome, including failures and --dry-run.")
+
+	root.AddCommand(newAddonsCmd(), newCheckCmd(opts))
+	return root
+}
+
+// validateFlags rejects flag combinations before anything runs.
+func validateFlags(config internal.Config) error {
+	// --clone needs an explicit repository URL; checkout mode derives it from origin.
+	if config.Clone && config.RepositoryURL == "" {
+		return errors.New("--repository-url is required with --clone")
+	}
+	// Validated against what the provider factory accepts, so git@host:owner/repo.git passes.
+	if config.RepositoryURL != "" {
+		if err := codehosting.ValidateRepositoryURL(config.RepositoryURL); err != nil {
+			return fmt.Errorf("invalid repository URL: %w", err)
+		}
+	}
+	return nil
 }
 
 // runUpdate is the body of the root command's RunE. Named rather than inline because a closure
-// assigned to RunE is invisible to `go tool cover -func`.
-func runUpdate(cmd *cobra.Command, args []string) error {
+// assigned to RunE is invisible to `go tool cover -func`. config is a copy: the run resolves the
+// token, the project file and the checkout into it.
+func runUpdate(cmd *cobra.Command, args []string, config internal.Config, configFile string) error {
 
 	// Registered as each becomes known, so nothing is logged unredacted in between.
 	redactor := logging.NewRedactor()
@@ -459,17 +490,19 @@ func configurableAddons() []string {
 	return slices.DeleteFunc(names, func(n string) bool { return slices.Contains(mandatoryAddons, n) })
 }
 
-// addonsCmd lists the addon names that can be set in .drupdater.yaml.
-var addonsCmd = &cobra.Command{
-	Use:   "addons",
-	Short: "List the addon names that can be set in .drupdater.yaml",
-	Run: func(cmd *cobra.Command, _ []string) {
-		out := cmd.OutOrStdout()
-		fmt.Fprintln(out, "Addons you can set under run_types.normal.addons / run_types.security.addons in .drupdater.yaml:")
-		for _, n := range configurableAddons() {
-			fmt.Fprintf(out, "  %s\n", n)
-		}
-	},
+// newAddonsCmd lists the addon names that can be set in .drupdater.yaml.
+func newAddonsCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "addons",
+		Short: "List the addon names that can be set in .drupdater.yaml",
+		Run: func(cmd *cobra.Command, _ []string) {
+			out := cmd.OutOrStdout()
+			fmt.Fprintln(out, "Addons you can set under run_types.normal.addons / run_types.security.addons in .drupdater.yaml:")
+			for _, n := range configurableAddons() {
+				fmt.Fprintf(out, "  %s\n", n)
+			}
+		},
+	}
 }
 
 // handleWorkflowError logs AbortErrors as warnings (non-fatal) and all others as errors (fatal).
@@ -482,30 +515,18 @@ func handleWorkflowError(logger *zap.Logger, err error) error {
 	return err
 }
 
-func init() {
-	rootCmd.PersistentFlags().StringVar(&config.Branch, "branch", "main", "Branch to update and target for the MR. Only used with --clone; in checkout mode it's taken from the checkout (or CI branch variable).")
-	rootCmd.PersistentFlags().StringVar(&config.WorkingDir, "working-dir", ".", "Path to the existing checkout to update in place.")
-	rootCmd.PersistentFlags().BoolVar(&config.Clone, "clone", false, "Clone the repository instead of using the existing checkout. Requires --repository-url. Intended for local testing.")
-	rootCmd.PersistentFlags().StringVar(&config.RepositoryURL, "repository-url", "", "Repository URL. Required with --clone; otherwise derived from the checkout's origin remote.")
-	rootCmd.PersistentFlags().BoolVar(&config.Security, "security", false, "Only security updates. If true, only security updates will be applied.")
-	rootCmd.PersistentFlags().BoolVar(&config.DryRun, "dry-run", false, "Do not push the update branch or create a merge request. The branch and commits are still created locally.")
-	rootCmd.PersistentFlags().BoolVar(&config.Verbose, "verbose", false, "Verbose")
-	rootCmd.PersistentFlags().StringVar(&configFile, "config", "", "Path to the config file (default: <working-dir>/.drupdater.yaml).")
-	rootCmd.PersistentFlags().IntVar(&config.Concurrency, "concurrency", runtime.GOMAXPROCS(0), "Maximum number of sites to install/update concurrently. Defaults to GOMAXPROCS(0), which reflects the container's CPU quota, not just the host's core count.")
-	rootCmd.PersistentFlags().StringVar(&config.ReportPath, "report", "", "Write a machine-readable JSON report of the run to this path. Written on every outcome, including failures and --dry-run.")
-
-	rootCmd.AddCommand(addonsCmd)
-}
-
 // osExit is a variable so a test can observe the exit code instead of ending the test binary.
 var osExit = os.Exit
+
+// newCommand is a variable so a test can run Execute against a command of its own.
+var newCommand = newRootCmd
 
 func Execute() {
 	// Cancel the workflow context on SIGINT/SIGTERM so cleanup runs on termination.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	if err := rootCmd.ExecuteContext(ctx); err != nil {
+	if err := newCommand().ExecuteContext(ctx); err != nil {
 		osExit(1)
 	}
 }

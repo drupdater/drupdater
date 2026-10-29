@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"path/filepath"
 	"runtime"
 	"slices"
 	"strconv"
@@ -76,9 +77,10 @@ func TestPersistentFlagDefaults(t *testing.T) {
 		{flag: "report", want: ""},
 	}
 
+	flags := newRootCmd().PersistentFlags()
 	for _, tt := range tests {
 		t.Run(tt.flag, func(t *testing.T) {
-			f := rootCmd.PersistentFlags().Lookup(tt.flag)
+			f := flags.Lookup(tt.flag)
 			require.NotNil(t, f, "flag %q is not registered", tt.flag)
 			assert.Equal(t, tt.want, f.DefValue)
 			assert.NotEmpty(t, f.Usage, "every flag needs help text")
@@ -87,7 +89,7 @@ func TestPersistentFlagDefaults(t *testing.T) {
 
 	// Not a literal: it reflects the container's CPU quota, so pin the source rather than a
 	// number that differs per machine.
-	concurrency := rootCmd.PersistentFlags().Lookup("concurrency")
+	concurrency := flags.Lookup("concurrency")
 	require.NotNil(t, concurrency)
 	assert.Equal(t, strconv.Itoa(runtime.GOMAXPROCS(0)), concurrency.DefValue)
 }
@@ -241,10 +243,12 @@ func TestConfigurableAddons(t *testing.T) {
 
 func TestAddonsCommand(t *testing.T) {
 	var buf bytes.Buffer
-	addonsCmd.SetOut(&buf)
-	addonsCmd.Run(addonsCmd, nil)
+	addons := newAddonsCmd()
+	addons.SetOut(&buf)
+	addons.Run(addons, nil)
 	out := buf.String()
 
+	assert.Contains(t, out, "Addons you can set under run_types.normal.addons")
 	assert.Contains(t, out, "code_beautifier")
 	// Mandatory addons must not be listed as settable.
 	assert.NotContains(t, out, "composer_patches")
@@ -327,4 +331,47 @@ type cleanAudit struct{ addon.Composer }
 
 func (cleanAudit) Audit(context.Context, string) (composer.Audit, error) {
 	return composer.Audit{}, nil
+}
+
+func TestCommandTreesShareNoFlagState(t *testing.T) {
+	first := newRootCmd()
+	require.NoError(t, first.PersistentFlags().Parse([]string{"--branch", "develop", "--dry-run"}))
+
+	second := newRootCmd()
+
+	assert.Equal(t, "main", second.PersistentFlags().Lookup("branch").Value.String())
+	assert.Equal(t, "false", second.PersistentFlags().Lookup("dry-run").Value.String())
+}
+
+func TestRootCommandValidatesTheFlagsItParsed(t *testing.T) {
+	cmd := newRootCmd()
+	cmd.SetArgs([]string{"--clone"})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	require.ErrorContains(t, cmd.ExecuteContext(t.Context()), "--repository-url is required")
+}
+
+func TestCheckCommandReadsTheRootFlags(t *testing.T) {
+	dir := t.TempDir()
+	_, err := git.PlainInit(dir, false)
+	require.NoError(t, err)
+	reportPath := filepath.Join(t.TempDir(), "check.json")
+
+	root := newRootCmd()
+	root.SetArgs([]string{"check", "--working-dir", dir, "--report", reportPath})
+	root.SetOut(&bytes.Buffer{})
+	root.SetErr(&bytes.Buffer{})
+
+	require.ErrorContains(t, root.ExecuteContext(t.Context()), "preflight check failed")
+	assert.FileExists(t, reportPath, "--report, a root flag, has to reach the check command")
+}
+
+func TestCheckCommandHasTheFullFlag(t *testing.T) {
+	check, _, err := newRootCmd().Find([]string{"check"})
+	require.NoError(t, err)
+
+	full := check.Flags().Lookup("full")
+	require.NotNil(t, full)
+	assert.Equal(t, "false", full.DefValue)
 }
