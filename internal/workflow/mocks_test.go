@@ -206,59 +206,6 @@ func (_c *MockAddon_Hooks_Call) RunAndReturn(run func() Hooks) *MockAddon_Hooks_
 	return _c
 }
 
-// RenderTemplate provides a mock function for the type MockAddon
-func (_mock *MockAddon) RenderTemplate() (string, error) {
-	ret := _mock.Called()
-
-	if len(ret) == 0 {
-		panic("no return value specified for RenderTemplate")
-	}
-
-	var r0 string
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func() (string, error)); ok {
-		return returnFunc()
-	}
-	if returnFunc, ok := ret.Get(0).(func() string); ok {
-		r0 = returnFunc()
-	} else {
-		r0 = ret.Get(0).(string)
-	}
-	if returnFunc, ok := ret.Get(1).(func() error); ok {
-		r1 = returnFunc()
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// MockAddon_RenderTemplate_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RenderTemplate'
-type MockAddon_RenderTemplate_Call struct {
-	*mock.Call
-}
-
-// RenderTemplate is a helper method to define mock.On call
-func (_e *MockAddon_Expecter) RenderTemplate() *MockAddon_RenderTemplate_Call {
-	return &MockAddon_RenderTemplate_Call{Call: _e.mock.On("RenderTemplate")}
-}
-
-func (_c *MockAddon_RenderTemplate_Call) Run(run func()) *MockAddon_RenderTemplate_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *MockAddon_RenderTemplate_Call) Return(s string, err error) *MockAddon_RenderTemplate_Call {
-	_c.Call.Return(s, err)
-	return _c
-}
-
-func (_c *MockAddon_RenderTemplate_Call) RunAndReturn(run func() (string, error)) *MockAddon_RenderTemplate_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // NewMockComposer creates a new instance of MockComposer. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockComposer(t interface {

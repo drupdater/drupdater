@@ -34,23 +34,21 @@ func On[E any](stage Stage, fn func(E) error) *Hook[E] {
 
 // Hooks is what an addon runs on each workflow event; a nil field means the addon sits it out.
 type Hooks struct {
-	PreComposerUpdate     *Hook[*PreComposerUpdateEvent]
-	PostComposerUpdate    *Hook[*PostComposerUpdateEvent]
-	PostCodeUpdate        *Hook[*PostCodeUpdateEvent]
-	PreSiteUpdate         *Hook[*PreSiteUpdateEvent]
-	PostSiteUpdate        *Hook[*PostSiteUpdateEvent]
-	PreMergeRequestCreate *Hook[*PreMergeRequestCreateEvent]
+	PreComposerUpdate  *Hook[*PreComposerUpdateEvent]
+	PostComposerUpdate *Hook[*PostComposerUpdateEvent]
+	PostCodeUpdate     *Hook[*PostCodeUpdateEvent]
+	PreSiteUpdate      *Hook[*PreSiteUpdateEvent]
+	PostSiteUpdate     *Hook[*PostSiteUpdateEvent]
 }
 
 // Pipeline runs a set of addons' hooks, one method per event. Each method stops at the first
 // failing hook, so a later one never sees a half-done event.
 type Pipeline struct {
-	preComposerUpdate     []*Hook[*PreComposerUpdateEvent]
-	postComposerUpdate    []*Hook[*PostComposerUpdateEvent]
-	postCodeUpdate        []*Hook[*PostCodeUpdateEvent]
-	preSiteUpdate         []*Hook[*PreSiteUpdateEvent]
-	postSiteUpdate        []*Hook[*PostSiteUpdateEvent]
-	preMergeRequestCreate []*Hook[*PreMergeRequestCreateEvent]
+	preComposerUpdate  []*Hook[*PreComposerUpdateEvent]
+	postComposerUpdate []*Hook[*PostComposerUpdateEvent]
+	postCodeUpdate     []*Hook[*PostCodeUpdateEvent]
+	preSiteUpdate      []*Hook[*PreSiteUpdateEvent]
+	postSiteUpdate     []*Hook[*PostSiteUpdateEvent]
 }
 
 // NewPipeline reads each addon's hooks once.
@@ -63,14 +61,12 @@ func NewPipeline(addons []Addon) *Pipeline {
 		p.postCodeUpdate = appendHook(p.postCodeUpdate, h.PostCodeUpdate)
 		p.preSiteUpdate = appendHook(p.preSiteUpdate, h.PreSiteUpdate)
 		p.postSiteUpdate = appendHook(p.postSiteUpdate, h.PostSiteUpdate)
-		p.preMergeRequestCreate = appendHook(p.preMergeRequestCreate, h.PreMergeRequestCreate)
 	}
 	sortByStage(p.preComposerUpdate)
 	sortByStage(p.postComposerUpdate)
 	sortByStage(p.postCodeUpdate)
 	sortByStage(p.preSiteUpdate)
 	sortByStage(p.postSiteUpdate)
-	sortByStage(p.preMergeRequestCreate)
 	return p
 }
 
@@ -92,10 +88,6 @@ func (p *Pipeline) PreSiteUpdate(e *PreSiteUpdateEvent) error {
 
 func (p *Pipeline) PostSiteUpdate(e *PostSiteUpdateEvent) error {
 	return run("post-site-update", p.postSiteUpdate, e)
-}
-
-func (p *Pipeline) PreMergeRequestCreate(e *PreMergeRequestCreateEvent) error {
-	return run("pre-merge-request-create", p.preMergeRequestCreate, e)
 }
 
 func appendHook[E any](hooks []*Hook[E], h *Hook[E]) []*Hook[E] {

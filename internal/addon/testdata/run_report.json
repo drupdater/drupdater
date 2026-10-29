@@ -70,6 +70,12 @@
       ],
       "fixable": 3
     },
+    "composer_allow_plugins": {
+      "added": [
+        "php-http/discovery",
+        "tbachert/spi"
+      ]
+    },
     "composer_audit": {
       "fixed": [
         {
@@ -108,6 +114,42 @@
         }
       ]
     },
+    "composer_diff": [
+      {
+        "package": "drupal/core",
+        "operation": "upgrade",
+        "from": "10.3.8",
+        "to": "10.3.9",
+        "dev": false,
+        "direct": true,
+        "compare_url": "https://github.com/drupal/core/compare/10.3.8...10.3.9",
+        "project_url": "https://github.com/drupal/core"
+      },
+      {
+        "package": "drupal/redirect",
+        "operation": "install",
+        "to": "1.10.0",
+        "dev": false,
+        "direct": true,
+        "project_url": "https://www.drupal.org/project/redirect"
+      },
+      {
+        "package": "drupal/legacy_feature",
+        "operation": "remove",
+        "from": "1.2.0",
+        "dev": false,
+        "direct": true
+      },
+      {
+        "package": "phpunit/phpunit",
+        "operation": "upgrade",
+        "from": "10.5.30",
+        "to": "10.5.31",
+        "dev": true,
+        "direct": false,
+        "compare_url": "https://github.com/sebastianbergmann/phpunit/compare/10.5.30...10.5.31"
+      }
+    ],
     "composer_patches": {
       "removed": [
         {

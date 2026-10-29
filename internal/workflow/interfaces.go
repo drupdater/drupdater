@@ -8,13 +8,11 @@ import (
 	"github.com/drupdater/drupdater/pkg/repo"
 )
 
-// Addon hooks into workflow events and renders a merge request section.
+// Addon hooks into workflow events. What it found reaches the merge request only through its
+// report section: the description is rendered from the report.
 type Addon interface {
 	// Hooks is read once per run, before the first event fires.
 	Hooks() Hooks
-
-	// RenderTemplate returns "" when the addon has nothing to say, which omits the section.
-	RenderTemplate() (string, error)
 }
 
 type Composer interface {

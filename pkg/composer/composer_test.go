@@ -795,36 +795,73 @@ func TestCheckPlatformReqs(t *testing.T) {
 	})
 }
 
+// Shaped like composer-diff 2.4's --format=json output, including PHP's [] for an empty list.
+const composerDiffJSON = `{
+    "packages": {
+        "psr\/log": {"name": "psr\/log", "direct": false, "effective": false, "operation": "upgrade",
+            "version_base": "1.1.4", "version_target": "2.0.0",
+            "compare": "https:\/\/github.com\/php-fig\/log\/compare\/1.1.4...2.0.0",
+            "link": "https:\/\/github.com\/php-fig\/log"},
+        "drupal\/token": {"name": "drupal\/token", "direct": true, "effective": false, "operation": "install",
+            "version_base": null, "version_target": "1.15.0", "compare": null, "link": null}
+    },
+    "packages-dev": {
+        "phpunit\/phpunit": {"name": "phpunit\/phpunit", "direct": true, "effective": false, "operation": "remove",
+            "version_base": "10.5.1", "version_target": null, "compare": null, "link": "https:\/\/github.com\/sebastianbergmann\/phpunit"}
+    }
+}`
+
 func TestDiff(t *testing.T) {
-	service := &CLI{logger: zap.NewNop()}
+	var args []string
+	execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+		args = arg
+		cs := append([]string{"-test.run=TestHelperProcess", "--", composerDiffJSON}, arg...)
+		cmd := exec.CommandContext(ctx, os.Args[0], cs...)
+		cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
+		return cmd
+	}
+	t.Cleanup(func() { execCommand = exec.CommandContext })
 
-	t.Run("without links", func(t *testing.T) {
-		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
-			cs := []string{"-test.run=TestHelperProcess", "--", "diff output"}
-			cs = append(cs, arg...)
-			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
-			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
-			return cmd
-		}
-		defer func() { execCommand = exec.CommandContext }()
-		out, err := service.Diff(t.Context(), "/tmp", false)
-		require.NoError(t, err)
-		assert.Equal(t, "diff output", out)
-	})
+	entries, err := (&CLI{logger: zap.NewNop()}).Diff(t.Context(), "/tmp")
 
-	t.Run("with links", func(t *testing.T) {
-		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
-			cs := []string{"-test.run=TestHelperProcess", "--", "diff with links"}
-			cs = append(cs, arg...)
-			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
-			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
-			return cmd
-		}
-		defer func() { execCommand = exec.CommandContext }()
-		out, err := service.Diff(t.Context(), "/tmp", true)
-		require.NoError(t, err)
-		assert.Equal(t, "diff with links", out)
-	})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"diff", "--format=json", "--with-links"}, args)
+	assert.Equal(t, []DiffEntry{
+		{Package: "drupal/token", Operation: "install", To: "1.15.0", Direct: true},
+		{
+			Package: "psr/log", Operation: "upgrade", From: "1.1.4", To: "2.0.0",
+			CompareURL: "https://github.com/php-fig/log/compare/1.1.4...2.0.0", ProjectURL: "https://github.com/php-fig/log",
+		},
+		{
+			Package: "phpunit/phpunit", Operation: "remove", From: "10.5.1", Dev: true, Direct: true,
+			ProjectURL: "https://github.com/sebastianbergmann/phpunit",
+		},
+	}, entries)
+}
+
+func TestDiffWithNothingChanged(t *testing.T) {
+	stubComposerOutput(t, `{"packages": [], "packages-dev": []}`)
+
+	entries, err := (&CLI{logger: zap.NewNop()}).Diff(t.Context(), "/tmp")
+
+	require.NoError(t, err)
+	assert.Empty(t, entries)
+}
+
+func TestDiffRejectsMalformedOutput(t *testing.T) {
+	for name, out := range map[string]string{
+		"not json":       "Script failed",
+		"prod not a map": `{"packages": "x", "packages-dev": []}`,
+		"dev not a map":  `{"packages": [], "packages-dev": 1}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			stubComposerOutput(t, out)
+
+			_, err := (&CLI{logger: zap.NewNop()}).Diff(t.Context(), "/tmp")
+
+			require.ErrorContains(t, err, "failed to parse composer diff output")
+		})
+	}
 }
 
 func TestGetConfig(t *testing.T) {

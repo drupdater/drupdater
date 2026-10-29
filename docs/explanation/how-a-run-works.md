@@ -110,8 +110,9 @@ so concurrent commits would race on the index.
 
 ### 8. `render merge request`
 
-Fire **`pre-merge-request-create`** (where a security run retitles the request) and
-assemble the description from every addon's template.
+Render the title and description from the [run report](../reference/run-report.md) as
+it stands, every addon's section included. A security run is titled by its date, a normal
+one by its month.
 
 This is a phase of its own, ahead of `publish`, so that it happens under `--dry-run` too.
 The description is the run's only human-readable account of itself, and both title and

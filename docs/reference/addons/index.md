@@ -11,16 +11,16 @@ to the [run report](../run-report.md), or both.
 
 | Addon | Runs | Events | Report key |
 |---|---|---|---|
-| [`composer_allow_plugins`](composer-allow-plugins.md) | Always | `pre-composer-update`, `post-composer-update` | — |
+| [`composer_allow_plugins`](composer-allow-plugins.md) | Always | `pre-composer-update`, `post-composer-update` | `composer_allow_plugins` |
 | [`composer_patches`](composer-patches.md) | Always | `pre-composer-update` | `composer_patches` |
-| [`composer_diff`](composer-diff.md) | Always | `post-composer-update` | — |
+| [`composer_diff`](composer-diff.md) | Always | `post-composer-update` | `composer_diff` |
 | [`update_hooks`](update-hooks.md) | Always | `pre-site-update` | `update_hooks` |
-| [`composer_audit`](composer-audit.md) | Always | `pre-composer-update`, `post-code-update`, `pre-merge-request-create` | `composer_audit` |
+| [`composer_audit`](composer-audit.md) | Always | `pre-composer-update`, `post-code-update` | `composer_audit` |
 | [`code_beautifier`](code-beautifier.md) | Configurable | `post-code-update` | `code_beautifier` |
 | [`deprecations_remover`](deprecations-remover.md) | Configurable | `post-code-update` | `deprecations_remover` |
 | [`translations_updater`](translations-updater.md) | Configurable | `post-site-update` | `translations_updater` |
 | [`composer_normalizer`](composer-normalizer.md) | Configurable | `post-composer-update` | — |
-| [`unsupported_modules`](unsupported-modules.md) | Always | `pre-site-update`, `pre-merge-request-create` | `unsupported_modules` |
+| [`unsupported_modules`](unsupported-modules.md) | Always | `pre-site-update` | `unsupported_modules` |
 
 ## Mandatory versus configurable
 
@@ -32,13 +32,13 @@ to the [run report](../run-report.md), or both.
 - `composer_audit` and `unsupported_modules` — between them, the project's "no longer
   maintained" report. `composer_audit` covers what Packagist knows (security advisories,
   abandoned packages), `unsupported_modules` what Drupal.org knows (modules with no
-  supported release). Either alone covers half a Drupal project, and they render their
-  findings as a [single list](unsupported-modules.md#pull-request-section) — which only
+  supported release). Either alone covers half a Drupal project, and the request
+  description shows their findings as a [single list](unsupported-modules.md#pull-request-section) — which only
   works if both run on every update.
 
 `composer_audit` behaves differently under `--security`: only then does it narrow the
-update to the vulnerable packages and relabel the request. On a normal run it audits and
-reports, nothing more.
+update to the vulnerable packages, and abort when there are none. On a normal run it
+audits and reports, nothing more.
 
 **The remaining four are configurable** per run type in
 [`.drupdater.yaml`](../configuration.md#run_typestypeaddons):
@@ -64,10 +64,12 @@ Addons that have something to say contribute a section under `addons` in the [ru
 report](../run-report.md). An addon with nothing to report is omitted rather than present
 and empty.
 
-Two addons deliberately report nothing at all:
+The report is also where the pull request description comes from: it is rendered from the
+`addons` sections, so an addon's section in the description and in the report cannot
+disagree.
 
-- **`composer_diff`** — its content duplicates the top-level `packages` field.
-- **`composer_normalizer`** — it only reorders `composer.json`.
+One addon deliberately reports nothing at all: **`composer_normalizer`**, which only
+reorders `composer.json`.
 
 Everything else reports even when its work is "only" a code change. The diff tells you
 what changed but not whether an addon ran at all, and most addons log and swallow their
@@ -78,12 +80,10 @@ report](../../explanation/why-a-run-report.md).
 ## Order of execution
 
 Each addon's hook on an event declares a stage — `Prepare`, `Change`, `Format`, `Inspect`,
-run in that order — and for three events that order is deliberate rather than incidental:
+run in that order — and for two events that order is deliberate rather than incidental:
 
 - On `pre-composer-update`, `composer_audit` prepares, because on a security run it decides
   *what* the update is allowed to touch. Everything else reacts to that decision.
-- On `pre-merge-request-create`, `composer_audit` (Prepare) hands its abandoned packages to
-  `unsupported_modules` (Inspect), which renders both kinds of finding as one list.
 - On `post-code-update`, the order is `deprecations_remover` → `code_beautifier` →
   `composer_audit`. PHPCBF formats what Rector wrote, and the final audit must see the
   final code.

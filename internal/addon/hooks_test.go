@@ -19,7 +19,6 @@ func stages(h workflow.Hooks) map[string]workflow.Stage {
 	add("post-code-update", stageOf(h.PostCodeUpdate))
 	add("pre-site-update", stageOf(h.PreSiteUpdate))
 	add("post-site-update", stageOf(h.PostSiteUpdate))
-	add("pre-merge-request-create", stageOf(h.PreMergeRequestCreate))
 	return got
 }
 
@@ -45,9 +44,8 @@ func TestAddonHookStages(t *testing.T) {
 			"post-composer-update": workflow.Change,
 		}},
 		"composer_audit": {&ComposerAudit{}, map[string]workflow.Stage{
-			"pre-composer-update":      workflow.Prepare,
-			"post-code-update":         workflow.Inspect,
-			"pre-merge-request-create": workflow.Prepare,
+			"pre-composer-update": workflow.Prepare,
+			"post-code-update":    workflow.Inspect,
 		}},
 		"composer_diff": {&ComposerDiff{}, map[string]workflow.Stage{
 			"post-composer-update": workflow.Inspect,
@@ -65,8 +63,7 @@ func TestAddonHookStages(t *testing.T) {
 			"post-site-update": workflow.Change,
 		}},
 		"unsupported_modules": {&UnsupportedModules{}, map[string]workflow.Stage{
-			"pre-site-update":          workflow.Inspect,
-			"pre-merge-request-create": workflow.Inspect,
+			"pre-site-update": workflow.Inspect,
 		}},
 		"update_hooks": {&UpdateHooks{}, map[string]workflow.Stage{
 			"pre-site-update": workflow.Inspect,

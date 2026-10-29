@@ -31,10 +31,6 @@ func (tu *TranslationsUpdater) Hooks() workflow.Hooks {
 	}
 }
 
-func (tu *TranslationsUpdater) RenderTemplate() (string, error) {
-	return "", nil
-}
-
 func (tu *TranslationsUpdater) postSiteUpdateHandler(evt *workflow.PostSiteUpdateEvent) error {
 
 	enabled, err := tu.drush.IsModuleEnabled(evt.Context(), evt.Path(), evt.Site(), "locale_deploy")

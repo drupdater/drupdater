@@ -140,8 +140,9 @@ which is the one way a golden file can make tests worse rather than better.
 
 | Golden file | Pins |
 |---|---|
-| `internal/addon/testdata/*.md` | Each addon's merge request section, from its template |
-| `internal/workflow/testdata/dependency_update.md` | The assembled description a full run produces |
+| `internal/mergerequest/testdata/description.md` | The description rendered from the example report |
+| `internal/mergerequest/testdata/<section>.md` | Each section of that description, from its template |
+| `internal/workflow/testdata/dependency_update.md` | The description a full run with no addon sections produces |
 | `internal/addon/testdata/run_report.json` | The whole `--report` document, every reporting addon at once |
 
 Most of these are embedded into this documentation with `pymdownx.snippets`, so the published
@@ -567,8 +568,8 @@ architecture](../explanation/addon-architecture.md).
 
 ## Description templates
 
-Templates in `internal/addon/templates/` render into the pull request description. Keep
-them consistent with the existing style:
+Templates in `internal/mergerequest/templates/` render the run report into the pull request
+description. Keep them consistent with the existing style:
 
 - Section headers: `## {emoji} **{Title}**`
 - Table cells: always use the `{{ cell }}` helper, which escapes pipe characters and
@@ -576,7 +577,8 @@ them consistent with the existing style:
 - Wrap long sections in `<details>` / `<summary>`, as the existing templates do
 - **Always verify the output with `--dry-run` before shipping a new template**
 
-Each template has a golden file in `internal/addon/testdata/`. Those files are embedded
+Each template has a golden file in `internal/mergerequest/testdata/`, rendered from the
+example report in `internal/addon/testdata/run_report.json`. Those files are embedded
 directly into this documentation, so updating one updates the published example too.
 
 ## Docker image

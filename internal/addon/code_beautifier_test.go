@@ -14,13 +14,6 @@ import (
 	"go.uber.org/zap"
 )
 
-func TestCodeBeautifier_RenderTemplate(t *testing.T) {
-	cb := &CodeBeautifier{}
-	result, err := cb.RenderTemplate()
-	require.NoError(t, err)
-	assert.Empty(t, result)
-}
-
 func TestCreatePHPCSConfig(t *testing.T) {
 	logger := zap.NewNop()
 

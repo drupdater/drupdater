@@ -3,9 +3,7 @@ package addon
 import (
 	"context"
 	"testing"
-	"time"
 
-	"github.com/drupdater/drupdater/internal/golden"
 	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/stretchr/testify/assert"
@@ -18,15 +16,12 @@ func TestNewComposerAudit(t *testing.T) {
 	logger := zap.NewNop()
 	mockComposer := NewMockComposer(t)
 
-	before := time.Now()
 	audit := NewComposerAudit(logger, mockComposer, true)
-	after := time.Now()
 
 	assert.NotNil(t, audit)
 	assert.Equal(t, logger, audit.logger)
 	assert.Equal(t, mockComposer, audit.composer)
-	assert.True(t, audit.current.After(before) || audit.current.Equal(before))
-	assert.True(t, audit.current.Before(after) || audit.current.Equal(after))
+	assert.True(t, audit.security)
 }
 
 // TestComposerAudit_PreComposerUpdateHandler_WithAdvisories tests handling security advisories
@@ -190,74 +185,6 @@ func TestComposerAudit_GetFixedAdvisories(t *testing.T) {
 	assert.Equal(t, "drupal/core", fixed[0].PackageName)
 }
 
-// TestComposerAudit_PreMergeRequestCreateHandler tests the merge request title generation
-func TestComposerAudit_PreMergeRequestCreateHandler(t *testing.T) {
-	fixedDate := time.Date(2023, 5, 15, 12, 0, 0, 0, time.UTC)
-	audit := &ComposerAudit{
-		current:  fixedDate,
-		security: true,
-	}
-
-	mockEvent := &workflow.PreMergeRequestCreateEvent{}
-
-	err := audit.preMergeRequestCreateHandler(mockEvent)
-
-	require.NoError(t, err)
-	assert.Equal(t, "2023-05-15: Drupal Security Updates", mockEvent.Title)
-}
-
-// TestComposerAudit_RenderTemplate tests template rendering
-func TestComposerAudit_RenderTemplate(t *testing.T) {
-	logger := zap.NewNop()
-	mockComposer := NewMockComposer(t)
-	audit := NewComposerAudit(logger, mockComposer, true)
-
-	audit.beforeAudit = composer.Audit{
-		Advisories: []composer.Advisory{
-			{
-				PackageName: "drupal/core",
-				CVE:         "CVE-2023-1234",
-				Title:       "Fixed issue",
-			},
-			{
-				PackageName: "other/package",
-				CVE:         "CVE-2023-5678",
-				Title:       "Unresolved issue",
-			},
-		},
-	}
-
-	audit.afterAudit = composer.Audit{
-		Advisories: []composer.Advisory{
-			{
-				PackageName: "other/package",
-				CVE:         "CVE-2023-5678",
-				Title:       "Still unresolved",
-			},
-		},
-	}
-
-	result, err := audit.RenderTemplate()
-	require.NoError(t, err)
-	golden.Assert(t, "testdata/composer_audit.md", result)
-}
-
-// TestComposerAudit_RenderTemplate_EscapesPipes ensures a "|" in an advisory
-// title is escaped so it can't break out of the markdown table cell.
-func TestComposerAudit_RenderTemplate_EscapesPipes(t *testing.T) {
-	audit := NewComposerAudit(zap.NewNop(), NewMockComposer(t), true)
-	audit.afterAudit = composer.Audit{
-		Advisories: []composer.Advisory{
-			{PackageName: "drupal/foo", CVE: "CVE-1", Title: "XSS via a|b\nsecond line"},
-		},
-	}
-
-	result, err := audit.RenderTemplate()
-	require.NoError(t, err)
-	assert.Contains(t, result, "XSS via a\\|b second line")
-	assert.NotContains(t, result, "a|b")
-}
-
 // drupal/* is left to unsupported_modules, so one module is not reported twice.
 func TestComposerAudit_GetAbandonedPackages_FiltersDrupalPackages(t *testing.T) {
 	audit := NewComposerAudit(zap.NewNop(), NewMockComposer(t), true)
@@ -327,78 +254,6 @@ func TestComposerAudit_PreComposerUpdateHandler_NormalModeNoAdvisories(t *testin
 	mockEvent := workflow.NewPreComposerUpdateEvent(ctx, path, committer, []string{}, []string{}, false)
 
 	require.NoError(t, audit.preComposerUpdateHandler(mockEvent))
-}
-
-// TestComposerAudit_PreMergeRequestCreateHandler_NormalMode checks a normal run keeps the
-// maintenance title it was given, and still publishes its abandoned packages.
-func TestComposerAudit_PreMergeRequestCreateHandler_NormalMode(t *testing.T) {
-	audit := &ComposerAudit{current: time.Date(2023, 5, 15, 12, 0, 0, 0, time.UTC)}
-	audit.afterAudit = composer.Audit{
-		Abandoned: []composer.AbandonedPackage{{PackageName: "swiftmailer/swiftmailer", Replacement: "symfony/mailer"}},
-	}
-
-	mockEvent := &workflow.PreMergeRequestCreateEvent{Title: "July 2026: Drupal Maintenance Updates"}
-
-	require.NoError(t, audit.preMergeRequestCreateHandler(mockEvent))
-	assert.Equal(t, "July 2026: Drupal Maintenance Updates", mockEvent.Title)
-	assert.Equal(t, []workflow.AbandonedPackage{
-		{Name: "swiftmailer/swiftmailer", Replacement: "symfony/mailer"},
-	}, mockEvent.AbandonedPackages)
-}
-
-// TestComposerAudit_PreMergeRequestCreateHandler_PublishesAbandonedPackages checks the handoff
-// to unsupported_modules, which renders these together with the unsupported modules.
-func TestComposerAudit_PreMergeRequestCreateHandler_PublishesAbandonedPackages(t *testing.T) {
-	audit := &ComposerAudit{security: true, current: time.Now()}
-	audit.afterAudit = composer.Audit{
-		Abandoned: []composer.AbandonedPackage{
-			{PackageName: "drupal/token"},
-			{PackageName: "patchwork/jsqueeze"},
-		},
-	}
-
-	mockEvent := &workflow.PreMergeRequestCreateEvent{}
-
-	require.NoError(t, audit.preMergeRequestCreateHandler(mockEvent))
-	// drupal/* is filtered out before the handoff, so the merged list cannot show one
-	// end-of-life module as two rows.
-	assert.Equal(t, []workflow.AbandonedPackage{{Name: "patchwork/jsqueeze"}}, mockEvent.AbandonedPackages)
-}
-
-// No advisories at all contributes no section, or every routine merge request carries an empty
-// security report.
-func TestComposerAudit_RenderTemplate_NothingToReport(t *testing.T) {
-	audit := NewComposerAudit(zap.NewNop(), NewMockComposer(t), false)
-
-	result, err := audit.RenderTemplate()
-	require.NoError(t, err)
-	assert.Empty(t, result)
-}
-
-// Abandoned packages go to unsupported_modules; rendering them here too shows one finding twice.
-func TestComposerAudit_RenderTemplate_OmitsAbandonedPackages(t *testing.T) {
-	audit := NewComposerAudit(zap.NewNop(), NewMockComposer(t), true)
-	audit.afterAudit = composer.Audit{
-		Advisories: []composer.Advisory{{PackageName: "drupal/core", CVE: "CVE-1", Title: "Open"}},
-		Abandoned:  []composer.AbandonedPackage{{PackageName: "patchwork/jsqueeze"}},
-	}
-
-	result, err := audit.RenderTemplate()
-	require.NoError(t, err)
-	assert.NotContains(t, result, "patchwork/jsqueeze")
-}
-
-// The other half of the guard: a run that closed every advisory still has something to say.
-func TestComposerAudit_RenderTemplate_FixedOnly(t *testing.T) {
-	audit := NewComposerAudit(zap.NewNop(), NewMockComposer(t), true)
-	audit.beforeAudit = composer.Audit{
-		Advisories: []composer.Advisory{{PackageName: "drupal/core", CVE: "CVE-1", Title: "Closed"}},
-	}
-
-	result, err := audit.RenderTemplate()
-	require.NoError(t, err)
-	assert.Contains(t, result, "CVE-1")
-	assert.Contains(t, result, "All security issues have been resolved.")
 }
 
 // A swallowed audit failure would let a security run continue with an empty advisory list,

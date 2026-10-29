@@ -1,14 +1,14 @@
 package addon
 
 import (
-	"context"
 	"testing"
 
-	"github.com/drupdater/drupdater/internal/golden"
 	"github.com/drupdater/drupdater/internal/workflow"
+	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 func TestNewComposerDiff(t *testing.T) {
@@ -22,48 +22,35 @@ func TestNewComposerDiff(t *testing.T) {
 	assert.Equal(t, mockComposer, diff.composer)
 }
 
-func TestComposerDiff_PostComposerUpdateHandler_Success(t *testing.T) {
-	logger := zap.NewNop()
+func TestComposerDiffRecordsAndLogsTheChanges(t *testing.T) {
+	core, logs := observer.New(zap.InfoLevel)
 	mockComposer := NewMockComposer(t)
-	diff := NewComposerDiff(logger, mockComposer)
+	entries := []composer.DiffEntry{
+		{Package: "drupal/core", Operation: "upgrade", From: "10.3.8", To: "10.3.9", CompareURL: "https://example.com/compare"},
+		{Package: "drupal/redirect", Operation: "install", To: "1.10.0"},
+		{Package: "phpunit/phpunit", Operation: "remove", From: "10.5.1", Dev: true},
+	}
+	mockComposer.EXPECT().Diff(anyCtx, "/test/path").Return(entries, nil)
 
-	ctx := context.Background()
-	testPath := "/test/path"
-	expectedDiff := "package diff table"
+	cd := NewComposerDiff(zap.New(core), mockComposer)
+	require.NoError(t, cd.postComposerUpdateHandler(workflow.NewPostComposerUpdateEvent(t.Context(), "/test/path", nil)))
 
-	mockEvent := workflow.NewPostComposerUpdateEvent(ctx, testPath, nil)
-
-	mockComposer.EXPECT().Diff(ctx, testPath, true).Return(expectedDiff, nil)
-	mockComposer.EXPECT().Diff(ctx, testPath, false).Return("plain text diff", nil)
-
-	err := diff.postComposerUpdateHandler(mockEvent)
-
-	require.NoError(t, err)
-	assert.Equal(t, expectedDiff, diff.table)
-	mockComposer.AssertExpectations(t)
+	assert.Equal(t, entries, cd.entries)
+	require.Equal(t, 1, logs.Len())
+	assert.Equal(t, "dependency diff\n"+
+		"upgrade drupal/core: 10.3.8 → 10.3.9\n"+
+		"install drupal/redirect: - → 1.10.0\n"+
+		"remove phpunit/phpunit (dev): 10.5.1 → -\n", logs.All()[0].Message)
 }
 
-func TestComposerDiff_RenderTemplate(t *testing.T) {
-	logger := zap.NewNop()
+func TestComposerDiffLogsNothingWithoutChanges(t *testing.T) {
+	core, logs := observer.New(zap.InfoLevel)
+	mockComposer := NewMockComposer(t)
+	mockComposer.EXPECT().Diff(anyCtx, "/test/path").Return(nil, nil)
 
-	composerRunner := NewMockComposer(t)
-	composerDiff := NewComposerDiff(logger, composerRunner)
-	composerDiff.table = "Dummy Table"
+	cd := NewComposerDiff(zap.New(core), mockComposer)
+	require.NoError(t, cd.postComposerUpdateHandler(workflow.NewPostComposerUpdateEvent(t.Context(), "/test/path", nil)))
 
-	result, err := composerDiff.RenderTemplate()
-
-	require.NoError(t, err)
-	golden.Assert(t, "testdata/composer_diff.md", result)
-	composerRunner.AssertExpectations(t)
-}
-
-func TestComposerDiff_RenderTemplate_NoDiff(t *testing.T) {
-	// An empty table (postComposerUpdateHandler never ran) must render nothing, not an empty
-	// "Dependency updates" header.
-	diff := NewComposerDiff(zap.NewNop(), NewMockComposer(t))
-
-	result, err := diff.RenderTemplate()
-
-	require.NoError(t, err)
-	assert.Empty(t, result)
+	assert.Zero(t, logs.Len())
+	assert.Nil(t, cd.ReportData())
 }

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/drupdater/drupdater/internal/golden"
 	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/drupdater/drupdater/pkg/drush"
 	"github.com/stretchr/testify/assert"
@@ -24,41 +23,6 @@ func TestNewUpdateHooks(t *testing.T) {
 	assert.Equal(t, mockDrush, updateHooks.drush)
 	assert.NotNil(t, updateHooks.hooks)
 	assert.Empty(t, updateHooks.hooks)
-}
-
-func TestUpdateHooks_RenderTemplate(t *testing.T) {
-	logger := zap.NewNop()
-	mockDrush := NewMockDrush(t)
-
-	hooks := UpdateHooksPerSite{
-		"default": {
-			"hook": drush.UpdateHook{
-				Description: "description",
-			},
-		},
-	}
-
-	ap := NewUpdateHooks(logger, mockDrush)
-	ap.hooks = hooks
-
-	result, err := ap.RenderTemplate()
-
-	require.NoError(t, err)
-	golden.Assert(t, "testdata/update_hooks.md", result)
-}
-
-func TestUpdateHooks_RenderTemplate_Empty(t *testing.T) {
-	logger := zap.NewNop()
-	mockDrush := NewMockDrush(t)
-	hooks := UpdateHooksPerSite{}
-
-	ap := NewUpdateHooks(logger, mockDrush)
-	ap.hooks = hooks
-
-	result, err := ap.RenderTemplate()
-
-	require.NoError(t, err)
-	assert.Empty(t, result)
 }
 
 func TestUpdateHooks_PreSiteUpdateHandler_Success(t *testing.T) {

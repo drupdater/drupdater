@@ -116,7 +116,7 @@ every subsequent run until someone rerolls the patch or the issue is fixed upstr
 
 ## Pull request section
 
---8<-- "internal/addon/testdata/composer_patches_1.md"
+--8<-- "internal/mergerequest/testdata/composer_patches.md"
 
 ## Without a Drupal.org token
 

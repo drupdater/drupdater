@@ -1,0 +1,13 @@
+## 🛡️ Security Report
+
+The security report shows fixed and unfixed security vulnerabilities. {{ if .Remaining }}There are still {{ len .Remaining }} unresolved issue{{ if gt (len .Remaining) 1 }}s{{ end }}. Please investigate manually.{{ else }}All security issues have been resolved.{{ end }}
+{{ if or .Fixed .Remaining }}
+| Status | CVE      | Title | Severity | Package  |
+| ------ | -------- | ----- | -------- | -------- |
+{{ range .Fixed -}}
+| ✅     | {{ .CVE | cell }} | {{ .Title | cell }} | {{ .Severity | cell }} | {{ .PackageName | cell }} |
+{{ end -}}
+{{ range .Remaining -}}
+| ⛔     | {{ .CVE | cell }} | {{ .Title | cell }} | {{ .Severity | cell }} | {{ .PackageName | cell }} |
+{{ end -}}
+{{ end -}}

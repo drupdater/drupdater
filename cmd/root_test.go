@@ -2,14 +2,18 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"runtime"
+	"slices"
 	"strconv"
 	"testing"
 
 	"github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/internal/addon"
 	"github.com/drupdater/drupdater/internal/logging"
 	"github.com/drupdater/drupdater/internal/workflow"
+	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/repo"
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -151,7 +155,7 @@ func TestCreateAddons(t *testing.T) {
 	})
 
 	t.Run("composer_audit and unsupported_modules run on a normal update", func(t *testing.T) {
-		// Both are mandatory: they render one list, so either alone publishes half of it.
+		// Both are mandatory: the description joins them into one list, so either alone shows half of it.
 		config := internal.Config{RunTypes: internal.RunTypesConfig{Normal: internal.RunTypeConfig{}}}
 		addons, err := createAddons(logger, config, nil, nil, nil)
 		require.NoError(t, err)
@@ -161,26 +165,26 @@ func TestCreateAddons(t *testing.T) {
 	})
 
 	// composer_audit runs in both modes, so --security must reach it some other way. Pinned on
-	// the one difference visible here: only a security run relabels the merge request.
-	t.Run("security mode lets composer_audit relabel the merge request", func(t *testing.T) {
-		config := internal.Config{Security: true, RunTypes: internal.RunTypesConfig{Security: internal.RunTypeConfig{}}}
-		addons, err := createAddons(logger, config, nil, nil, nil)
-		require.NoError(t, err)
+	// the one difference visible here: only a security run aborts when nothing is vulnerable.
+	for name, tt := range map[string]struct {
+		security bool
+		aborts   bool
+	}{
+		"security mode lets composer_audit abort a run with no advisories": {security: true, aborts: true},
+		"a normal run is not narrowed to advisories":                       {security: false, aborts: false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			config := internal.Config{Security: tt.security}
+			addons, err := createAddons(logger, config, nil, cleanAudit{}, nil)
+			require.NoError(t, err)
 
-		evt := workflow.NewPreMergeRequestCreateEvent("July 2026: Drupal Maintenance Updates")
-		require.NoError(t, workflow.NewPipeline(addons).PreMergeRequestCreate(evt))
-		assert.Contains(t, evt.Title, "Drupal Security Updates")
-	})
+			audit := addons[slices.Index(mandatoryAddons, "composer_audit")]
+			err = audit.Hooks().PreComposerUpdate.Run(workflow.NewPreComposerUpdateEvent(t.Context(), "/repo", nil, nil, nil, false))
 
-	t.Run("a normal run keeps the maintenance title", func(t *testing.T) {
-		config := internal.Config{RunTypes: internal.RunTypesConfig{Normal: internal.RunTypeConfig{}}}
-		addons, err := createAddons(logger, config, nil, nil, nil)
-		require.NoError(t, err)
-
-		evt := workflow.NewPreMergeRequestCreateEvent("July 2026: Drupal Maintenance Updates")
-		require.NoError(t, workflow.NewPipeline(addons).PreMergeRequestCreate(evt))
-		assert.Equal(t, "July 2026: Drupal Maintenance Updates", evt.Title)
-	})
+			_, aborted := errors.AsType[workflow.AbortError](err)
+			assert.Equal(t, tt.aborts, aborted, "error: %v", err)
+		})
+	}
 
 	t.Run("a mandatory addon listed in the YAML is not duplicated", func(t *testing.T) {
 		config := internal.Config{RunTypes: internal.RunTypesConfig{Normal: internal.RunTypeConfig{Addons: []string{"update_hooks"}}}}
@@ -316,4 +320,11 @@ func TestResolveCheckoutBranch(t *testing.T) {
 func TestComposerOptions(t *testing.T) {
 	assert.Len(t, composerOptions(internal.Config{Security: true}), 1, "a security run turns blocking off")
 	assert.Empty(t, composerOptions(internal.Config{}), "a normal run keeps the project's policy")
+}
+
+// cleanAudit is a composer whose audit finds nothing. Only Audit is implemented.
+type cleanAudit struct{ addon.Composer }
+
+func (cleanAudit) Audit(context.Context, string) (composer.Audit, error) {
+	return composer.Audit{}, nil
 }

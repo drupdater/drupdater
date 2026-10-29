@@ -1,9 +1,10 @@
 ---
 paths:
-  - "internal/addon/templates/**"
+  - "internal/mergerequest/templates/**"
 ---
 
-Templates render into the MR/PR description. Keep them consistent with the existing style:
+Templates render the run report into the MR/PR description. Each reads only what its report
+section publishes, via `sections` in `internal/mergerequest/mergerequest.go`. Keep them consistent with the existing style:
 
 - Section headers: `## {emoji} **{Title}**`
 - Table cells: always use the `{{ cell }}` helper to escape pipe characters

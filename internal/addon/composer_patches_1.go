@@ -102,13 +102,6 @@ func (h *ComposerPatches1) Hooks() workflow.Hooks {
 	}
 }
 
-func (h *ComposerPatches1) RenderTemplate() (string, error) {
-	if len(h.patchUpdates.Removed) == 0 && len(h.patchUpdates.Updated) == 0 && len(h.patchUpdates.Conflicts) == 0 {
-		return "", nil
-	}
-	return render("composer_patches_1.go.tmpl", h.patchUpdates)
-}
-
 func (h *ComposerPatches1) preComposerUpdateHandler(evt *workflow.PreComposerUpdateEvent) error {
 	ctx := evt.Context()
 	path := evt.Path()

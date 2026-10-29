@@ -26,14 +26,17 @@ other one is disabled" — because none of them ever depended on another being t
 | `post-code-update` | After `composer.json`/`.lock` are committed | — |
 | `pre-site-update` | Before each site's update hooks | — (carries the site name) |
 | `post-site-update` | After each site's hooks, before config export | — (carries the site name) |
-| `pre-merge-request-create` | While the request is rendered — under `--dry-run` too | `Title` |
 
-All but the last carry the run context, the working directory path, and a way to commit:
-see [Committing changes](#committing-changes).
+Each carries the run context, the working directory path, and a way to commit: see
+[Committing changes](#committing-changes).
+
+There is no event for the merge request. It is rendered from the [run
+report](../reference/run-report.md) once every addon has finished — see [Rendering the
+request description](#rendering-the-request-description).
 
 ## Steering the update through the payload
 
-Two events carry **mutable** fields, and that is how addons influence the workflow without
+One event carries **mutable** fields, and that is how addons influence the workflow without
 calling into it.
 
 On `pre-composer-update`:
@@ -47,21 +50,13 @@ On `pre-composer-update`:
   its patch cannot be made to apply against the new version.
 - **`MinimalChanges`** — ask Composer to disturb as little else as possible.
 
-On `pre-merge-request-create`:
-
-- **`Title`** is rewritten by `composer_audit` from the monthly maintenance form to a dated
-  security form, on a `--security` run only.
-- **`AbandonedPackages`** is written by `composer_audit` and read by
-  [`unsupported_modules`](../reference/addons/unsupported-modules.md), which renders it in
-  the same table as the modules Drupal.org reports as unsupported.
-
 Addons can therefore cooperate — the audit narrows the update and the patch handler pins one
-of the packages within it; the audit finds an abandoned package and another addon renders it
-— without either one referencing the other. They both just write to the same event.
+of the packages within it — without either one referencing the other. They both just write
+to the same event.
 
-`AbandonedPackages` is the first payload field used to hand *findings* rather than
-*instructions* between addons. The same rule applies: the producer never knows who reads it,
-and the consumer works fine when nobody wrote anything.
+Findings never travel this way. An addon that finds something reports it, and anything that
+combines two addons' findings does so from the report: see [Rendering the request
+description](#rendering-the-request-description).
 
 ## Committing changes
 
@@ -102,9 +97,8 @@ others happen to sit.
 | `post-code-update` | | `deprecations_remover` | `code_beautifier` | `composer_audit` |
 | `pre-site-update` | | | | `unsupported_modules`, `update_hooks` |
 | `post-site-update` | | `translations_updater` | | |
-| `pre-merge-request-create` | `composer_audit` | | | `unsupported_modules` |
 
-Three of those orders are load bearing rather than incidental.
+Two of those orders are load bearing rather than incidental.
 
 ### `pre-composer-update`
 
@@ -124,12 +118,6 @@ does not depend on this order — each addon commits only the paths it names (se
 advisories the update actually resolved. It must see the final code, after Rector and
 PHPCBF have finished.
 
-### `pre-merge-request-create`
-
-`composer_audit` prepares the abandoned packages and `unsupported_modules` inspects them.
-In the same stage the order would follow the addon list instead, and a reordered list would
-render an empty table — worse than a wrong one, because nothing looks broken.
-
 ## Mandatory versus configurable
 
 Six addons always run:
@@ -138,8 +126,9 @@ Six addons always run:
   at all** — Composer would prompt for plugin approval, or fail on a stale patch.
 - `composer_diff` and `update_hooks` **are the changelog** the reviewer needs.
 - `composer_audit` and `unsupported_modules` are the project's **"no longer maintained"
-  report**, and neither is complete alone: one reads Packagist, the other Drupal.org. They
-  render their findings as one list, which only works if both run on every update.
+  report**, and neither is complete alone: one reads Packagist, the other Drupal.org. The
+  request description shows their findings as one list, which only works if both run on
+  every update.
 
 `composer_audit` is also what makes `--security` mean anything; it is handed the flag rather
 than being switched on by it, so that a normal run still gets the audit's report without the
@@ -151,21 +140,33 @@ addon would look exactly like an addon with nothing to do.
 
 ## Rendering the request description
 
-Each addon can render a markdown section via a Go template, and the workflow concatenates
-them in addon order into the request description.
+Addons do not render anything. An addon that has something to tell a reviewer contributes
+a section to the [run report](../reference/run-report.md), and once every addon has
+finished, the title and description are rendered from that report by
+`internal/mergerequest`.
 
-An addon with nothing to say returns an empty string and contributes no section — which is
-why a request for a small update is short rather than full of empty headings.
+The renderer reads the report the way any consumer does: through its JSON. So the
+description cannot say anything the report does not publish, the two cannot disagree, and
+a `--dry-run` report shows exactly what a real run would put in the request — the report
+records the rendered title and description too.
+
+It also means findings from two addons can be combined without either knowing about the
+other. The end-of-life table joins `unsupported_modules`'s section with the abandoned
+packages in `composer_audit`'s; the title follows the report's `mode`.
+
+A section with nothing in it is absent from the report, and so from the description —
+which is why a request for a small update is short rather than full of empty headings. The
+sections appear in a fixed order: what needs a decision first, the logs last.
 
 Templates are embedded in the binary, so the rendered output is fixed at build time and
-cannot be affected by the project being updated.
+cannot be affected by the project being updated. If the description would exceed GitHub's
+65,536-byte limit, it is rendered again without the dependency table's links.
 
 ## Reporting
 
-Separately from the description, an addon may contribute a section to the [run
-report](../reference/run-report.md) by implementing two methods. This is satisfied
+An addon contributes its report section by implementing two methods. This is satisfied
 structurally, so no addon imports the report package — an addon that does not implement
-them is simply absent from the report.
+them is simply absent from the report, and from the request description.
 
 All of these methods live together in one file rather than beside each addon's other code.
 Together they *are* the report's `addons` schema, which is a published contract; scattered

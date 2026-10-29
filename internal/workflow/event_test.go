@@ -95,9 +95,3 @@ func TestNewPostSiteUpdateEvent(t *testing.T) {
 	assertCommitsThrough(t, evt, committer)
 	assert.Equal(t, "production", evt.Site())
 }
-
-func TestNewPreMergeRequestCreateEvent(t *testing.T) {
-	evt := NewPreMergeRequestCreateEvent("June 2025: Drupal Updates")
-
-	assert.Equal(t, "June 2025: Drupal Updates", evt.Title)
-}

@@ -195,12 +195,35 @@ func TestComposerPatchesReportDataNilWhenNoPatchChanges(t *testing.T) {
 	assert.Nil(t, (&ComposerPatches1{}).ReportData())
 }
 
-// composer_diff deliberately contributes nothing: the same information is already in the
-// report's top-level packages field, structured, straight from composer update.
-func TestComposerDiffDoesNotReport(t *testing.T) {
-	var addon any = &ComposerDiff{}
-	_, isReporter := addon.(report.Reporter)
-	assert.False(t, isReporter)
+// Every field is mapped: the description renders composer_diff from this section alone.
+func TestComposerDiffReportData(t *testing.T) {
+	cd := &ComposerDiff{entries: []composer.DiffEntry{{
+		Package: "drupal/core", Operation: "upgrade", From: "10.3.8", To: "10.3.9", Dev: true, Direct: true,
+		CompareURL: "https://example.com/compare", ProjectURL: "https://example.com/core",
+	}}}
+
+	assert.Equal(t, "composer_diff", cd.ReportKey())
+	assert.Equal(t, []DependencyChange{{
+		Package: "drupal/core", Operation: "upgrade", From: "10.3.8", To: "10.3.9", Dev: true, Direct: true,
+		CompareURL: "https://example.com/compare", ProjectURL: "https://example.com/core",
+	}}, cd.ReportData())
+}
+
+func TestComposerDiffReportDataNilWithoutChanges(t *testing.T) {
+	assert.Nil(t, (&ComposerDiff{}).ReportData())
+}
+
+// The plugins are collected by ranging over a map, so only the sort keeps the report stable.
+func TestComposerAllowPluginsReportDataIsSorted(t *testing.T) {
+	ap := &ComposerAllowPlugins{newAllowPlugins: []string{"zeta/plugin", "acme/plugin"}}
+
+	assert.Equal(t, "composer_allow_plugins", ap.ReportKey())
+	assert.Equal(t, PluginAllowlist{Added: []string{"acme/plugin", "zeta/plugin"}}, ap.ReportData())
+	assert.Equal(t, []string{"zeta/plugin", "acme/plugin"}, ap.newAllowPlugins, "the addon's own state is left as found")
+}
+
+func TestComposerAllowPluginsReportDataNilWithoutNewPlugins(t *testing.T) {
+	assert.Nil(t, (&ComposerAllowPlugins{}).ReportData())
 }
 
 func TestCodeBeautifierReportData(t *testing.T) {

@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/drupdater/drupdater/internal/workflow"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
@@ -48,15 +47,4 @@ func TestDefaultComposerNormalize_PostComposerUpdateHandler_PackageNotInstalled(
 
 	require.NoError(t, err)
 	composer.AssertExpectations(t)
-}
-
-func TestDefaultComposerNormalize_RenderTemplate(t *testing.T) {
-	logger := zap.NewNop()
-	composer := NewMockComposer(t)
-	normalize := NewComposerNormalizer(logger, composer)
-
-	template, err := normalize.RenderTemplate()
-
-	require.NoError(t, err)
-	assert.Empty(t, template, "Template should be empty string")
 }

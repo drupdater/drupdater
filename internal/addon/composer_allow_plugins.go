@@ -29,17 +29,6 @@ func (ap *ComposerAllowPlugins) Hooks() workflow.Hooks {
 	}
 }
 
-func (ap *ComposerAllowPlugins) RenderTemplate() (string, error) {
-	if len(ap.newAllowPlugins) == 0 {
-		return "", nil
-	}
-	return render("allowplugins.go.tmpl", struct {
-		NewAllowPlugins []string
-	}{
-		NewAllowPlugins: ap.newAllowPlugins,
-	})
-}
-
 func (ap *ComposerAllowPlugins) preComposerUpdateHandler(evt *workflow.PreComposerUpdateEvent) error {
 
 	var err error

@@ -5,6 +5,7 @@ package report
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/url"
 	"path/filepath"
 	"slices"
@@ -273,6 +274,16 @@ func (r *Recorder) AddReporter(v any) {
 	if reporter, ok := v.(Reporter); ok {
 		r.AddSection(reporter.ReportKey(), reporter.ReportData())
 	}
+}
+
+// Snapshot returns the report as recorded so far, leaving it open. The addons map is copied, so a
+// later AddSection cannot race a reader of the snapshot.
+func (r *Recorder) Snapshot() Report {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	snapshot := r.report
+	snapshot.Addons = maps.Clone(r.report.Addons)
+	return snapshot
 }
 
 // Finish closes the report. Safe to call repeatedly; each call refreshes the end timestamp.

@@ -49,15 +49,10 @@ func (a *YourAddon) postCodeUpdate(evt *workflow.PostCodeUpdateEvent) error {
 	_, err := evt.Commit("Describe the change", "web/modules/custom")
 	return err
 }
-
-func (a *YourAddon) RenderTemplate() (string, error) {
-	// Return "" when there is nothing to say — no empty sections in the request.
-	return "", nil
-}
 ```
 
-The package-level `render(name, data)` executes a template from `internal/addon/templates/`.
-The `workflow.Addon` interface is the whole contract. An addon that changes files commits
+The `workflow.Addon` interface is the whole contract. An addon renders nothing itself: what
+it found reaches the pull request through its [report section](#4-report). An addon that changes files commits
 them by naming them to the event, never through git itself — see [Committing
 changes](../explanation/addon-architecture.md#committing-changes).
 
@@ -70,7 +65,6 @@ changes](../explanation/addon-architecture.md#committing-changes).
 | `post-code-update` | Changing code — Rector, PHPCBF, and similar |
 | `pre-site-update` | Inspecting a site before its update hooks run |
 | `post-site-update` | Per-site work after hooks, before configuration export |
-| `pre-merge-request-create` | Changing the request title (mutable payload) |
 
 Pick the stage from what the hook does: `Prepare` if later hooks on the event read what it
 writes, `Change` if it edits the project, `Format` if it restyles what `Change` wrote, and
@@ -144,14 +138,22 @@ Three requirements:
 If your addon records a skip, record **why** — see
 [`translations_updater`](../reference/addons/translations-updater.md) for the pattern.
 
-## 5. Add a description template
+## 5. Add a description section
 
-If your addon should appear in the pull request, add
-`internal/addon/templates/your_addon.go.tmpl` and render it from `RenderTemplate`.
+The pull request description is rendered from the report by `internal/mergerequest`, so an
+addon appears in it through its report section. To give it one:
 
-Follow the conventions in [Development
-setup](development.md#description-templates), and add a golden file in
-`internal/addon/testdata/` — those files are embedded straight into the [addon
+1. Add `internal/mergerequest/templates/your_addon.go.tmpl`.
+2. In `internal/mergerequest/mergerequest.go`, read your section into `sections` — declaring
+   only the fields the template shows, by their JSON names — and add it to
+   `sectionsInOrder`, where the order of the description is decided.
+3. Add your addon to `reportingAddons()` in `internal/addon/report_golden_test.go`, and
+   regenerate both goldens: `go test ./internal/addon ./internal/mergerequest -update`.
+
+The renderer reads the report through its JSON, like any consumer, so it can only show what
+your section publishes. Follow the conventions in [Development
+setup](development.md#description-templates). The section's golden file in
+`internal/mergerequest/testdata/` is embedded straight into the [addon
 reference](../reference/addons/index.md), so a good one becomes the published example.
 
 ## 6. Test it
@@ -162,8 +164,7 @@ the addon with mocks, call its hook with an event, assert on both the side effec
 
 When your addon depends on another one's hook running first, test the two through
 `workflow.NewPipeline` rather than calling the hooks yourself — that runs them in the order a
-real run would, so the test fails if a stage changes. `TestUnsupportedModules_AbandonedHandoff`
-is the example.
+real run would, so the test fails if a stage changes.
 
 Then verify end to end against a real project:
 
@@ -172,8 +173,8 @@ go run . --working-dir /path/to/a/drupal/checkout --dry-run --verbose --report .
 jq '.addons.your_addon' report.json
 ```
 
-Check the rendered description too — `RenderTemplate` output is easy to get subtly wrong,
-and `--dry-run` still generates it.
+Check the rendered description too — `jq -r '.merge_request_description' report.json`.
+Template output is easy to get subtly wrong, and `--dry-run` still renders it.
 
 ## Checklist
 
@@ -182,6 +183,7 @@ and `--dry-run` still generates it.
 - [ ] Mandatory or configurable decided, and defaults updated if needed
 - [ ] `ReportKey`/`ReportData` in `internal/addon/report.go`, returning `nil` when empty
 - [ ] Output sorted for deterministic reports
+- [ ] Description section, if any, rendered from the report section and pinned by a golden
 - [ ] Per-site state mutex-guarded, if it hooks into a site event
 - [ ] Template and golden file, if it appears in the request
 - [ ] Tests, package at ≥ 90% coverage
