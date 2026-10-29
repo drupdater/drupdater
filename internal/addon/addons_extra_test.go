@@ -171,35 +171,12 @@ func TestComposerNormalizerErrors(t *testing.T) {
 }
 
 func TestDeprecationsRemoverErrors(t *testing.T) {
-	t.Run("installing rector fails", func(t *testing.T) {
-		composerService := NewMockComposer(t)
-		composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "palantirnet/drupal-rector").Return(false, nil)
-		composerService.EXPECT().Require(anyCtx, "/tmp", []string{"palantirnet/drupal-rector"}).Return("", assert.AnError)
-
-		dr := NewDeprecationsRemover(zap.NewNop(), NewMockRector(t), composerService)
-		require.Error(t, dr.postCodeUpdateHandler(workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", nil)))
-	})
-
 	t.Run("listing custom code directories fails", func(t *testing.T) {
 		composerService := NewMockComposer(t)
 		composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "palantirnet/drupal-rector").Return(true, nil)
 		composerService.EXPECT().GetCustomCodeDirectories(anyCtx, "/tmp").Return(nil, assert.AnError)
 
-		dr := NewDeprecationsRemover(zap.NewNop(), NewMockRector(t), composerService)
-		require.Error(t, dr.postCodeUpdateHandler(workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", nil)))
-	})
-
-	t.Run("removing the temporarily installed rector fails", func(t *testing.T) {
-		composerService := NewMockComposer(t)
-		composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "palantirnet/drupal-rector").Return(false, nil)
-		composerService.EXPECT().Require(anyCtx, "/tmp", []string{"palantirnet/drupal-rector"}).Return("", nil)
-		composerService.EXPECT().GetCustomCodeDirectories(anyCtx, "/tmp").Return([]string{"web/modules/custom"}, nil)
-		composerService.EXPECT().Remove(anyCtx, "/tmp", []string{"palantirnet/drupal-rector"}).Return("", assert.AnError)
-
-		runner := NewMockRector(t)
-		runner.EXPECT().Run(anyCtx, "/tmp", []string{"web/modules/custom"}).Return(rector.ReturnOutput{}, nil)
-
-		dr := NewDeprecationsRemover(zap.NewNop(), runner, composerService)
+		dr := NewDeprecationsRemover(zap.NewNop(), NewMockRector(t), NewMockRector(t), composerService)
 		require.Error(t, dr.postCodeUpdateHandler(workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", nil)))
 	})
 
@@ -215,7 +192,7 @@ func TestDeprecationsRemoverErrors(t *testing.T) {
 		}, nil)
 
 		committer := &fakeCommitter{err: assert.AnError}
-		dr := NewDeprecationsRemover(zap.NewNop(), runner, composerService)
+		dr := NewDeprecationsRemover(zap.NewNop(), runner, NewMockRector(t), composerService)
 		require.ErrorIs(t, dr.postCodeUpdateHandler(workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", committer)), assert.AnError)
 	})
 }

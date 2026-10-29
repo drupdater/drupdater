@@ -116,7 +116,7 @@ func TestCommitterSkipsPathsWithoutChanges(t *testing.T) {
 	before, err := repository.Head()
 	require.NoError(t, err)
 
-	committed, err := newGitCommitter(worktree).Commit("Remove temporary drupal/coder installation", "composer.json", "composer.lock")
+	committed, err := newGitCommitter(worktree).Commit("Update patches", "composer.json", "composer.lock")
 
 	require.NoError(t, err)
 	assert.False(t, committed)

@@ -357,16 +357,19 @@ type addonDeps struct {
 	security bool
 }
 
+// bundledToolsBin is where the image installs tools/, so addons install nothing into the project.
+const bundledToolsBin = "/opt/drupdater/tools/vendor/bin"
+
 // addonRegistry maps the names used in .drupdater.yaml to their constructors.
 var addonRegistry = map[string]func(addonDeps) workflow.Addon{
 	"composer_audit": func(d addonDeps) workflow.Addon {
 		return addon.NewComposerAudit(d.logger, d.composer, d.security)
 	},
 	"code_beautifier": func(d addonDeps) workflow.Addon {
-		return addon.NewCodeBeautifier(d.logger, phpcs.NewCLI(d.logger), d.composer)
+		return addon.NewCodeBeautifier(d.logger, phpcs.NewCLI(d.logger), phpcs.NewBundledCLI(d.logger, bundledToolsBin), d.composer)
 	},
 	"deprecations_remover": func(d addonDeps) workflow.Addon {
-		return addon.NewDeprecationsRemover(d.logger, rector.NewCLI(d.logger), d.composer)
+		return addon.NewDeprecationsRemover(d.logger, rector.NewCLI(d.logger), rector.NewBundledCLI(d.logger, bundledToolsBin), d.composer)
 	},
 	"translations_updater":   func(d addonDeps) workflow.Addon { return addon.NewTranslationsUpdater(d.logger, d.drush) },
 	"composer_allow_plugins": func(d addonDeps) workflow.Addon { return addon.NewComposerAllowPlugins(d.logger, d.composer) },

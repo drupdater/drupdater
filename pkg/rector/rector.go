@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
+	"path/filepath"
 
 	"go.uber.org/zap"
 
@@ -15,17 +16,23 @@ var execCommand = exec.CommandContext
 
 type CLI struct {
 	logger *zap.Logger
+	// binDir holds drupdater's own rector; empty runs the project's through composer.
+	binDir string
 }
 
+// NewCLI runs the project's own rector.
 func NewCLI(logger *zap.Logger) *CLI {
 	return &CLI{
 		logger: logger,
 	}
 }
 
-// command runs rector through `composer exec`, inheriting its process timeout.
-func (s *CLI) command(dir string) composer.Command {
-	return composer.Command{New: execCommand, Logger: s.logger, Dir: dir}
+// NewBundledCLI runs the rector in binDir, which needs nothing installed in the project.
+func NewBundledCLI(logger *zap.Logger, binDir string) *CLI {
+	return &CLI{
+		logger: logger,
+		binDir: binDir,
+	}
 }
 
 type ReturnOutput struct {
@@ -60,14 +67,24 @@ func (s *CLI) Run(ctx context.Context, dir string, customCodeDirectories []strin
 		}, nil
 	}
 
-	args := []string{"exec", "--", "rector", "process", "--config=/opt/drupdater/rector.php", "--no-progress-bar", "--no-diffs", "--debug", "--output-format=json"}
+	command := composer.Command{New: execCommand, Logger: s.logger, Dir: dir}
+	args := []string{"exec", "--", "rector", "process"}
+	if s.binDir != "" {
+		autoloader, err := projectAutoloader(ctx, command)
+		if err != nil {
+			return ReturnOutput{}, err
+		}
+		command.Program = filepath.Join(s.binDir, "rector")
+		args = []string{"process", "--autoload-file", autoloader}
+	}
+	args = append(args, "--config=/opt/drupdater/rector.php", "--no-progress-bar", "--no-diffs", "--debug", "--output-format=json")
 	args = append(args, customCodeDirectories...)
 
 	// Split: rector's --debug output and PHP notices would corrupt the JSON report.
-	out, _, err := s.command(dir).Split(ctx, args...)
+	out, _, err := command.Split(ctx, args...)
 
 	if err != nil {
-		return ReturnOutput{}, fmt.Errorf("failed to run composer command: %w", err)
+		return ReturnOutput{}, fmt.Errorf("failed to run rector: %w", err)
 	}
 
 	var deprecationRemovalResult ReturnOutput
@@ -76,4 +93,13 @@ func (s *CLI) Run(ctx context.Context, dir string, customCodeDirectories []strin
 	}
 
 	return deprecationRemovalResult, nil
+}
+
+// projectAutoloader honours vendor-dir, where Rector would only ever look under vendor/.
+func projectAutoloader(ctx context.Context, composerInDir composer.Command) (string, error) {
+	vendorDir, _, err := composerInDir.Split(ctx, "config", "--absolute", "vendor-dir")
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve the project's vendor directory: %w", err)
+	}
+	return filepath.Join(vendorDir, "autoload.php"), nil
 }

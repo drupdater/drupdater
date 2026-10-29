@@ -206,22 +206,6 @@ func (s *CLI) Install(ctx context.Context, dir string) error {
 	return nil
 }
 
-func (s *CLI) Require(ctx context.Context, dir string, args ...string) (string, error) {
-	out, err := s.execComposer(ctx, dir, append([]string{"require", "--ignore-platform-reqs"}, args...)...)
-	if err != nil {
-		return "", fmt.Errorf("failed to require package: %w, output: %s", err, out)
-	}
-	return out, nil
-}
-
-func (s *CLI) Remove(ctx context.Context, dir string, packages ...string) (string, error) {
-	out, err := s.execComposer(ctx, dir, append([]string{"remove", "--ignore-platform-reqs"}, packages...)...)
-	if err != nil {
-		return "", fmt.Errorf("failed to remove package: %w, output: %s", err, out)
-	}
-	return out, nil
-}
-
 // Audit returns both halves of `composer audit` output: advisories and abandoned packages.
 // --abandoned is not passed, so the project's own `audit.abandoned: ignore` still applies.
 func (s *CLI) Audit(ctx context.Context, dir string) (Audit, error) {

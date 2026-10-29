@@ -122,7 +122,7 @@ func TestRectorRun(t *testing.T) {
 
 		_, err := cli.Run(t.Context(), "/tmp", []string{"web/modules/custom"})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to run composer command")
+		assert.Contains(t, err.Error(), "failed to run rector")
 
 		// The cause has to stay reachable through the wrapper, so callers can inspect the
 		// exit status rather than string-matching the message.
@@ -140,6 +140,78 @@ func TestRectorRun(t *testing.T) {
 
 		var syntaxErr *json.SyntaxError
 		require.ErrorAs(t, err, &syntaxErr)
+	})
+}
+
+// call is one subprocess the production code asked for.
+type call struct {
+	name string
+	args []string
+}
+
+// stubExecEach answers the nth subprocess with outputs[n] and records every call; an output of
+// "!fail" makes that call exit non-zero.
+func stubExecEach(t *testing.T, outputs ...string) *[]call {
+	t.Helper()
+	calls := new([]call)
+
+	execCommand = func(ctx context.Context, n string, arg ...string) *exec.Cmd {
+		require.Less(t, len(*calls), len(outputs), "more subprocesses than the test expects")
+		out := outputs[len(*calls)]
+		*calls = append(*calls, call{name: n, args: append([]string(nil), arg...)})
+
+		c := exec.CommandContext(ctx, os.Args[0], "-test.run=TestHelperProcess", "--", out) //nolint:gosec // test helper process
+		c.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
+		if out == "!fail" {
+			c.Env = append(c.Env, "GO_HELPER_PROCESS_ERROR=1")
+		}
+		return c
+	}
+	t.Cleanup(func() { execCommand = exec.CommandContext })
+
+	return calls
+}
+
+func TestBundledRectorRun(t *testing.T) {
+	newBundledCLI := func() *CLI { return NewBundledCLI(zap.NewNop(), "/opt/drupdater/tools/vendor/bin") }
+
+	t.Run("loads the project's autoloader from its vendor-dir", func(t *testing.T) {
+		calls := stubExecEach(t,
+			"/project/libraries/vendor",
+			`{"totals":{"changed_files":1},"file_diffs":[],"changed_files":["web/modules/custom/a.php"]}`,
+		)
+
+		result, err := newBundledCLI().Run(t.Context(), t.TempDir(), []string{"web/modules/custom"})
+		require.NoError(t, err)
+
+		require.Len(t, *calls, 2)
+		assert.Equal(t, call{name: "composer", args: []string{"config", "--absolute", "vendor-dir"}}, (*calls)[0])
+		assert.Equal(t, call{name: "/opt/drupdater/tools/vendor/bin/rector", args: []string{
+			"process", "--autoload-file", "/project/libraries/vendor/autoload.php",
+			"--config=/opt/drupdater/rector.php",
+			"--no-progress-bar", "--no-diffs", "--debug", "--output-format=json",
+			"web/modules/custom",
+		}}, (*calls)[1])
+		assert.Equal(t, []string{"web/modules/custom/a.php"}, result.ChangedFiles)
+	})
+
+	t.Run("runs nothing when the vendor-dir cannot be resolved", func(t *testing.T) {
+		calls := stubExecEach(t, "!fail")
+
+		_, err := newBundledCLI().Run(t.Context(), t.TempDir(), []string{"web/modules/custom"})
+
+		require.ErrorContains(t, err, "failed to resolve the project's vendor directory")
+		var exitErr *exec.ExitError
+		require.ErrorAs(t, err, &exitErr)
+		assert.Len(t, *calls, 1)
+	})
+
+	t.Run("a failing rector", func(t *testing.T) {
+		stubExecEach(t, "/project/vendor", "!fail")
+
+		_, err := newBundledCLI().Run(t.Context(), t.TempDir(), []string{"web/modules/custom"})
+
+		require.ErrorContains(t, err, "failed to run rector")
 	})
 }
 

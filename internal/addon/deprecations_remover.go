@@ -2,6 +2,7 @@ package addon
 
 import (
 	"cmp"
+	"context"
 	"slices"
 
 	"github.com/drupdater/drupdater/internal/workflow"
@@ -11,19 +12,23 @@ import (
 )
 
 type DeprecationsRemover struct {
-	logger   *zap.Logger
-	rector   Rector
-	composer Composer
+	logger        *zap.Logger
+	projectRector Rector
+	bundledRector Rector
+	composer      Composer
 
 	// For the report. Written once from the single post-code-update event, read after the run.
 	fixes []DeprecationFix
 }
 
-func NewDeprecationsRemover(logger *zap.Logger, rector Rector, composer Composer) *DeprecationsRemover {
+// NewDeprecationsRemover runs projectRector when the project has drupal-rector, bundledRector
+// when it has no Rector at all.
+func NewDeprecationsRemover(logger *zap.Logger, projectRector Rector, bundledRector Rector, composer Composer) *DeprecationsRemover {
 	return &DeprecationsRemover{
-		logger:   logger,
-		rector:   rector,
-		composer: composer,
+		logger:        logger,
+		projectRector: projectRector,
+		bundledRector: bundledRector,
+		composer:      composer,
 	}
 }
 
@@ -38,15 +43,11 @@ func (dr *DeprecationsRemover) RenderTemplate() (string, error) {
 }
 
 func (dr *DeprecationsRemover) postCodeUpdateHandler(evt *workflow.PostCodeUpdateEvent) error {
-
 	dr.logger.Info("removing deprecations")
 
-	installed, _ := dr.composer.IsPackageInstalled(evt.Context(), evt.Path(), "palantirnet/drupal-rector")
-	if !installed {
-		dr.logger.Debug("rector is not installed, installing")
-		if _, err := dr.composer.Require(evt.Context(), evt.Path(), "palantirnet/drupal-rector"); err != nil {
-			return err
-		}
+	rector := dr.rectorFor(evt.Context(), evt.Path())
+	if rector == nil {
+		return nil
 	}
 
 	customCodeDirectories, err := dr.composer.GetCustomCodeDirectories(evt.Context(), evt.Path())
@@ -54,20 +55,9 @@ func (dr *DeprecationsRemover) postCodeUpdateHandler(evt *workflow.PostCodeUpdat
 		return err
 	}
 
-	deprecationRemovalResult, err := dr.rector.Run(evt.Context(), evt.Path(), customCodeDirectories)
+	deprecationRemovalResult, err := rector.Run(evt.Context(), evt.Path(), customCodeDirectories)
 	if err != nil {
 		return err
-	}
-
-	if !installed {
-		dr.logger.Debug("removing rector")
-		if _, err := dr.composer.Remove(evt.Context(), evt.Path(), "palantirnet/drupal-rector"); err != nil {
-			return err
-		}
-		// Removing rector rarely restores composer.lock byte-for-byte; the remainder gets its own commit.
-		if _, err := evt.Commit("Remove temporary drupal-rector installation", "composer.json", "composer.lock"); err != nil {
-			return err
-		}
 	}
 
 	if deprecationRemovalResult.Totals.ChangedFiles == 0 {
@@ -80,6 +70,19 @@ func (dr *DeprecationsRemover) postCodeUpdateHandler(evt *workflow.PostCodeUpdat
 	dr.logger.Debug("committing deprecation removals")
 	_, err = evt.Commit("Remove deprecations", deprecationRemovalResult.ChangedFiles...)
 	return err
+}
+
+// rectorFor returns the Rector that can load the project's code, or nil when neither can.
+func (dr *DeprecationsRemover) rectorFor(ctx context.Context, path string) Rector {
+	if installed, _ := dr.composer.IsPackageInstalled(ctx, path, "palantirnet/drupal-rector"); installed {
+		return dr.projectRector
+	}
+	// Ours would load the project's autoloader, and with it a second Rector's classes.
+	if installed, _ := dr.composer.IsPackageInstalled(ctx, path, "rector/rector"); installed {
+		dr.logger.Warn("skipping deprecation removal: the project requires rector/rector but not palantirnet/drupal-rector")
+		return nil
+	}
+	return dr.bundledRector
 }
 
 // recordFixes captures which rules fired on which files, for the report.
