@@ -5,22 +5,26 @@ declare(strict_types=1);
 use Rector\Config\RectorConfig;
 use DrupalRector\Rector\Deprecation\DeprecationHelperRemoveRector;
 use DrupalRector\Rector\ValueObject\DeprecationHelperRemoveConfiguration;
-use DrupalRector\Set\DrupalSetProvider;
+use DrupalRector\Set\Drupal10SetList;
+use DrupalRector\Set\Drupal8SetList;
+use DrupalRector\Set\Drupal9SetList;
 
 if (class_exists('DrupalFinder\DrupalFinderComposerRuntime')) {
   $drupalFinder = new DrupalFinder\DrupalFinderComposerRuntime();
 }
 else {
   $drupalFinder = new DrupalFinder\DrupalFinder();
-  $drupalFinder->locateRoot(__DIR__);
+  $drupalFinder->locateRoot(getcwd());
 }
 $drupalRoot = $drupalFinder->getDrupalRoot();
 
-// Composer-based sets read the deprecation sets from the installed drupal/core
-// version, replacing the manual vendor-directory walk.
+// Every set, as drupal-rector advises: each rule checks the installed core version itself.
 return RectorConfig::configure()
-  ->withSetProviders(DrupalSetProvider::class)
-  ->withComposerBased(drupal: TRUE)
+  ->withSets([
+    Drupal8SetList::DRUPAL_8,
+    Drupal9SetList::DRUPAL_9,
+    Drupal10SetList::DRUPAL_10,
+  ])
   ->withConfiguredRule(DeprecationHelperRemoveRector::class, [
     new DeprecationHelperRemoveConfiguration(\Drupal::VERSION),
   ])
