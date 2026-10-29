@@ -17,9 +17,23 @@ else {
 }
 $drupalRoot = $drupalFinder->getDrupalRoot();
 
+// phpstan-drupal types \Drupal::service() calls from the container's service map; without
+// it Rector cannot see a deprecated method called on one. Located through its class, so the
+// copy found is the one this Rector's autoloader loads: bundled, or the project's own.
+$phpstanConfigs = [];
+$bootstrapFiles = [];
+if (class_exists('mglaman\PHPStanDrupal\Drupal\DrupalAutoloader')) {
+  $phpstanDrupal = dirname((new ReflectionClass('mglaman\PHPStanDrupal\Drupal\DrupalAutoloader'))->getFileName(), 3);
+  $phpstanConfigs[] = $phpstanDrupal . '/extension.neon';
+  // Rector runs only its own bootstrap files, not an extension's; this builds the service map.
+  $bootstrapFiles[] = __DIR__ . '/phpstan-drupal-bootstrap.php';
+}
+
 // Composer-based sets read the deprecation sets from the installed drupal/core
 // version, replacing the manual vendor-directory walk.
 return RectorConfig::configure()
+  ->withPHPStanConfigs($phpstanConfigs)
+  ->withBootstrapFiles($bootstrapFiles)
   ->withSetProviders(DrupalSetProvider::class)
   ->withComposerBased(drupal: TRUE)
   // Composer-based sets match the installed major only; 10.x deprecations stay live until 12.

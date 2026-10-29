@@ -106,6 +106,9 @@ them against the project from there. A project that already depends on `drupal/c
 `rector/rector` stays below 2.6.2, which removed rule sets Drupal Rector still relies on;
 Drupal Rector's own `conflict` holds it there.
 
+`mglaman/phpstan-drupal` is installed beside Drupal Rector so that Rector knows the type of
+a `\Drupal::service()` call; see [`deprecations_remover`](addons/deprecations-remover.md#service-calls).
+
 The Composer environment is tuned for unattended runs; see [environment
 variables](environment-variables.md#set-inside-the-docker-image) for the values and why.
 

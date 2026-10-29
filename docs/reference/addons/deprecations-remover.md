@@ -36,6 +36,18 @@ custom code to rewrite APIs deprecated by the new Drupal version.
 It runs at the **Change** stage on `post-code-update`, ahead of
 [`code_beautifier`](code-beautifier.md) at Format, so that PHPCBF formats the code Rector wrote.
 
+### Service calls
+
+A deprecated method is only found when Rector knows the type of the object it is called on.
+For `\Drupal::service('renderer')->renderPlain($build)` that type comes from Drupal's service
+container, which Rector learns through
+[`mglaman/phpstan-drupal`](https://github.com/mglaman/phpstan-drupal): the bundled Rector
+always has it, and a project's own Rector uses the project's copy when there is one.
+
+If phpstan-drupal cannot load the project — a malformed `*.services.yml`, say — Rector still
+runs and applies every other fix, and only calls on `\Drupal::service()` results go
+unrewritten. The reason is logged at debug level.
+
 ## Why it exists
 
 Each Drupal minor release deprecates APIs that the *next* major removes. Fixing them at
