@@ -2,7 +2,6 @@ package addon
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/drupdater/drupdater/internal/workflow"
 
@@ -13,9 +12,7 @@ type TranslationsUpdater struct {
 	logger *zap.Logger
 	drush  Drush
 
-	// Per-site outcome for the report. post-site-update fires concurrently, hence the mutex.
-	mu      sync.Mutex
-	results map[string]TranslationResult
+	results workflow.PerSite[TranslationResult]
 }
 
 func NewTranslationsUpdater(logger *zap.Logger, drush Drush) *TranslationsUpdater {
@@ -72,10 +69,5 @@ func (tu *TranslationsUpdater) postSiteUpdateHandler(evt *workflow.PostSiteUpdat
 
 // record stores a site's outcome for the report.
 func (tu *TranslationsUpdater) record(site string, result TranslationResult) {
-	tu.mu.Lock()
-	defer tu.mu.Unlock()
-	if tu.results == nil {
-		tu.results = make(map[string]TranslationResult)
-	}
-	tu.results[site] = result
+	tu.results.Set(site, result)
 }

@@ -21,7 +21,7 @@ For each site, after that site's update hooks and configuration export have run:
 3. Updates the interface translations via Drush.
 4. Commits the translation path as `Update translations` — only if something in it changed.
 
-Sites run concurrently, so the results map is mutex-guarded and keyed by site.
+The outcome is kept per site.
 
 ## Why it exists
 

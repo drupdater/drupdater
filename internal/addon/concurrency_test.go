@@ -13,10 +13,10 @@ import (
 	"go.uber.org/zap"
 )
 
-// The per-site events fire from errgroup goroutines, one per site, so every addon accumulating
-// state across sites writes its map concurrently. These tests are the ones that give `-race`
-// something to observe: the rest of the suite drives each handler with a single site, where an
-// unguarded map write is invisible. Each also asserts no site is lost, which stands on its own.
+// The per-site events fire from errgroup goroutines, one per site. An addon keeps what they find
+// in a workflow.PerSite, and TestPerSiteHooksShareStateOnlyThroughPerSite keeps it that way. These
+// tests drive each such addon from many sites at once, giving `-race` something to observe and
+// asserting that no site is lost.
 
 // concurrentSites returns the site names to drive the handlers with. Enough of them that a lost
 // update is not masked by the goroutines happening to serialise.
@@ -62,9 +62,10 @@ func TestUpdateHooksRecordsEverySiteUnderConcurrency(t *testing.T) {
 		return updateHooks.preSiteUpdateHandler(workflow.NewPreSiteUpdateEvent(ctx, "/project", committer, site))
 	})
 
-	require.Len(t, updateHooks.hooks, len(sites))
+	hooks := updateHooks.hooks.All()
+	require.Len(t, hooks, len(sites))
 	for _, site := range sites {
-		assert.Contains(t, updateHooks.hooks, site)
+		assert.Contains(t, hooks, site)
 	}
 }
 
@@ -89,10 +90,14 @@ func TestUnsupportedModulesRecordsEverySiteUnderConcurrency(t *testing.T) {
 		return um.preSiteUpdateHandler(workflow.NewPreSiteUpdateEvent(ctx, "/project", committer, site))
 	})
 
-	require.Len(t, um.modules, len(sites)+1)
-	assert.Contains(t, um.modules, "shared_module")
+	var names []string
+	for _, module := range um.ReportData().([]drush.UnsupportedModule) {
+		names = append(names, module.Name)
+	}
+	require.Len(t, names, len(sites)+1, "one module per site, plus the shared one once")
+	assert.Contains(t, names, "shared_module")
 	for _, site := range sites {
-		assert.Contains(t, um.modules, "module_"+site)
+		assert.Contains(t, names, "module_"+site)
 	}
 }
 
@@ -114,8 +119,9 @@ func TestTranslationsUpdaterRecordsEverySiteUnderConcurrency(t *testing.T) {
 		return tu.postSiteUpdateHandler(workflow.NewPostSiteUpdateEvent(ctx, "/project", committer, site))
 	})
 
-	require.Len(t, tu.results, len(sites))
+	results := tu.results.All()
+	require.Len(t, results, len(sites))
 	for _, site := range sites {
-		assert.Contains(t, tu.results, site)
+		assert.Contains(t, results, site)
 	}
 }

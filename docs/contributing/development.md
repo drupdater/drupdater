@@ -172,10 +172,12 @@ contract, not when it is merely large.
 ## The race detector
 
 Drupdater runs the per-site phases concurrently — an `errgroup` bounded by `--concurrency`, one
-goroutine per site — and several addons accumulate state across those goroutines. That state is
-mutex-guarded, and nothing else in the toolchain can tell you when it stops being: coverage
-proves a line ran, mutation testing proves a test would notice a *changed* line, and both are
-blind to two goroutines touching the same map.
+goroutine per site — and several addons accumulate state across those goroutines. That state
+lives in a `workflow.PerSite`, which does the locking, and
+`TestPerSiteHooksShareStateOnlyThroughPerSite` rejects an addon with a per-site hook that keeps a
+map, slice or mutex of its own. The race detector checks the rest: coverage proves a line ran,
+mutation testing proves a test would notice a *changed* line, and both are blind to two
+goroutines touching the same memory.
 
 ```bash
 make test-race
@@ -196,19 +198,20 @@ still comes from an uninstrumented run.
 This is the part worth internalising. `-race` is not a static check — it observes real memory
 accesses, so it finds nothing in code no test drives concurrently. Every `Run` test used
 to run a single site, which walks the per-site phases on one goroutine: the addon maps were
-written by one writer, and removing their mutexes would have gone unnoticed.
+written by one writer, and removing the mutexes that guarded them then would have gone
+unnoticed.
 
 So the concurrency tests and the detector are one tool, not two:
 
 | Test | Drives |
 |---|---|
 | `TestRunWithConcurrentSites` | The real workflow with four sites, asserting the baseline installs overlap and the committing tail does not |
-| `internal/addon/concurrency_test.go` | Each mutex-guarded addon's per-site handler, fired from all sites at once |
+| `internal/addon/concurrency_test.go` | Each addon's per-site handler, fired from all sites at once |
+| `TestPerSiteUnderConcurrentSites` | `workflow.PerSite` itself, written from many sites at once |
 | `TestForEachSite` | The fan-out itself: the concurrency bound, and cancellation on first error |
 
-Deleting a mutex from `internal/addon` makes the matching test fail under `-race` and **pass
-without it**. When you add state that accumulates across sites, add it to
-`concurrency_test.go` — otherwise the guard around it is untested however green CI looks.
+Deleting the lock from `PerSite` makes these tests fail under `-race` and **pass without it**.
+When you add an addon with a per-site hook, add it to `concurrency_test.go` too.
 
 Where the shared resource is not memory, the detector cannot help and the test has to assert
 directly. `siteCommitMu` serialises the tail of `updateSite` because the sites share one git

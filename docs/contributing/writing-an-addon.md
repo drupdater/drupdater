@@ -74,9 +74,14 @@ addon to `TestAddonHookStages`.
 
 ### Concurrency
 
-`pre-site-update` and `post-site-update` fire **once per site, concurrently**. Any state
-your addon accumulates across sites must be mutex-guarded, and any map you hand to the
-report must be a copy — see the existing per-site addons for the pattern.
+`pre-site-update` and `post-site-update` fire **once per site, concurrently**. Keep what such
+a hook finds in a `workflow.PerSite[T]` field: the hook calls `Set(evt.Site(), value)` for its
+own site, and `ReportData` reads `All()`, a copy, and merges the sites — deduplicating, say,
+as `unsupported_modules` does. The lock lives inside `PerSite`, so there is none to forget.
+
+An addon with a per-site hook may not have a map, slice or mutex field at all:
+`TestPerSiteHooksShareStateOnlyThroughPerSite` fails if it does. Add the addon to
+`internal/addon/concurrency_test.go` as well, which fires its hook from many sites at once.
 
 ## 2. Register it
 
@@ -184,7 +189,7 @@ Template output is easy to get subtly wrong, and `--dry-run` still renders it.
 - [ ] `ReportKey`/`ReportData` in `internal/addon/report.go`, returning `nil` when empty
 - [ ] Output sorted for deterministic reports
 - [ ] Description section, if any, rendered from the report section and pinned by a golden
-- [ ] Per-site state mutex-guarded, if it hooks into a site event
+- [ ] Per-site findings kept in a `workflow.PerSite`, if it hooks into a site event
 - [ ] Template and golden file, if it appears in the request
 - [ ] Tests, package at ≥ 90% coverage
 - [ ] Documented: a page under `docs/reference/addons/`, listed in the catalogue table, and

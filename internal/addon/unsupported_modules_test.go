@@ -21,8 +21,7 @@ func TestNewUnsupportedModules(t *testing.T) {
 	assert.NotNil(t, um)
 	assert.Equal(t, logger, um.logger)
 	assert.Equal(t, mockDrush, um.drush)
-	assert.NotNil(t, um.modules)
-	assert.Empty(t, um.modules)
+	assert.Empty(t, um.modules.All())
 }
 
 func TestUnsupportedModules_PreSiteUpdateHandler_Success(t *testing.T) {
@@ -45,7 +44,7 @@ func TestUnsupportedModules_PreSiteUpdateHandler_Success(t *testing.T) {
 	err := um.preSiteUpdateHandler(mockEvent)
 
 	require.NoError(t, err)
-	assert.Equal(t, mockModules[0], um.modules["module_a"])
+	assert.Equal(t, map[string][]drush.UnsupportedModule{testSite: mockModules}, um.modules.All())
 }
 
 func TestUnsupportedModules_PreSiteUpdateHandler_Dedupe(t *testing.T) {
@@ -64,8 +63,7 @@ func TestUnsupportedModules_PreSiteUpdateHandler_Dedupe(t *testing.T) {
 	require.NoError(t, um.preSiteUpdateHandler(workflow.NewPreSiteUpdateEvent(ctx, "/test/path", committer, "site1")))
 	require.NoError(t, um.preSiteUpdateHandler(workflow.NewPreSiteUpdateEvent(ctx, "/test/path", committer, "site2")))
 
-	assert.Len(t, um.modules, 1)
-	assert.Equal(t, shared, um.modules["module_a"])
+	assert.Equal(t, []drush.UnsupportedModule{shared}, um.ReportData(), "a module two sites share is one finding")
 }
 
 func TestUnsupportedModules_PreSiteUpdateHandler_NoModules(t *testing.T) {
@@ -85,7 +83,7 @@ func TestUnsupportedModules_PreSiteUpdateHandler_NoModules(t *testing.T) {
 	err := um.preSiteUpdateHandler(mockEvent)
 
 	require.NoError(t, err)
-	assert.Empty(t, um.modules)
+	assert.Empty(t, um.modules.All())
 }
 
 func TestUnsupportedModules_PreSiteUpdateHandler_Error(t *testing.T) {
@@ -108,5 +106,5 @@ func TestUnsupportedModules_PreSiteUpdateHandler_Error(t *testing.T) {
 	err := um.preSiteUpdateHandler(mockEvent)
 
 	require.NoError(t, err)
-	assert.Empty(t, um.modules)
+	assert.Empty(t, um.modules.All())
 }

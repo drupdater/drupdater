@@ -178,7 +178,7 @@ func TestTranslationsUpdaterErrors(t *testing.T) {
 		err := tu.postSiteUpdateHandler(newEvent(&fakeCommitter{err: assert.AnError}))
 		require.ErrorIs(t, err, assert.AnError)
 		assert.Contains(t, err.Error(), "failed to commit translation path")
-		assert.Empty(t, tu.results, "a site whose commit failed has no outcome to report")
+		assert.Empty(t, tu.results.All(), "a site whose commit failed has no outcome to report")
 	})
 }
 

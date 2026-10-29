@@ -120,7 +120,7 @@ Where things live. For *how they work*, read `docs/explanation/` rather than dup
 - **`internal/addon/report.go` is a published contract.** Renaming a field there is a breaking change to `schema_version`, and `internal/addon/testdata/run_report.json` is what makes such a rename fail rather than ship. A new reporting addon belongs in that golden's `reportingAddons()`.
 - **Report types mirror rather than reuse internal types** (`report.PackageChange` vs `composer.PackageChange`) so an internal refactor can't rename a published field.
 - **The report's deferred write is registered first**, so it runs last and is emitted on every exit path.
-- **Per-site events fire concurrently.** Addon state accumulated across sites must be mutex-guarded, and maps handed to the report must be copies. `-race` only catches a missing guard if a test drives the handler from several sites at once — when you add cross-site state, add it to `internal/addon/concurrency_test.go` too.
+- **Per-site events fire concurrently.** An addon with a per-site hook keeps what it finds in a `workflow.PerSite` — one value per site, locked inside, copied on read — and has no map, slice or mutex field of its own; `TestPerSiteHooksShareStateOnlyThroughPerSite` fails the build otherwise. Add the addon to `internal/addon/concurrency_test.go` too, which drives it from many sites at once under `-race`.
 
 ## Comments
 
