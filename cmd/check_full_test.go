@@ -3,6 +3,8 @@ package cmd
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/drupdater/drupdater/internal"
@@ -33,10 +35,15 @@ func (f *fakeComposer) GetConfig(_ context.Context, _ string, _ string) (string,
 type fakeInstaller struct {
 	failFor map[string]error
 	calls   []string
+
+	dataDir        string
+	dataDirExisted bool
 }
 
 func (f *fakeInstaller) Install(_ context.Context, dir string, site string) error {
 	f.calls = append(f.calls, dir+"/"+site)
+	_, err := os.Stat(f.dataDir)
+	f.dataDirExisted = err == nil
 	return f.failFor[site]
 }
 
@@ -54,7 +61,10 @@ func stubFullCheckDeps(t *testing.T, clonePath string, cloneErr error, composerD
 				return clonePath, cloneErr
 			},
 			newComposer: func() fullCheckComposer { return composerDouble },
-			newInstaller: func(fullCheckComposer) (siteInstaller, error) {
+			newInstaller: func(_ fullCheckComposer, dataDir string) (siteInstaller, error) {
+				if fake, ok := installer.(*fakeInstaller); ok {
+					fake.dataDir = dataDir
+				}
 				return installer, installerErr
 			},
 		}
@@ -162,4 +172,20 @@ func TestRunFullChecksStopsAtCloneFailure(t *testing.T) {
 	// Nothing was constructed past the clone, so there is nothing to clean up either.
 	assert.Zero(t, comp.cleanupCalled)
 	assert.Empty(t, comp.installCalls)
+}
+
+func TestRunFullChecksRemovesTheCloneAndSiteData(t *testing.T) {
+	clone := filepath.Join(t.TempDir(), "repo123")
+	require.NoError(t, os.MkdirAll(clone, 0o755))
+	inst := &fakeInstaller{}
+	stubFullCheckDeps(t, clone, nil, &fakeComposer{}, inst, nil)
+
+	cfg := internal.Config{RepositoryURL: "https://example.com/acme/site.git", Sites: []string{"default"}}
+	runFullChecks(t.Context(), zap.NewNop(), cfg, "")
+
+	require.NotEmpty(t, inst.dataDir)
+	assert.True(t, inst.dataDirExisted, "the installer's data directory must exist while sites install")
+	assert.NotEqual(t, filepath.Dir(clone), filepath.Dir(inst.dataDir), "site data must not land beside the clone")
+	assert.NoDirExists(t, inst.dataDir)
+	assert.NoDirExists(t, clone)
 }

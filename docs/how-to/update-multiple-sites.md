@@ -90,19 +90,18 @@ updated independently — the point is a single, coherent request.
 
 ## Disk requirements
 
-Each site gets its own SQLite database and private files directory, written **beside** the
-working directory:
+Each site gets its own SQLite database and private files directory, in one directory the
+run creates under the system temp dir (`$TMPDIR`, else `/tmp`):
 
 ```text
-<working-dir>/../default.sqlite
-<working-dir>/../intranet.sqlite
-<working-dir>/../careers.sqlite
-<working-dir>/../private/<site>/
+$TMPDIR/drupdater-sites-<random>/default.sqlite
+$TMPDIR/drupdater-sites-<random>/intranet.sqlite
+$TMPDIR/drupdater-sites-<random>/careers.sqlite
+$TMPDIR/drupdater-sites-<random>/private/<site>/
 ```
 
-Budget for one full database per site. Checkout-mode runs remove all of them afterwards,
-including the `private/` directory itself — but only if it is empty, so a project's real
-private files directory survives.
+Budget for one full database per site on that filesystem. The directory is removed when the
+run ends; nothing is written beside the working directory.
 
 ## What the request looks like
 

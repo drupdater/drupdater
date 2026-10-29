@@ -1,6 +1,7 @@
 package drupal
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -43,8 +44,13 @@ profile: thunder
 
 	t.Run("Success", func(t *testing.T) {
 		// Setup mocks
+		var duringInstall []byte
 		drush := NewMockDrush(t)
-		drush.EXPECT().InstallSite(t.Context(), "/tmp", "site1").Return(nil)
+		drush.EXPECT().InstallSite(t.Context(), "/tmp", "site1").RunAndReturn(func(context.Context, string, string) error {
+			var err error
+			duringInstall, err = afero.ReadFile(fs, settingsPath)
+			return err
+		})
 		drush.EXPECT().GetConfigSyncDir(t.Context(), "/tmp", "site1", false).Return(configSyncDir, nil)
 
 		composer := NewMockComposer(t)
@@ -55,6 +61,7 @@ profile: thunder
 			drush:    drush,
 			composer: composer,
 			fs:       fs,
+			dataDir:  "/data",
 		}
 
 		err := installer.Install(t.Context(), "/tmp", "site1")
@@ -62,26 +69,30 @@ profile: thunder
 			t.Fatalf("Failed to install Drupal: %v", err)
 		}
 
-		settingsContent, err := afero.ReadFile(fs, settingsPath)
-		if err != nil {
-			t.Fatalf("Failed to read updated content from settings.php: %v", err)
-		}
 		updatedContent := `
 ` + settingsMarker + `
 $databases['default']['default'] = [
-	'database' => '/site1.sqlite',
+	'database' => '/data/site1.sqlite',
 	'prefix' => '',
 	'driver' => 'sqlite',
 	'namespace' => 'Drupal\\sqlite\\Driver\\Database\\sqlite',
 	'autoload' => 'core/modules/sqlite/src/Driver/Database/sqlite/',
 ];
 $settings['skip_permissions_hardening'] = TRUE;
-$settings['file_private_path'] = '/private/site1';
+$settings['file_private_path'] = '/data/private/site1';
 $settings['hash_salt'] = 'changeme';
 `
 
-		if string(settingsContent) != updatedContent {
-			t.Fatalf("Expected content: %s, got: %s", updatedContent, string(settingsContent))
+		if string(duringInstall) != updatedContent {
+			t.Fatalf("Expected content during install: %s, got: %s", updatedContent, string(duringInstall))
+		}
+
+		after, err := afero.ReadFile(fs, settingsPath)
+		if err != nil {
+			t.Fatalf("Failed to read settings.php: %v", err)
+		}
+		if string(after) != settingsContent {
+			t.Fatalf("settings.php must be restored after the install, got: %s", string(after))
 		}
 	})
 
@@ -105,6 +116,14 @@ $settings['hash_salt'] = 'changeme';
 
 		if err == nil {
 			t.Fatalf("Expected an error but got nil")
+		}
+
+		after, readErr := afero.ReadFile(fs, settingsPath)
+		if readErr != nil {
+			t.Fatalf("Failed to read settings.php: %v", readErr)
+		}
+		if string(after) != settingsContent {
+			t.Fatalf("settings.php must be restored after a failed install, got: %s", string(after))
 		}
 	})
 }

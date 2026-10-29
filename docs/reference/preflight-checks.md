@@ -106,8 +106,8 @@ Without a token this check is skipped entirely and its absence from the output i
 Added by `--full`. These cost most of a real run.
 
 The repository is cloned to a **scratch directory** — never the live working copy — and
-everything is removed afterwards, including the clone, each `<site>.sqlite` and
-`private/<site>`.
+everything is removed afterwards: the clone, and the temporary directory holding the
+sites' databases and private files.
 
 Four names can appear in this tier. Three of them replace the rest of the tier when they
 fail, because there is nothing left to check:

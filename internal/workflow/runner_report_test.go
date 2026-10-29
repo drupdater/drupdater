@@ -94,6 +94,7 @@ func (h *reportHarness) expectFullRun(t *testing.T) {
 
 	h.installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil).Maybe()
 	h.installer.EXPECT().ConfigureDatabase(anyCtx, "/tmp", "site1").Return(nil).Maybe()
+	h.installer.EXPECT().RestoreSettings(anyCtx, "/tmp", "site1").Return(nil).Maybe()
 	h.drush.EXPECT().UpdateSite(anyCtx, "/tmp", "site1").Return(nil).Maybe()
 	h.drush.EXPECT().ExportConfiguration(anyCtx, "/tmp", "site1").Return(nil).Maybe()
 	h.drush.EXPECT().ConfigResave(anyCtx, "/tmp", "site1").Return(nil).Maybe()
@@ -263,6 +264,7 @@ func TestReportNoChangesIsNotAFailure(t *testing.T) {
 	h.worktree.EXPECT().Checkout(mock.Anything).Return(nil).Maybe()
 	h.installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil).Maybe()
 	h.installer.EXPECT().ConfigureDatabase(anyCtx, "/tmp", "site1").Return(nil).Maybe()
+	h.installer.EXPECT().RestoreSettings(anyCtx, "/tmp", "site1").Return(nil).Maybe()
 	h.repository.EXPECT().Head().Return(nil, plumbing.ErrReferenceNotFound).Maybe()
 	h.composer.EXPECT().Update(anyCtx, "/tmp", mock.Anything, mock.Anything, false, false).
 		Return([]composer.PackageChange{}, nil)

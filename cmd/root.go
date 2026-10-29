@@ -114,7 +114,13 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	// Patch checks leave a scratch project with a full vendor tree behind otherwise.
 	defer composer.Cleanup()
 	drupalOrg := drupalorg.NewHTTPClient(logger)
-	installer := drupal.NewInstaller(logger, drush, composer)
+	siteData, err := os.MkdirTemp("", "drupdater-sites-")
+	if err != nil {
+		logger.Error("failed to create the site database directory", zap.Error(err))
+		return err
+	}
+	defer os.RemoveAll(siteData)
+	installer := drupal.NewInstaller(logger, drush, composer, siteData)
 	git := repo.NewGitRepositoryService(logger)
 
 	// In checkout mode the URL and target branch come from the checkout; --branch is --clone only.

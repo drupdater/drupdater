@@ -50,6 +50,7 @@ type Worktree = repo.Worktree
 type Installer interface {
 	Install(ctx context.Context, dir string, site string) error
 	ConfigureDatabase(ctx context.Context, dir string, site string) error
+	RestoreSettings(ctx context.Context, dir string, site string) error
 }
 
 type Platform interface {
