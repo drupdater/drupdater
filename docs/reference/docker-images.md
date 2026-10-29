@@ -102,25 +102,15 @@ release the image came from.
 
 ## Volumes and the working directory
 
-Drupdater writes each site's SQLite database and private files **beside** the working
-directory, not inside it:
-
-```text
-<working-dir>/../<site>.sqlite
-<working-dir>/../private/<site>/
-```
-
-So the checkout's parent must be a real, writable directory inside the container. Mount
-a parent directory and point `--working-dir` at the checkout within it:
+Drupdater writes each site's SQLite database and private files to a directory of its own
+under the container's temp dir (`$TMPDIR`, else `/tmp`), removed when the run ends. Only
+the checkout itself needs to be mounted:
 
 ```bash
-docker run -v "$(pwd)":/workspace/project -w /workspace \
+docker run -v "$(pwd)":/workspace -w /workspace \
   ghcr.io/drupdater/drupdater-php8.3:latest \
-  "$DRUPDATER_TOKEN" --working-dir /workspace/project
+  "$DRUPDATER_TOKEN" --working-dir /workspace
 ```
-
-Mounting the checkout directly at `/` or at a mount root leaves nowhere to write those
-files.
 
 ## Building locally
 

@@ -308,9 +308,7 @@ func (r *Runner) acquireWorkingCopy(username, email string) (GitRepository, Work
 // stageScaffoldChanges stages the web-root files drupal-scaffold rewrites on a core update --
 // .htaccess, robots.txt, index.php -- which the composer.* glob does not cover.
 //
-// Tracked paths only: vendor/ and web/core legitimately sit untracked in the checkout. Each
-// site's settings.php is excluded too, because the installer appends throwaway SQLite
-// credentials to it (pkg/drupal/installer.go).
+// Tracked paths only: vendor/ and web/core legitimately sit untracked in the checkout.
 func (r *Runner) stageScaffoldChanges(ctx context.Context, path string, worktree Worktree) error {
 	status, err := worktree.Status()
 	if err != nil {
@@ -335,19 +333,11 @@ func (r *Runner) stageScaffoldChanges(ctx context.Context, path string, worktree
 	if err != nil {
 		return fmt.Errorf("failed to determine web root: %w", err)
 	}
-	excluded := make(map[string]struct{}, len(r.config.Sites))
-	for _, site := range r.config.Sites {
-		excluded[filepath.Join(webroot, "sites", site, "settings.php")] = struct{}{}
-	}
-
 	staged := make([]string, 0, len(candidates))
 	for _, file := range candidates {
 		// Web root only: everything outside it belongs to a later phase, and sweeping it in
 		// here would commit it mid-update, still carrying the baseline install's state.
 		if !strings.HasPrefix(file, webroot+"/") {
-			continue
-		}
-		if _, skip := excluded[file]; skip {
 			continue
 		}
 		if _, err := worktree.Add(file); err != nil {
@@ -378,8 +368,8 @@ func (r *Runner) forEachSite(ctx context.Context, fn func(context.Context, strin
 	return g.Wait()
 }
 
-// cleanup removes the run's artifacts: its temp clone, or the files a site install wrote beside
-// the checkout.
+// cleanup removes a clone-mode run's temp clone. Site databases live in the installer's own
+// directory, which its owner removes.
 func (r *Runner) cleanup(path string) {
 	if r.config.Clone {
 		// This run's own directory, not the shared per-URL parent, so a concurrent run of the
@@ -387,21 +377,7 @@ func (r *Runner) cleanup(path string) {
 		if rel, err := filepath.Rel(os.TempDir(), path); err == nil && rel != "." && !strings.HasPrefix(rel, "..") {
 			os.RemoveAll(path)
 		}
-		return
 	}
-	CleanupSiteArtifacts(filepath.Dir(path), r.config.Sites)
-}
-
-// CleanupSiteArtifacts removes the SQLite databases and private files a site install writes
-// beside the checkout. Shared with "drupdater check --full", which owes the same cleanup.
-func CleanupSiteArtifacts(parent string, sites []string) {
-	for _, site := range sites {
-		os.Remove(filepath.Join(parent, site+".sqlite"))
-		// Per-site only: "private" is a standard Drupal tree and can hold real project data.
-		os.RemoveAll(filepath.Join(parent, "private", site))
-	}
-	// Drops the parent only if it is now empty — os.Remove refuses a non-empty directory.
-	os.Remove(filepath.Join(parent, "private"))
 }
 
 // resolveUpdate settles what the update changes and what its branch is called, touching only
@@ -529,12 +505,18 @@ func (r *Runner) ensureUpdateBranchAvailable(repository GitRepository, updateBra
 	return nil
 }
 
-func (r *Runner) updateSite(ctx context.Context, path string, worktree Worktree, site string) error {
+func (r *Runner) updateSite(ctx context.Context, path string, worktree Worktree, site string) (err error) {
 	r.logger.Info("updating site", zap.String("site", site))
 
 	if err := r.installer.ConfigureDatabase(ctx, path, site); err != nil {
 		return fmt.Errorf("failed to configure database: %w", err)
 	}
+	// Uncancelled: the first failing site cancels ctx, and the rest must still be put back.
+	defer func() {
+		if restoreErr := r.installer.RestoreSettings(context.WithoutCancel(ctx), path, site); restoreErr != nil {
+			err = errors.Join(err, fmt.Errorf("failed to restore settings: %w", restoreErr))
+		}
+	}()
 
 	preSiteUpdateEvent := NewPreSiteUpdateEvent(ctx, path, worktree, site)
 	if err := r.dispatcher.FireEvent(preSiteUpdateEvent); err != nil {

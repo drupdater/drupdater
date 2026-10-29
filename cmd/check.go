@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 
@@ -217,7 +216,7 @@ type siteInstaller interface {
 type fullCheckDeps struct {
 	clone        func(repositoryURL string, branch string, token string) (string, error)
 	newComposer  func() fullCheckComposer
-	newInstaller func(fullCheckComposer) (siteInstaller, error)
+	newInstaller func(c fullCheckComposer, dataDir string) (siteInstaller, error)
 }
 
 // newFullCheckDeps builds the real dependencies. A variable so tests can substitute doubles.
@@ -229,12 +228,12 @@ var newFullCheckDeps = func(logger *zap.Logger) fullCheckDeps {
 			return path, err
 		},
 		newComposer: func() fullCheckComposer { return composer.NewCLI(logger) },
-		newInstaller: func(c fullCheckComposer) (siteInstaller, error) {
+		newInstaller: func(c fullCheckComposer, dataDir string) (siteInstaller, error) {
 			cache, err := NewCache()
 			if err != nil {
 				return nil, err
 			}
-			return drupal.NewInstaller(logger, drush.NewCLI(logger, cache), c), nil
+			return drupal.NewInstaller(logger, drush.NewCLI(logger, cache), c, dataDir), nil
 		},
 	}
 }
@@ -257,7 +256,7 @@ func runFullChecks(ctx context.Context, logger *zap.Logger, cfg internal.Config,
 	if err != nil {
 		return []workflow.CheckResult{workflow.CheckFailed("clone for full check", err.Error())}
 	}
-	defer cleanupFullCheckArtifacts(path, cfg.Sites)
+	defer os.RemoveAll(path)
 
 	composerCLI := deps.newComposer()
 	defer composerCLI.Cleanup()
@@ -267,7 +266,13 @@ func runFullChecks(ctx context.Context, logger *zap.Logger, cfg internal.Config,
 	}
 	results := []workflow.CheckResult{workflow.CheckOK("composer install")}
 
-	installer, err := deps.newInstaller(composerCLI)
+	siteData, err := os.MkdirTemp("", "drupdater-sites-")
+	if err != nil {
+		return append(results, workflow.CheckFailed("drush site-install --existing-config", err.Error()))
+	}
+	defer os.RemoveAll(siteData)
+
+	installer, err := deps.newInstaller(composerCLI, siteData)
 	if err != nil {
 		return append(results, workflow.CheckFailed("drush site-install --existing-config", err.Error()))
 	}
@@ -281,13 +286,6 @@ func runFullChecks(ctx context.Context, logger *zap.Logger, cfg internal.Config,
 		results = append(results, workflow.CheckOK(name))
 	}
 	return results
-}
-
-// cleanupFullCheckArtifacts removes the clone and the SQLite/private files the installs wrote.
-func cleanupFullCheckArtifacts(path string, sites []string) {
-	defer os.RemoveAll(path)
-
-	workflow.CleanupSiteArtifacts(filepath.Dir(path), sites)
 }
 
 // printCheckResults redacts each detail: a failure's Detail can carry raw subprocess output.

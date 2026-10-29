@@ -76,6 +76,12 @@ This is what makes the update hooks in phase 7 meaningful. Running `updatedb` re
 database at the pre-update schema; without a baseline there would be nothing for the
 hooks to update, and no way to discover which hooks the update introduces.
 
+The database is SQLite, in a directory of the system temp dir that belongs to this run.
+Drupal reads its database settings only from `settings.php`, so Drupdater appends a
+block pointing there, and cuts it off again as soon as the install finishes. The same
+happens around each site's update in phase 7. That leaves `settings.php` byte-for-byte
+as the project has it whenever anything is staged or committed.
+
 Sites are installed concurrently, limited by `--concurrency`.
 
 ### 6. `update shared code`
@@ -89,8 +95,7 @@ The centre of the run:
    rewrote that git already tracks — `drupal-scaffold` owns files in the web root such as
    `.htaccess`, `robots.txt` and `index.php`, and a core update changes them. Untracked
    paths are left alone: `vendor/`, `web/core` and the site's generated files belong to
-   nobody. Each site's `settings.php` is excluded too, because the baseline install
-   appended a throwaway SQLite database to it.
+   nobody.
 4. Fire **`post-code-update`** — Rector, PHPCBF, and the post-update security audit.
 5. Check out the branch named in phase 4 from the work branch's tip.
 
@@ -169,10 +174,9 @@ that [`composer_allow_plugins`](../reference/addons/composer-allow-plugins.md) l
 `composer.json`. Errors during restore are logged but never returned: they must not mask
 the original failure.
 
-**Site artefacts are removed.** In checkout mode, each `<site>.sqlite` and
-`private/<site>` beside the working directory, then `private/` itself — which only
-succeeds if empty, which is exactly the desired guard. A project's real private files
-directory survives.
+**Site artefacts are removed.** Each site's SQLite database and private files live in
+one temporary directory of the run's own, removed whole when the run ends. Nothing is
+written beside the checkout, so a project's real `private/` directory is never touched.
 
 In clone mode the whole temporary directory is removed, guarded by a check that it really
 is inside the system temp directory.

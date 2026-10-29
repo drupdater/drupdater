@@ -83,16 +83,20 @@ has an effect here.
 
 ## Where files are written
 
-Site databases are SQLite files written **beside** the working directory, not inside it:
+Site databases are SQLite files, written with each site's private files to a directory
+the run creates under the system temp dir (`$TMPDIR`, else `/tmp`):
 
 ```text
-<working-dir>/../<site>.sqlite
-<working-dir>/../private/<site>/
+$TMPDIR/drupdater-sites-<random>/<site>.sqlite
+$TMPDIR/drupdater-sites-<random>/private/<site>/
 ```
 
-Checkout-mode runs remove these afterwards, including the `private/` directory itself if
-it is empty — so a project's real private files directory survives. This means the
-checkout's parent must be a real, writable directory.
+The directory is removed when the run ends, however it ends. Nothing is written beside the
+working directory.
+
+Each site's `settings.php` has a block appended pointing at that database while Drupal
+needs it, and is restored byte-for-byte afterwards — before anything is staged, and on
+failure too.
 
 ## Examples
 

@@ -52,6 +52,7 @@ func TestRun(t *testing.T) {
 
 	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil)
 	installer.EXPECT().ConfigureDatabase(anyCtx, "/tmp", "site1").Return(nil)
+	installer.EXPECT().RestoreSettings(anyCtx, "/tmp", "site1").Return(nil)
 
 	drush.EXPECT().UpdateSite(anyCtx, "/tmp", "site1").Return(nil)
 	drush.EXPECT().ExportConfiguration(anyCtx, "/tmp", "site1").Return(nil)
@@ -130,6 +131,7 @@ func TestRunPublishUsesLiveContext(t *testing.T) {
 
 	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil)
 	installer.EXPECT().ConfigureDatabase(anyCtx, "/tmp", "site1").Return(nil)
+	installer.EXPECT().RestoreSettings(anyCtx, "/tmp", "site1").Return(nil)
 
 	drush.EXPECT().UpdateSite(anyCtx, "/tmp", "site1").Return(nil)
 	drush.EXPECT().ExportConfiguration(anyCtx, "/tmp", "site1").Return(nil)
@@ -213,6 +215,7 @@ func TestRunSiteFailureDoesNotPublish(t *testing.T) {
 
 	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil)
 	installer.EXPECT().ConfigureDatabase(anyCtx, "/tmp", "site1").Return(nil)
+	installer.EXPECT().RestoreSettings(anyCtx, "/tmp", "site1").Return(nil)
 
 	// The site update fails. ConfigResave/ExportConfiguration are left unexpected on
 	// purpose: if the failure didn't short-circuit, those calls would fail the test.
@@ -442,6 +445,7 @@ func TestRunInstallsSitesAtTheOldCode(t *testing.T) {
 		steps = append(steps, "site update")
 		return nil
 	})
+	installer.EXPECT().RestoreSettings(anyCtx, "/tmp", "site1").Return(nil)
 	drush.EXPECT().UpdateSite(anyCtx, "/tmp", "site1").Return(nil)
 	drush.EXPECT().ConfigResave(anyCtx, "/tmp", "site1").Return(nil)
 	drush.EXPECT().ExportConfiguration(anyCtx, "/tmp", "site1").Return(nil)
@@ -727,6 +731,7 @@ func TestRunWithDryRun(t *testing.T) {
 
 	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil)
 	installer.EXPECT().ConfigureDatabase(anyCtx, "/tmp", "site1").Return(nil)
+	installer.EXPECT().RestoreSettings(anyCtx, "/tmp", "site1").Return(nil)
 
 	drush.EXPECT().UpdateSite(anyCtx, "/tmp", "site1").Return(nil)
 	drush.EXPECT().ExportConfiguration(anyCtx, "/tmp", "site1").Return(nil)
@@ -791,6 +796,7 @@ func TestRunCheckoutDryRunWithoutPlatform(t *testing.T) {
 
 	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil)
 	installer.EXPECT().ConfigureDatabase(anyCtx, "/tmp", "site1").Return(nil)
+	installer.EXPECT().RestoreSettings(anyCtx, "/tmp", "site1").Return(nil)
 
 	drush.EXPECT().UpdateSite(anyCtx, "/tmp", "site1").Return(nil)
 	drush.EXPECT().ExportConfiguration(anyCtx, "/tmp", "site1").Return(nil)
@@ -859,6 +865,7 @@ func TestPublishWorkDeletesBranchOnMRFailure(t *testing.T) {
 
 	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil)
 	installer.EXPECT().ConfigureDatabase(anyCtx, "/tmp", "site1").Return(nil)
+	installer.EXPECT().RestoreSettings(anyCtx, "/tmp", "site1").Return(nil)
 
 	drush.EXPECT().UpdateSite(anyCtx, "/tmp", "site1").Return(nil)
 	drush.EXPECT().ExportConfiguration(anyCtx, "/tmp", "site1").Return(nil)
@@ -921,6 +928,7 @@ func TestPublishWorkLogsWarningWhenDeleteBranchFails(t *testing.T) {
 
 	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil)
 	installer.EXPECT().ConfigureDatabase(anyCtx, "/tmp", "site1").Return(nil)
+	installer.EXPECT().RestoreSettings(anyCtx, "/tmp", "site1").Return(nil)
 
 	drush.EXPECT().UpdateSite(anyCtx, "/tmp", "site1").Return(nil)
 	drush.EXPECT().ExportConfiguration(anyCtx, "/tmp", "site1").Return(nil)
@@ -985,6 +993,7 @@ func TestPublishWorkPushFails(t *testing.T) {
 
 	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil)
 	installer.EXPECT().ConfigureDatabase(anyCtx, "/tmp", "site1").Return(nil)
+	installer.EXPECT().RestoreSettings(anyCtx, "/tmp", "site1").Return(nil)
 
 	drush.EXPECT().UpdateSite(anyCtx, "/tmp", "site1").Return(nil)
 	drush.EXPECT().ExportConfiguration(anyCtx, "/tmp", "site1").Return(nil)
@@ -1133,6 +1142,7 @@ func TestRunConfigResaveError(t *testing.T) {
 
 	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil)
 	installer.EXPECT().ConfigureDatabase(anyCtx, "/tmp", "site1").Return(nil)
+	installer.EXPECT().RestoreSettings(anyCtx, "/tmp", "site1").Return(nil)
 
 	drush.EXPECT().UpdateSite(anyCtx, "/tmp", "site1").Return(nil)
 	resaveErr := errors.New("drush config:resave failed")
@@ -1186,6 +1196,7 @@ func TestRunExportConfigurationError(t *testing.T) {
 
 	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil)
 	installer.EXPECT().ConfigureDatabase(anyCtx, "/tmp", "site1").Return(nil)
+	installer.EXPECT().RestoreSettings(anyCtx, "/tmp", "site1").Return(nil)
 
 	drush.EXPECT().UpdateSite(anyCtx, "/tmp", "site1").Return(nil)
 	drush.EXPECT().ConfigResave(anyCtx, "/tmp", "site1").Return(nil)
@@ -1241,6 +1252,7 @@ func TestRunWithAutoMerge(t *testing.T) {
 
 	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil)
 	installer.EXPECT().ConfigureDatabase(anyCtx, "/tmp", "site1").Return(nil)
+	installer.EXPECT().RestoreSettings(anyCtx, "/tmp", "site1").Return(nil)
 
 	drush.EXPECT().UpdateSite(anyCtx, "/tmp", "site1").Return(nil)
 	drush.EXPECT().ExportConfiguration(anyCtx, "/tmp", "site1").Return(nil)
@@ -1306,6 +1318,7 @@ func TestRunAutoMergeError(t *testing.T) {
 
 	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil)
 	installer.EXPECT().ConfigureDatabase(anyCtx, "/tmp", "site1").Return(nil)
+	installer.EXPECT().RestoreSettings(anyCtx, "/tmp", "site1").Return(nil)
 
 	drush.EXPECT().UpdateSite(anyCtx, "/tmp", "site1").Return(nil)
 	drush.EXPECT().ExportConfiguration(anyCtx, "/tmp", "site1").Return(nil)
@@ -1370,6 +1383,7 @@ func TestRunAutoMergeSkippedWhenDisabled(t *testing.T) {
 
 	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil)
 	installer.EXPECT().ConfigureDatabase(anyCtx, "/tmp", "site1").Return(nil)
+	installer.EXPECT().RestoreSettings(anyCtx, "/tmp", "site1").Return(nil)
 
 	drush.EXPECT().UpdateSite(anyCtx, "/tmp", "site1").Return(nil)
 	drush.EXPECT().ExportConfiguration(anyCtx, "/tmp", "site1").Return(nil)
@@ -1444,6 +1458,7 @@ func TestRunFireEventError(t *testing.T) {
 	// installSite may or may not run before the context is cancelled.
 	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil).Maybe()
 	installer.EXPECT().ConfigureDatabase(anyCtx, "/tmp", "site1").Return(nil).Maybe()
+	installer.EXPECT().RestoreSettings(anyCtx, "/tmp", "site1").Return(nil).Maybe()
 	drush.EXPECT().UpdateSite(anyCtx, "/tmp", "site1").Return(nil).Maybe()
 	drush.EXPECT().ExportConfiguration(anyCtx, "/tmp", "site1").Return(nil).Maybe()
 	drush.EXPECT().ConfigResave(anyCtx, "/tmp", "site1").Return(nil).Maybe()
@@ -1485,6 +1500,7 @@ func TestRunUsesExistingCheckout(t *testing.T) {
 
 	installer.EXPECT().Install(anyCtx, checkout, "site1").Return(nil)
 	installer.EXPECT().ConfigureDatabase(anyCtx, checkout, "site1").Return(nil)
+	installer.EXPECT().RestoreSettings(anyCtx, checkout, "site1").Return(nil)
 
 	drush.EXPECT().UpdateSite(anyCtx, checkout, "site1").Return(nil)
 	drush.EXPECT().ExportConfiguration(anyCtx, checkout, "site1").Return(nil)
@@ -1600,6 +1616,7 @@ func TestRunRestoresCheckoutOnFailureInCheckoutMode(t *testing.T) {
 
 	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil).Maybe()
 	installer.EXPECT().ConfigureDatabase(anyCtx, "/tmp", "site1").Return(nil).Maybe()
+	installer.EXPECT().RestoreSettings(anyCtx, "/tmp", "site1").Return(nil).Maybe()
 	drush.EXPECT().UpdateSite(anyCtx, "/tmp", "site1").Return(nil).Maybe()
 	drush.EXPECT().ExportConfiguration(anyCtx, "/tmp", "site1").Return(nil).Maybe()
 	drush.EXPECT().ConfigResave(anyCtx, "/tmp", "site1").Return(nil).Maybe()
@@ -1646,6 +1663,7 @@ func TestRunDoesNotRestoreCheckoutOnSuccess(t *testing.T) {
 
 	installer.EXPECT().Install(anyCtx, checkout, "site1").Return(nil)
 	installer.EXPECT().ConfigureDatabase(anyCtx, checkout, "site1").Return(nil)
+	installer.EXPECT().RestoreSettings(anyCtx, checkout, "site1").Return(nil)
 
 	drush.EXPECT().UpdateSite(anyCtx, checkout, "site1").Return(nil)
 	drush.EXPECT().ExportConfiguration(anyCtx, checkout, "site1").Return(nil)
@@ -1793,18 +1811,72 @@ func TestCleanup(t *testing.T) {
 		assert.DirExists(t, os.TempDir())
 	})
 
-	t.Run("checkout mode removes the sqlite databases and private dir", func(t *testing.T) {
+	t.Run("checkout mode leaves the checkout and its parent alone", func(t *testing.T) {
 		base := t.TempDir()
 		work := filepath.Join(base, "checkout")
 		require.NoError(t, os.MkdirAll(work, 0o755))
-		require.NoError(t, os.WriteFile(filepath.Join(base, "site1.sqlite"), []byte("x"), 0o600))
 		require.NoError(t, os.MkdirAll(filepath.Join(base, "private"), 0o755))
 
 		ws := &Runner{logger: logger, config: internal.Config{Sites: []string{"site1"}}}
 		ws.cleanup(work)
 
-		assert.NoFileExists(t, filepath.Join(base, "site1.sqlite"))
-		assert.NoDirExists(t, filepath.Join(base, "private"))
+		assert.DirExists(t, work)
+		assert.DirExists(t, filepath.Join(base, "private"))
+	})
+}
+
+func TestUpdateSiteRestoresSettings(t *testing.T) {
+	newRunner := func(t *testing.T) (*Runner, *MockInstaller, *MockDrush) {
+		t.Helper()
+		installer := NewMockInstaller(t)
+		drush := NewMockDrush(t)
+		dispatcher := NewMockEventDispatcher(t)
+		dispatcher.EXPECT().FireEvent(mock.Anything).Return(nil).Maybe()
+		return &Runner{logger: zap.NewNop(), installer: installer, drush: drush, dispatcher: dispatcher}, installer, drush
+	}
+
+	t.Run("after a failed update hook", func(t *testing.T) {
+		ws, installer, drush := newRunner(t)
+		installer.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(nil)
+		drush.EXPECT().UpdateSite(anyCtx, "/project", "site1").Return(assert.AnError)
+		installer.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(nil).Once()
+
+		err := ws.updateSite(t.Context(), "/project", nil, "site1")
+		require.ErrorIs(t, err, assert.AnError)
+		assert.NotContains(t, err.Error(), "restore")
+	})
+
+	t.Run("with a context another site cancelled", func(t *testing.T) {
+		ws, installer, drush := newRunner(t)
+		ctx, cancel := context.WithCancel(t.Context())
+		installer.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(nil)
+		drush.EXPECT().UpdateSite(anyCtx, "/project", "site1").RunAndReturn(func(context.Context, string, string) error {
+			cancel()
+			return context.Canceled
+		})
+		installer.EXPECT().RestoreSettings(mock.MatchedBy(func(ctx context.Context) bool { return ctx.Err() == nil }), "/project", "site1").Return(nil).Once()
+
+		require.ErrorIs(t, ws.updateSite(ctx, "/project", nil, "site1"), context.Canceled)
+	})
+
+	t.Run("a failed restore fails the site", func(t *testing.T) {
+		ws, installer, drush := newRunner(t)
+		installer.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(nil)
+		drush.EXPECT().UpdateSite(anyCtx, "/project", "site1").Return(nil)
+		drush.EXPECT().ConfigResave(anyCtx, "/project", "site1").Return(nil)
+		drush.EXPECT().ExportConfiguration(anyCtx, "/project", "site1").Return(nil)
+		installer.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(assert.AnError)
+
+		err := ws.updateSite(t.Context(), "/project", nil, "site1")
+		require.ErrorIs(t, err, assert.AnError)
+		assert.Contains(t, err.Error(), "failed to restore settings")
+	})
+
+	t.Run("not when configuring failed", func(t *testing.T) {
+		ws, installer, _ := newRunner(t)
+		installer.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(assert.AnError)
+
+		require.ErrorIs(t, ws.updateSite(t.Context(), "/project", nil, "site1"), assert.AnError)
 	})
 }
 
@@ -1958,32 +2030,6 @@ func TestStageScaffoldChanges(t *testing.T) {
 		require.NoError(t, ws.stageScaffoldChanges(context.Background(), "/project", worktree))
 		// "webhooks/" is in the list because a prefix match on "web" rather than "web/" would
 		// pull it in.
-		assert.Equal(t, []string{"web/robots.txt"}, staged)
-	})
-
-	t.Run("never stages a site's settings.php", func(t *testing.T) {
-		// The installer appends the throwaway SQLite database to it. Committing that would put
-		// test credentials and a local path into the merge request.
-		worktree := NewMockWorktree(t)
-		worktree.EXPECT().Status().Return(git.Status{
-			"web/sites/default/settings.php": {Worktree: git.Modified},
-			"web/sites/second/settings.php":  {Worktree: git.Modified},
-			"web/robots.txt":                 {Worktree: git.Modified},
-		}, nil)
-
-		var staged []string
-		worktree.EXPECT().Add(mock.Anything).RunAndReturn(func(path string) (plumbing.Hash, error) {
-			staged = append(staged, path)
-			return plumbing.ZeroHash, nil
-		})
-
-		ws := &Runner{
-			logger:   logger,
-			config:   internal.Config{Sites: []string{"default", "second"}},
-			composer: newComposer("web/"),
-		}
-
-		require.NoError(t, ws.stageScaffoldChanges(context.Background(), "/project", worktree))
 		assert.Equal(t, []string{"web/robots.txt"}, staged)
 	})
 
