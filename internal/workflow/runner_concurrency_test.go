@@ -2,10 +2,13 @@ package workflow
 
 import (
 	"context"
-	"github.com/drupdater/drupdater/pkg/repo"
+	"slices"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/drupdater/drupdater/pkg/repo"
 
 	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/codehosting"
@@ -45,7 +48,7 @@ func (o *occupancyProbe) probe(context.Context, string, string) error {
 func (o *occupancyProbe) peak() int32 { return o.high.Load() }
 
 // Every other Run test runs a single site, which walks the per-site phases on one
-// goroutine and leaves forEachSite's fan-out and siteCommitMu untested against each other. This
+// goroutine and leaves forEachSite's fan-out and the sites' turns untested against each other. This
 // one drives the real workflow with several sites, and asserts both halves of the design: the
 // independent phase overlaps, the committing one does not.
 func TestRunWithConcurrentSites(t *testing.T) {
@@ -113,8 +116,8 @@ func TestRunWithConcurrentSites(t *testing.T) {
 	// The baseline installs are the fan-out: independent per site, so they must overlap or the
 	// concurrency the whole design rests on is not happening.
 	assert.Greater(t, baseline.peak(), int32(1), "baseline site installs never overlapped")
-	// The tail of updateSite commits into one shared working tree, so siteCommitMu has to keep
-	// it to one site at a time however many are running.
+	// The tail of updateSite commits into one shared working tree, so the turns have to keep it
+	// to one site at a time however many are running.
 	assert.EqualValues(t, 1, commitTail.peak(), "the committing tail of updateSite overlapped")
 
 	installer.AssertExpectations(t)
@@ -122,4 +125,133 @@ func TestRunWithConcurrentSites(t *testing.T) {
 	repositoryService.AssertExpectations(t)
 	mockComposer.AssertExpectations(t)
 	vcsProvider.AssertExpectations(t)
+}
+
+// turnsRunner is a Runner whose sites each export to config/<site>, and which records the order
+// the exports happen in. stub sets what each site's update hooks do.
+func turnsRunner(t *testing.T, sites []string, concurrency int, stub func(site string) error) (*Runner, *fakeCommitter, func() []string) {
+	t.Helper()
+	installer := NewMockInstaller(t)
+	drush := NewMockDrush(t)
+	var mu sync.Mutex
+	var exported []string
+
+	for _, site := range sites {
+		installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, site).Return(nil)
+		installer.EXPECT().RestoreSettings(anyCtx, testCheckout, site).Return(nil).Once()
+		drush.EXPECT().UpdateSite(anyCtx, testCheckout, site).RunAndReturn(func(context.Context, string, string) error {
+			return stub(site)
+		})
+		drush.EXPECT().ConfigResave(anyCtx, testCheckout, site).Return(nil).Maybe()
+		drush.EXPECT().ExportConfiguration(anyCtx, testCheckout, site).RunAndReturn(func(context.Context, string, string) error {
+			mu.Lock()
+			defer mu.Unlock()
+			exported = append(exported, site)
+			return nil
+		}).Maybe()
+		drush.EXPECT().GetConfigSyncDir(anyCtx, testCheckout, site, true).Return("config/"+site, nil).Maybe()
+	}
+
+	committer := &fakeCommitter{result: true}
+	r := &Runner{
+		logger:    zap.NewNop(),
+		config:    internal.Config{Sites: sites, Concurrency: concurrency},
+		installer: installer,
+		drush:     drush,
+		hooks:     NewPipeline(nil),
+		committer: committer,
+	}
+	return r, committer, func() []string {
+		mu.Lock()
+		defer mu.Unlock()
+		return slices.Clone(exported)
+	}
+}
+
+func commitMessages(c *fakeCommitter) []string {
+	messages := make([]string, 0, len(c.commits))
+	for _, commit := range c.commits {
+		messages = append(messages, commit.message)
+	}
+	return messages
+}
+
+// withinDeadline fails instead of hanging when the turns deadlock.
+func withinDeadline(t *testing.T, fn func() error) error {
+	t.Helper()
+	result := make(chan error, 1)
+	go func() { result <- fn() }()
+	select {
+	case err := <-result:
+		return err
+	case <-time.After(10 * time.Second):
+		t.Fatal("the sites never finished: a turn was never handed on")
+		return nil
+	}
+}
+
+func TestUpdateSitesCommitsInSiteOrderHoweverTheSitesFinish(t *testing.T) {
+	sites := []string{"site1", "site2", "site3"}
+	// Each site's update hooks finish only after the next site's have, so the sites finish their
+	// database work last to first.
+	finished := map[string]chan struct{}{}
+	for _, site := range sites {
+		finished[site] = make(chan struct{})
+	}
+	r, committer, exported := turnsRunner(t, sites, len(sites), func(site string) error {
+		defer close(finished[site])
+		if i := slices.Index(sites, site); i+1 < len(sites) {
+			<-finished[sites[i+1]]
+		}
+		return nil
+	})
+
+	require.NoError(t, withinDeadline(t, func() error { return r.updateSites(t.Context(), testCheckout) }))
+
+	assert.Equal(t, sites, exported())
+	assert.Equal(t, []string{"Update configuration site1", "Update configuration site2", "Update configuration site3"}, commitMessages(committer))
+}
+
+func TestUpdateSitesRunsInOrderWithOneSiteAtATime(t *testing.T) {
+	sites := []string{"site1", "site2", "site3"}
+	r, committer, exported := turnsRunner(t, sites, 1, func(string) error { return nil })
+
+	require.NoError(t, withinDeadline(t, func() error { return r.updateSites(t.Context(), testCheckout) }))
+
+	assert.Equal(t, sites, exported())
+	assert.Len(t, committer.commits, len(sites))
+}
+
+func TestUpdateSitesGivesNoLaterSiteATurnAfterAnEarlierOneFails(t *testing.T) {
+	sites := []string{"site1", "site2", "site3"}
+	// site1 fails only once the later sites have finished their database work and are waiting
+	// for their turn, so a turn handed on regardless would show up as an export.
+	waiting := make(chan struct{}, len(sites))
+	r, committer, exported := turnsRunner(t, sites, len(sites), func(site string) error {
+		if site != "site1" {
+			waiting <- struct{}{}
+			return nil
+		}
+		<-waiting
+		<-waiting
+		return assert.AnError
+	})
+
+	err := withinDeadline(t, func() error { return r.updateSites(t.Context(), testCheckout) })
+
+	require.ErrorIs(t, err, assert.AnError)
+	assert.Empty(t, exported(), "a site after the failed one exported anyway")
+	assert.Empty(t, committer.commits)
+}
+
+func TestUpdateSiteReportsACancelledWaitForItsTurn(t *testing.T) {
+	r, committer, exported := turnsRunner(t, []string{"site2"}, 1, func(string) error { return nil })
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	err := r.updateSite(ctx, testCheckout, "site2", make(chan struct{}), make(chan struct{}))
+
+	require.ErrorIs(t, err, context.Canceled, "a site that never got its turn must not read as done")
+	assert.Empty(t, exported())
+	assert.Empty(t, committer.commits)
 }

@@ -115,14 +115,21 @@ The centre of the run:
 
 ### 7. `site update`
 
-Per site, concurrently: configure the database, fire **`pre-site-update`**, run the update
-hooks, resave configuration, fire **`post-site-update`**, export configuration, and commit
-the site's config sync directory as `Update configuration <site>`.
+Each site's work has two halves:
 
-The commit step is serialised across sites even though the rest is concurrent: all sites
-share one worktree and one git index. Drupdater commits the export itself rather than
-letting `drush config:export --commit` run git, so no git hook or git-config identity is
-involved.
+1. **Concurrently, across sites:** configure the database, fire **`pre-site-update`**, run
+   the update hooks and resave configuration. This half touches only the site's database.
+2. **One site at a time, in `--sites` order:** fire **`post-site-update`**, export
+   configuration, and commit the site's config sync directory as `Update configuration
+   <site>`.
+
+The second half writes into the working tree. Sites share that working tree and its git
+index, and two sites can name the same config or translation directory. A site starts its
+second half once its own first half is done and every site before it in `--sites` has
+finished its second half. Overlapping sites still overlap on the slow database work, and
+the commits come out in the same order on every run, whichever site finishes first.
+Drupdater commits the export itself rather than letting `drush config:export --commit` run
+git, so no git hook or git-config identity is involved.
 
 Once every site is done, the update branch named in phase 4 is pointed at the result. Only
 now, because the run commits on a detached `HEAD`: a branch created earlier would not follow
@@ -210,5 +217,6 @@ it really is inside the system temp directory.
 Per-site work fans out with a limit of `--concurrency`, defaulting to `GOMAXPROCS(0)` —
 which reflects the container's CPU quota rather than the host's core count.
 
-The first site to fail cancels the rest. Sites are not updated independently; the point is
-a single coherent request covering all of them.
+The first site to fail cancels the rest, and no later site in `--sites` order gets to
+write into the working tree after it. Sites are not updated independently; the point is a
+single coherent request covering all of them.

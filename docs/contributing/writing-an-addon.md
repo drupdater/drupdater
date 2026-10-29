@@ -76,8 +76,10 @@ addon to `TestAddonHookStages`.
 
 ### Concurrency
 
-`pre-site-update` and `post-site-update` fire **once per site, concurrently**. Keep what such
-a hook finds in a `workflow.PerSite[T]` field: the hook calls `Set(evt.Site(), value)` for its
+`pre-site-update` and `post-site-update` fire **once per site, from a goroutine per site**.
+`pre-site-update` hooks run concurrently. `post-site-update` hooks run one site at a time,
+in `--sites` order, because they may write into the shared working tree, but still from
+different goroutines. Keep what either kind of hook finds in a `workflow.PerSite[T]` field: the hook calls `Set(evt.Site(), value)` for its
 own site, and `ReportData` reads `All()`, a copy, and merges the sites — deduplicating, say,
 as `unsupported_modules` does. The lock lives inside `PerSite`, so there is none to forget.
 
