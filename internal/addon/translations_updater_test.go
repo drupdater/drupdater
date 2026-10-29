@@ -11,13 +11,6 @@ import (
 	"go.uber.org/zap"
 )
 
-func TestTranslationsUpdater_RenderTemplate(t *testing.T) {
-	tu := &TranslationsUpdater{}
-	result, err := tu.RenderTemplate()
-	require.NoError(t, err)
-	assert.Empty(t, result)
-}
-
 func TestUpdateTranslationsEventHandlerWithoutLocaleDeploy(t *testing.T) {
 	// Setup - Create mocks and system under test
 	mockDrush := NewMockDrush(t)

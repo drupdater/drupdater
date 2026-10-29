@@ -290,46 +290,31 @@ func TestRunWithoutReportSinkIsUnaffected(t *testing.T) {
 	assert.Nil(t, h.got)
 }
 
-// mergeRequestAddon stands in at both points the merge request is assembled: it renames the
-// title and contributes a description section.
-type mergeRequestAddon struct {
-	title   string
-	section string
-	// err fails the handler, renderErr the section one step later.
-	err       error
-	renderErr error
+// quietAddon hooks nothing and reports nothing.
+type quietAddon struct{}
+
+func (quietAddon) Hooks() Hooks { return Hooks{} }
+
+// advisoryAddon reports one remaining advisory, which the description renders as its own section.
+func advisoryAddon() *reportingAddon {
+	return &reportingAddon{key: "composer_audit", data: map[string]any{
+		"remaining": []map[string]string{{"cve": "CVE-2026-1", "title": "XSS", "severity": "high", "packageName": "drupal/core"}},
+	}}
 }
-
-func (a *mergeRequestAddon) Hooks() Hooks {
-	return Hooks{PreMergeRequestCreate: On(Change, func(e *PreMergeRequestCreateEvent) error {
-		if a.err != nil {
-			return a.err
-		}
-		e.Title = a.title
-		return nil
-	})}
-}
-
-func (a *mergeRequestAddon) RenderTemplate() (string, error) { return a.section, a.renderErr }
-
-var _ Addon = (*mergeRequestAddon)(nil)
 
 // A --dry-run assembles a merge request without opening one, which is what makes a broken
 // template visible before a real run has pushed anything.
 func TestReportRecordsMergeRequestContentOnDryRun(t *testing.T) {
 	h := newReportHarness(t, true)
 	h.expectFullRun(t)
-	h.withAddons(&mergeRequestAddon{
-		title:   "2026-07-25: Drupal Security Updates",
-		section: "## Security Report\n",
-	})
+	h.withAddons(advisoryAddon())
 
 	require.NoError(t, h.run(t))
 
 	require.NotNil(t, h.got)
-	assert.Equal(t, "2026-07-25: Drupal Security Updates", h.got.MergeRequestTitle,
-		"the title an addon set must be the one the dry run reports")
-	assert.Contains(t, h.got.MergeRequestDescription, "## Security Report")
+	assert.Contains(t, h.got.MergeRequestTitle, ": Drupal Maintenance Updates")
+	assert.Contains(t, h.got.MergeRequestDescription, "## 🛡️ Security Report")
+	assert.Contains(t, h.got.MergeRequestDescription, "CVE-2026-1")
 	assert.Contains(t, phaseNames(h.got.Phases), "render merge request")
 	assert.NotContains(t, phaseNames(h.got.Phases), "publish")
 	assert.Nil(t, h.got.MergeRequest)
@@ -339,7 +324,7 @@ func TestReportRecordsMergeRequestContentOnDryRun(t *testing.T) {
 func TestReportedMergeRequestContentIsWhatWasPublished(t *testing.T) {
 	h := newReportHarness(t, false)
 	h.expectFullRun(t)
-	h.withAddons(&mergeRequestAddon{title: "custom title", section: "## Section\n"})
+	h.withAddons(advisoryAddon())
 	h.repository.EXPECT().Push(mock.Anything).Return(nil)
 
 	var publishedTitle, publishedDescription string
@@ -353,49 +338,27 @@ func TestReportedMergeRequestContentIsWhatWasPublished(t *testing.T) {
 	require.NoError(t, h.run(t))
 
 	require.NotNil(t, h.got)
-	assert.Equal(t, "custom title", publishedTitle)
-	assert.Contains(t, publishedDescription, "## Section")
+	assert.Contains(t, publishedDescription, "CVE-2026-1")
 	assert.Equal(t, publishedTitle, h.got.MergeRequestTitle)
 	assert.Equal(t, publishedDescription, h.got.MergeRequestDescription)
 }
 
-// A phase like any other, so its failure is attributed rather than unexplained. Both halves
-// can fail: the event settling the title, and the template rendering the description.
+// A phase like any other, so its failure is attributed rather than unexplained: here a section
+// whose shape the description cannot read.
 func TestReportNamesTheRenderPhaseWhenAssemblyFails(t *testing.T) {
-	t.Run("the title event fails", func(t *testing.T) {
-		titleErr := errors.New("addon could not produce a title")
-		h := newReportHarness(t, true)
-		h.expectFullRun(t)
-		h.withAddons(&mergeRequestAddon{err: titleErr})
+	h := newReportHarness(t, true)
+	h.expectFullRun(t)
+	h.withAddons(&reportingAddon{key: "composer_audit", data: "not an object"})
 
-		err := h.run(t)
+	err := h.run(t)
 
-		// Wrapped, not replaced: a caller matching on its own sentinel error still can.
-		require.ErrorIs(t, err, titleErr)
-		require.NotNil(t, h.got)
-		assert.Equal(t, report.StatusFailed, h.got.Status)
-		assert.Equal(t, "render merge request", h.got.FailedPhase)
-		assert.Contains(t, h.got.Error, "pre-merge-request-create hook failed")
-		assert.Contains(t, h.got.Error, "addon could not produce a title")
-		assert.Empty(t, h.got.MergeRequestTitle)
-		assert.Empty(t, h.got.MergeRequestDescription)
-	})
-
-	t.Run("an addon cannot render its section", func(t *testing.T) {
-		renderErr := errors.New("template exploded")
-		h := newReportHarness(t, true)
-		h.expectFullRun(t)
-		h.withAddons(&mergeRequestAddon{title: "a title", renderErr: renderErr})
-
-		err := h.run(t)
-
-		require.ErrorIs(t, err, renderErr)
-		require.NotNil(t, h.got)
-		assert.Equal(t, report.StatusFailed, h.got.Status)
-		assert.Equal(t, "render merge request", h.got.FailedPhase)
-		assert.Contains(t, h.got.Error, "failed to generate description")
-		assert.Empty(t, h.got.MergeRequestDescription)
-	})
+	require.ErrorContains(t, err, "failed to generate description")
+	require.NotNil(t, h.got)
+	assert.Equal(t, report.StatusFailed, h.got.Status)
+	assert.Equal(t, "render merge request", h.got.FailedPhase)
+	assert.Contains(t, h.got.Error, "failed to read the report's addon sections")
+	assert.Empty(t, h.got.MergeRequestTitle)
+	assert.Empty(t, h.got.MergeRequestDescription)
 }
 
 func phaseNames(phases []report.Phase) []string {
@@ -459,7 +422,7 @@ func TestReportRecordsAutoMergeOutcome(t *testing.T) {
 }
 
 type reportingAddon struct {
-	mergeRequestAddon
+	quietAddon
 	key  string
 	data any
 }
@@ -471,13 +434,13 @@ func TestReportCollectsSectionsOnlyFromReporters(t *testing.T) {
 	h := newReportHarness(t, true)
 	h.expectFullRun(t)
 	h.withAddons(
-		&reportingAddon{key: "composer_audit", data: map[string]int{"fixed": 2}},
+		&reportingAddon{key: "translations_updater", data: map[string]int{"fixed": 2}},
 		&reportingAddon{key: "quiet_addon"},
-		&mergeRequestAddon{},
+		quietAddon{},
 	)
 
 	require.NoError(t, h.run(t))
 
 	require.NotNil(t, h.got)
-	assert.Equal(t, map[string]any{"composer_audit": map[string]int{"fixed": 2}}, h.got.Addons)
+	assert.Equal(t, map[string]any{"translations_updater": map[string]int{"fixed": 2}}, h.got.Addons)
 }

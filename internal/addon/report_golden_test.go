@@ -53,6 +53,17 @@ func reportingAddons() []workflow.Addon {
 	}
 
 	return []workflow.Addon{
+		&ComposerAllowPlugins{newAllowPlugins: []string{"tbachert/spi", "php-http/discovery"}},
+		&ComposerDiff{entries: []composer.DiffEntry{
+			{
+				Package: "drupal/core", Operation: "upgrade", From: "10.3.8", To: "10.3.9", Direct: true,
+				CompareURL: "https://github.com/drupal/core/compare/10.3.8...10.3.9", ProjectURL: "https://github.com/drupal/core",
+			},
+			{Package: "drupal/redirect", Operation: "install", To: "1.10.0", Direct: true, ProjectURL: "https://www.drupal.org/project/redirect"},
+			{Package: "drupal/legacy_feature", Operation: "remove", From: "1.2.0", Direct: true},
+			{Package: "phpunit/phpunit", Operation: "upgrade", From: "10.5.30", To: "10.5.31", Dev: true,
+				CompareURL: "https://github.com/sebastianbergmann/phpunit/compare/10.5.30...10.5.31"},
+		}},
 		&ComposerAudit{beforeAudit: beforeAudit, afterAudit: afterAudit},
 		&UpdateHooks{hooks: UpdateHooksPerSite{
 			"default": {"token_update_8002": {Module: "token", UpdateID: 8002, Description: "Rebuild the token cache", Type: "hook_update_n"}},

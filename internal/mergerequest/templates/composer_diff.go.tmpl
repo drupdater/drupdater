@@ -1,0 +1,13 @@
+## 🛠️ Dependency updates
+
+<details open>
+<summary>Open/close</summary>
+{{ $links := .Links }}
+{{- range .Tables }}
+| {{ .Title }} | Operation | Base | Target |{{ if $links }} Link |{{ end }}
+| --- | --- | --- | --- |{{ if $links }} --- |{{ end }}
+{{ range .Changes -}}
+| {{ if and $links .ProjectURL }}[{{ .Package | cell }}]({{ .ProjectURL }}){{ else }}{{ .Package | cell }}{{ end }} | {{ .Operation | operation }} | {{ .From | version }} | {{ .To | version }} |{{ if $links }} {{ if .CompareURL }}[Compare]({{ .CompareURL }}){{ end }} |{{ end }}
+{{ end -}}
+{{ end }}
+</details>

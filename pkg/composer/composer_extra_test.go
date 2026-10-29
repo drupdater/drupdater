@@ -4,8 +4,6 @@ import (
 	"context"
 	"os"
 	"os/exec"
-	"slices"
-	"strings"
 	"testing"
 
 	"github.com/spf13/afero"
@@ -324,40 +322,13 @@ func TestGetInstalledPackageVersionErrors(t *testing.T) {
 	})
 }
 
-func TestDiffFallsBackWhenTooLargeInBytes(t *testing.T) {
-	// The MR body limit is bytes, not runes: 40000 "é" is under the rune threshold and over the
-	// byte one, so the fallback must measure bytes.
-	hugeMultiByte := strings.Repeat("é", 40000)
-
-	var calls int
-	execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
-		calls++
-		out := hugeMultiByte
-		if !slices.Contains(arg, "--with-links") {
-			out = "short plain diff"
-		}
-		cs := []string{"-test.run=TestHelperProcess", "--", out}
-		cs = append(cs, arg...)
-		cmd := exec.CommandContext(ctx, os.Args[0], cs...)
-		cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
-		return cmd
-	}
-	t.Cleanup(func() { execCommand = exec.CommandContext })
-
-	service := &CLI{logger: zap.NewNop()}
-	out, err := service.Diff(t.Context(), "/tmp", true)
-	require.NoError(t, err)
-	assert.Equal(t, "short plain diff", out)
-	assert.Equal(t, 2, calls, "expected a fallback call without --with-links")
-}
-
 func TestDiffFailure(t *testing.T) {
 	stubComposerFailure(t)
 
 	service := &CLI{logger: zap.NewNop()}
-	out, err := service.Diff(t.Context(), "/tmp", true)
+	entries, err := service.Diff(t.Context(), "/tmp")
 	require.Error(t, err)
-	assert.Empty(t, out)
+	assert.Nil(t, entries)
 }
 
 func TestGetInstalledPluginsFailure(t *testing.T) {

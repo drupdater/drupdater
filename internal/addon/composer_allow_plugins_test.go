@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/drupdater/drupdater/internal/golden"
 	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -81,30 +80,4 @@ func TestDefaultAllowPlugins_PostComposerUpdateHandler(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"new/plugin"}, ap.newAllowPlugins)
 	composerRunner.AssertExpectations(t)
-}
-
-func TestDefaultAllowPlugins_RenderTemplate(t *testing.T) {
-	logger := zap.NewNop()
-	composerRunner := NewMockComposer(t)
-
-	ap := NewComposerAllowPlugins(logger, composerRunner)
-	ap.newAllowPlugins = []string{"plugin1", "plugin2"}
-
-	result, err := ap.RenderTemplate()
-
-	require.NoError(t, err)
-	golden.Assert(t, "testdata/allowplugins.md", result)
-}
-
-func TestDefaultAllowPlugins_RenderTemplate_Empty(t *testing.T) {
-	logger := zap.NewNop()
-	composerRunner := NewMockComposer(t)
-
-	ap := NewComposerAllowPlugins(logger, composerRunner)
-	ap.newAllowPlugins = []string{}
-
-	result, err := ap.RenderTemplate()
-
-	require.NoError(t, err)
-	assert.Empty(t, result)
 }

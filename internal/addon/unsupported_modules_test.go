@@ -5,9 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/drupdater/drupdater/internal/golden"
 	"github.com/drupdater/drupdater/internal/workflow"
-	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/drush"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -25,37 +23,6 @@ func TestNewUnsupportedModules(t *testing.T) {
 	assert.Equal(t, mockDrush, um.drush)
 	assert.NotNil(t, um.modules)
 	assert.Empty(t, um.modules)
-}
-
-func TestUnsupportedModules_RenderTemplate(t *testing.T) {
-	logger := zap.NewNop()
-	mockDrush := NewMockDrush(t)
-
-	um := NewUnsupportedModules(logger, mockDrush)
-	um.modules = map[string]drush.UnsupportedModule{
-		"module_b": {Name: "module_b", InstalledVersion: "2.3.1", RecommendedVersion: "3.0.0"},
-		"module_a": {Name: "module_a", InstalledVersion: "1.0.0", RecommendedVersion: "None"},
-	}
-	um.abandoned = []workflow.AbandonedPackage{
-		{Name: "swiftmailer/swiftmailer", Replacement: "symfony/mailer"},
-		{Name: "patchwork/jsqueeze"},
-	}
-
-	result, err := um.RenderTemplate()
-
-	require.NoError(t, err)
-	golden.Assert(t, "testdata/unsupported_modules.md", result)
-}
-
-func TestUnsupportedModules_RenderTemplate_Empty(t *testing.T) {
-	logger := zap.NewNop()
-	mockDrush := NewMockDrush(t)
-	um := NewUnsupportedModules(logger, mockDrush)
-
-	result, err := um.RenderTemplate()
-
-	require.NoError(t, err)
-	assert.Empty(t, result)
 }
 
 func TestUnsupportedModules_PreSiteUpdateHandler_Success(t *testing.T) {
@@ -142,91 +109,4 @@ func TestUnsupportedModules_PreSiteUpdateHandler_Error(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Empty(t, um.modules)
-}
-
-// TestUnsupportedModules_PreMergeRequestCreateHandler checks the handoff from composer_audit:
-// the abandoned packages arrive on the event and are rendered in the same list as the modules.
-func TestUnsupportedModules_PreMergeRequestCreateHandler(t *testing.T) {
-	um := NewUnsupportedModules(zap.NewNop(), NewMockDrush(t))
-
-	evt := &workflow.PreMergeRequestCreateEvent{
-		AbandonedPackages: []workflow.AbandonedPackage{{Name: "patchwork/jsqueeze"}},
-	}
-
-	require.NoError(t, um.preMergeRequestCreateHandler(evt))
-	assert.Equal(t, evt.AbandonedPackages, um.abandoned)
-}
-
-// An abandoned package with no unsupported module still gets the section — the case that fell
-// through the gap before the two lists were merged.
-func TestUnsupportedModules_RenderTemplate_AbandonedOnly(t *testing.T) {
-	um := NewUnsupportedModules(zap.NewNop(), NewMockDrush(t))
-	um.abandoned = []workflow.AbandonedPackage{{Name: "patchwork/jsqueeze"}}
-
-	result, err := um.RenderTemplate()
-	require.NoError(t, err)
-	assert.Contains(t, result, "| patchwork/jsqueeze | Abandoned package | — | No replacement suggested |")
-}
-
-// One list sorted by name, sources interleaved. Both halves come from maps, so without the sort
-// two runs over an unchanged project produce different descriptions.
-func TestUnsupportedModules_EndOfLifeEntries_Ordering(t *testing.T) {
-	um := NewUnsupportedModules(zap.NewNop(), NewMockDrush(t))
-	um.modules = map[string]drush.UnsupportedModule{
-		"zebra": {Name: "zebra", InstalledVersion: "1.0.0", RecommendedVersion: "2.0.0"},
-		"alpha": {Name: "alpha", InstalledVersion: "1.0.0", RecommendedVersion: "None"},
-	}
-	um.abandoned = []workflow.AbandonedPackage{
-		{Name: "zeta/pkg"},
-		{Name: "acme/pkg", Replacement: "acme/next"},
-	}
-
-	names := make([]string, 0, 4)
-	for _, entry := range um.endOfLifeEntries() {
-		names = append(names, entry.Name)
-	}
-	assert.Equal(t, []string{"acme/pkg", "alpha", "zebra", "zeta/pkg"}, names)
-}
-
-// The four phrasings, including drush's literal "None" — a status, not a version to update to.
-func TestUnsupportedModules_EndOfLifeEntries_Recommendations(t *testing.T) {
-	um := NewUnsupportedModules(zap.NewNop(), NewMockDrush(t))
-	um.modules = map[string]drush.UnsupportedModule{
-		"none":    {Name: "none", RecommendedVersion: "None"},
-		"empty":   {Name: "empty", RecommendedVersion: ""},
-		"upgrade": {Name: "upgrade", RecommendedVersion: "3.0.0"},
-	}
-	um.abandoned = []workflow.AbandonedPackage{
-		{Name: "a/replaced", Replacement: "a/next"},
-		{Name: "b/orphan"},
-	}
-
-	got := map[string]string{}
-	for _, entry := range um.endOfLifeEntries() {
-		got[entry.Name] = entry.Recommendation
-	}
-	assert.Equal(t, map[string]string{
-		"none":       "No supported release — replace it",
-		"empty":      "No supported release — replace it",
-		"upgrade":    "Update to 3.0.0",
-		"a/replaced": "Replace with a/next",
-		"b/orphan":   "No replacement suggested",
-	}, got)
-}
-
-// The whole handoff through the addons' hooks, with the reader listed first: only the stages put
-// the write before the read.
-func TestUnsupportedModules_AbandonedHandoff(t *testing.T) {
-	audit := NewComposerAudit(zap.NewNop(), NewMockComposer(t), false)
-	audit.afterAudit = composer.Audit{
-		Abandoned: []composer.AbandonedPackage{{PackageName: "swiftmailer/swiftmailer", Replacement: "symfony/mailer"}},
-	}
-	um := NewUnsupportedModules(zap.NewNop(), NewMockDrush(t))
-
-	evt := workflow.NewPreMergeRequestCreateEvent("July 2026: Drupal Maintenance Updates")
-	require.NoError(t, workflow.NewPipeline([]workflow.Addon{um, audit}).PreMergeRequestCreate(evt))
-
-	result, err := um.RenderTemplate()
-	require.NoError(t, err)
-	assert.Contains(t, result, "| swiftmailer/swiftmailer | Abandoned package | — | Replace with symfony/mailer |")
 }

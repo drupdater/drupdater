@@ -34,17 +34,6 @@ func (uh *UpdateHooks) Hooks() workflow.Hooks {
 	}
 }
 
-// RenderTemplate locks because the goroutine ordering is the caller's invariant, not this type's.
-func (uh *UpdateHooks) RenderTemplate() (string, error) {
-	uh.mu.Lock()
-	defer uh.mu.Unlock()
-
-	if len(uh.hooks) == 0 {
-		return "", nil
-	}
-	return render("update_hooks.go.tmpl", uh.hooks)
-}
-
 func (uh *UpdateHooks) preSiteUpdateHandler(evt *workflow.PreSiteUpdateEvent) error {
 
 	hooks, err := uh.drush.GetUpdateHooks(evt.Context(), evt.Path(), evt.Site())

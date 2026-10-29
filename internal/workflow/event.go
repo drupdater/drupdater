@@ -101,22 +101,3 @@ func NewPostSiteUpdateEvent(ctx context.Context, path string, committer Committe
 func (e *PostSiteUpdateEvent) Site() string {
 	return e.site
 }
-
-// AbandonedPackage mirrors composer.AbandonedPackage: it is the wire between two addons, so a
-// change to composer's output shape must not reach through it. Replacement is "" when none.
-type AbandonedPackage struct {
-	Name        string
-	Replacement string
-}
-
-type PreMergeRequestCreateEvent struct {
-	Title string
-	// Written by composer_audit at Prepare, read by unsupported_modules at Inspect.
-	AbandonedPackages []AbandonedPackage
-}
-
-func NewPreMergeRequestCreateEvent(title string) *PreMergeRequestCreateEvent {
-	return &PreMergeRequestCreateEvent{
-		Title: title,
-	}
-}

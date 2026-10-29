@@ -1,9 +1,7 @@
 package workflow
 
 import (
-	"bytes"
 	"context"
-	"embed"
 	"errors"
 	"fmt"
 	"os"
@@ -12,10 +10,10 @@ import (
 	"slices"
 	"strings"
 	"sync"
-	"text/template"
 	"time"
 
 	"github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/internal/mergerequest"
 	"github.com/drupdater/drupdater/internal/report"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/repo"
@@ -27,8 +25,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-//go:embed templates
-var templates embed.FS
 
 type Runner struct {
 	logger     *zap.Logger
@@ -242,7 +238,7 @@ func (r *Runner) runPhases(
 	var mrTitle, mrDescription string
 	if err := rec.Run("render merge request", func() error {
 		var renderErr error
-		mrTitle, mrDescription, renderErr = r.renderMergeRequest(addons)
+		mrTitle, mrDescription, renderErr = renderMergeRequest(rec, addons)
 		return renderErr
 	}); err != nil {
 		return err
@@ -257,20 +253,20 @@ func (r *Runner) runPhases(
 	return nil
 }
 
-// renderMergeRequest produces the title and description. The title starts as the maintenance
-// default and is offered to the addons — how composer_audit re-labels a security run.
-func (r *Runner) renderMergeRequest(addons []Addon) (string, string, error) {
-	e := NewPreMergeRequestCreateEvent(fmt.Sprintf("%s: Drupal Maintenance Updates", r.current.Format("January 2006")))
-	if err := r.hooks.PreMergeRequestCreate(e); err != nil {
-		return "", "", err
+// renderMergeRequest renders from the report as it stands, so the merge request says what the
+// report says. Every addon has finished by now; the final report re-reads the same sections.
+func renderMergeRequest(rec *report.Recorder, addons []Addon) (string, string, error) {
+	for _, a := range addons {
+		rec.AddReporter(a)
 	}
+	snapshot := rec.Snapshot()
 
-	description, err := renderDescription(addons)
+	description, err := mergerequest.Description(snapshot)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to generate description: %w", err)
 	}
 
-	return e.Title, description, nil
+	return mergerequest.Title(snapshot), description, nil
 }
 
 // captureOriginalHead returns the checkout's HEAD so a failed run can be put back rather than
@@ -618,23 +614,4 @@ func (r *Runner) publishWork(ctx context.Context, repository GitRepository, upda
 	}
 
 	return nil
-}
-
-// descriptionTemplates parses the embedded templates once: the FS is compiled in, result fixed.
-var descriptionTemplates = sync.OnceValues(func() (*template.Template, error) {
-	return template.ParseFS(templates, "templates/*.go.tmpl")
-})
-
-func renderDescription(addons []Addon) (string, error) {
-	tmpl, err := descriptionTemplates()
-	if err != nil {
-		return "", fmt.Errorf("failed to parse template: %w", err)
-	}
-
-	var output bytes.Buffer
-	if err := tmpl.ExecuteTemplate(&output, "dependency_update.go.tmpl", struct{ Addons []Addon }{addons}); err != nil {
-		return "", fmt.Errorf("failed to execute template: %w", err)
-	}
-
-	return output.String(), nil
 }

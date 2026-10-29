@@ -2,8 +2,10 @@ package addon
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/drupdater/drupdater/internal/workflow"
+	"github.com/drupdater/drupdater/pkg/composer"
 	"go.uber.org/zap"
 )
 
@@ -11,7 +13,7 @@ type ComposerDiff struct {
 	logger   *zap.Logger
 	composer Composer
 
-	table string
+	entries []composer.DiffEntry
 }
 
 func NewComposerDiff(logger *zap.Logger, composer Composer) *ComposerDiff {
@@ -27,29 +29,36 @@ func (cd *ComposerDiff) Hooks() workflow.Hooks {
 	}
 }
 
-// RenderTemplate returns "" with no diff, so the section is omitted rather than left empty.
-func (cd *ComposerDiff) RenderTemplate() (string, error) {
-	if cd.table == "" {
-		return "", nil
-	}
-	return render("composer_diff.go.tmpl", cd.table)
-}
-
 func (cd *ComposerDiff) postComposerUpdateHandler(evt *workflow.PostComposerUpdateEvent) error {
-
-	table, err := cd.composer.Diff(evt.Context(), evt.Path(), true)
+	entries, err := cd.composer.Diff(evt.Context(), evt.Path())
 	if err != nil {
 		return fmt.Errorf("failed to get diff: %w", err)
 	}
-	cd.table = table
+	cd.entries = entries
 
-	// The log gets the link-free table: markdown URLs are unreadable in a terminal.
-	plain, err := cd.composer.Diff(evt.Context(), evt.Path(), false)
-	if err != nil {
-		cd.logger.Warn("failed to render the dependency diff for the log", zap.Error(err))
-		return nil
+	if len(entries) > 0 {
+		cd.logger.Info("dependency diff\n" + plainDiff(entries))
 	}
-	cd.logger.Info("dependency diff\n" + plain)
 
 	return nil
+}
+
+// plainDiff is the log's rendering: one line per package, without the links a terminal can't use.
+func plainDiff(entries []composer.DiffEntry) string {
+	var b strings.Builder
+	for _, e := range entries {
+		dev := ""
+		if e.Dev {
+			dev = " (dev)"
+		}
+		fmt.Fprintf(&b, "%s %s%s: %s → %s\n", e.Operation, e.Package, dev, orDash(e.From), orDash(e.To))
+	}
+	return b.String()
+}
+
+func orDash(version string) string {
+	if version == "" {
+		return "-"
+	}
+	return version
 }

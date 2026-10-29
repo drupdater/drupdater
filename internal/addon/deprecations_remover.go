@@ -38,10 +38,6 @@ func (dr *DeprecationsRemover) Hooks() workflow.Hooks {
 	}
 }
 
-func (dr *DeprecationsRemover) RenderTemplate() (string, error) {
-	return "", nil
-}
-
 func (dr *DeprecationsRemover) postCodeUpdateHandler(evt *workflow.PostCodeUpdateEvent) error {
 	dr.logger.Info("removing deprecations")
 

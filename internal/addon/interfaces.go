@@ -15,7 +15,7 @@ type Composer interface {
 	Update(ctx context.Context, dir string, packagesToUpdate []string, packagesToKeep []string, minimalChanges bool, dryRun bool) ([]composer.PackageChange, error)
 	Audit(ctx context.Context, dir string) (composer.Audit, error)
 	Normalize(ctx context.Context, dir string) (string, error)
-	Diff(ctx context.Context, path string, withLinks bool) (string, error)
+	Diff(ctx context.Context, path string) ([]composer.DiffEntry, error)
 
 	GetInstalledPackageVersion(ctx context.Context, dir string, packageName string) (string, error)
 	GetAllowPlugins(ctx context.Context, dir string) (map[string]bool, error)

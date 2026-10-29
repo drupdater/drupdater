@@ -1,12 +1,12 @@
 # `composer_audit`
 
 Runs `composer audit` and reports what it found. On a `--security` run it also drives the
-update: it decides which packages may be touched, and retitles the pull request.
+update: it decides which packages may be touched.
 
 | | |
 |---|---|
 | Runs | **Always.** Mandatory in both modes, not something you put in `.drupdater.yaml` |
-| Events | `pre-composer-update` (**Prepare**), `post-code-update` (Inspect), `pre-merge-request-create` (Prepare) |
+| Events | `pre-composer-update` (**Prepare**), `post-code-update` (Inspect) |
 | Report key | `composer_audit` |
 | Pull request section | "🛡️ Security Report", plus the abandoned packages in [`unsupported_modules`](unsupported-modules.md)' section |
 
@@ -21,7 +21,9 @@ The audit itself runs either way. What changes is how much authority it has:
 | Contributes abandoned packages | ✅ | ✅ |
 | Narrows the update to the vulnerable packages | — | ✅ |
 | Aborts when there is nothing to fix | — | ✅ |
-| Relabels the pull request | — | ✅ |
+
+The pull request title differs too — dated and labelled as security updates — but that comes
+from the report's `mode`, not from this addon.
 
 A normal run therefore gets a security report for free — a monthly maintenance update that
 happens to close a CVE says so — without the audit dictating what that update does.
@@ -80,12 +82,11 @@ of ordinary PHP libraries.
 The list is taken from the audit **after** the update, like the remaining advisories, so it
 describes the code the pull request actually contains.
 
-It is **not rendered in this addon's section.** On `pre-merge-request-create` the list is put
-on the event, and [`unsupported_modules`](unsupported-modules.md) — which reads it at the later
-Inspect stage — renders it in the same table as the unsupported modules. An abandoned package and
-an unsupported module are the same finding to a reviewer, and which addon found one is not a
-reason to put them in different sections. The [run report](../run-report.md) keeps `abandoned`
-here, under the audit that produced it.
+It is **not rendered in this addon's section.** The pull request description shows it in
+[`unsupported_modules`' table](unsupported-modules.md#pull-request-section), joined with the
+unsupported modules: an abandoned package and an unsupported module are the same finding to a
+reviewer, and which addon found one is not a reason to put them in different sections. The
+[run report](../run-report.md) keeps `abandoned` here, under the audit that produced it.
 
 !!! info "`drupal/*` packages are excluded"
 
@@ -110,9 +111,9 @@ here, under the audit that produced it.
     is no drupdater-side switch for this — the project's Composer configuration is the single
     place it is decided.
 
-### Before the pull request — retitling
+### The pull request title
 
-**`--security` only.** Rewrites the request title from the default monthly form to:
+A `--security` run's request is titled by the report's `mode`, not by this addon, as:
 
 ```text
 2026-07-26: Drupal Security Updates
@@ -178,7 +179,7 @@ common case.
 
 ## Pull request section
 
---8<-- "internal/addon/testdata/composer_audit.md"
+--8<-- "internal/mergerequest/testdata/composer_audit.md"
 
 Rendered only when there is at least one advisory to show, so a routine update on a healthy
 project carries no security section rather than one saying there was nothing to report.

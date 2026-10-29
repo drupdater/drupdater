@@ -25,11 +25,6 @@ func (cn *ComposerNormalizer) Hooks() workflow.Hooks {
 	}
 }
 
-// RenderTemplate is empty: normalizing composer.json is visible in the diff, not in a section.
-func (cn *ComposerNormalizer) RenderTemplate() (string, error) {
-	return "", nil
-}
-
 func (cn *ComposerNormalizer) postComposerUpdateHandler(evt *workflow.PostComposerUpdateEvent) error {
 
 	installed, err := cn.composer.IsPackageInstalled(evt.Context(), evt.Path(), "ergebnis/composer-normalize")

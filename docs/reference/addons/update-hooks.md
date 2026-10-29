@@ -52,7 +52,7 @@ object; the whole section is omitted only when no site had any.
 
 ## Pull request section
 
---8<-- "internal/addon/testdata/update_hooks.md"
+--8<-- "internal/mergerequest/testdata/update_hooks.md"
 
 In a multi-site run each site gets its own `### Site: <name>` heading. With a single site
 the heading is omitted, since it would carry no information.

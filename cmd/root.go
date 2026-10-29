@@ -391,8 +391,8 @@ var addonRegistry = map[string]func(addonDeps) workflow.Addon{
 	"unsupported_modules": func(d addonDeps) workflow.Addon { return addon.NewUnsupportedModules(d.logger, d.drush) },
 }
 
-// mandatoryAddons always run, regardless of the .drupdater.yaml addon lists. composer_audit and
-// unsupported_modules render one shared end-of-life list, so both are needed on every update.
+// mandatoryAddons always run, regardless of the .drupdater.yaml addon lists. The description joins
+// composer_audit's and unsupported_modules' findings into one end-of-life list, so both always run.
 var mandatoryAddons = []string{
 	"composer_allow_plugins",
 	"composer_patches",

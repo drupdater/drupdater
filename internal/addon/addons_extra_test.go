@@ -121,27 +121,9 @@ func TestComposerAllowPluginsErrors(t *testing.T) {
 	})
 }
 
-func TestComposerDiffLogFailureDoesNotFailTheRun(t *testing.T) {
-	// The link-free table only feeds the run log. Failing to produce it must be reported but
-	// must not abort an otherwise successful update.
-	core, logs := observer.New(zap.WarnLevel)
-
-	composerService := NewMockComposer(t)
-	composerService.EXPECT().Diff(anyCtx, "/tmp", true).Return("| linked table |", nil)
-	composerService.EXPECT().Diff(anyCtx, "/tmp", false).Return("", assert.AnError)
-
-	cd := NewComposerDiff(zap.New(core), composerService)
-	err := cd.postComposerUpdateHandler(workflow.NewPostComposerUpdateEvent(t.Context(), "/tmp", nil))
-
-	require.NoError(t, err)
-	assert.Equal(t, "| linked table |", cd.table, "the merge request still gets the linked table")
-	require.Equal(t, 1, logs.Len())
-	assert.Equal(t, "failed to render the dependency diff for the log", logs.All()[0].Message)
-}
-
 func TestComposerDiffFailure(t *testing.T) {
 	composerService := NewMockComposer(t)
-	composerService.EXPECT().Diff(anyCtx, "/tmp", true).Return("", assert.AnError)
+	composerService.EXPECT().Diff(anyCtx, "/tmp").Return(nil, assert.AnError)
 
 	cd := NewComposerDiff(zap.NewNop(), composerService)
 	err := cd.postComposerUpdateHandler(workflow.NewPostComposerUpdateEvent(t.Context(), "/tmp", nil))
@@ -267,21 +249,7 @@ func TestUnsupportedModulesDeduplicatesAcrossSites(t *testing.T) {
 	require.NoError(t, um.preSiteUpdateHandler(workflow.NewPreSiteUpdateEvent(t.Context(), "/tmp", nil, "site1")))
 	require.NoError(t, um.preSiteUpdateHandler(workflow.NewPreSiteUpdateEvent(t.Context(), "/tmp", nil, "site2")))
 
-	assert.Len(t, um.modules, 1)
-
-	out, err := um.RenderTemplate()
-	require.NoError(t, err)
-	assert.Equal(t, 1, countOccurrences(out, "old_module"))
-}
-
-func countOccurrences(haystack string, needle string) int {
-	count := 0
-	for i := 0; i+len(needle) <= len(haystack); i++ {
-		if haystack[i:i+len(needle)] == needle {
-			count++
-		}
-	}
-	return count
+	assert.Equal(t, []drush.UnsupportedModule{module}, um.ReportData())
 }
 
 // anyCtx matches any non-nil context.Context in a mock expectation. mock.Anything would let a

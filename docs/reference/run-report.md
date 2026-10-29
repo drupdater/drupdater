@@ -80,8 +80,9 @@ auto-merge](../how-to/enable-auto-merge.md).
 
 ### Merge request content
 
-`merge_request_title` and `merge_request_description` hold the title and body assembled
-from the addons. They are recorded **independently of `merge_request`**: a `--dry-run`
+`merge_request_title` and `merge_request_description` hold the title and body rendered
+from this report: the description from the [`addons`](#addons) sections, the title from
+`mode` and `started_at`. They are recorded **independently of `merge_request`**: a `--dry-run`
 renders both and opens nothing, so they are the only readable account that run leaves
 behind.
 
@@ -132,7 +133,7 @@ Adds `error` when `ok` is `false`. The phase names, in order:
 | `baseline site install` | Installing each site at the old code |
 | `update shared code` | Installing the resolved update, addon events, commits, branch creation |
 | `site update` | Update hooks and configuration export per site |
-| `render merge request` | Assembling the title and description from the addons — runs under `--dry-run` too |
+| `render merge request` | Rendering the title and description from the report — runs under `--dry-run` too |
 | `publish` | Push and open the request — absent under `--dry-run` |
 
 Recording durations here makes the cost of a run measurable without separate
@@ -149,6 +150,8 @@ configured.
 
 | Key | Shape |
 |---|---|
+| [`composer_allow_plugins`](addons/composer-allow-plugins.md) | `{ added: [...] }`, sorted by name |
+| [`composer_diff`](addons/composer-diff.md) | `[ { package, operation, from, to, dev, direct, compare_url, project_url } ]`, prod first, by name |
 | [`composer_audit`](addons/composer-audit.md) | `{ fixed: [...], remaining: [...], abandoned: [...] }`, abandoned sorted by name |
 | [`update_hooks`](addons/update-hooks.md) | `{ <site>: { <hook>: {...} } }` |
 | [`unsupported_modules`](addons/unsupported-modules.md) | `[ {...} ]`, sorted by name |
@@ -158,9 +161,11 @@ configured.
 | [`translations_updater`](addons/translations-updater.md) | `{ <site>: { path, updated, skipped } }` |
 
 Addons with nothing to say are **omitted** rather than present and empty.
-[`composer_diff`](addons/composer-diff.md) and
-[`composer_normalizer`](addons/composer-normalizer.md) never appear at all — see those
-pages for why.
+[`composer_normalizer`](addons/composer-normalizer.md) never appears at all — see its page
+for why.
+
+The merge request description is rendered from these sections and nothing else, so what
+the description says about an addon is what its section says.
 
 ## Check report
 

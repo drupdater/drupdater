@@ -15,8 +15,7 @@ import (
 // Addons satisfy report.Reporter structurally, so none of them imports the report package. Keys
 // match .drupdater.yaml's addon names.
 //
-// composer_diff and composer_normalizer contribute nothing: the top-level "packages" field
-// already carries what they do.
+// composer_normalizer contributes nothing: what it changes is formatting, not a finding.
 
 // --- composer_audit ---
 
@@ -41,6 +40,60 @@ func (ca *ComposerAudit) ReportData() any {
 	}
 
 	return SecurityAdvisories{Fixed: fixed, Remaining: remaining, Abandoned: abandoned}
+}
+
+// --- composer_diff ---
+
+// DependencyChange is one row of the composer_diff section. Unlike the top-level packages, which
+// come from composer's own output, it separates dev packages and links to each change.
+type DependencyChange struct {
+	Package string `json:"package"`
+	// Operation is install, upgrade, downgrade, remove, or change: a new commit of one version.
+	Operation  string `json:"operation"`
+	From       string `json:"from,omitempty"`
+	To         string `json:"to,omitempty"`
+	Dev        bool   `json:"dev"`
+	Direct     bool   `json:"direct"`
+	CompareURL string `json:"compare_url,omitempty"`
+	ProjectURL string `json:"project_url,omitempty"`
+}
+
+// ReportKey implements report.Reporter.
+func (cd *ComposerDiff) ReportKey() string { return "composer_diff" }
+
+// ReportData implements report.Reporter.
+func (cd *ComposerDiff) ReportData() any {
+	if len(cd.entries) == 0 {
+		return nil
+	}
+
+	changes := make([]DependencyChange, 0, len(cd.entries))
+	for _, e := range cd.entries {
+		changes = append(changes, DependencyChange{
+			Package: e.Package, Operation: e.Operation, From: e.From, To: e.To,
+			Dev: e.Dev, Direct: e.Direct, CompareURL: e.CompareURL, ProjectURL: e.ProjectURL,
+		})
+	}
+	return changes
+}
+
+// --- composer_allow_plugins ---
+
+// PluginAllowlist is the composer_allow_plugins section. Added are the plugins the update brought
+// in, entered into allow-plugins as false: each needs someone to decide whether to trust it.
+type PluginAllowlist struct {
+	Added []string `json:"added"`
+}
+
+// ReportKey implements report.Reporter.
+func (ap *ComposerAllowPlugins) ReportKey() string { return "composer_allow_plugins" }
+
+// ReportData implements report.Reporter. Sorted: the plugins are found by ranging over a map.
+func (ap *ComposerAllowPlugins) ReportData() any {
+	if len(ap.newAllowPlugins) == 0 {
+		return nil
+	}
+	return PluginAllowlist{Added: slices.Sorted(slices.Values(ap.newAllowPlugins))}
 }
 
 // --- update_hooks ---

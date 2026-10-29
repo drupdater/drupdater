@@ -448,3 +448,17 @@ func TestRecorderAddReporterIgnoresNonReporters(t *testing.T) {
 
 	assert.Equal(t, map[string]any{"stub": 1}, rec.Finish().Addons)
 }
+
+func TestSnapshotLeavesTheReportOpen(t *testing.T) {
+	rec := NewRecorder("v1", ModeSecurity, true, "https://example.com/repo.git", "main", nil)
+	rec.AddSection("composer_audit", "first")
+
+	snapshot := rec.Snapshot()
+	rec.AddSection("composer_audit", "second")
+	rec.AddSection("update_hooks", "late")
+
+	assert.Equal(t, ModeSecurity, snapshot.Mode)
+	assert.True(t, snapshot.FinishedAt.IsZero(), "a snapshot does not close the report")
+	assert.Equal(t, map[string]any{"composer_audit": "first"}, snapshot.Addons, "later sections do not reach it")
+	assert.Equal(t, map[string]any{"composer_audit": "second", "update_hooks": "late"}, rec.Finish().Addons)
+}

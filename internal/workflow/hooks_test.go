@@ -9,8 +9,7 @@ import (
 
 type hookAddon struct{ hooks Hooks }
 
-func (a hookAddon) Hooks() Hooks                    { return a.hooks }
-func (a hookAddon) RenderTemplate() (string, error) { return "", nil }
+func (a hookAddon) Hooks() Hooks { return a.hooks }
 
 func failing[E any](E) error { return assert.AnError }
 
@@ -65,31 +64,28 @@ func TestPipelineCoversEveryEvent(t *testing.T) {
 	hooks := func(name string, stage Stage) Hooks {
 		r := record(name)
 		return Hooks{
-			PreComposerUpdate:     On(stage, func(*PreComposerUpdateEvent) error { return r() }),
-			PostComposerUpdate:    On(stage, func(*PostComposerUpdateEvent) error { return r() }),
-			PostCodeUpdate:        On(stage, func(*PostCodeUpdateEvent) error { return r() }),
-			PreSiteUpdate:         On(stage, func(*PreSiteUpdateEvent) error { return r() }),
-			PostSiteUpdate:        On(stage, func(*PostSiteUpdateEvent) error { return r() }),
-			PreMergeRequestCreate: On(stage, func(*PreMergeRequestCreateEvent) error { return r() }),
+			PreComposerUpdate:  On(stage, func(*PreComposerUpdateEvent) error { return r() }),
+			PostComposerUpdate: On(stage, func(*PostComposerUpdateEvent) error { return r() }),
+			PostCodeUpdate:     On(stage, func(*PostCodeUpdateEvent) error { return r() }),
+			PreSiteUpdate:      On(stage, func(*PreSiteUpdateEvent) error { return r() }),
+			PostSiteUpdate:     On(stage, func(*PostSiteUpdateEvent) error { return r() }),
 		}
 	}
 	p := NewPipeline([]Addon{hookAddon{hooks("late", Inspect)}, hookAddon{hooks("early", Prepare)}})
 	broken := NewPipeline([]Addon{hookAddon{Hooks{
-		PreComposerUpdate:     On(Change, failing[*PreComposerUpdateEvent]),
-		PostComposerUpdate:    On(Change, failing[*PostComposerUpdateEvent]),
-		PostCodeUpdate:        On(Change, failing[*PostCodeUpdateEvent]),
-		PreSiteUpdate:         On(Change, failing[*PreSiteUpdateEvent]),
-		PostSiteUpdate:        On(Change, failing[*PostSiteUpdateEvent]),
-		PreMergeRequestCreate: On(Change, failing[*PreMergeRequestCreateEvent]),
+		PreComposerUpdate:  On(Change, failing[*PreComposerUpdateEvent]),
+		PostComposerUpdate: On(Change, failing[*PostComposerUpdateEvent]),
+		PostCodeUpdate:     On(Change, failing[*PostCodeUpdateEvent]),
+		PreSiteUpdate:      On(Change, failing[*PreSiteUpdateEvent]),
+		PostSiteUpdate:     On(Change, failing[*PostSiteUpdateEvent]),
 	}}})
 
 	fires := map[string]func(*Pipeline) error{
-		"pre-composer-update":      func(p *Pipeline) error { return p.PreComposerUpdate(&PreComposerUpdateEvent{}) },
-		"post-composer-update":     func(p *Pipeline) error { return p.PostComposerUpdate(&PostComposerUpdateEvent{}) },
-		"post-code-update":         func(p *Pipeline) error { return p.PostCodeUpdate(&PostCodeUpdateEvent{}) },
-		"pre-site-update":          func(p *Pipeline) error { return p.PreSiteUpdate(&PreSiteUpdateEvent{}) },
-		"post-site-update":         func(p *Pipeline) error { return p.PostSiteUpdate(&PostSiteUpdateEvent{}) },
-		"pre-merge-request-create": func(p *Pipeline) error { return p.PreMergeRequestCreate(&PreMergeRequestCreateEvent{}) },
+		"pre-composer-update":  func(p *Pipeline) error { return p.PreComposerUpdate(&PreComposerUpdateEvent{}) },
+		"post-composer-update": func(p *Pipeline) error { return p.PostComposerUpdate(&PostComposerUpdateEvent{}) },
+		"post-code-update":     func(p *Pipeline) error { return p.PostCodeUpdate(&PostCodeUpdateEvent{}) },
+		"pre-site-update":      func(p *Pipeline) error { return p.PreSiteUpdate(&PreSiteUpdateEvent{}) },
+		"post-site-update":     func(p *Pipeline) error { return p.PostSiteUpdate(&PostSiteUpdateEvent{}) },
 	}
 	for event, fire := range fires {
 		t.Run(event, func(t *testing.T) {

@@ -43,10 +43,6 @@ func (cb *CodeBeautifier) Hooks() workflow.Hooks {
 	}
 }
 
-func (cb *CodeBeautifier) RenderTemplate() (string, error) {
-	return "", nil
-}
-
 // phpcsConfigPath returns the project's phpcs config file. An unreadable config counts as found:
 // only absence means "no config".
 func phpcsConfigPath(path string) (configPath string, found bool) {

@@ -4,5 +4,5 @@ The security report shows fixed and unfixed security vulnerabilities. There are 
 
 | Status | CVE      | Title | Severity | Package  |
 | ------ | -------- | ----- | -------- | -------- |
-| ✅     | CVE-2023-1234 | Fixed issue |  | drupal/core |
-| ⛔     | CVE-2023-5678 | Still unresolved |  | other/package |
+| ✅     | CVE-2026-1111 | Cross site scripting in the render pipeline | critical | drupal/core |
+| ⛔     | CVE-2026-2222 | Access bypass | moderate | drupal/token |

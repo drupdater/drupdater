@@ -5,7 +5,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/drupdater/drupdater/pkg/composer"
@@ -13,19 +12,12 @@ import (
 	"go.uber.org/zap"
 )
 
-// SecurityReport holds the advisories from before and after the update.
-type SecurityReport struct {
-	FixedAdvisories       []composer.Advisory
-	AfterUpdateAdvisories []composer.Advisory
-}
-
 // ComposerAudit runs on every update: a routine update that closes a CVE should say so. Only a
-// security run lets the audit dictate the update's scope, abort, and relabel the merge request.
+// security run lets the audit dictate the update's scope, and abort when there is nothing to fix.
 type ComposerAudit struct {
 	logger   *zap.Logger
 	composer Composer
 	security bool
-	current  time.Time
 
 	beforeAudit composer.Audit
 	afterAudit  composer.Audit
@@ -37,30 +29,14 @@ func NewComposerAudit(logger *zap.Logger, composer Composer, security bool) *Com
 		logger:   logger,
 		composer: composer,
 		security: security,
-		current:  time.Now(),
 	}
 }
 
 func (ca *ComposerAudit) Hooks() workflow.Hooks {
 	return workflow.Hooks{
-		PreComposerUpdate:     workflow.On(workflow.Prepare, ca.preComposerUpdateHandler),
-		PostCodeUpdate:        workflow.On(workflow.Inspect, ca.postCodeUpdateHandler),
-		PreMergeRequestCreate: workflow.On(workflow.Prepare, ca.preMergeRequestCreateHandler),
+		PreComposerUpdate: workflow.On(workflow.Prepare, ca.preComposerUpdateHandler),
+		PostCodeUpdate:    workflow.On(workflow.Inspect, ca.postCodeUpdateHandler),
 	}
-}
-
-// RenderTemplate renders nothing when there are no advisories at all, so a routine merge request
-// carries no empty security section. Abandoned packages go to unsupported_modules instead.
-func (ca *ComposerAudit) RenderTemplate() (string, error) {
-	fixed := ca.GetFixedAdvisories()
-	if len(fixed) == 0 && len(ca.afterAudit.Advisories) == 0 {
-		return "", nil
-	}
-
-	return render("security_report.go.tmpl", SecurityReport{
-		FixedAdvisories:       fixed,
-		AfterUpdateAdvisories: ca.afterAudit.Advisories,
-	})
 }
 
 // preComposerUpdateHandler audits the pre-update code. A security run narrows the update to the
@@ -160,22 +136,4 @@ func advisoryKey(a composer.Advisory) string {
 		return "id:" + a.AdvisoryID
 	}
 	return "pkg:" + strconv.Quote(a.PackageName) + strconv.Quote(a.Title)
-}
-
-// preMergeRequestCreateHandler publishes the abandoned packages for unsupported_modules and, on a
-// security run, relabels the merge request. Runs at Normal, above the BelowNormal consumer.
-func (ca *ComposerAudit) preMergeRequestCreateHandler(evt *workflow.PreMergeRequestCreateEvent) error {
-
-	for _, pkg := range ca.GetAbandonedPackages() {
-		evt.AbandonedPackages = append(evt.AbandonedPackages, workflow.AbandonedPackage{
-			Name:        pkg.PackageName,
-			Replacement: pkg.Replacement,
-		})
-	}
-
-	if ca.security {
-		evt.Title = fmt.Sprintf("%s: Drupal Security Updates", ca.current.Format("2006-01-02"))
-	}
-
-	return nil
 }

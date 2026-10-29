@@ -32,13 +32,6 @@ func TestRecordFixes_DoesNotSortRectorsOutputInPlace(t *testing.T) {
 		"the report section is still sorted")
 }
 
-func TestDeprecationsRemover_RenderTemplate(t *testing.T) {
-	dr := &DeprecationsRemover{}
-	result, err := dr.RenderTemplate()
-	require.NoError(t, err)
-	assert.Empty(t, result)
-}
-
 func TestRemoveDeprecations(t *testing.T) {
 	logger := zap.NewNop()
 	noChanges := rector.ReturnOutput{

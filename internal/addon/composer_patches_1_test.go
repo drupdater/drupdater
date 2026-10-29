@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/drupdater/drupdater/internal/golden"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/drupalorg"
 	"github.com/stretchr/testify/assert"
@@ -54,46 +53,6 @@ func TestCleanURLString(t *testing.T) {
 			got := h.cleanURLString(tt.in)
 			assert.Equal(t, tt.want, got)
 			assert.NotContains(t, got, "/") // never yields a path separator
-		})
-	}
-}
-
-func TestComposerPatches1_RenderTemplate_NoChanges(t *testing.T) {
-	logger := zap.NewNop()
-	h := &ComposerPatches1{logger: logger, patchUpdates: PatchUpdates{}}
-	result, err := h.RenderTemplate()
-	require.NoError(t, err)
-	assert.Empty(t, result)
-}
-
-func TestComposerPatches1_RenderTemplate_AnyChangeRenders(t *testing.T) {
-	// Each of the three clauses alone must produce a section, or two could be deleted and the
-	// addon would stay silent about a patch it removed, updated or found conflicting.
-	tests := []struct {
-		name    string
-		updates PatchUpdates
-	}{
-		{
-			name:    "only removals",
-			updates: PatchUpdates{Removed: []RemovedPatch{{Package: "drupal/core", PatchPath: "p.patch", Reason: "fixed"}}},
-		},
-		{
-			name:    "only updates",
-			updates: PatchUpdates{Updated: []UpdatedPatch{{Package: "drupal/core", PreviousPatchPath: "old.patch", NewPatchPath: "new.patch"}}},
-		},
-		{
-			name:    "only conflicts",
-			updates: PatchUpdates{Conflicts: []ConflictPatch{{Package: "drupal/core", FixedVersion: "1.0", NewVersion: "1.1"}}},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			h := &ComposerPatches1{logger: zap.NewNop(), patchUpdates: tt.updates}
-			result, err := h.RenderTemplate()
-			require.NoError(t, err)
-			assert.NotEmpty(t, result, "a change of any kind has to reach the merge request")
-			assert.Contains(t, result, "drupal/core")
 		})
 	}
 }
@@ -936,52 +895,6 @@ func TestUpdatePatches(t *testing.T) {
 		composerService.AssertExpectations(t)
 		drupalOrgService.AssertExpectations(t)
 	})
-}
-
-func TestComposer_Patches_1_RenderTemplate(t *testing.T) {
-	logger := zap.NewNop()
-	composerRunner := NewMockComposer(t)
-	drupalorgService := NewMockDrupalOrg(t)
-
-	ap := NewComposerPatches1(logger, composerRunner, drupalorgService, http.DefaultClient)
-	ap.patchUpdates = PatchUpdates{
-		Conflicts: []ConflictPatch{
-			{
-				Package:          "package3",
-				PatchPath:        "patch3",
-				FixedVersion:     "2.0",
-				NewVersion:       "3.0",
-				PatchDescription: "description",
-			},
-		},
-		Updated: []UpdatedPatch{
-			{
-				Package:           "package2",
-				PatchDescription:  "description",
-				PreviousPatchPath: "oldPatch",
-				NewPatchPath:      "newPatch",
-			},
-		},
-		Removed: []RemovedPatch{
-			{
-				PatchDescription: "package1 not installed anymore",
-				Package:          "package1",
-				PatchPath:        "patch1",
-				Reason:           "reason1",
-			},
-			{
-				PatchDescription: "Issue #3123456: [Fix the thing](https://www.drupal.org/i/3123456) was fixed in version 2.0",
-				Package:          "package1",
-				PatchPath:        "patch1",
-				Reason:           "Fixed",
-			},
-		},
-	}
-
-	result, err := ap.RenderTemplate()
-
-	require.NoError(t, err)
-	golden.Assert(t, "testdata/composer_patches_1.md", result)
 }
 
 func TestDownloadFile(t *testing.T) {

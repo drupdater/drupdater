@@ -287,25 +287,27 @@ func (_c *MockComposer_CheckIfPatchesApply_Call) RunAndReturn(run func(ctx conte
 }
 
 // Diff provides a mock function for the type MockComposer
-func (_mock *MockComposer) Diff(ctx context.Context, path string, withLinks bool) (string, error) {
-	ret := _mock.Called(ctx, path, withLinks)
+func (_mock *MockComposer) Diff(ctx context.Context, path string) ([]composer.DiffEntry, error) {
+	ret := _mock.Called(ctx, path)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Diff")
 	}
 
-	var r0 string
+	var r0 []composer.DiffEntry
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool) (string, error)); ok {
-		return returnFunc(ctx, path, withLinks)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) ([]composer.DiffEntry, error)); ok {
+		return returnFunc(ctx, path)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, bool) string); ok {
-		r0 = returnFunc(ctx, path, withLinks)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) []composer.DiffEntry); ok {
+		r0 = returnFunc(ctx, path)
 	} else {
-		r0 = ret.Get(0).(string)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]composer.DiffEntry)
+		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string, bool) error); ok {
-		r1 = returnFunc(ctx, path, withLinks)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, path)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -320,12 +322,11 @@ type MockComposer_Diff_Call struct {
 // Diff is a helper method to define mock.On call
 //   - ctx context.Context
 //   - path string
-//   - withLinks bool
-func (_e *MockComposer_Expecter) Diff(ctx any, path any, withLinks any) *MockComposer_Diff_Call {
-	return &MockComposer_Diff_Call{Call: _e.mock.On("Diff", ctx, path, withLinks)}
+func (_e *MockComposer_Expecter) Diff(ctx any, path any) *MockComposer_Diff_Call {
+	return &MockComposer_Diff_Call{Call: _e.mock.On("Diff", ctx, path)}
 }
 
-func (_c *MockComposer_Diff_Call) Run(run func(ctx context.Context, path string, withLinks bool)) *MockComposer_Diff_Call {
+func (_c *MockComposer_Diff_Call) Run(run func(ctx context.Context, path string)) *MockComposer_Diff_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -335,25 +336,20 @@ func (_c *MockComposer_Diff_Call) Run(run func(ctx context.Context, path string,
 		if args[1] != nil {
 			arg1 = args[1].(string)
 		}
-		var arg2 bool
-		if args[2] != nil {
-			arg2 = args[2].(bool)
-		}
 		run(
 			arg0,
 			arg1,
-			arg2,
 		)
 	})
 	return _c
 }
 
-func (_c *MockComposer_Diff_Call) Return(s string, err error) *MockComposer_Diff_Call {
-	_c.Call.Return(s, err)
+func (_c *MockComposer_Diff_Call) Return(diffEntrys []composer.DiffEntry, err error) *MockComposer_Diff_Call {
+	_c.Call.Return(diffEntrys, err)
 	return _c
 }
 
-func (_c *MockComposer_Diff_Call) RunAndReturn(run func(ctx context.Context, path string, withLinks bool) (string, error)) *MockComposer_Diff_Call {
+func (_c *MockComposer_Diff_Call) RunAndReturn(run func(ctx context.Context, path string) ([]composer.DiffEntry, error)) *MockComposer_Diff_Call {
 	_c.Call.Return(run)
 	return _c
 }

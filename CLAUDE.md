@@ -44,11 +44,12 @@ Verify with `make docs-build` (runs `mkdocs build --strict`, which fails on brok
 
 Some pages embed files from the repo via `pymdownx.snippets`, so they cannot drift:
 
-- `internal/addon/testdata/*.md` → the "pull request section" examples on addon pages
+- `internal/mergerequest/testdata/*.md` → the "pull request section" examples on addon pages,
+  rendered from the example report
 - `internal/addon/testdata/run_report.json` → the example report on `docs/reference/run-report.md`
 - `.github/assert-report.jq`, `.github/assert-lock-matches-report.jq` → `docs/how-to/consume-the-run-report.md`
 
-Changing a golden file changes the published example. `internal/addon/testdata/composer_diff.md` is a `Dummy Table` placeholder and is deliberately *not* embedded — that page hand-writes its example.
+Changing a golden file changes the published example.
 
 ## Commands
 
@@ -94,12 +95,12 @@ Where things live. For *how they work*, read `docs/explanation/` rather than dup
 | `main.go` → `cmd/root.go` | Cobra commands, flag parsing, service construction, `addonRegistry`, `mandatoryAddons` |
 | `cmd/check.go` | The `check` command and its cheap/full check tiers |
 | `internal/workflow/runner.go` | `Runner.Run` and the nine phases |
-| `internal/workflow/event.go` | The six workflow events and `AbortError` |
+| `internal/workflow/event.go` | The five workflow events and `AbortError` |
 | `internal/workflow/hooks.go` | Addon hooks, their stages, and the order they run in |
 | `internal/workflow/preflight.go` | Checks shared between `check` and the run's own `preflight` phase |
 | `internal/addon/` | The ten addons |
 | `internal/addon/report.go` | **Every addon's report contribution, together** — this file *is* the report's `addons` schema |
-| `internal/addon/templates/` | Go templates rendering the MR description sections |
+| `internal/mergerequest/` | The MR title and description, rendered from the run report; its templates |
 | `internal/configfile.go` | `.drupdater.yaml` loading, defaults, strict decode, legacy-layout rejection |
 | `internal/codehosting/` | GitHub and GitLab implementations, provider factory |
 | `internal/report/` | The published JSON report schema and its atomic writer |
@@ -111,9 +112,10 @@ Where things live. For *how they work*, read `docs/explanation/` rather than dup
 
 ### Invariants worth knowing before editing
 
-- **Addons never call each other.** They communicate only through mutable event payloads (`PackagesToUpdate`, `PackagesToKeep`, `MinimalChanges`, `Title`).
+- **Addons never call each other.** They communicate only through mutable event payloads (`PackagesToUpdate`, `PackagesToKeep`, `MinimalChanges`).
 - **Addons never touch git.** They name the paths they changed to the event's `Commit`; the runner's committer (`internal/workflow/commit.go`) commits exactly those, and refuses when something else is already staged.
-- **Hook stages are load-bearing** on `pre-composer-update`, `post-code-update` and `pre-merge-request-create`. See `docs/explanation/addon-architecture.md` before changing one.
+- **Hook stages are load-bearing** on `pre-composer-update` and `post-code-update`. See `docs/explanation/addon-architecture.md` before changing one.
+- **The MR is rendered from the report**, through its JSON. An addon reaches the description only via its report section; findings from two addons are joined there, never handed between them.
 - **`internal/addon/report.go` is a published contract.** Renaming a field there is a breaking change to `schema_version`, and `internal/addon/testdata/run_report.json` is what makes such a rename fail rather than ship. A new reporting addon belongs in that golden's `reportingAddons()`.
 - **Report types mirror rather than reuse internal types** (`report.PackageChange` vs `composer.PackageChange`) so an internal refactor can't rename a published field.
 - **The report's deferred write is registered first**, so it runs last and is emitted on every exit path.

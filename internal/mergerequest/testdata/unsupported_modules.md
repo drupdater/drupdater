@@ -4,7 +4,7 @@ The following are no longer maintained: an unsupported module has no supported r
 
 | Name | Status | Installed version | Recommendation |
 | ---- | ------ | ----------------- | -------------- |
-| module_a | Unsupported module | 1.0.0 | No supported release — replace it |
-| module_b | Unsupported module | 2.3.1 | Update to 3.0.0 |
+| legacy_feature | Unsupported module | 1.2.0 | No supported release — replace it |
+| old_widget | Unsupported module | 2.0.0 | Update to 3.1.0 |
 | patchwork/jsqueeze | Abandoned package | — | No replacement suggested |
 | swiftmailer/swiftmailer | Abandoned package | — | Replace with symfony/mailer |
