@@ -15,47 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
-	"go.uber.org/zap/zaptest/observer"
 )
-
-func TestPathWithin(t *testing.T) {
-	tests := []struct {
-		name     string
-		filePath string
-		dir      string
-		expected bool
-	}{
-		{name: "file directly in the directory", filePath: "translations/de.po", dir: "translations", expected: true},
-		{name: "file nested deeper in the directory", filePath: "translations/custom/de.po", dir: "translations", expected: true},
-		{name: "the directory itself", filePath: "translations", dir: "translations", expected: true},
-		{name: "an empty dir matches everything", filePath: "any/file.txt", dir: "", expected: true},
-		{name: "unrelated directory", filePath: "modules/custom/x.php", dir: "translations", expected: false},
-		// The reason pathWithin exists: a substring test would call these a match.
-		{name: "sibling sharing a name prefix", filePath: "translations-backup/de.po", dir: "translations", expected: false},
-		{name: "prefix match inside a longer segment", filePath: "web/translationsx/de.po", dir: "web/translations", expected: false},
-		{name: "leading and trailing slashes are ignored", filePath: "/translations/de.po", dir: "translations/", expected: true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, pathWithin(tt.filePath, tt.dir))
-		})
-	}
-}
-
-func TestIsSomethingStagedInPathIgnoresPrefixSiblings(t *testing.T) {
-	service := NewGitRepositoryService(zap.NewNop())
-
-	// The translations addon commits on this answer, so a false positive from the sibling
-	// "translations-backup" creates a commit with nothing in it.
-	worktree := NewMockWorktree(t)
-	worktree.EXPECT().Status().Return(git.Status{
-		"translations-backup/de.po": &git.FileStatus{Staging: git.Modified},
-	}, nil)
-
-	assert.False(t, service.IsSomethingStagedInPath(worktree, "translations"))
-}
 
 // initRepoWithCommit creates a repo containing a single empty commit.
 func initRepoWithCommit(t *testing.T) (string, *git.Repository) {
@@ -331,22 +291,6 @@ func isolateGitConfig(t *testing.T) string {
 	t.Setenv("HOME", home)
 	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
 	return home
-}
-
-func TestIsSomethingStagedInPathOnStatusError(t *testing.T) {
-	core, logs := observer.New(zapcore.ErrorLevel)
-	service := NewGitRepositoryService(zap.New(core))
-
-	worktree := NewMockWorktree(t)
-	// Non-empty on purpose: with an empty status the guarded and unguarded versions both
-	// return false, and the test could not tell them apart.
-	worktree.EXPECT().Status().Return(git.Status{
-		"file1.txt": &git.FileStatus{Staging: git.Modified},
-	}, assert.AnError)
-
-	assert.False(t, service.IsSomethingStagedInPath(worktree, ""))
-	assert.Equal(t, 1, logs.FilterMessage("failed to get worktree status").Len(),
-		"a failed status must surface in the log rather than pass as 'nothing staged'")
 }
 
 func TestPrepareCheckoutKeepsExistingGlobalIdentity(t *testing.T) {

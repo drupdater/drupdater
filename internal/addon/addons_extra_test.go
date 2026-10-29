@@ -3,17 +3,19 @@ package addon
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/drupdater/drupdater/internal/workflow"
+	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/drush"
 	"github.com/drupdater/drupdater/pkg/rector"
-	git "github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
 )
 
@@ -33,6 +35,45 @@ func TestNewComposerPatches1(t *testing.T) {
 		require.NotNil(t, h)
 		assert.NotNil(t, h.gitlab)
 	})
+
+	t.Run("drops patch files from the real filesystem", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, "patches"), 0o750))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "patches", "a.patch"), []byte("x"), 0o600))
+
+		h := NewComposerPatches1(zap.NewNop(), NewMockComposer(t), NewMockDrupalOrg(t), nil)
+		require.NoError(t, h.dropPatchFile(dir, "patches/a.patch"))
+		assert.NoFileExists(t, filepath.Join(dir, "patches", "a.patch"))
+	})
+}
+
+func TestPatchRemovalFailuresAreLogged(t *testing.T) {
+	// The patch is still reported as removed, so the log is the only trace of a file left behind.
+	newHandler := func(t *testing.T, removeErr error) (*ComposerPatches1, *observer.ObservedLogs) {
+		t.Helper()
+		core, logs := observer.New(zapcore.ErrorLevel)
+		composerService := NewMockComposer(t)
+		composerService.EXPECT().IsPackageInstalled(anyCtx, "/project", "drupal/gone").Return(false, nil).Maybe()
+		return &ComposerPatches1{
+			logger:     zap.New(core),
+			composer:   composerService,
+			removeFile: func(string) error { return removeErr },
+		}, logs
+	}
+	patches := func() map[string]map[string]string {
+		return map[string]map[string]string{"drupal/gone": {"fix": "patches/gone.patch"}}
+	}
+	removal := composer.PackageChange{Action: "Remove", Package: "drupal/gone"}
+
+	for _, removeErr := range []error{nil, assert.AnError} {
+		h, logs := newHandler(t, removeErr)
+		assert.Len(t, h.removePackagePatches("/project", removal, patches()), 1)
+		assert.Equal(t, removeErr != nil, logs.FilterMessage("failed to remove patch").Len() == 1, "removed package, err=%v", removeErr)
+
+		h, logs = newHandler(t, removeErr)
+		assert.Len(t, h.removeUninstalledPackagePatches(t.Context(), "/project", patches()), 1)
+		assert.Equal(t, removeErr != nil, logs.FilterMessage("failed to remove patch").Len() == 1, "uninstalled package, err=%v", removeErr)
+	}
 }
 
 func TestComposerAllowPluginsNilMapIsNotAPanic(t *testing.T) {
@@ -162,7 +203,7 @@ func TestDeprecationsRemoverErrors(t *testing.T) {
 		require.Error(t, dr.postCodeUpdateHandler(workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", nil)))
 	})
 
-	t.Run("staging a changed file fails", func(t *testing.T) {
+	t.Run("committing the removals fails", func(t *testing.T) {
 		composerService := NewMockComposer(t)
 		composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "palantirnet/drupal-rector").Return(true, nil)
 		composerService.EXPECT().GetCustomCodeDirectories(anyCtx, "/tmp").Return([]string{"web/modules/custom"}, nil)
@@ -173,25 +214,23 @@ func TestDeprecationsRemoverErrors(t *testing.T) {
 			ChangedFiles: []string{"web/modules/custom/a.php"},
 		}, nil)
 
-		worktree := NewMockWorktree(t)
-		worktree.EXPECT().Add("web/modules/custom/a.php").Return(plumbing.NewHash(""), assert.AnError)
-
+		committer := &fakeCommitter{err: assert.AnError}
 		dr := NewDeprecationsRemover(zap.NewNop(), runner, composerService)
-		require.Error(t, dr.postCodeUpdateHandler(workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", worktree)))
+		require.ErrorIs(t, dr.postCodeUpdateHandler(workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", committer)), assert.AnError)
 	})
 }
 
 func TestTranslationsUpdaterErrors(t *testing.T) {
-	newEvent := func(worktree Worktree) *workflow.PostSiteUpdateEvent {
-		return workflow.NewPostSiteUpdateEvent(t.Context(), "/tmp", worktree, "site1")
+	newEvent := func(committer workflow.Committer) *workflow.PostSiteUpdateEvent {
+		return workflow.NewPostSiteUpdateEvent(t.Context(), "/tmp", committer, "site1")
 	}
 
 	t.Run("module check fails", func(t *testing.T) {
 		drushService := NewMockDrush(t)
 		drushService.EXPECT().IsModuleEnabled(anyCtx, "/tmp", "site1", "locale_deploy").Return(false, assert.AnError)
 
-		tu := NewTranslationsUpdater(zap.NewNop(), drushService, NewMockRepository(t))
-		require.Error(t, tu.postSiteUpdateHandler(newEvent(nil)))
+		tu := NewTranslationsUpdater(zap.NewNop(), drushService)
+		require.Error(t, tu.postSiteUpdateHandler(newEvent(&fakeCommitter{})))
 	})
 
 	t.Run("localizing translations fails", func(t *testing.T) {
@@ -199,35 +238,20 @@ func TestTranslationsUpdaterErrors(t *testing.T) {
 		drushService.EXPECT().IsModuleEnabled(anyCtx, "/tmp", "site1", "locale_deploy").Return(true, nil)
 		drushService.EXPECT().LocalizeTranslations(anyCtx, "/tmp", "site1").Return(assert.AnError)
 
-		tu := NewTranslationsUpdater(zap.NewNop(), drushService, NewMockRepository(t))
-		require.Error(t, tu.postSiteUpdateHandler(newEvent(nil)))
+		tu := NewTranslationsUpdater(zap.NewNop(), drushService)
+		require.Error(t, tu.postSiteUpdateHandler(newEvent(&fakeCommitter{})))
 	})
 
 	t.Run("an unresolvable translation path is skipped, not fatal", func(t *testing.T) {
-		// GetTranslationPath refuses to return an empty path, because handing that to
-		// Worktree.Add would stage the entire working tree.
+		// GetTranslationPath refuses to return an empty path, because committing that would
+		// commit the entire working tree.
 		drushService := NewMockDrush(t)
 		drushService.EXPECT().IsModuleEnabled(anyCtx, "/tmp", "site1", "locale_deploy").Return(true, nil)
 		drushService.EXPECT().LocalizeTranslations(anyCtx, "/tmp", "site1").Return(nil)
 		drushService.EXPECT().GetTranslationPath(anyCtx, "/tmp", "site1", true).Return("", errors.New("does not resolve"))
 
-		tu := NewTranslationsUpdater(zap.NewNop(), drushService, NewMockRepository(t))
-		require.NoError(t, tu.postSiteUpdateHandler(newEvent(nil)))
-	})
-
-	t.Run("staging the translation path fails", func(t *testing.T) {
-		drushService := NewMockDrush(t)
-		drushService.EXPECT().IsModuleEnabled(anyCtx, "/tmp", "site1", "locale_deploy").Return(true, nil)
-		drushService.EXPECT().LocalizeTranslations(anyCtx, "/tmp", "site1").Return(nil)
-		drushService.EXPECT().GetTranslationPath(anyCtx, "/tmp", "site1", true).Return("translations", nil)
-
-		worktree := NewMockWorktree(t)
-		worktree.EXPECT().Add("translations").Return(plumbing.NewHash(""), assert.AnError)
-
-		tu := NewTranslationsUpdater(zap.NewNop(), drushService, NewMockRepository(t))
-		err := tu.postSiteUpdateHandler(newEvent(worktree))
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to add translation path")
+		tu := NewTranslationsUpdater(zap.NewNop(), drushService)
+		require.NoError(t, tu.postSiteUpdateHandler(newEvent(&fakeCommitter{})))
 	})
 
 	t.Run("committing the translations fails", func(t *testing.T) {
@@ -236,18 +260,11 @@ func TestTranslationsUpdaterErrors(t *testing.T) {
 		drushService.EXPECT().LocalizeTranslations(anyCtx, "/tmp", "site1").Return(nil)
 		drushService.EXPECT().GetTranslationPath(anyCtx, "/tmp", "site1", true).Return("translations", nil)
 
-		worktree := NewMockWorktree(t)
-		worktree.EXPECT().Add("translations").Return(plumbing.NewHash(""), nil)
-		worktree.EXPECT().Status().Return(git.Status{}, nil)
-		worktree.EXPECT().Commit("Update translations", &git.CommitOptions{}).Return(plumbing.NewHash(""), assert.AnError)
-
-		repository := NewMockRepository(t)
-		repository.EXPECT().IsSomethingStagedInPath(worktree, "translations").Return(true)
-
-		tu := NewTranslationsUpdater(zap.NewNop(), drushService, repository)
-		err := tu.postSiteUpdateHandler(newEvent(worktree))
-		require.Error(t, err)
+		tu := NewTranslationsUpdater(zap.NewNop(), drushService)
+		err := tu.postSiteUpdateHandler(newEvent(&fakeCommitter{err: assert.AnError}))
+		require.ErrorIs(t, err, assert.AnError)
 		assert.Contains(t, err.Error(), "failed to commit translation path")
+		assert.Empty(t, tu.results, "a site whose commit failed has no outcome to report")
 	})
 }
 

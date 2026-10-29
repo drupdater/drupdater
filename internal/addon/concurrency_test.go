@@ -50,7 +50,7 @@ func TestUpdateHooksRecordsEverySiteUnderConcurrency(t *testing.T) {
 	updateHooks := NewUpdateHooks(zap.NewNop(), mockDrush)
 
 	ctx := context.Background()
-	worktree := NewMockWorktree(t)
+	committer := &fakeCommitter{}
 	sites := concurrentSites(8)
 
 	for _, site := range sites {
@@ -59,7 +59,7 @@ func TestUpdateHooksRecordsEverySiteUnderConcurrency(t *testing.T) {
 	}
 
 	runPerSite(t, sites, func(site string) error {
-		return updateHooks.preSiteUpdateHandler(workflow.NewPreSiteUpdateEvent(ctx, "/project", worktree, site))
+		return updateHooks.preSiteUpdateHandler(workflow.NewPreSiteUpdateEvent(ctx, "/project", committer, site))
 	})
 
 	require.Len(t, updateHooks.hooks, len(sites))
@@ -73,7 +73,7 @@ func TestUnsupportedModulesRecordsEverySiteUnderConcurrency(t *testing.T) {
 	um := NewUnsupportedModules(zap.NewNop(), mockDrush)
 
 	ctx := context.Background()
-	worktree := NewMockWorktree(t)
+	committer := &fakeCommitter{}
 	sites := concurrentSites(8)
 
 	// A module per site plus one they all report, so the run exercises both a fresh key and the
@@ -86,7 +86,7 @@ func TestUnsupportedModulesRecordsEverySiteUnderConcurrency(t *testing.T) {
 	}
 
 	runPerSite(t, sites, func(site string) error {
-		return um.preSiteUpdateHandler(workflow.NewPreSiteUpdateEvent(ctx, "/project", worktree, site))
+		return um.preSiteUpdateHandler(workflow.NewPreSiteUpdateEvent(ctx, "/project", committer, site))
 	})
 
 	require.Len(t, um.modules, len(sites)+1)
@@ -98,20 +98,20 @@ func TestUnsupportedModulesRecordsEverySiteUnderConcurrency(t *testing.T) {
 
 func TestTranslationsUpdaterRecordsEverySiteUnderConcurrency(t *testing.T) {
 	mockDrush := NewMockDrush(t)
-	tu := NewTranslationsUpdater(zap.NewNop(), mockDrush, NewMockRepository(t))
+	tu := NewTranslationsUpdater(zap.NewNop(), mockDrush)
 
 	ctx := context.Background()
-	worktree := NewMockWorktree(t)
+	committer := &fakeCommitter{}
 	sites := concurrentSites(8)
 
-	// The skip path is the one that writes without touching the worktree, so the goroutines
+	// The skip path is the one that writes without committing anything, so the goroutines
 	// reach `record` with nothing else serialising them.
 	for _, site := range sites {
 		mockDrush.EXPECT().IsModuleEnabled(ctx, "/project", site, "locale_deploy").Return(false, nil)
 	}
 
 	runPerSite(t, sites, func(site string) error {
-		return tu.postSiteUpdateHandler(workflow.NewPostSiteUpdateEvent(ctx, "/project", worktree, site))
+		return tu.postSiteUpdateHandler(workflow.NewPostSiteUpdateEvent(ctx, "/project", committer, site))
 	})
 
 	require.Len(t, tu.results, len(sites))

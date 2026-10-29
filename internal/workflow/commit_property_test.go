@@ -1,4 +1,4 @@
-package repo
+package workflow
 
 import (
 	"path"
@@ -9,8 +9,8 @@ import (
 	"pgregory.net/rapid"
 )
 
-// pathWithin decides whether a changed file counts as a change to a configured directory. These
-// properties state the containment laws for every path, not just the documented example.
+// pathWithin decides whether a staged file belongs to a path an addon committed. These properties
+// state the containment laws for every path, not just the documented example.
 
 // segmentGen starts each segment with an alphanumeric so it cannot produce "." or "..": git
 // status paths never contain either, and path.Join would silently collapse them.
@@ -87,4 +87,29 @@ func TestPropertyPathWithinTreatsAnEmptyDirAsNoFilter(t *testing.T) {
 		// including paths that are themselves empty or nothing but separators.
 		assert.True(t, pathWithin(file, ""))
 	})
+}
+
+func TestPathWithin(t *testing.T) {
+	tests := []struct {
+		name     string
+		filePath string
+		dir      string
+		expected bool
+	}{
+		{name: "file directly in the directory", filePath: "translations/de.po", dir: "translations", expected: true},
+		{name: "file nested deeper in the directory", filePath: "translations/custom/de.po", dir: "translations", expected: true},
+		{name: "the directory itself", filePath: "translations", dir: "translations", expected: true},
+		{name: "an empty dir matches everything", filePath: "any/file.txt", dir: "", expected: true},
+		{name: "unrelated directory", filePath: "modules/custom/x.php", dir: "translations", expected: false},
+		// The reason pathWithin exists: a substring test would call these a match.
+		{name: "sibling sharing a name prefix", filePath: "translations-backup/de.po", dir: "translations", expected: false},
+		{name: "prefix match inside a longer segment", filePath: "web/translationsx/de.po", dir: "web/translations", expected: false},
+		{name: "leading and trailing slashes are ignored", filePath: "/translations/de.po", dir: "translations/", expected: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, pathWithin(tt.filePath, tt.dir))
+		})
+	}
 }

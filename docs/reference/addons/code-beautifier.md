@@ -32,8 +32,8 @@ If absent, it is required as a dev dependency and committed as `Install drupal/c
 
 It is removed again once `phpcs` and `phpcbf` have run, in a
 `Remove temporary drupal/coder installation` commit. Removing it rarely restores
-`composer.lock` byte-for-byte, so the remainder is committed here rather than left for
-another addon's `composer.*` staging to sweep into an unrelated commit.
+`composer.lock` byte-for-byte, so the remainder gets its own commit rather than being left
+uncommitted in the working tree.
 
 A project that already depends on `drupal/coder` keeps it: the addon only removes what it
 installed itself. Otherwise the merge request would carry a dev dependency nobody asked
@@ -81,6 +81,5 @@ Omitted when no files were fixed.
 ## Ordering
 
 This addon runs at **normal** priority on `post-code-update`, deliberately *after*
-[`deprecations_remover`](deprecations-remover.md), which runs above normal. Rector
-temporarily installs and removes itself, and that `composer.json` churn must be committed
-before PHPCBF stages anything — otherwise it would be swept into the coding-style commit.
+[`deprecations_remover`](deprecations-remover.md), which runs above normal, so that PHPCBF
+formats the code Rector wrote.

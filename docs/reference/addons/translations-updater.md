@@ -19,8 +19,7 @@ For each site, after that site's update hooks and configuration export have run:
 1. Checks whether the `locale_deploy` module is enabled. If not, the site is **skipped**.
 2. Resolves the site's translation path. If it does not resolve, the site is **skipped**.
 3. Updates the interface translations via Drush.
-4. Stages the translation path and commits `Update translations` — only if something was
-   actually staged.
+4. Commits the translation path as `Update translations` — only if something in it changed.
 
 Sites run concurrently, so the results map is mutex-guarded and keyed by site.
 

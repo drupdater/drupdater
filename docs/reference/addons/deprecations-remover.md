@@ -20,11 +20,10 @@ custom code to rewrite APIs deprecated by the new Drupal version.
 3. The temporary Rector installation is removed again, and any residual `composer.json`
    or `composer.lock` change is committed as `Remove temporary drupal-rector
    installation`.
-4. Changed files are staged and committed as `Remove deprecations`.
+4. Changed files are committed as `Remove deprecations`.
 
-The temporary install-then-remove is what forces this addon to run **above normal**
-priority on `post-code-update`: its `composer.json` churn must be fully committed before
-[`code_beautifier`](code-beautifier.md) stages anything at normal priority.
+It runs **above normal** priority on `post-code-update`, ahead of
+[`code_beautifier`](code-beautifier.md), so that PHPCBF formats the code Rector wrote.
 
 ## Why it exists
 

@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/spf13/afero"
 
@@ -233,31 +232,4 @@ func (rs *GitRepositoryService) BranchExists(repository Repository, branch strin
 		}
 	}
 	return false, nil
-}
-
-func (rs *GitRepositoryService) IsSomethingStagedInPath(worktree Worktree, dir string) bool {
-	status, err := worktree.Status()
-	if err != nil {
-		rs.logger.Error("failed to get worktree status", zap.Error(err))
-		return false
-	}
-
-	for filePath, s := range status {
-		if s.Staging != git.Unmodified && pathWithin(filePath, dir) {
-			return true
-		}
-	}
-
-	return false
-}
-
-// pathWithin reports whether filePath is dir or lives under it — not a substring test, which
-// would match the sibling "translations-backup/de.po" for dir "translations". Empty dir matches all.
-func pathWithin(filePath string, dir string) bool {
-	dir = strings.Trim(filepath.ToSlash(dir), "/")
-	if dir == "" {
-		return true
-	}
-	filePath = strings.Trim(filepath.ToSlash(filePath), "/")
-	return filePath == dir || strings.HasPrefix(filePath, dir+"/")
 }

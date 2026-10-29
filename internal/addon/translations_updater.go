@@ -5,27 +5,24 @@ import (
 	"sync"
 
 	"github.com/drupdater/drupdater/internal/workflow"
-	"github.com/go-git/go-git/v5"
 	"github.com/gookit/event"
 
 	"go.uber.org/zap"
 )
 
 type TranslationsUpdater struct {
-	logger     *zap.Logger
-	drush      Drush
-	repository Repository
+	logger *zap.Logger
+	drush  Drush
 
 	// Per-site outcome for the report. post-site-update fires concurrently, hence the mutex.
 	mu      sync.Mutex
 	results map[string]TranslationResult
 }
 
-func NewTranslationsUpdater(logger *zap.Logger, drush Drush, repository Repository) *TranslationsUpdater {
+func NewTranslationsUpdater(logger *zap.Logger, drush Drush) *TranslationsUpdater {
 	return &TranslationsUpdater{
-		logger:     logger,
-		drush:      drush,
-		repository: repository,
+		logger: logger,
+		drush:  drush,
 	}
 }
 
@@ -68,21 +65,14 @@ func (tu *TranslationsUpdater) postSiteUpdateHandler(e event.Event) error {
 		return nil
 	}
 
-	_, err = evt.Worktree().Add(translationPath)
+	committed, err := evt.Commit("Update translations", translationPath)
 	if err != nil {
-		return fmt.Errorf("failed to add translation path: %w", err)
+		return fmt.Errorf("failed to commit translation path: %w", err)
 	}
-
-	status, _ := evt.Worktree().Status()
-	tu.logger.Debug("git status", zap.Any("status", status))
-	if !tu.repository.IsSomethingStagedInPath(evt.Worktree(), translationPath) {
+	if !committed {
 		tu.logger.Debug("nothing to commit")
 		tu.record(evt.Site(), TranslationResult{Path: translationPath})
 		return nil
-	}
-	_, err = evt.Worktree().Commit("Update translations", &git.CommitOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to commit translation path: %w", err)
 	}
 
 	tu.record(evt.Site(), TranslationResult{Path: translationPath, Updated: true})

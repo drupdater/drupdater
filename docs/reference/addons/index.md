@@ -86,8 +86,8 @@ is deliberate rather than incidental:
 - On `pre-merge-request-create`, `composer_audit` (Normal) hands its abandoned packages to
   `unsupported_modules` (BelowNormal), which renders both kinds of finding as one list.
 - On `post-code-update`, the order is `deprecations_remover` → `code_beautifier` →
-  `composer_audit`. Rector's temporary `composer.json` churn must be committed before
-  PHPCBF stages anything, and the final audit must see the final code.
+  `composer_audit`. PHPCBF formats what Rector wrote, and the final audit must see the
+  final code.
 
 See [The addon architecture](../../explanation/addon-architecture.md).
 

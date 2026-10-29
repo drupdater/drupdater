@@ -1,0 +1,47 @@
+# 2026/10/29 05:57:23.681000 [TestPropertyPathWithinTreatsAnEmptyDirAsNoFilter] [rapid] draw file: "~꥟+Ⱥv®;"
+# 2026/10/29 05:57:23.681052 [TestPropertyPathWithinTreatsAnEmptyDirAsNoFilter] 
+# 	Error Trace:	/home/user/drupdater/internal/workflow/commit_property_test.go:88
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:458
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:467
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:292
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:207
+# 	            				/home/user/drupdater/internal/workflow/commit_property_test.go:83
+# 	            				/root/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.1.linux-amd64/src/runtime/asm_amd64.s:1264
+# 	Error:      	Should be true
+# 	Test:       	TestPropertyPathWithinTreatsAnEmptyDirAsNoFilter
+# 
+v0.4.8#16677517394288657780
+0x191ab80e99cffa
+0x10
+0x68838ae6bf227
+0x3
+0x19944fc534ddbe
+0x1c
+0x1cfac837af8b78
+0x1fc
+0x16899ec702e208
+0x2d
+0x1d
+0xae4961dd802b5
+0x0
+0x140c65a961839f
+0xb
+0x11170bbb47550e
+0x39
+0x2a
+0x3f
+0x29
+0xead4930cbf141
+0x15
+0xc57254a4ec88e
+0x15
+0xc8af3c6c26541
+0x20
+0x5ae0cbe2f85d4
+0x2
+0x1fa6fc73bd18d5
+0x12
+0x181f2b71841665
+0x33
+0x13
+0x3bee22b711d67

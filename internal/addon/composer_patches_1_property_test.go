@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"pgregory.net/rapid"
 )
 
@@ -76,20 +76,26 @@ func TestPropertyIsRemotePatchAcceptsHTTPURLs(t *testing.T) {
 	})
 }
 
-func TestPropertyDropPatchFileTouchesTheWorktreeOnlyForLocalPatches(t *testing.T) {
+func TestPropertyDropPatchFileRemovesOnlyLocalPatches(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		patchPath := rapid.OneOf(
 			rapid.StringMatching(`(/)?([a-zA-Z0-9_.-]{1,10}/){0,3}[a-zA-Z0-9_.-]{1,10}\.(patch|diff)`),
 			rapid.StringMatching(`https?://[a-z]{1,8}\.example\.com/[a-z0-9-]{1,10}\.patch`),
 		).Draw(t, "patchPath")
 
-		worktree := NewMockWorktree(t)
-		if !isRemotePatch(patchPath) {
-			worktree.EXPECT().Remove(patchPath).Return(plumbing.Hash{}, nil).Once()
-		}
+		var removed []string
+		h := &ComposerPatches1{removeFile: func(name string) error {
+			removed = append(removed, name)
+			return nil
+		}}
 
-		// A URL handed to worktree.Remove fails, and reads as "the patch could not be
-		// dropped". The two have to agree for every reference, not just the listed ones.
-		assert.NoError(t, (&ComposerPatches1{}).dropPatchFile(worktree, patchPath))
+		// A URL handed to removeFile fails, and reads as "the patch could not be dropped". The
+		// two have to agree for every reference, not just the listed ones.
+		require.NoError(t, h.dropPatchFile("/project", patchPath))
+		if isRemotePatch(patchPath) {
+			assert.Empty(t, removed)
+		} else {
+			assert.Equal(t, []string{filepath.Join("/project", patchPath)}, removed)
+		}
 	})
 }

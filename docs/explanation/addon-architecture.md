@@ -28,8 +28,8 @@ other one is disabled" — because none of them ever depended on another being t
 | `post-site-update` | After each site's hooks, before config export | — (carries the site name) |
 | `pre-merge-request-create` | While the request is rendered — under `--dry-run` too | `Title` |
 
-All but the last carry the run context, the working directory path and the git worktree,
-so an addon can read files and stage changes without being handed a service.
+All but the last carry the run context, the working directory path, and a way to commit:
+see [Committing changes](#committing-changes).
 
 ## Steering the update through the payload
 
@@ -63,6 +63,22 @@ of the packages within it; the audit finds an abandoned package and another addo
 *instructions* between addons. The same rule applies: the producer never knows who reads it,
 and the consumer works fine when nobody wrote anything.
 
+## Committing changes
+
+Addons never touch git. One that changes files names them to the event's
+`Commit(message, paths...)`, and the runner commits exactly those paths — files or
+directories, deletions included — under that message.
+
+Two rules make that safe without any addon knowing about the others:
+
+- **Paths without a change are not committed.** `Commit` reports `false` and makes no
+  commit, so an addon need not check first whether its tool changed anything.
+- **A commit never carries someone else's change.** If anything outside the named paths is
+  already staged, the commit is refused with an error naming it. A half-staged change from
+  one addon cannot end up under another's message, whatever order they ran in.
+
+Changes nobody names stay in the working tree, uncommitted.
+
 ## Why priority matters
 
 Addons on the same event run in priority order, and for two events that order is load
@@ -83,10 +99,10 @@ The order is:
 2. `code_beautifier` (normal)
 3. `composer_audit` (below normal)
 
-`deprecations_remover` temporarily installs Rector and then removes it again. That
-`composer.json` churn must be committed **before** `code_beautifier` stages anything —
-otherwise a dependency change would be swept into a commit labelled "Update coding
-styles", which is both wrong and confusing to review.
+`deprecations_remover` runs first so that PHPCBF formats the code Rector wrote: Rector's
+output is not written to Drupal's coding standard, and the coding-style pass is what puts
+it right. Commit hygiene no longer depends on this order — each addon commits only the
+paths it names (see [Committing changes](#committing-changes)).
 
 `composer_audit` runs last on this event because its job here is to verify which
 advisories the update actually resolved. It must see the final code, after Rector and

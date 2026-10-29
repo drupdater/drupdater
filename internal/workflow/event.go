@@ -15,9 +15,9 @@ func (e AbortError) Error() string {
 }
 
 type BasicAddonEvent struct {
-	ctx      context.Context
-	path     string
-	worktree Worktree
+	ctx       context.Context
+	path      string
+	committer Committer
 }
 
 func (e *BasicAddonEvent) Context() context.Context {
@@ -28,13 +28,14 @@ func (e *BasicAddonEvent) Path() string {
 	return e.path
 }
 
-func (e *BasicAddonEvent) Worktree() Worktree {
-	return e.worktree
+// Commit records the addon's change to paths on the update branch; see Committer.
+func (e *BasicAddonEvent) Commit(message string, paths ...string) (bool, error) {
+	return e.committer.Commit(message, paths...)
 }
 
 // newBasicAddonEvent builds the context every addon event carries.
-func newBasicAddonEvent(ctx context.Context, path string, worktree Worktree) BasicAddonEvent {
-	return BasicAddonEvent{ctx: ctx, path: path, worktree: worktree}
+func newBasicAddonEvent(ctx context.Context, path string, committer Committer) BasicAddonEvent {
+	return BasicAddonEvent{ctx: ctx, path: path, committer: committer}
 }
 
 type PreComposerUpdateEvent struct {
@@ -45,9 +46,9 @@ type PreComposerUpdateEvent struct {
 	MinimalChanges   bool
 }
 
-func NewPreComposerUpdateEvent(ctx context.Context, path string, worktree Worktree, packagesToUpdate []string, packagesToKeep []string, minimalChanges bool) *PreComposerUpdateEvent {
+func NewPreComposerUpdateEvent(ctx context.Context, path string, committer Committer, packagesToUpdate []string, packagesToKeep []string, minimalChanges bool) *PreComposerUpdateEvent {
 	evt := &PreComposerUpdateEvent{
-		BasicAddonEvent:  newBasicAddonEvent(ctx, path, worktree),
+		BasicAddonEvent:  newBasicAddonEvent(ctx, path, committer),
 		PackagesToUpdate: packagesToUpdate,
 		PackagesToKeep:   packagesToKeep,
 		MinimalChanges:   minimalChanges,
@@ -61,9 +62,9 @@ type PostComposerUpdateEvent struct {
 	BasicAddonEvent
 }
 
-func NewPostComposerUpdateEvent(ctx context.Context, path string, worktree Worktree) *PostComposerUpdateEvent {
+func NewPostComposerUpdateEvent(ctx context.Context, path string, committer Committer) *PostComposerUpdateEvent {
 	evt := &PostComposerUpdateEvent{
-		BasicAddonEvent: newBasicAddonEvent(ctx, path, worktree),
+		BasicAddonEvent: newBasicAddonEvent(ctx, path, committer),
 	}
 	evt.SetName("post-composer-update")
 	return evt
@@ -74,9 +75,9 @@ type PostCodeUpdateEvent struct {
 	BasicAddonEvent
 }
 
-func NewPostCodeUpdateEvent(ctx context.Context, path string, worktree Worktree) *PostCodeUpdateEvent {
+func NewPostCodeUpdateEvent(ctx context.Context, path string, committer Committer) *PostCodeUpdateEvent {
 	evt := &PostCodeUpdateEvent{
-		BasicAddonEvent: newBasicAddonEvent(ctx, path, worktree),
+		BasicAddonEvent: newBasicAddonEvent(ctx, path, committer),
 	}
 	evt.SetName("post-code-update")
 	return evt
@@ -88,9 +89,9 @@ type PreSiteUpdateEvent struct {
 	site string
 }
 
-func NewPreSiteUpdateEvent(ctx context.Context, path string, worktree Worktree, site string) *PreSiteUpdateEvent {
+func NewPreSiteUpdateEvent(ctx context.Context, path string, committer Committer, site string) *PreSiteUpdateEvent {
 	evt := &PreSiteUpdateEvent{
-		BasicAddonEvent: newBasicAddonEvent(ctx, path, worktree),
+		BasicAddonEvent: newBasicAddonEvent(ctx, path, committer),
 		site:            site,
 	}
 	evt.SetName("pre-site-update")
@@ -107,9 +108,9 @@ type PostSiteUpdateEvent struct {
 	site string
 }
 
-func NewPostSiteUpdateEvent(ctx context.Context, path string, worktree Worktree, site string) *PostSiteUpdateEvent {
+func NewPostSiteUpdateEvent(ctx context.Context, path string, committer Committer, site string) *PostSiteUpdateEvent {
 	evt := &PostSiteUpdateEvent{
-		BasicAddonEvent: newBasicAddonEvent(ctx, path, worktree),
+		BasicAddonEvent: newBasicAddonEvent(ctx, path, committer),
 		site:            site,
 	}
 	evt.SetName("post-site-update")

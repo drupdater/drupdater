@@ -9,7 +9,6 @@ import (
 
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/drupalorg"
-	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -60,7 +59,7 @@ func upgradeCore() []composer.PackageChange {
 }
 
 func TestUpdatePatchesRemovesRemotePatchForFixedIssue(t *testing.T) {
-	// A remote patch has no file to remove. Passing its URL to worktree.Remove used to fail,
+	// A remote patch has no file to remove. Passing its URL to the file removal used to fail,
 	// dropping the patch from composer.json unreported.
 	const patchURL = "https://www.drupal.org/files/issues/123456-1.patch"
 
@@ -72,23 +71,22 @@ func TestUpdatePatchesRemovesRemotePatchForFixedIssue(t *testing.T) {
 	drupalOrgService.EXPECT().FindIssueNumber("Issue #123456").Return("123456", true)
 	drupalOrgService.EXPECT().GetIssue(anyCtx, "123456").Return(fixedIssue(), nil)
 
-	// No worktree.Remove expectation: calling it with a URL is exactly the bug under test, and
-	// the mock fails the test if it is called.
-	worktree := NewMockWorktree(t)
-
+	var removed []string
 	updater := &ComposerPatches1{
-		logger:    zap.NewNop(),
-		composer:  composerService,
-		drupalOrg: drupalOrgService,
-		gitlab:    fixedIssueGitlab(t),
+		logger:     zap.NewNop(),
+		composer:   composerService,
+		drupalOrg:  drupalOrgService,
+		gitlab:     fixedIssueGitlab(t),
+		removeFile: recordRemovals(&removed),
 	}
 
 	patches := map[string]map[string]string{
 		"drupal/core": {"Issue #123456": patchURL},
 	}
 
-	report, newPatches := updater.updatePatches(t.Context(), "/tmp", worktree, upgradeCore(), patches)
+	report, newPatches := updater.updatePatches(t.Context(), "/tmp", upgradeCore(), patches)
 
+	assert.Empty(t, removed, "a URL is not a file; removing it is exactly the bug under test")
 	assert.Equal(t, map[string]map[string]string{}, newPatches, "the patch must be dropped from composer.json")
 	require.Len(t, report.Removed, 1, "and the removal must be reported in the merge request")
 	assert.Equal(t, patchURL, report.Removed[0].PatchPath)
@@ -109,21 +107,19 @@ func TestUpdatePatchesKeepsPatchWhenRemovalFails(t *testing.T) {
 	drupalOrgService.EXPECT().FindIssueNumber("Issue #123456").Return("123456", true)
 	drupalOrgService.EXPECT().GetIssue(anyCtx, "123456").Return(fixedIssue(), nil)
 
-	worktree := NewMockWorktree(t)
-	worktree.EXPECT().Remove(patchPath).Return(plumbing.NewHash(""), assert.AnError)
-
 	updater := &ComposerPatches1{
-		logger:    zap.NewNop(),
-		composer:  composerService,
-		drupalOrg: drupalOrgService,
-		gitlab:    fixedIssueGitlab(t),
+		logger:     zap.NewNop(),
+		composer:   composerService,
+		drupalOrg:  drupalOrgService,
+		gitlab:     fixedIssueGitlab(t),
+		removeFile: func(string) error { return assert.AnError },
 	}
 
 	patches := map[string]map[string]string{
 		"drupal/core": {"Issue #123456": patchPath},
 	}
 
-	report, newPatches := updater.updatePatches(t.Context(), "/tmp", worktree, upgradeCore(), patches)
+	report, newPatches := updater.updatePatches(t.Context(), "/tmp", upgradeCore(), patches)
 
 	assert.Empty(t, report.Removed)
 	assert.Equal(t, map[string]map[string]string{
@@ -132,24 +128,23 @@ func TestUpdatePatchesKeepsPatchWhenRemovalFails(t *testing.T) {
 }
 
 func TestDropPatchFile(t *testing.T) {
-	updater := &ComposerPatches1{logger: zap.NewNop()}
-
 	t.Run("skips remote patches", func(t *testing.T) {
-		// A mock with no Remove expectation fails the test if Remove is called.
-		worktree := NewMockWorktree(t)
-		require.NoError(t, updater.dropPatchFile(worktree, "https://example.com/a.patch"))
+		var removed []string
+		updater := &ComposerPatches1{logger: zap.NewNop(), removeFile: recordRemovals(&removed)}
+		require.NoError(t, updater.dropPatchFile("/project", "https://example.com/a.patch"))
+		assert.Empty(t, removed)
 	})
 
-	t.Run("removes local patches", func(t *testing.T) {
-		worktree := NewMockWorktree(t)
-		worktree.EXPECT().Remove("patches/a.patch").Return(plumbing.NewHash(""), nil)
-		require.NoError(t, updater.dropPatchFile(worktree, "patches/a.patch"))
+	t.Run("removes local patches below the project", func(t *testing.T) {
+		var removed []string
+		updater := &ComposerPatches1{logger: zap.NewNop(), removeFile: recordRemovals(&removed)}
+		require.NoError(t, updater.dropPatchFile("/project", "patches/a.patch"))
+		assert.Equal(t, []string{"/project/patches/a.patch"}, removed)
 	})
 
 	t.Run("propagates the removal error", func(t *testing.T) {
-		worktree := NewMockWorktree(t)
-		worktree.EXPECT().Remove("patches/a.patch").Return(plumbing.NewHash(""), assert.AnError)
-		require.Error(t, updater.dropPatchFile(worktree, "patches/a.patch"))
+		updater := &ComposerPatches1{logger: zap.NewNop(), removeFile: func(string) error { return assert.AnError }}
+		require.ErrorIs(t, updater.dropPatchFile("/project", "patches/a.patch"), assert.AnError)
 	})
 }
 
@@ -229,7 +224,7 @@ func TestUpdatePatchesRecognisesEveryFixedIssueStatus(t *testing.T) {
 			}
 
 			patches := map[string]map[string]string{"drupal/core": {"Issue #123456": patchURL}}
-			report, newPatches := updater.updatePatches(t.Context(), "/tmp", NewMockWorktree(t), upgradeCore(), patches)
+			report, newPatches := updater.updatePatches(t.Context(), "/tmp", upgradeCore(), patches)
 
 			if tt.wantRemoved {
 				assert.Empty(t, newPatches["drupal/core"], "a fixed issue's patch must be dropped")
@@ -266,7 +261,7 @@ func TestUpdatePatchesKeepsPatchWithoutGitlabClient(t *testing.T) {
 	}
 
 	patches := map[string]map[string]string{"drupal/core": {"Issue #123456": patchURL}}
-	_, newPatches := updater.updatePatches(t.Context(), "/tmp", NewMockWorktree(t), upgradeCore(), patches)
+	_, newPatches := updater.updatePatches(t.Context(), "/tmp", upgradeCore(), patches)
 
 	assert.NotEmpty(t, newPatches["drupal/core"])
 }

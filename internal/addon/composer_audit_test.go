@@ -55,7 +55,7 @@ func TestComposerAudit_PreComposerUpdateHandler_WithAdvisories(t *testing.T) {
 	logger := zap.NewNop()
 	mockComposer := NewMockComposer(t)
 	audit := NewComposerAudit(logger, mockComposer, true)
-	worktree := NewMockWorktree(t)
+	committer := &fakeCommitter{}
 
 	ctx := context.Background()
 	path := "/test/path"
@@ -75,7 +75,7 @@ func TestComposerAudit_PreComposerUpdateHandler_WithAdvisories(t *testing.T) {
 		},
 	}
 
-	mockEvent := workflow.NewPreComposerUpdateEvent(ctx, path, worktree, []string{}, []string{}, true)
+	mockEvent := workflow.NewPreComposerUpdateEvent(ctx, path, committer, []string{}, []string{}, true)
 
 	mockComposer.EXPECT().Audit(ctx, path).Return(mockAudit, nil)
 
@@ -93,7 +93,7 @@ func TestComposerAudit_PreComposerUpdateHandler_NoAdvisories(t *testing.T) {
 	logger := zap.NewNop()
 	mockComposer := NewMockComposer(t)
 	audit := NewComposerAudit(logger, mockComposer, true)
-	worktree := NewMockWorktree(t)
+	committer := &fakeCommitter{}
 
 	ctx := context.Background()
 	path := "/test/path"
@@ -102,7 +102,7 @@ func TestComposerAudit_PreComposerUpdateHandler_NoAdvisories(t *testing.T) {
 		Advisories: []composer.Advisory{},
 	}
 
-	mockEvent := workflow.NewPreComposerUpdateEvent(ctx, path, worktree, []string{}, []string{}, true)
+	mockEvent := workflow.NewPreComposerUpdateEvent(ctx, path, committer, []string{}, []string{}, true)
 
 	mockComposer.EXPECT().Audit(ctx, path).Return(mockAudit, nil)
 
@@ -118,7 +118,7 @@ func TestComposerAudit_PreComposerUpdateHandler_NoAdvisories(t *testing.T) {
 func TestComposerAudit_PostCodeUpdateHandler(t *testing.T) {
 	logger := zap.NewNop()
 	mockComposer := NewMockComposer(t)
-	worktree := NewMockWorktree(t)
+	committer := &fakeCommitter{}
 	audit := NewComposerAudit(logger, mockComposer, true)
 
 	ctx := context.Background()
@@ -134,7 +134,7 @@ func TestComposerAudit_PostCodeUpdateHandler(t *testing.T) {
 		},
 	}
 
-	mockEvent := workflow.NewPostCodeUpdateEvent(ctx, path, worktree)
+	mockEvent := workflow.NewPostCodeUpdateEvent(ctx, path, committer)
 
 	mockComposer.EXPECT().Audit(ctx, path).Return(mockAudit, nil)
 
@@ -319,7 +319,7 @@ func TestComposerAudit_GetAbandonedPackages_UsesTheAuditAfterTheUpdate(t *testin
 func TestComposerAudit_PreComposerUpdateHandler_NormalMode(t *testing.T) {
 	mockComposer := NewMockComposer(t)
 	audit := NewComposerAudit(zap.NewNop(), mockComposer, false)
-	worktree := NewMockWorktree(t)
+	committer := &fakeCommitter{}
 
 	ctx := context.Background()
 	path := "/test/path"
@@ -328,7 +328,7 @@ func TestComposerAudit_PreComposerUpdateHandler_NormalMode(t *testing.T) {
 	}
 	mockComposer.EXPECT().Audit(ctx, path).Return(mockAudit, nil)
 
-	mockEvent := workflow.NewPreComposerUpdateEvent(ctx, path, worktree, []string{}, []string{}, false)
+	mockEvent := workflow.NewPreComposerUpdateEvent(ctx, path, committer, []string{}, []string{}, false)
 
 	require.NoError(t, audit.preComposerUpdateHandler(mockEvent))
 	assert.Equal(t, mockAudit, audit.beforeAudit, "the audit still runs: it is what the security report is built from")
@@ -341,13 +341,13 @@ func TestComposerAudit_PreComposerUpdateHandler_NormalMode(t *testing.T) {
 func TestComposerAudit_PreComposerUpdateHandler_NormalModeNoAdvisories(t *testing.T) {
 	mockComposer := NewMockComposer(t)
 	audit := NewComposerAudit(zap.NewNop(), mockComposer, false)
-	worktree := NewMockWorktree(t)
+	committer := &fakeCommitter{}
 
 	ctx := context.Background()
 	path := "/test/path"
 	mockComposer.EXPECT().Audit(ctx, path).Return(composer.Audit{}, nil)
 
-	mockEvent := workflow.NewPreComposerUpdateEvent(ctx, path, worktree, []string{}, []string{}, false)
+	mockEvent := workflow.NewPreComposerUpdateEvent(ctx, path, committer, []string{}, []string{}, false)
 
 	require.NoError(t, audit.preComposerUpdateHandler(mockEvent))
 }
@@ -436,7 +436,7 @@ func TestComposerAudit_AuditFailures(t *testing.T) {
 		audit := NewComposerAudit(zap.NewNop(), mockComposer, true)
 		mockComposer.EXPECT().Audit(anyCtx, path).Return(composer.Audit{}, assert.AnError)
 
-		evt := workflow.NewPreComposerUpdateEvent(context.Background(), path, NewMockWorktree(t), []string{}, []string{}, true)
+		evt := workflow.NewPreComposerUpdateEvent(context.Background(), path, &fakeCommitter{}, []string{}, []string{}, true)
 		err := audit.preComposerUpdateHandler(evt)
 
 		require.Error(t, err)
@@ -451,7 +451,7 @@ func TestComposerAudit_AuditFailures(t *testing.T) {
 		audit := NewComposerAudit(zap.NewNop(), mockComposer, true)
 		mockComposer.EXPECT().Audit(anyCtx, path).Return(composer.Audit{}, assert.AnError)
 
-		evt := workflow.NewPostCodeUpdateEvent(context.Background(), path, NewMockWorktree(t))
+		evt := workflow.NewPostCodeUpdateEvent(context.Background(), path, &fakeCommitter{})
 		err := audit.postCodeUpdateHandler(evt)
 
 		require.Error(t, err)
@@ -474,7 +474,7 @@ func TestComposerAudit_PreComposerUpdateHandler_DeduplicatesPackages(t *testing.
 		},
 	}, nil)
 
-	evt := workflow.NewPreComposerUpdateEvent(context.Background(), path, NewMockWorktree(t), []string{}, []string{}, true)
+	evt := workflow.NewPreComposerUpdateEvent(context.Background(), path, &fakeCommitter{}, []string{}, []string{}, true)
 	require.NoError(t, audit.preComposerUpdateHandler(evt))
 
 	// First-seen order, not sorted: the order is the order composer receives the arguments in.

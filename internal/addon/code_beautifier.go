@@ -13,7 +13,6 @@ import (
 
 	"github.com/drupdater/drupdater/internal/workflow"
 
-	"github.com/go-git/go-git/v5"
 	"github.com/gookit/event"
 	"go.uber.org/zap"
 )
@@ -97,7 +96,7 @@ func (cb *CodeBeautifier) postCodeUpdateHandler(e event.Event) (err error) { //n
 	cb.logger.Info("updating coding styles")
 
 	if !fileExists(event.Path()) {
-		created, err := cb.CreatePHPCSConfig(event.Context(), event.Path(), event.Worktree())
+		created, err := cb.CreatePHPCSConfig(event.Context(), event.Path(), event)
 		if err != nil {
 			return err
 		}
@@ -117,13 +116,15 @@ func (cb *CodeBeautifier) postCodeUpdateHandler(e event.Event) (err error) { //n
 	}
 
 	if installed, _ := cb.composer.IsPackageInstalled(event.Context(), event.Path(), "drupal/coder"); !installed {
-		if err := cb.InstallCoder(event.Context(), event.Path(), event.Worktree()); err != nil {
+		if err := cb.InstallCoder(event.Context(), event.Path(), event); err != nil {
 			return err
 		}
 		// Deferred, not called at the end: every path below returns early, and a coder left
 		// behind is committed into the update branch as a dependency nobody asked for.
 		defer func() {
-			if removeErr := cb.removeCoder(event.Context(), event.Path(), event.Worktree()); removeErr != nil && err == nil {
+			// Equivalent mutant: without removeErr != nil, a nil removeErr is assigned to a nil err.
+			// mutator-disable-next-line expression/remove
+			if removeErr := cb.removeCoder(event.Context(), event.Path(), event); removeErr != nil && err == nil {
 				err = removeErr
 			}
 		}()
@@ -151,50 +152,23 @@ func (cb *CodeBeautifier) postCodeUpdateHandler(e event.Event) (err error) { //n
 		if (codingStyleUpdateResult.Files[file].Errors + codingStyleUpdateResult.Files[file].Warnings) == 0 {
 			continue
 		}
-		relativePath := strings.TrimLeft(strings.TrimPrefix(file, event.Path()), "/")
-
-		if _, err := event.Worktree().Add(relativePath); err != nil {
-			return fmt.Errorf("failed to add file to commit: %w", err)
-		}
-		addedFiles = append(addedFiles, relativePath)
+		addedFiles = append(addedFiles, strings.TrimLeft(strings.TrimPrefix(file, event.Path()), "/"))
 	}
 
-	// phpcbf may have changed nothing, which would make an empty commit go-git rejects. Only
-	// this handler's own paths, so another listener's dangling change is never swept in.
-	staged, err := stagedAnyOf(event.Worktree(), addedFiles)
+	// phpcbf may have changed nothing even where phpcs reported something fixable.
+	committed, err := event.Commit("Update coding styles", addedFiles...)
 	if err != nil {
-		return fmt.Errorf("failed to check worktree status: %w", err)
+		return err
 	}
-	if !staged {
+	if !committed {
 		cb.logger.Debug("no coding style changes to commit")
 		return nil
-	}
-
-	if _, err := event.Worktree().Commit("Update coding styles", &git.CommitOptions{}); err != nil {
-		return err
 	}
 
 	slices.Sort(addedFiles)
 	cb.fixedFiles = addedFiles
 	cb.fixable = codingStyleUpdateResult.Totals.Fixable
 	return nil
-}
-
-// stagedAnyOf reports whether any of paths has a staged change in worktree.
-func stagedAnyOf(worktree Worktree, paths []string) (bool, error) {
-	if len(paths) == 0 {
-		return false, nil
-	}
-	status, err := worktree.Status()
-	if err != nil {
-		return false, err
-	}
-	for _, p := range paths {
-		if s, ok := status[p]; ok && s.Staging != git.Unmodified {
-			return true, nil
-		}
-	}
-	return false, nil
 }
 
 var phpcsTemplateStr = `<?xml version="1.0" encoding="UTF-8"?>
@@ -210,7 +184,7 @@ var phpcsTemplateStr = `<?xml version="1.0" encoding="UTF-8"?>
 </ruleset>
 `
 
-func (cb *CodeBeautifier) CreatePHPCSConfig(ctx context.Context, path string, worktree Worktree) (bool, error) {
+func (cb *CodeBeautifier) CreatePHPCSConfig(ctx context.Context, path string, committer workflow.Committer) (bool, error) {
 	cb.logger.Debug("no phpcs.xml or phpcs.xml.dist file found, creating phpcs.xml")
 
 	tmpl, err := template.New("ruleset").Parse(phpcsTemplateStr)
@@ -258,52 +232,32 @@ func (cb *CodeBeautifier) CreatePHPCSConfig(ctx context.Context, path string, wo
 		return false, fmt.Errorf("failed to close phpcs.xml: %w", err)
 	}
 
-	if _, err := worktree.Add("phpcs.xml"); err != nil {
-		return false, fmt.Errorf("failed to add file to commit: %w", err)
-	}
-
-	if _, err = worktree.Commit("Add PHPCS config", &git.CommitOptions{}); err != nil {
+	if _, err := committer.Commit("Add PHPCS config", "phpcs.xml"); err != nil {
 		return false, err
 	}
 
 	return true, nil
 }
 
-func (cb *CodeBeautifier) InstallCoder(ctx context.Context, path string, worktree Worktree) error {
+func (cb *CodeBeautifier) InstallCoder(ctx context.Context, path string, committer workflow.Committer) error {
 	cb.logger.Debug("drupal/coder is not installed, installing")
 	if _, err := cb.composer.Require(ctx, path, "--dev", "drupal/coder"); err != nil {
 		return err
 	}
 
-	if err := worktree.AddGlob("composer.*"); err != nil {
-		return fmt.Errorf("failed to add file to commit: %w", err)
-	}
-	if _, err := worktree.Commit("Install drupal/coder", &git.CommitOptions{}); err != nil {
-		return err
-	}
-
-	return nil
+	_, err := committer.Commit("Install drupal/coder", "composer.json", "composer.lock")
+	return err
 }
 
 // removeCoder undoes InstallCoder. Removing it rarely restores composer.lock byte-for-byte, so the
-// remainder is committed here rather than swept into another listener's AddGlob("composer.*").
-func (cb *CodeBeautifier) removeCoder(ctx context.Context, path string, worktree Worktree) error {
+// remainder is committed under its own message.
+func (cb *CodeBeautifier) removeCoder(ctx context.Context, path string, committer workflow.Committer) error {
 	cb.logger.Debug("removing drupal/coder")
 	// --dev because InstallCoder required it there; without the flag composer refuses.
 	if _, err := cb.composer.Remove(ctx, path, "--dev", "drupal/coder"); err != nil {
 		return err
 	}
 
-	if err := worktree.AddGlob("composer.*"); err != nil {
-		return fmt.Errorf("failed to add file to commit: %w", err)
-	}
-	staged, err := stagedAnyOf(worktree, []string{"composer.json", "composer.lock"})
-	if err != nil {
-		return err
-	}
-	if !staged {
-		return nil
-	}
-	_, err = worktree.Commit("Remove temporary drupal/coder installation", &git.CommitOptions{})
+	_, err := committer.Commit("Remove temporary drupal/coder installation", "composer.json", "composer.lock")
 	return err
 }

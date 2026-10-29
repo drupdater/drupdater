@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/drupdater/drupdater/internal/workflow"
-	"github.com/go-git/go-git/v5"
 	"github.com/gookit/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -29,14 +28,14 @@ func TestDefaultComposerNormalize_PostComposerUpdateHandler_PackageInstalled(t *
 
 	ctx := context.Background()
 	testPath := "/test/path"
-	worktree := &git.Worktree{}
+	committer := &fakeCommitter{}
 
 	composer.EXPECT().IsPackageInstalled(ctx, testPath, "ergebnis/composer-normalize").Return(true, nil)
 	composer.EXPECT().Normalize(ctx, testPath).Return("normalized", nil)
 
 	normalize := NewComposerNormalizer(logger, composer)
 
-	e := workflow.NewPostComposerUpdateEvent(ctx, testPath, worktree)
+	e := workflow.NewPostComposerUpdateEvent(ctx, testPath, committer)
 	err := normalize.postComposerUpdateHandler(e)
 
 	require.NoError(t, err)
@@ -49,14 +48,14 @@ func TestDefaultComposerNormalize_PostComposerUpdateHandler_PackageNotInstalled(
 
 	ctx := context.Background()
 	testPath := "/test/path"
-	worktree := &git.Worktree{}
+	committer := &fakeCommitter{}
 
 	// Configure mock expectations - package not installed
 	composer.EXPECT().IsPackageInstalled(ctx, testPath, "ergebnis/composer-normalize").Return(false, nil)
 
 	normalize := NewComposerNormalizer(logger, composer)
 
-	e := workflow.NewPostComposerUpdateEvent(ctx, testPath, worktree)
+	e := workflow.NewPostComposerUpdateEvent(ctx, testPath, committer)
 	err := normalize.postComposerUpdateHandler(e)
 
 	require.NoError(t, err)

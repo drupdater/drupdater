@@ -50,8 +50,9 @@ func (a *YourAddon) SubscribedEvents() map[string]any {
 
 func (a *YourAddon) OnPostCodeUpdate(e event.Event) error {
 	evt := e.(*workflow.PostCodeUpdateEvent)
-	// evt.Context(), evt.Path(), evt.Worktree()
-	return nil
+	// Change files under evt.Path(), then name them; false means nothing changed.
+	_, err := evt.Commit("Describe the change", "web/modules/custom")
+	return err
 }
 
 func (a *YourAddon) RenderTemplate() (string, error) {
@@ -61,7 +62,9 @@ func (a *YourAddon) RenderTemplate() (string, error) {
 ```
 
 The package-level `render(name, data)` executes a template from `internal/addon/templates/`.
-The `workflow.Addon` interface is the whole contract.
+The `workflow.Addon` interface is the whole contract. An addon that changes files commits
+them by naming them to the event, never through git itself — see [Committing
+changes](../explanation/addon-architecture.md#committing-changes).
 
 ### Choosing an event and priority
 

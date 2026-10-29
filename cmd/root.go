@@ -145,7 +145,7 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	addons, err := createAddons(logger, config, drush, composer, drupalOrg, git)
+	addons, err := createAddons(logger, config, drush, composer, drupalOrg)
 	if err != nil {
 		return err
 	}
@@ -356,7 +356,6 @@ type addonDeps struct {
 	drush     addon.Drush
 	composer  addon.Composer
 	drupalOrg addon.DrupalOrg
-	git       addon.Repository
 	// security marks a --security run. Only composer_audit reads it.
 	security bool
 }
@@ -372,7 +371,7 @@ var addonRegistry = map[string]func(addonDeps) workflow.Addon{
 	"deprecations_remover": func(d addonDeps) workflow.Addon {
 		return addon.NewDeprecationsRemover(d.logger, rector.NewCLI(d.logger), d.composer)
 	},
-	"translations_updater":   func(d addonDeps) workflow.Addon { return addon.NewTranslationsUpdater(d.logger, d.drush, d.git) },
+	"translations_updater":   func(d addonDeps) workflow.Addon { return addon.NewTranslationsUpdater(d.logger, d.drush) },
 	"composer_allow_plugins": func(d addonDeps) workflow.Addon { return addon.NewComposerAllowPlugins(d.logger, d.composer) },
 	"composer_normalizer":    func(d addonDeps) workflow.Addon { return addon.NewComposerNormalizer(d.logger, d.composer) },
 	"composer_patches": func(d addonDeps) workflow.Addon {
@@ -401,9 +400,8 @@ func createAddons(
 	drush addon.Drush,
 	composer addon.Composer,
 	drupalOrg addon.DrupalOrg,
-	git addon.Repository,
 ) ([]workflow.Addon, error) {
-	deps := addonDeps{logger: logger, drush: drush, composer: composer, drupalOrg: drupalOrg, git: git, security: config.Security}
+	deps := addonDeps{logger: logger, drush: drush, composer: composer, drupalOrg: drupalOrg, security: config.Security}
 
 	names := config.ActiveRunType().Addons
 

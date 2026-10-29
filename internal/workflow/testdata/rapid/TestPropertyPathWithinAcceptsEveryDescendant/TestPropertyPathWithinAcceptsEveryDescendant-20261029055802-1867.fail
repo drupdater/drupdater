@@ -1,0 +1,102 @@
+# 2026/10/29 05:58:02.196825 [TestPropertyPathWithinAcceptsEveryDescendant] [rapid] draw dir: []string{"yv5.g7", "g", "0-z2"}
+# 2026/10/29 05:58:02.196840 [TestPropertyPathWithinAcceptsEveryDescendant] [rapid] draw below: []string{"5-n25nf."}
+# 2026/10/29 05:58:02.196911 [TestPropertyPathWithinAcceptsEveryDescendant] 
+# 	Error Trace:	/home/user/drupdater/internal/workflow/commit_property_test.go:31
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:458
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:467
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:292
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:207
+# 	            				/home/user/drupdater/internal/workflow/commit_property_test.go:27
+# 	            				/root/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.1.linux-amd64/src/runtime/asm_amd64.s:1264
+# 	Error:      	Should be true
+# 	Test:       	TestPropertyPathWithinAcceptsEveryDescendant
+# 
+v0.4.8#1480154111712372520
+0x57281fdf4110e
+0x0
+0x1b7140983b9eb1
+0x22
+0x1399131568fba8
+0x0
+0x1a49fa63da7b53
+0x22
+0xdbd6d023ac011
+0x0
+0xc2ce91c48ccf6
+0x7
+0x1eecad74c5582d
+0x0
+0x3f7ccc72300ea
+0x1
+0x8c28875088860
+0x0
+0x162d24c33f9c29
+0x13
+0x1d0a748079b541
+0x0
+0x13e21b8083d962
+0x38
+0x9
+0x52d3134f86726
+0x107a82e32d1c2c
+0x0
+0x1ddccc98e405a5
+0x31
+0x3b
+0x10
+0x1a17977e0b579
+0x1eb5b81aa2f2a8
+0x0
+0x2b5fa7476f6c0
+0x0
+0xde6b99cc6a388
+0x0
+0xb4a73b0f890c
+0x0
+0xb95a64e4a36a5
+0x0
+0x1fd5fe60e942c5
+0xffffffffffffffff
+0x17166faaf383ab
+0x0
+0xa3300ca9b441e
+0x4
+0x57d4845056264
+0x7976dbae044b3
+0x79747d045676c
+0x0
+0x10f0a910ab2c44
+0x25
+0x5
+0x19dcd17f92d04d
+0x0
+0x1e2d22d2f1a65
+0x0
+0xf0b08ddcc0b8f
+0x0
+0x1c95c7d3ebc44d
+0x2a
+0x1a
+0x1b0d07c102cdfa
+0x0
+0x1d90c2d500b581
+0x4
+0xe675b50a7bd6e
+0x0
+0x181f6bc1c706d2
+0x7
+0xde53b24606f01
+0x0
+0xefcd3732eef81
+0x1a
+0x11624d66e3cf71
+0x0
+0xedfe862d22abe
+0x12
+0x1f4285191c3ca3
+0x0
+0x17997b9dfd6a2b
+0x35
+0x1
+0x1837155f0639ed
+0xcd49c68e4b2cf
