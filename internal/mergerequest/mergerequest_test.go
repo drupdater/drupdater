@@ -105,6 +105,8 @@ func TestAFailingSectionTemplateFailsTheDescription(t *testing.T) {
 	}))
 
 	require.ErrorContains(t, err, "failed to execute template composer_allow_plugins.go.tmpl")
+	var execErr template.ExecError
+	require.ErrorAs(t, err, &execErr)
 	assert.Empty(t, description)
 }
 
