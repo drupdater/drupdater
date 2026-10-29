@@ -66,8 +66,9 @@ Settles what the update changes and what its branch will be called, while touchi
    [`composer_patches`](../reference/addons/composer-patches.md) pins packages whose
    patches cannot be made to apply.
 2. Run `composer update --no-install` with those constraints. It resolves the update and
-   bumps the constraints in `composer.json`, but leaves `vendor/` at the old code. **If
-   nothing changed, the run aborts here.**
+   bumps the constraints in `composer.json`, but leaves `vendor/` at the old code. What
+   changed is read from `composer diff` between the lock before and after, not from
+   Composer's console output. **If nothing changed, the run aborts here.**
 3. Compute the branch name from the resolved `composer.lock` (see
    [below](#content-addressed-branch-names)), and **abort if it already exists**, locally
    or on the remote.

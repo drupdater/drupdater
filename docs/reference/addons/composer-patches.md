@@ -14,8 +14,9 @@ whose patch cannot be made to apply.
 
 ## What it does
 
-It runs before the real update, using a dry-run `composer update` to see which packages
-would change, then works through the project's `extra.patches`:
+It runs before the real update, resolving it once to see which packages would change and
+then putting `composer.json` and `composer.lock` back, then works through the project's
+`extra.patches`:
 
 ### Removal
 

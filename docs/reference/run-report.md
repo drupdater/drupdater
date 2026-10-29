@@ -114,7 +114,12 @@ on, so it never fails the run.
 ```
 
 `action` is one of `Install`, `Upgrade`, `Downgrade` or `Remove`. `from` is absent on an
-install; `to` is absent on a removal.
+install; `to` is absent on a removal. The list is ordered by action — `Upgrade`,
+`Downgrade`, `Remove`, `Install` — then by package name, and includes `require-dev`
+packages.
+
+A dev-branch package shows its version with the short commit, as Composer prints it
+(`"1.x-dev 0424dff"`); a new commit on the same branch is an `Upgrade`.
 
 ### `phases`
 

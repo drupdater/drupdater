@@ -5,6 +5,7 @@ import (
 	"cmp"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"os"
@@ -57,7 +58,7 @@ func WithoutBlocking() Option {
 
 // requiredComposerEnv is forced on every invocation (see Env), not left to the Dockerfile, which
 // only covers the published image. The 300s default timeout kills a large install mid-phase, and
-// the implicit audit is output Update() cannot parse. Deployment policy is not forced here.
+// the implicit audit is noise in every update's log. Deployment policy is not forced here.
 var requiredComposerEnv = []string{
 	"COMPOSER_PROCESS_TIMEOUT=0",
 	"COMPOSER_NO_AUDIT=1",
@@ -141,79 +142,135 @@ type PackageChange struct {
 }
 
 // Update resolves into composer.json and composer.lock only; Install brings vendor/ to the result.
-// A dry run writes nothing.
-func (s *CLI) Update(ctx context.Context, dir string, packages []string, packagesToKeep []string, minimalChanges bool, dryRun bool) ([]PackageChange, error) {
-	args := append([]string{"update", "--no-interaction", "--no-progress", "--optimize-autoloader", "--with-all-dependencies", "--no-ansi", "--ignore-platform-reqs"}, packages...)
+// A dry run leaves both files as it found them.
+//
+// The changes are read from a diff of composer.lock before and after, never from the console
+// output, whose wording composer does not keep stable and which drops dev-branch commits.
+func (s *CLI) Update(ctx context.Context, dir string, packages []string, packagesToKeep []string, minimalChanges bool, dryRun bool) (changes []PackageChange, err error) {
+	lockPath := filepath.Join(dir, "composer.lock")
+	baseLock, err := afero.ReadFile(s.fs, lockPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read composer.lock: %w", err)
+	}
+
+	// Lock only: vendor/ keeps the old code until Install, so sites can still be installed at it
+	// after the update is known to change anything.
+	args := append([]string{"update", "--no-interaction", "--no-progress", "--optimize-autoloader", "--with-all-dependencies", "--no-ansi", "--ignore-platform-reqs", "--no-install"}, packages...)
 	for _, packageToKeep := range packagesToKeep {
-		args = append(args, fmt.Sprintf("--with=%s", packageToKeep))
+		name, version, _ := strings.Cut(packageToKeep, ":")
+		args = append(args, fmt.Sprintf("--with=%s:%s", name, constraint(version)))
 	}
 	if minimalChanges {
 		args = append(args, "--minimal-changes")
 	}
 	if dryRun {
-		args = append(args, "--dry-run")
-	} else {
-		// Lock only: vendor/ keeps the old code until Install, so sites can still be installed
-		// at it after the update is known to change anything.
-		args = append(args, "--bump-after-update", "--no-install")
-	}
-	var changes []PackageChange
-	out, err := s.execComposer(ctx, dir, args...)
-	if err != nil {
-		return changes, fmt.Errorf("failed to update dependencies: %w, output: %s, arg: %v", err, out, args)
-	}
-
-	// A lock-only update says "Locking" where an install says "Installing".
-	out = strings.ReplaceAll(out, "- Locking ", "- Installing ")
-
-	// Grouped by action, not scanned line by line, so the result stays ordered however composer
-	// interleaved its output. Deduplicated because composer reports a version change twice, once
-	// for the lock and once for the install, in identical wording.
-	seen := make(map[PackageChange]struct{})
-	for _, pattern := range packageChangePatterns {
-		for _, match := range pattern.re.FindAllStringSubmatch(out, -1) {
-			change := PackageChange{Action: pattern.action, Package: match[1]}
-			if pattern.from > 0 {
-				change.From = match[pattern.from]
-			}
-			if pattern.to > 0 {
-				change.To = match[pattern.to]
-			}
-			if _, ok := seen[change]; ok {
-				continue
-			}
-			seen[change] = struct{}{}
-			changes = append(changes, change)
+		// composer's own --dry-run writes no lock, leaving nothing to diff, so the files are put
+		// back instead. No scripts: the project never asked for them on a result that is undone.
+		args = append(args, "--no-scripts")
+		restore, snapshotErr := s.snapshot(dir, "composer.json", "composer.lock")
+		if snapshotErr != nil {
+			return nil, snapshotErr
 		}
+		defer func() { err = errors.Join(err, restore()) }()
+	} else {
+		args = append(args, "--bump-after-update")
 	}
 
+	if out, err := s.execComposer(ctx, dir, args...); err != nil {
+		return nil, fmt.Errorf("failed to update dependencies: %w, output: %s, arg: %v", err, out, args)
+	}
+
+	base, err := afero.TempFile(s.fs, "", "drupdater-base-*.lock")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create the base lock file: %w", err)
+	}
+	defer func() {
+		if err := s.fs.Remove(base.Name()); err != nil {
+			s.logger.Warn("failed to remove the base lock file", zap.String("path", base.Name()), zap.Error(err))
+		}
+	}()
+	_, writeErr := base.Write(baseLock)
+	if err := errors.Join(writeErr, base.Close()); err != nil {
+		return nil, fmt.Errorf("failed to write the base lock file: %w", err)
+	}
+
+	entries, err := s.diff(ctx, dir, "--base="+base.Name(), "--target=composer.lock")
+	if err != nil {
+		return nil, fmt.Errorf("failed to diff composer.lock: %w", err)
+	}
+	return packageChanges(entries)
+}
+
+// snapshot reads files under dir now and returns a func that writes them back as they were.
+func (s *CLI) snapshot(dir string, files ...string) (func() error, error) {
+	contents := make(map[string][]byte, len(files))
+	for _, file := range files {
+		path := filepath.Join(dir, file)
+		content, err := afero.ReadFile(s.fs, path)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read %s: %w", file, err)
+		}
+		contents[path] = content
+	}
+	return func() error {
+		var errs []error
+		for path, content := range contents {
+			// Equivalent mutant: the file was just read, so it exists and the mode is never used.
+			// mutator-disable-next-line numbers/incrementer,numbers/decrementer
+			if err := afero.WriteFile(s.fs, path, content, 0644); err != nil {
+				errs = append(errs, fmt.Errorf("failed to restore %s: %w", filepath.Base(path), err))
+			}
+		}
+		return errors.Join(errs...)
+	}, nil
+}
+
+// packageAction maps a composer-diff operation to a PackageChange action. A "change" is a new
+// commit of the same version, which composer itself reports as an upgrade.
+func packageAction(operation string) (string, bool) {
+	switch operation {
+	case "upgrade", "change":
+		return "Upgrade", true
+	case "downgrade":
+		return "Downgrade", true
+	case "remove":
+		return "Remove", true
+	case "install":
+		return "Install", true
+	}
+	return "", false
+}
+
+// actionOrder is the order the changes come back in, which both the report and the MR carry.
+var actionOrder = []string{"Upgrade", "Downgrade", "Remove", "Install"}
+
+// packageChanges sorts by action, then package, so the result does not depend on how
+// composer-diff split production from dev packages.
+func packageChanges(entries []DiffEntry) ([]PackageChange, error) {
+	var changes []PackageChange
+	for _, entry := range entries {
+		action, ok := packageAction(entry.Operation)
+		if !ok {
+			return nil, fmt.Errorf("unknown composer-diff operation %q for %s", entry.Operation, entry.Package)
+		}
+		changes = append(changes, PackageChange{Action: action, Package: entry.Package, From: entry.From, To: entry.To})
+	}
+	slices.SortFunc(changes, func(a, b PackageChange) int {
+		return cmp.Or(
+			cmp.Compare(slices.Index(actionOrder, a.Action), slices.Index(actionOrder, b.Action)),
+			strings.Compare(a.Package, b.Package),
+		)
+	})
 	return changes, nil
 }
 
-// packageChangePatterns matches composer update's report of what it did, one entry per action.
-// This order is the order the changes come back in, which both the report and the MR carry.
-var packageChangePatterns = []struct {
-	action string
-	re     *regexp.Regexp
-	// from and to are the capture groups holding those versions; 0 means the action has none.
-	from int
-	to   int
-}{
-	{action: "Upgrade", re: twoVersionRegex("Upgrading"), from: 2, to: 3},
-	{action: "Downgrade", re: twoVersionRegex("Downgrading"), from: 2, to: 3},
-	{action: "Remove", re: oneVersionRegex("Removing"), from: 2},
-	{action: "Install", re: oneVersionRegex("Installing"), to: 2},
-}
-
-// versionPattern allows "+" and "~" so build-metadata versions (1.0.0+21AF26D3) still match.
-const versionPattern = `[\w.\-+~]+`
-
-func twoVersionRegex(verb string) *regexp.Regexp {
-	return regexp.MustCompile(`- ` + verb + ` ([\w\-/]+) \((` + versionPattern + `) => (` + versionPattern + `)\)`)
-}
-
-func oneVersionRegex(verb string) *regexp.Regexp {
-	return regexp.MustCompile(`- ` + verb + ` ([\w\-/]+) \((` + versionPattern + `)\)`)
+// constraint turns a version as composer prints it into one composer accepts back: a dev
+// version prints as "1.x-dev 0424dff", but a constraint names its commit as "1.x-dev#0424dff".
+func constraint(version string) string {
+	if name, ref, ok := strings.Cut(version, " "); ok {
+		return name + "#" + ref
+	}
+	return version
 }
 
 func (s *CLI) Install(ctx context.Context, dir string) error {
@@ -441,7 +498,11 @@ type DiffEntry struct {
 
 // Diff lists what changed in composer.lock since HEAD, production packages first, each by name.
 func (s *CLI) Diff(ctx context.Context, dir string) ([]DiffEntry, error) {
-	out, err := s.execComposerJSON(ctx, dir, "diff", "--format=json", "--with-links")
+	return s.diff(ctx, dir, "--with-links")
+}
+
+func (s *CLI) diff(ctx context.Context, dir string, args ...string) ([]DiffEntry, error) {
+	out, err := s.execComposerJSON(ctx, dir, append([]string{"diff", "--format=json"}, args...)...)
 	if err != nil {
 		return nil, err
 	}
@@ -848,7 +909,7 @@ func (s *CLI) CheckIfPatchApplies(ctx context.Context, projectDir string, packag
 // that suppresses the message this classification reads.
 func (s *CLI) requireIntoScratch(ctx context.Context, packageName string, packageVersion string) (bool, error) {
 	out, err := s.execComposer(ctx, s.tempDir,
-		"require", "--ignore-platform-reqs", packageName+":"+packageVersion, "--with-all-dependencies")
+		"require", "--ignore-platform-reqs", packageName+":"+constraint(packageVersion), "--with-all-dependencies")
 	if err == nil {
 		return true, nil
 	}
