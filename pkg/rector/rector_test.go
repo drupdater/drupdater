@@ -97,7 +97,7 @@ func TestRectorRun(t *testing.T) {
 		assert.Equal(t, []string{
 			"exec", "--", "rector", "process",
 			"--config=/opt/drupdater/rector.php",
-			"--no-progress-bar", "--no-diffs", "--debug", "--output-format=json",
+			"--no-progress-bar", "--debug", "--output-format=json",
 			"web/modules/custom", "web/themes/custom",
 		}, *args)
 
@@ -189,7 +189,7 @@ func TestBundledRectorRun(t *testing.T) {
 		assert.Equal(t, call{name: "/opt/drupdater/tools/vendor/bin/rector", args: []string{
 			"process", "--autoload-file", "/project/libraries/vendor/autoload.php",
 			"--config=/opt/drupdater/rector.php",
-			"--no-progress-bar", "--no-diffs", "--debug", "--output-format=json",
+			"--no-progress-bar", "--debug", "--output-format=json",
 			"web/modules/custom",
 		}}, (*calls)[1])
 		assert.Equal(t, []string{"web/modules/custom/a.php"}, result.ChangedFiles)

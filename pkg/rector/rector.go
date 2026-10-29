@@ -77,7 +77,8 @@ func (s *CLI) Run(ctx context.Context, dir string, customCodeDirectories []strin
 		command.Program = filepath.Join(s.binDir, "rector")
 		args = []string{"process", "--autoload-file", autoloader}
 	}
-	args = append(args, "--config=/opt/drupdater/rector.php", "--no-progress-bar", "--no-diffs", "--debug", "--output-format=json")
+	// No --no-diffs: rector's JSON lists each file's applied rules only alongside its diff.
+	args = append(args, "--config=/opt/drupdater/rector.php", "--no-progress-bar", "--debug", "--output-format=json")
 	args = append(args, customCodeDirectories...)
 
 	// Split: rector's --debug output and PHP notices would corrupt the JSON report.
