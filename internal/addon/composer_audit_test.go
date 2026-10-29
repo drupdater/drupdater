@@ -416,7 +416,9 @@ func TestComposerAudit_AuditFailures(t *testing.T) {
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to run composer audit")
-			assert.Empty(t, evt.PackagesToUpdate)
+		// Not an abort: aborting reads as "nothing to do here" and exits 0.
+		assert.NotErrorAs(t, err, &workflow.AbortError{})
+		assert.Empty(t, evt.PackagesToUpdate)
 	})
 
 	t.Run("after the update", func(t *testing.T) {

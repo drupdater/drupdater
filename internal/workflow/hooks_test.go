@@ -31,8 +31,7 @@ func TestHooksRunByStageThenAddonOrder(t *testing.T) {
 		hookAddon{hook("second change", Change)},
 	}
 
-	p := newPipeline(addons)
-	require.NoError(t, fire("post-code-update", p.postCodeUpdate, &PostCodeUpdateEvent{}))
+	require.NoError(t, NewPipeline(addons).PostCodeUpdate(&PostCodeUpdateEvent{}))
 
 	assert.Equal(t, []string{"first", "rector", "second change", "phpcbf", "audit"}, ran)
 }
@@ -47,15 +46,15 @@ func TestHooksStopAtTheFirstFailure(t *testing.T) {
 		})}},
 	}
 
-	p := newPipeline(addons)
-	err := fire("pre-site-update", p.preSiteUpdate, &PreSiteUpdateEvent{})
+	err := NewPipeline(addons).PreSiteUpdate(&PreSiteUpdateEvent{})
 
 	require.ErrorIs(t, err, assert.AnError)
 	require.EqualError(t, err, "pre-site-update hook failed: "+assert.AnError.Error())
 	assert.False(t, later, "a hook after the failing one must not run")
 }
 
-func TestPipelineSortsEveryEventsHooks(t *testing.T) {
+// Every event's hooks are ordered, and every event's failure names that event.
+func TestPipelineCoversEveryEvent(t *testing.T) {
 	var ran []string
 	record := func(name string) func() error {
 		return func() error {
@@ -63,8 +62,8 @@ func TestPipelineSortsEveryEventsHooks(t *testing.T) {
 			return nil
 		}
 	}
-	hooks := func(prefix string, stage Stage) Hooks {
-		r := record(prefix)
+	hooks := func(name string, stage Stage) Hooks {
+		r := record(name)
 		return Hooks{
 			PreComposerUpdate:     On(stage, func(*PreComposerUpdateEvent) error { return r() }),
 			PostComposerUpdate:    On(stage, func(*PostComposerUpdateEvent) error { return r() }),
@@ -74,17 +73,31 @@ func TestPipelineSortsEveryEventsHooks(t *testing.T) {
 			PreMergeRequestCreate: On(stage, func(*PreMergeRequestCreateEvent) error { return r() }),
 		}
 	}
-	p := newPipeline([]Addon{hookAddon{hooks("late", Inspect)}, hookAddon{hooks("early", Prepare)}})
+	p := NewPipeline([]Addon{hookAddon{hooks("late", Inspect)}, hookAddon{hooks("early", Prepare)}})
+	broken := NewPipeline([]Addon{hookAddon{Hooks{
+		PreComposerUpdate:     On(Change, failing[*PreComposerUpdateEvent]),
+		PostComposerUpdate:    On(Change, failing[*PostComposerUpdateEvent]),
+		PostCodeUpdate:        On(Change, failing[*PostCodeUpdateEvent]),
+		PreSiteUpdate:         On(Change, failing[*PreSiteUpdateEvent]),
+		PostSiteUpdate:        On(Change, failing[*PostSiteUpdateEvent]),
+		PreMergeRequestCreate: On(Change, failing[*PreMergeRequestCreateEvent]),
+	}}})
 
-	require.NoError(t, fire("", p.preComposerUpdate, &PreComposerUpdateEvent{}))
-	require.NoError(t, fire("", p.postComposerUpdate, &PostComposerUpdateEvent{}))
-	require.NoError(t, fire("", p.postCodeUpdate, &PostCodeUpdateEvent{}))
-	require.NoError(t, fire("", p.preSiteUpdate, &PreSiteUpdateEvent{}))
-	require.NoError(t, fire("", p.postSiteUpdate, &PostSiteUpdateEvent{}))
-	require.NoError(t, fire("", p.preMergeRequestCreate, &PreMergeRequestCreateEvent{}))
+	fires := map[string]func(*Pipeline) error{
+		"pre-composer-update":      func(p *Pipeline) error { return p.PreComposerUpdate(&PreComposerUpdateEvent{}) },
+		"post-composer-update":     func(p *Pipeline) error { return p.PostComposerUpdate(&PostComposerUpdateEvent{}) },
+		"post-code-update":         func(p *Pipeline) error { return p.PostCodeUpdate(&PostCodeUpdateEvent{}) },
+		"pre-site-update":          func(p *Pipeline) error { return p.PreSiteUpdate(&PreSiteUpdateEvent{}) },
+		"post-site-update":         func(p *Pipeline) error { return p.PostSiteUpdate(&PostSiteUpdateEvent{}) },
+		"pre-merge-request-create": func(p *Pipeline) error { return p.PreMergeRequestCreate(&PreMergeRequestCreateEvent{}) },
+	}
+	for event, fire := range fires {
+		t.Run(event, func(t *testing.T) {
+			ran = nil
+			require.NoError(t, fire(p))
+			assert.Equal(t, []string{"early", "late"}, ran)
 
-	assert.Equal(t, []string{
-		"early", "late", "early", "late", "early", "late",
-		"early", "late", "early", "late", "early", "late",
-	}, ran)
+			require.EqualError(t, fire(broken), event+" hook failed: "+assert.AnError.Error())
+		})
+	}
 }

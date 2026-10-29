@@ -157,7 +157,13 @@ reference](../reference/addons/index.md), so a good one becomes the published ex
 ## 6. Test it
 
 Changed packages need **≥ 90% coverage**. Existing addon tests show the pattern: construct
-the addon with mocks, fire the event, assert on both the side effects and `ReportData()`.
+the addon with mocks, call its hook with an event, assert on both the side effects and
+`ReportData()`.
+
+When your addon depends on another one's hook running first, test the two through
+`workflow.NewPipeline` rather than calling the hooks yourself — that runs them in the order a
+real run would, so the test fails if a stage changes. `TestUnsupportedModules_AbandonedHandoff`
+is the example.
 
 Then verify end to end against a real project:
 
@@ -171,7 +177,7 @@ and `--dry-run` still generates it.
 
 ## Checklist
 
-- [ ] Implements the addon interface, each hook at a justified stage
+- [ ] Implements the addon interface, each hook at a justified stage, listed in `TestAddonHookStages`
 - [ ] Registered in `addonRegistry` under the name users will write
 - [ ] Mandatory or configurable decided, and defaults updated if needed
 - [ ] `ReportKey`/`ReportData` in `internal/addon/report.go`, returning `nil` when empty

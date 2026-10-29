@@ -109,12 +109,12 @@ func (h *ComposerPatches1) RenderTemplate() (string, error) {
 	return render("composer_patches_1.go.tmpl", h.patchUpdates)
 }
 
-func (h *ComposerPatches1) preComposerUpdateHandler(event *workflow.PreComposerUpdateEvent) error {
-	ctx := event.Context()
-	path := event.Path()
-	packagesToUpdate := event.PackagesToUpdate
-	minimalChanges := event.MinimalChanges
-	packagesToKeep := event.PackagesToKeep
+func (h *ComposerPatches1) preComposerUpdateHandler(evt *workflow.PreComposerUpdateEvent) error {
+	ctx := evt.Context()
+	path := evt.Path()
+	packagesToUpdate := evt.PackagesToUpdate
+	minimalChanges := evt.MinimalChanges
+	packagesToKeep := evt.PackagesToKeep
 
 	patches := make(map[string]map[string]string)
 	patchesString, err := h.composer.GetConfig(ctx, path, "extra.patches")
@@ -155,13 +155,13 @@ func (h *ComposerPatches1) preComposerUpdateHandler(event *workflow.PreComposerU
 			return fmt.Errorf("failed to update composer lock hash: %w", err)
 		}
 
-		if _, err := event.Commit("Update patches", h.patchUpdates.changedPaths("composer.json", "composer.lock")...); err != nil {
+		if _, err := evt.Commit("Update patches", h.patchUpdates.changedPaths("composer.json", "composer.lock")...); err != nil {
 			return fmt.Errorf("failed to commit patches: %w", err)
 		}
 	}
 
 	for _, patchUpdate := range patchUpdates.Conflicts {
-		event.PackagesToKeep = append(event.PackagesToKeep, fmt.Sprintf("%s:%s", patchUpdate.Package, patchUpdate.FixedVersion))
+		evt.PackagesToKeep = append(evt.PackagesToKeep, fmt.Sprintf("%s:%s", patchUpdate.Package, patchUpdate.FixedVersion))
 	}
 
 	return nil

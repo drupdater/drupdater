@@ -224,9 +224,7 @@ func TestUnsupportedModules_AbandonedHandoff(t *testing.T) {
 	um := NewUnsupportedModules(zap.NewNop(), NewMockDrush(t))
 
 	evt := workflow.NewPreMergeRequestCreateEvent("July 2026: Drupal Maintenance Updates")
-	for _, h := range inStageOrder(um.Hooks().PreMergeRequestCreate, audit.Hooks().PreMergeRequestCreate) {
-		require.NoError(t, h.Run(evt))
-	}
+	require.NoError(t, workflow.NewPipeline([]workflow.Addon{um, audit}).PreMergeRequestCreate(evt))
 
 	result, err := um.RenderTemplate()
 	require.NoError(t, err)

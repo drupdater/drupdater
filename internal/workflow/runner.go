@@ -44,7 +44,7 @@ type Runner struct {
 	committer Committer
 
 	// hooks are the run's addons' hooks, set when the run starts.
-	hooks *pipeline
+	hooks *Pipeline
 
 	// siteCommitMu serializes the git-committing tail of updateSite: sites update concurrently
 	// but share one working tree and index.
@@ -93,7 +93,7 @@ func New(
 
 func (r *Runner) Run(ctx context.Context, addons []Addon) (err error) {
 	start := time.Now()
-	r.hooks = newPipeline(addons)
+	r.hooks = NewPipeline(addons)
 
 	mode := report.ModeNormal
 	if r.config.Security {
@@ -261,7 +261,7 @@ func (r *Runner) runPhases(
 // default and is offered to the addons — how composer_audit re-labels a security run.
 func (r *Runner) renderMergeRequest(addons []Addon) (string, string, error) {
 	e := NewPreMergeRequestCreateEvent(fmt.Sprintf("%s: Drupal Maintenance Updates", r.current.Format("January 2006")))
-	if err := fire("pre-merge-request-create", r.hooks.preMergeRequestCreate, e); err != nil {
+	if err := r.hooks.PreMergeRequestCreate(e); err != nil {
 		return "", "", err
 	}
 
@@ -404,7 +404,7 @@ func (r *Runner) resolveUpdate(ctx context.Context, repository GitRepository, wo
 	}
 
 	preComposerUpdateEvent := NewPreComposerUpdateEvent(ctx, path, r.committer, []string{}, []string{}, false)
-	if err := fire("pre-composer-update", r.hooks.preComposerUpdate, preComposerUpdateEvent); err != nil {
+	if err := r.hooks.PreComposerUpdate(preComposerUpdateEvent); err != nil {
 		return "", err
 	}
 
@@ -452,7 +452,7 @@ func (r *Runner) updateSharedCode(ctx context.Context, worktree Worktree, path s
 	}
 
 	postComposerUpdateEvent := NewPostComposerUpdateEvent(ctx, path, r.committer)
-	if err := fire("post-composer-update", r.hooks.postComposerUpdate, postComposerUpdateEvent); err != nil {
+	if err := r.hooks.PostComposerUpdate(postComposerUpdateEvent); err != nil {
 		return err
 	}
 
@@ -467,7 +467,7 @@ func (r *Runner) updateSharedCode(ctx context.Context, worktree Worktree, path s
 	}
 
 	postCodeUpdateEvent := NewPostCodeUpdateEvent(ctx, path, r.committer)
-	if err := fire("post-code-update", r.hooks.postCodeUpdate, postCodeUpdateEvent); err != nil {
+	if err := r.hooks.PostCodeUpdate(postCodeUpdateEvent); err != nil {
 		return err
 	}
 
@@ -525,7 +525,7 @@ func (r *Runner) updateSite(ctx context.Context, path string, site string) (err 
 	}()
 
 	preSiteUpdateEvent := NewPreSiteUpdateEvent(ctx, path, r.committer, site)
-	if err := fire("pre-site-update", r.hooks.preSiteUpdate, preSiteUpdateEvent); err != nil {
+	if err := r.hooks.PreSiteUpdate(preSiteUpdateEvent); err != nil {
 		return err
 	}
 
@@ -549,7 +549,7 @@ func (r *Runner) commitSiteChanges(ctx context.Context, path string, site string
 	defer r.siteCommitMu.Unlock()
 
 	postSiteUpdateEvent := NewPostSiteUpdateEvent(ctx, path, r.committer, site)
-	if err := fire("post-site-update", r.hooks.postSiteUpdate, postSiteUpdateEvent); err != nil {
+	if err := r.hooks.PostSiteUpdate(postSiteUpdateEvent); err != nil {
 		return err
 	}
 

@@ -1,19 +1,11 @@
 package addon
 
 import (
-	"slices"
 	"testing"
 
 	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/stretchr/testify/assert"
 )
-
-// inStageOrder orders hooks as a run would: by stage, then by the order given.
-func inStageOrder[E any](hooks ...*workflow.Hook[E]) []*workflow.Hook[E] {
-	sorted := slices.Clone(hooks)
-	slices.SortStableFunc(sorted, func(a, b *workflow.Hook[E]) int { return int(a.Stage) - int(b.Stage) })
-	return sorted
-}
 
 func stages(h workflow.Hooks) map[string]workflow.Stage {
 	got := map[string]workflow.Stage{}

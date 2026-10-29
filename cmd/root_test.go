@@ -168,7 +168,7 @@ func TestCreateAddons(t *testing.T) {
 		require.NoError(t, err)
 
 		evt := workflow.NewPreMergeRequestCreateEvent("July 2026: Drupal Maintenance Updates")
-		require.NoError(t, firePreMergeRequestCreate(addons, evt))
+		require.NoError(t, workflow.NewPipeline(addons).PreMergeRequestCreate(evt))
 		assert.Contains(t, evt.Title, "Drupal Security Updates")
 	})
 
@@ -178,7 +178,7 @@ func TestCreateAddons(t *testing.T) {
 		require.NoError(t, err)
 
 		evt := workflow.NewPreMergeRequestCreateEvent("July 2026: Drupal Maintenance Updates")
-		require.NoError(t, firePreMergeRequestCreate(addons, evt))
+		require.NoError(t, workflow.NewPipeline(addons).PreMergeRequestCreate(evt))
 		assert.Equal(t, "July 2026: Drupal Maintenance Updates", evt.Title)
 	})
 
@@ -311,18 +311,4 @@ func TestResolveCheckoutBranch(t *testing.T) {
 		assert.Contains(t, err.Error(), "failed to determine branch from checkout")
 		require.ErrorIs(t, err, git.ErrRepositoryNotExists, "the cause must survive the wrapper")
 	})
-}
-
-// firePreMergeRequestCreate runs the addons' hooks for evt in stage order, as a run would.
-func firePreMergeRequestCreate(addons []workflow.Addon, evt *workflow.PreMergeRequestCreateEvent) error {
-	for stage := workflow.Prepare; stage <= workflow.Inspect; stage++ {
-		for _, a := range addons {
-			if h := a.Hooks().PreMergeRequestCreate; h != nil && h.Stage == stage {
-				if err := h.Run(evt); err != nil {
-					return err
-				}
-			}
-		}
-	}
-	return nil
 }

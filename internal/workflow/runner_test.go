@@ -471,7 +471,7 @@ func TestUpdateSharedCodeFailures(t *testing.T) {
 		t.Helper()
 		mockComposer := NewMockComposer(t)
 		worktree := NewMockWorktree(t)
-		return &Runner{logger: zap.NewNop(), composer: mockComposer, hooks: newPipeline([]Addon{hookAddon{hooks}})}, mockComposer, worktree
+		return &Runner{logger: zap.NewNop(), composer: mockComposer, hooks: NewPipeline([]Addon{hookAddon{hooks}})}, mockComposer, worktree
 	}
 
 	t.Run("installing the resolved lock", func(t *testing.T) {
@@ -1813,12 +1813,34 @@ func TestCleanup(t *testing.T) {
 }
 
 func TestUpdateSiteRestoresSettings(t *testing.T) {
-	newRunner := func(t *testing.T) (*Runner, *MockInstaller, *MockDrush) {
+	newRunner := func(t *testing.T, addons ...Addon) (*Runner, *MockInstaller, *MockDrush) {
 		t.Helper()
 		installer := NewMockInstaller(t)
 		drush := NewMockDrush(t)
-		return &Runner{logger: zap.NewNop(), installer: installer, drush: drush, hooks: newPipeline(nil)}, installer, drush
+		return &Runner{logger: zap.NewNop(), installer: installer, drush: drush, hooks: NewPipeline(addons)}, installer, drush
 	}
+
+	t.Run("after a failed pre-site-update hook, which stops the update", func(t *testing.T) {
+		ws, installer, _ := newRunner(t, hookAddon{Hooks{PreSiteUpdate: On(Inspect, failing[*PreSiteUpdateEvent])}})
+		installer.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(nil)
+		installer.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(nil).Once()
+
+		err := ws.updateSite(t.Context(), "/project", "site1")
+		require.ErrorIs(t, err, assert.AnError)
+		assert.Contains(t, err.Error(), "pre-site-update hook failed")
+	})
+
+	t.Run("after a failed post-site-update hook, which stops the export", func(t *testing.T) {
+		ws, installer, drush := newRunner(t, hookAddon{Hooks{PostSiteUpdate: On(Change, failing[*PostSiteUpdateEvent])}})
+		installer.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(nil)
+		drush.EXPECT().UpdateSite(anyCtx, "/project", "site1").Return(nil)
+		drush.EXPECT().ConfigResave(anyCtx, "/project", "site1").Return(nil)
+		installer.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(nil).Once()
+
+		err := ws.updateSite(t.Context(), "/project", "site1")
+		require.ErrorIs(t, err, assert.AnError)
+		assert.Contains(t, err.Error(), "post-site-update hook failed")
+	})
 
 	t.Run("after a failed update hook", func(t *testing.T) {
 		ws, installer, drush := newRunner(t)
