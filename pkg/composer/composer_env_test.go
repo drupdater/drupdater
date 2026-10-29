@@ -177,3 +177,34 @@ func TestExecComposerEnvironmentReachesTheSubprocess(t *testing.T) {
 		assert.Equal(t, "inherited", out)
 	})
 }
+
+func TestWithoutBlocking(t *testing.T) {
+	printBlocking := func(t *testing.T) {
+		t.Helper()
+		execCommand = func(ctx context.Context, _ string, _ ...string) *exec.Cmd {
+			return exec.CommandContext(ctx, "sh", "-c", `printf %s "${COMPOSER_NO_BLOCKING-unset}"`) //nolint:gosec // fixed test script
+		}
+		t.Cleanup(func() { execCommand = exec.CommandContext })
+	}
+
+	t.Run("turns composer's policy blocking off for every invocation", func(t *testing.T) {
+		printBlocking(t)
+		t.Setenv("COMPOSER_NO_BLOCKING", "0")
+
+		out, err := NewCLI(zap.NewNop(), WithoutBlocking()).execComposer(t.Context(), t.TempDir(), "update")
+		require.NoError(t, err)
+
+		assert.Equal(t, "1", out, "it must also win over an inherited value")
+	})
+
+	t.Run("leaves blocking to the environment otherwise", func(t *testing.T) {
+		printBlocking(t)
+		t.Setenv("COMPOSER_NO_BLOCKING", "")
+		os.Unsetenv("COMPOSER_NO_BLOCKING")
+
+		out, err := NewCLI(zap.NewNop()).execComposer(t.Context(), t.TempDir(), "update")
+		require.NoError(t, err)
+
+		assert.Equal(t, "unset", out)
+	})
+}

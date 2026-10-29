@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Rector\Config\RectorConfig;
 use DrupalRector\Rector\Deprecation\DeprecationHelperRemoveRector;
 use DrupalRector\Rector\ValueObject\DeprecationHelperRemoveConfiguration;
+use DrupalRector\Set\Drupal10SetList;
 use DrupalRector\Set\DrupalSetProvider;
 
 if (class_exists('DrupalFinder\DrupalFinderComposerRuntime')) {
@@ -12,7 +13,7 @@ if (class_exists('DrupalFinder\DrupalFinderComposerRuntime')) {
 }
 else {
   $drupalFinder = new DrupalFinder\DrupalFinder();
-  $drupalFinder->locateRoot(__DIR__);
+  $drupalFinder->locateRoot(getcwd());
 }
 $drupalRoot = $drupalFinder->getDrupalRoot();
 
@@ -21,6 +22,8 @@ $drupalRoot = $drupalFinder->getDrupalRoot();
 return RectorConfig::configure()
   ->withSetProviders(DrupalSetProvider::class)
   ->withComposerBased(drupal: TRUE)
+  // Composer-based sets match the installed major only; 10.x deprecations stay live until 12.
+  ->withSets([Drupal10SetList::DRUPAL_10])
   ->withConfiguredRule(DeprecationHelperRemoveRector::class, [
     new DeprecationHelperRemoveConfiguration(\Drupal::VERSION),
   ])

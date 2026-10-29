@@ -34,6 +34,16 @@ func TestCommandBuild(t *testing.T) {
 		assert.Equal(t, []string{"composer", "update", "--dry-run"}, seen)
 	})
 
+	t.Run("asks the factory for Program instead, when one is named", func(t *testing.T) {
+		var seen []string
+		c := Command{New: shellCommand("true", &seen), Logger: zap.NewNop(), Program: "/opt/tools/phpcs"}
+
+		_, err := c.Combined(t.Context(), "--report=json")
+		require.NoError(t, err)
+
+		assert.Equal(t, []string{"/opt/tools/phpcs", "--report=json"}, seen)
+	})
+
 	t.Run("runs in Dir", func(t *testing.T) {
 		var seen []string
 		dir := t.TempDir()

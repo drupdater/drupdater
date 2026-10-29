@@ -92,6 +92,19 @@ Built on `php:<version>-cli-trixie`, with:
   pre-allow-listed.
 - **Helper scripts** at `/opt/drupdater/` — the Rector configuration, the unsupported
   modules query, and the configuration resave script.
+- **Bundled tools** at `/opt/drupdater/tools/` — see below.
+
+### Bundled tools
+
+[`code_beautifier`](addons/code-beautifier.md) and
+[`deprecations_remover`](addons/deprecations-remover.md) need PHPCS with `drupal/coder` and
+Drupal Rector. Rather than installing them into the project for each run, the image installs
+them once into `/opt/drupdater/tools/`, from the repository's `tools/composer.lock`, and runs
+them against the project from there. A project that already depends on `drupal/coder` or
+`palantirnet/drupal-rector` runs its own copy instead.
+
+`rector/rector` stays below 2.6.2, which removed rule sets Drupal Rector still relies on;
+Drupal Rector's own `conflict` holds it there.
 
 The Composer environment is tuned for unattended runs; see [environment
 variables](environment-variables.md#set-inside-the-docker-image) for the values and why.

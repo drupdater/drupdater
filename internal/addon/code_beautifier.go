@@ -17,20 +17,23 @@ import (
 )
 
 type CodeBeautifier struct {
-	logger   *zap.Logger
-	phpcs    PHPCS
-	composer Composer
+	logger       *zap.Logger
+	projectPHPCS PHPCS
+	bundledPHPCS PHPCS
+	composer     Composer
 
 	// For the report. Written once from the single post-code-update event, read after the run.
 	fixedFiles []string
 	fixable    int
 }
 
-func NewCodeBeautifier(logger *zap.Logger, phpcs PHPCS, composer Composer) *CodeBeautifier {
+// NewCodeBeautifier runs projectPHPCS when the project has drupal/coder, bundledPHPCS otherwise.
+func NewCodeBeautifier(logger *zap.Logger, projectPHPCS PHPCS, bundledPHPCS PHPCS, composer Composer) *CodeBeautifier {
 	return &CodeBeautifier{
-		logger:   logger,
-		phpcs:    phpcs,
-		composer: composer,
+		logger:       logger,
+		projectPHPCS: projectPHPCS,
+		bundledPHPCS: bundledPHPCS,
+		composer:     composer,
 	}
 }
 
@@ -87,7 +90,7 @@ var hasPHPCSPathDefinitions = func(path string) (bool, error) {
 	return len(ruleset.Files) > 0, nil
 }
 
-func (cb *CodeBeautifier) postCodeUpdateHandler(evt *workflow.PostCodeUpdateEvent) (err error) { //nolint:cyclop
+func (cb *CodeBeautifier) postCodeUpdateHandler(evt *workflow.PostCodeUpdateEvent) error { //nolint:cyclop
 	cb.logger.Info("updating coding styles")
 
 	if !fileExists(evt.Path()) {
@@ -110,22 +113,13 @@ func (cb *CodeBeautifier) postCodeUpdateHandler(evt *workflow.PostCodeUpdateEven
 		}
 	}
 
-	if installed, _ := cb.composer.IsPackageInstalled(evt.Context(), evt.Path(), "drupal/coder"); !installed {
-		if err := cb.InstallCoder(evt.Context(), evt.Path(), evt); err != nil {
-			return err
-		}
-		// Deferred, not called at the end: every path below returns early, and a coder left
-		// behind is committed into the update branch as a dependency nobody asked for.
-		defer func() {
-			// Equivalent mutant: without removeErr != nil, a nil removeErr is assigned to a nil err.
-			// mutator-disable-next-line expression/remove
-			if removeErr := cb.removeCoder(evt.Context(), evt.Path(), evt); removeErr != nil && err == nil {
-				err = removeErr
-			}
-		}()
+	// The project's own coder brings the version and extra standards its phpcs.xml was written for.
+	phpcs := cb.bundledPHPCS
+	if installed, _ := cb.composer.IsPackageInstalled(evt.Context(), evt.Path(), "drupal/coder"); installed {
+		phpcs = cb.projectPHPCS
 	}
 
-	codingStyleUpdateResult, err := cb.phpcs.Run(evt.Context(), evt.Path())
+	codingStyleUpdateResult, err := phpcs.Run(evt.Context(), evt.Path())
 	if err != nil {
 		return fmt.Errorf("failed to run phpcs: %w", err)
 	}
@@ -135,7 +129,7 @@ func (cb *CodeBeautifier) postCodeUpdateHandler(evt *workflow.PostCodeUpdateEven
 		return nil
 	}
 
-	err = cb.phpcs.RunCBF(evt.Context(), evt.Path())
+	err = phpcs.RunCBF(evt.Context(), evt.Path())
 	if err != nil {
 		cb.logger.Debug("remaining issues", zap.Error(err))
 	}
@@ -232,27 +226,4 @@ func (cb *CodeBeautifier) CreatePHPCSConfig(ctx context.Context, path string, co
 	}
 
 	return true, nil
-}
-
-func (cb *CodeBeautifier) InstallCoder(ctx context.Context, path string, committer workflow.Committer) error {
-	cb.logger.Debug("drupal/coder is not installed, installing")
-	if _, err := cb.composer.Require(ctx, path, "--dev", "drupal/coder"); err != nil {
-		return err
-	}
-
-	_, err := committer.Commit("Install drupal/coder", "composer.json", "composer.lock")
-	return err
-}
-
-// removeCoder undoes InstallCoder. Removing it rarely restores composer.lock byte-for-byte, so the
-// remainder is committed under its own message.
-func (cb *CodeBeautifier) removeCoder(ctx context.Context, path string, committer workflow.Committer) error {
-	cb.logger.Debug("removing drupal/coder")
-	// --dev because InstallCoder required it there; without the flag composer refuses.
-	if _, err := cb.composer.Remove(ctx, path, "--dev", "drupal/coder"); err != nil {
-		return err
-	}
-
-	_, err := committer.Commit("Remove temporary drupal/coder installation", "composer.json", "composer.lock")
-	return err
 }

@@ -52,6 +52,11 @@ RUN composer global config --no-plugins allow-plugins.mglaman/composer-drupal-le
     composer global config --no-plugins allow-plugins.ion-bazan/composer-diff true; \
     composer global require mglaman/composer-drupal-lenient ion-bazan/composer-diff;
 
+# PHPCS and Rector for the addons, installed here so they never touch the project's composer.json.
+COPY tools/composer.json tools/composer.lock /opt/drupdater/tools/
+RUN composer install --working-dir=/opt/drupdater/tools --no-dev --no-interaction --no-progress \
+    && composer clear-cache
+
 COPY scripts/ /opt/drupdater/
 COPY --from=build /build/drupdater /opt/drupdater/bin
 

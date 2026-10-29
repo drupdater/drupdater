@@ -73,9 +73,10 @@ skips.
 A project that has not adopted a formatting tool has not asked for its `composer.json` to
 be reordered, and doing so unprompted would produce a large diff nobody requested.
 
-The addons that *do* install something — `drupal/coder` for PHPCBF, Rector for deprecation
-removal — install it as a dev dependency for the duration and, in Rector's case, remove it
-again afterwards.
+The same goes for the tools the addons themselves need. PHPCS with `drupal/coder` and
+Drupal Rector are [bundled in the Docker image](../reference/docker-images.md#bundled-tools)
+and run against the project from there, rather than being installed into its
+`composer.json` for the length of a run.
 
 ## It does not have a plugin API
 

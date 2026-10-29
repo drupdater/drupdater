@@ -162,6 +162,39 @@ func TestPhpcsRunCBF(t *testing.T) {
 	})
 }
 
+func TestBundledCLIRunsItsOwnBinaries(t *testing.T) {
+	core, _ := observer.New(zapcore.DebugLevel)
+	cli := NewBundledCLI(zap.New(core), "/opt/drupdater/tools/vendor/bin")
+
+	t.Run("phpcs", func(t *testing.T) {
+		data := `{"files":{},"totals":{"errors":0,"warnings":0,"fixable":0}}`
+		name, args, cmd := stubExec(t, data, false)
+		workDir := t.TempDir()
+
+		_, err := cli.Run(t.Context(), workDir)
+		require.NoError(t, err)
+
+		assert.Equal(t, "/opt/drupdater/tools/vendor/bin/phpcs", *name)
+		assert.Equal(t, []string{
+			"--report=json", "-q",
+			"--runtime-set", "ignore_errors_on_exit", "1",
+			"--runtime-set", "ignore_warnings_on_exit", "1",
+		}, *args)
+		assert.Equal(t, workDir, (*cmd).Dir, "phpcs finds the project's phpcs.xml from its working directory")
+	})
+
+	t.Run("phpcbf", func(t *testing.T) {
+		name, args, cmd := stubExec(t, "", false)
+		workDir := t.TempDir()
+
+		require.NoError(t, cli.RunCBF(t.Context(), workDir))
+
+		assert.Equal(t, "/opt/drupdater/tools/vendor/bin/phpcbf", *name)
+		assert.Empty(t, *args)
+		assert.Equal(t, workDir, (*cmd).Dir)
+	})
+}
+
 func TestHelperProcess(*testing.T) {
 	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
 		return

@@ -1,0 +1,19 @@
+{
+    "name": "drupdater/tools",
+    "description": "The code-quality tools drupdater runs against a project without installing them into it.",
+    "type": "project",
+    "license": "Apache-2.0",
+    "require": {
+        "drupal/coder": "^8.3.31",
+        "palantirnet/drupal-rector": "^1.1.3"
+    },
+    "config": {
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": true
+        },
+        "platform": {
+            "php": "8.2.0"
+        },
+        "sort-packages": true
+    }
+}

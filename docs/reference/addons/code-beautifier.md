@@ -9,7 +9,7 @@ a PHPCS configuration first if the project has none.
 | Events | `post-code-update` (Format) |
 | Report key | `code_beautifier` |
 | Pull request section | *(none)* |
-| Commits | `Add PHPCS config`, `Install drupal/coder`, `Update coding styles`, `Remove temporary drupal/coder installation` |
+| Commits | `Add PHPCS config`, `Update coding styles` |
 
 ## What it does
 
@@ -26,18 +26,15 @@ Two cases stop it short:
 - **A config exists but declares no `<file>` paths** — a warning is logged and the addon
   skips, rather than guessing at a scope the project deliberately left open.
 
-### Ensures `drupal/coder` is installed, then puts it back
+### Picks a PHPCS
 
-If absent, it is required as a dev dependency and committed as `Install drupal/coder`.
+A project that depends on `drupal/coder` runs its own `phpcs` and `phpcbf`, through
+`composer exec`: its `phpcs.xml` was written for that coder version and may name standards
+only the project installs.
 
-It is removed again once `phpcs` and `phpcbf` have run, in a
-`Remove temporary drupal/coder installation` commit. Removing it rarely restores
-`composer.lock` byte-for-byte, so the remainder gets its own commit rather than being left
-uncommitted in the working tree.
-
-A project that already depends on `drupal/coder` keeps it: the addon only removes what it
-installed itself. Otherwise the merge request would carry a dev dependency nobody asked
-for, in a lock change the [run report](../run-report.md)'s package list never mentions.
+Any other project runs the copies [bundled in the Docker image](../docker-images.md#bundled-tools).
+Nothing is installed into the project, so its `composer.json` and `composer.lock` are never
+touched by this addon.
 
 ### Fixes and commits
 

@@ -13,8 +13,6 @@ import (
 
 type Composer interface {
 	Update(ctx context.Context, dir string, packagesToUpdate []string, packagesToKeep []string, minimalChanges bool, dryRun bool) ([]composer.PackageChange, error)
-	Require(ctx context.Context, dir string, args ...string) (string, error)
-	Remove(ctx context.Context, dir string, packages ...string) (string, error)
 	Audit(ctx context.Context, dir string) (composer.Audit, error)
 	Normalize(ctx context.Context, dir string) (string, error)
 	Diff(ctx context.Context, path string, withLinks bool) (string, error)

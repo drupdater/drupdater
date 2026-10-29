@@ -14,17 +14,23 @@ import (
 type CommandFactory func(ctx context.Context, name string, args ...string) *exec.Cmd
 
 // Command is one composer invocation: run in Dir, under the environment Env guarantees. Shared
-// by drush, phpcs and rector too, which all go through `composer exec`.
+// by drush, phpcs and rector too, which go through `composer exec` or name their own Program.
 type Command struct {
 	New    CommandFactory
 	Logger *zap.Logger
 	Dir    string
+	// Program runs instead of composer, for a tool drupdater bundles rather than the project.
+	Program string
 	// ExtraEnv is appended after Env, so it wins over anything inherited — drush's SITE_NAME.
 	ExtraEnv []string
 }
 
 func (c Command) build(ctx context.Context, args ...string) *exec.Cmd {
-	command := c.New(ctx, "composer", args...)
+	program := c.Program
+	if program == "" {
+		program = "composer"
+	}
+	command := c.New(ctx, program, args...)
 	command.Dir = c.Dir
 	// Environ() falls back to os.Environ(), layering on the deployment's environment.
 	command.Env = append(Env(command.Environ()), c.ExtraEnv...)

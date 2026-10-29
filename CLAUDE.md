@@ -107,6 +107,7 @@ Where things live. For *how they work*, read `docs/explanation/` rather than dup
 | `internal/golden/` | Golden-file comparison and the `-update` flag; imported only from tests |
 | `pkg/` | One directory per wrapped external tool: `composer`, `drush`, `repo` (go-git), `phpcs`, `rector`, `drupal` (installer), `drupalorg` |
 | `scripts/` | PHP helpers copied into the image (`rector.php`, `unsupported-modules.php`, `config-resave.php`) |
+| `tools/` | The PHPCS and Rector the image installs to `/opt/drupdater/tools`, so addons install nothing into the project |
 
 ### Invariants worth knowing before editing
 

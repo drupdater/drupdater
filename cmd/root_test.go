@@ -312,3 +312,8 @@ func TestResolveCheckoutBranch(t *testing.T) {
 		require.ErrorIs(t, err, git.ErrRepositoryNotExists, "the cause must survive the wrapper")
 	})
 }
+
+func TestComposerOptions(t *testing.T) {
+	assert.Len(t, composerOptions(internal.Config{Security: true}), 1, "a security run turns blocking off")
+	assert.Empty(t, composerOptions(internal.Config{}), "a normal run keeps the project's policy")
+}

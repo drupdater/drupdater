@@ -19,6 +19,15 @@ updates:
       - "dependencies"
       - "docker"
 
+  # The tools the addons run, installed into the image from tools/composer.lock.
+  - package-ecosystem: "composer"
+    directory: "/tools"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

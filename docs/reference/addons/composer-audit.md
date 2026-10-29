@@ -38,6 +38,13 @@ advisories. It then sets, on the `pre-composer-update` event:
   cannot move without them.
 - **`MinimalChanges: true`** — Composer is asked to disturb as little else as possible.
 
+A security run also turns off Composer's policy blocking (`COMPOSER_NO_BLOCKING=1`) for every
+Composer command it runs. Composer 2.9 and later otherwise refuse to resolve to any version
+with an advisory. An advisory with no fixed version inside the project's constraints would
+then make the whole update unresolvable, holding back every fix that does exist. Without
+blocking, such a package stays where it is, and the audit after the update reports it under
+`remaining`. A normal run leaves the project's `policy` settings in force.
+
 It runs at the **Prepare** stage on this event precisely because it decides the
 scope that every other addon then works within.
 
