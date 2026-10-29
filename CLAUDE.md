@@ -113,6 +113,7 @@ Where things live. For *how they work*, read `docs/explanation/` rather than dup
 ### Invariants worth knowing before editing
 
 - **Addons never call each other.** They communicate only through mutable event payloads (`PackagesToUpdate`, `PackagesToKeep`, `MinimalChanges`).
+- **A run never touches the user's checkout.** Checkout mode works in a linked worktree (`repo.AddWorktree`), commits are signed explicitly, and nothing writes the repository's git config or shells out to git there; the update branch is the only thing a run adds.
 - **Addons never touch git.** They name the paths they changed to the event's `Commit`; the runner's committer (`internal/workflow/commit.go`) commits exactly those, and refuses when something else is already staged.
 - **Hook stages are load-bearing** on `pre-composer-update` and `post-code-update`. See `docs/explanation/addon-architecture.md` before changing one.
 - **The MR is rendered from the report**, through its JSON. An addon reaches the description only via its report section; findings from two addons are joined there, never handed between them.

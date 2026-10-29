@@ -282,6 +282,114 @@ func (_c *MockRepository_Remote_Call) RunAndReturn(run func(name string) (*git.R
 	return _c
 }
 
+// RemoveBranch provides a mock function for the type MockRepository
+func (_mock *MockRepository) RemoveBranch(name string) error {
+	ret := _mock.Called(name)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RemoveBranch")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(string) error); ok {
+		r0 = returnFunc(name)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockRepository_RemoveBranch_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RemoveBranch'
+type MockRepository_RemoveBranch_Call struct {
+	*mock.Call
+}
+
+// RemoveBranch is a helper method to define mock.On call
+//   - name string
+func (_e *MockRepository_Expecter) RemoveBranch(name any) *MockRepository_RemoveBranch_Call {
+	return &MockRepository_RemoveBranch_Call{Call: _e.mock.On("RemoveBranch", name)}
+}
+
+func (_c *MockRepository_RemoveBranch_Call) Run(run func(name string)) *MockRepository_RemoveBranch_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_RemoveBranch_Call) Return(err error) *MockRepository_RemoveBranch_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockRepository_RemoveBranch_Call) RunAndReturn(run func(name string) error) *MockRepository_RemoveBranch_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SetBranch provides a mock function for the type MockRepository
+func (_mock *MockRepository) SetBranch(name string, hash plumbing.Hash) error {
+	ret := _mock.Called(name, hash)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetBranch")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(string, plumbing.Hash) error); ok {
+		r0 = returnFunc(name, hash)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockRepository_SetBranch_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SetBranch'
+type MockRepository_SetBranch_Call struct {
+	*mock.Call
+}
+
+// SetBranch is a helper method to define mock.On call
+//   - name string
+//   - hash plumbing.Hash
+func (_e *MockRepository_Expecter) SetBranch(name any, hash any) *MockRepository_SetBranch_Call {
+	return &MockRepository_SetBranch_Call{Call: _e.mock.On("SetBranch", name, hash)}
+}
+
+func (_c *MockRepository_SetBranch_Call) Run(run func(name string, hash plumbing.Hash)) *MockRepository_SetBranch_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 string
+		if args[0] != nil {
+			arg0 = args[0].(string)
+		}
+		var arg1 plumbing.Hash
+		if args[1] != nil {
+			arg1 = args[1].(plumbing.Hash)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockRepository_SetBranch_Call) Return(err error) *MockRepository_SetBranch_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockRepository_SetBranch_Call) RunAndReturn(run func(name string, hash plumbing.Hash) error) *MockRepository_SetBranch_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // NewMockWorktree creates a new instance of MockWorktree. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockWorktree(t interface {
@@ -427,57 +535,6 @@ func (_c *MockWorktree_AddGlob_Call) Return(err error) *MockWorktree_AddGlob_Cal
 }
 
 func (_c *MockWorktree_AddGlob_Call) RunAndReturn(run func(pattern string) error) *MockWorktree_AddGlob_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// Checkout provides a mock function for the type MockWorktree
-func (_mock *MockWorktree) Checkout(opts *git.CheckoutOptions) error {
-	ret := _mock.Called(opts)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Checkout")
-	}
-
-	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(*git.CheckoutOptions) error); ok {
-		r0 = returnFunc(opts)
-	} else {
-		r0 = ret.Error(0)
-	}
-	return r0
-}
-
-// MockWorktree_Checkout_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Checkout'
-type MockWorktree_Checkout_Call struct {
-	*mock.Call
-}
-
-// Checkout is a helper method to define mock.On call
-//   - opts *git.CheckoutOptions
-func (_e *MockWorktree_Expecter) Checkout(opts any) *MockWorktree_Checkout_Call {
-	return &MockWorktree_Checkout_Call{Call: _e.mock.On("Checkout", opts)}
-}
-
-func (_c *MockWorktree_Checkout_Call) Run(run func(opts *git.CheckoutOptions)) *MockWorktree_Checkout_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 *git.CheckoutOptions
-		if args[0] != nil {
-			arg0 = args[0].(*git.CheckoutOptions)
-		}
-		run(
-			arg0,
-		)
-	})
-	return _c
-}
-
-func (_c *MockWorktree_Checkout_Call) Return(err error) *MockWorktree_Checkout_Call {
-	_c.Call.Return(err)
-	return _c
-}
-
-func (_c *MockWorktree_Checkout_Call) RunAndReturn(run func(opts *git.CheckoutOptions) error) *MockWorktree_Checkout_Call {
 	_c.Call.Return(run)
 	return _c
 }

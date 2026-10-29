@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"context"
+	"github.com/drupdater/drupdater/pkg/repo"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -52,6 +53,7 @@ func TestRunWithConcurrentSites(t *testing.T) {
 	repositoryService := NewMockRepository(t)
 	vcsProvider := NewMockPlatform(t)
 	repository := NewMockGitRepository(t)
+	expectUpdateBranch(repository)
 	mockComposer := NewMockComposer(t)
 	expectVersionLookup(mockComposer)
 	drush := NewMockDrush(t)
@@ -71,7 +73,6 @@ func TestRunWithConcurrentSites(t *testing.T) {
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
 	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
-	worktree.EXPECT().Checkout(workBranchCheckout).Return(nil)
 
 	// Two opposite invariants, measured by peak occupancy rather than by the race detector: the
 	// git index the commit tail writes is mocked here, so nothing about it is shared memory.
@@ -84,10 +85,12 @@ func TestRunWithConcurrentSites(t *testing.T) {
 		installer.EXPECT().RestoreSettings(anyCtx, testCheckout, site).Return(nil)
 		drush.EXPECT().UpdateSite(anyCtx, testCheckout, site).Return(nil)
 		drush.EXPECT().ExportConfiguration(anyCtx, testCheckout, site).RunAndReturn(commitTail.probe)
+		drush.EXPECT().GetConfigSyncDir(anyCtx, testCheckout, site, true).Return("config/"+site, nil)
+		worktree.EXPECT().Add("config/"+site).Return(plumbing.ZeroHash, nil)
 		drush.EXPECT().ConfigResave(anyCtx, testCheckout, site).Return(nil)
 	}
 
-	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, testCheckout, nil)
+	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
 	repositoryService.EXPECT().IsShallowClone(testCheckout).Return(false, nil)
 	repositoryService.EXPECT().BranchExists(repository, mock.Anything, mock.Anything).Return(false, nil)
 	repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound)

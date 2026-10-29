@@ -1,18 +1,24 @@
 package repo
 
 import (
+	"cmp"
+	"context"
 	"errors"
 	"fmt"
 	"hash/fnv"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/spf13/afero"
 
 	git "github.com/go-git/go-git/v5"
 	gitconfig "github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"go.uber.org/zap"
 )
@@ -30,6 +36,10 @@ type Repository interface {
 	Head() (*plumbing.Reference, error)
 	// Reference looks up a local reference, erroring with plumbing.ErrReferenceNotFound.
 	Reference(name plumbing.ReferenceName, resolved bool) (*plumbing.Reference, error)
+	// SetBranch points the local branch name at hash, creating it when absent.
+	SetBranch(name string, hash plumbing.Hash) error
+	// RemoveBranch deletes the local branch name.
+	RemoveBranch(name string) error
 }
 
 type Worktree interface {
@@ -38,7 +48,37 @@ type Worktree interface {
 	Remove(path string) (plumbing.Hash, error)
 	Commit(msg string, opts *git.CommitOptions) (plumbing.Hash, error)
 	Status() (git.Status, error)
-	Checkout(opts *git.CheckoutOptions) error
+}
+
+// Identity is who drupdater's commits are by.
+type Identity struct {
+	Name  string
+	Email string
+}
+
+// Signature is the identity at the current time, which is what a go-git commit records.
+func (i Identity) Signature() *object.Signature {
+	return &object.Signature{Name: i.Name, Email: i.Email, When: time.Now()}
+}
+
+// Checkout is a working copy drupdater changes and commits in: its own clone, or a linked worktree
+// of the user's checkout. Commits carry Author explicitly, so the repository's git config is never
+// written to.
+type Checkout struct {
+	Repository Repository
+	Worktree   Worktree
+	Path       string
+	Author     Identity
+}
+
+type repository struct{ *git.Repository }
+
+func (r repository) SetBranch(name string, hash plumbing.Hash) error {
+	return r.Storer.SetReference(plumbing.NewHashReference(plumbing.NewBranchReferenceName(name), hash))
+}
+
+func (r repository) RemoveBranch(name string) error {
+	return r.Storer.RemoveReference(plumbing.NewBranchReferenceName(name))
 }
 
 type GitRepositoryService struct {
@@ -56,7 +96,8 @@ func BasicAuth(token string) *http.BasicAuth {
 
 // open names the path in the error: it comes from the user or CI, so a bad one must say which.
 func (rs *GitRepositoryService) open(path string) (*git.Repository, error) {
-	checkout, err := git.PlainOpen(path)
+	// The common dir is where a linked worktree keeps its refs, remotes and shallow file.
+	checkout, err := git.PlainOpenWithOptions(path, &git.PlainOpenOptions{EnableDotGitCommonDir: true})
 	if err != nil {
 		if errors.Is(err, git.ErrRepositoryNotExists) {
 			return nil, fmt.Errorf("no git repository at %q: --working-dir must be the repository root (the directory containing .git): %w", path, err)
@@ -73,18 +114,19 @@ func NewGitRepositoryService(logger *zap.Logger) *GitRepositoryService {
 	}
 }
 
-func (rs *GitRepositoryService) CloneRepository(repository string, branch string, token string, username string, email string) (Repository, Worktree, string, error) {
+// CloneRepository clones the branch into a new temporary directory.
+func (rs *GitRepositoryService) CloneRepository(repository string, branch string, token string, username string, email string) (Checkout, error) {
 
 	h := fnv.New64a()
 	_, _ = h.Write([]byte(repository))
 	hash := fmt.Sprintf("%x", h.Sum64())
 	projectDir := filepath.Join(os.TempDir(), hash)
 	if err := rs.fs.MkdirAll(projectDir, os.ModePerm); err != nil {
-		return nil, nil, "", fmt.Errorf("failed to create project directory: %w", err)
+		return Checkout{}, fmt.Errorf("failed to create project directory: %w", err)
 	}
 	tmpDirName, err := afero.TempDir(rs.fs, projectDir, "repo")
 	if err != nil {
-		return nil, nil, "", fmt.Errorf("failed to create temporary directory: %w", err)
+		return Checkout{}, fmt.Errorf("failed to create temporary directory: %w", err)
 	}
 
 	checkout, err := git.PlainClone(tmpDirName, false, &git.CloneOptions{
@@ -96,19 +138,62 @@ func (rs *GitRepositoryService) CloneRepository(repository string, branch string
 	})
 
 	if err != nil {
-		return nil, nil, "", fmt.Errorf("git clone: %w", err)
+		return Checkout{}, fmt.Errorf("git clone: %w", err)
 	}
 
-	return rs.prepareCheckout(checkout, username, email)
+	return rs.checkout(checkout, username, email)
 }
 
-// OpenRepository opens an existing checkout, with CloneRepository's git-user and hook setup.
-func (rs *GitRepositoryService) OpenRepository(path string, username string, email string) (Repository, Worktree, string, error) {
+// AddWorktree adds a linked worktree of the checkout at source, detached at its HEAD, in a new
+// temporary directory. The run works and commits there, so the user's working tree, branch and
+// config stay as they were whatever happens. Through the git CLI: go-git cannot create one.
+func (rs *GitRepositoryService) AddWorktree(ctx context.Context, source string, username string, email string) (Checkout, error) {
+	if _, err := rs.open(source); err != nil {
+		return Checkout{}, err
+	}
+
+	parent, err := os.MkdirTemp("", "drupdater-worktree-")
+	if err != nil {
+		return Checkout{}, fmt.Errorf("failed to create temporary directory: %w", err)
+	}
+	path := filepath.Join(parent, "checkout")
+	if out, err := runGit(ctx, source, "worktree", "add", "--detach", path, "HEAD"); err != nil {
+		_ = os.RemoveAll(parent)
+		return Checkout{}, fmt.Errorf("failed to add a worktree of %s: %w: %s", source, err, out)
+	}
+
 	checkout, err := rs.open(path)
 	if err != nil {
-		return nil, nil, "", err
+		_ = rs.RemoveWorktree(ctx, source, path)
+		return Checkout{}, err
 	}
-	return rs.prepareCheckout(checkout, username, email)
+	return rs.checkout(checkout, username, email)
+}
+
+// RemoveWorktree removes a worktree AddWorktree added, its directory included.
+func (rs *GitRepositoryService) RemoveWorktree(ctx context.Context, source string, path string) error {
+	out, err := runGit(ctx, source, "worktree", "remove", "--force", path)
+	// The temporary parent goes either way; after a failed remove, prune drops the registration.
+	if removeErr := os.RemoveAll(filepath.Dir(path)); removeErr != nil && err == nil {
+		return fmt.Errorf("failed to remove the worktree directory: %w", removeErr)
+	}
+	if err != nil {
+		if _, pruneErr := runGit(ctx, source, "worktree", "prune"); pruneErr != nil {
+			return fmt.Errorf("failed to remove the worktree at %s: %w: %s", path, err, out)
+		}
+	}
+	return nil
+}
+
+var execCommand = exec.CommandContext
+
+// runGit trusts the repository for this one command: a checkout mounted into the container is
+// owned by another user, which git refuses as "dubious ownership" — and go-git never checks.
+func runGit(ctx context.Context, dir string, args ...string) (string, error) {
+	command := execCommand(ctx, "git", append([]string{"-c", "safe.directory=*"}, args...)...)
+	command.Dir = dir
+	out, err := command.CombinedOutput()
+	return strings.TrimSpace(string(out)), err
 }
 
 // GetRemoteURL returns the "origin" URL, stripped of the credentials GitLab CI embeds in it.
@@ -162,54 +247,32 @@ func (rs *GitRepositoryService) IsShallowClone(path string) (bool, error) {
 	return len(shallow) > 0, nil
 }
 
-// prepareCheckout sets the commit identity and removes the prepare-commit-msg hook.
-func (rs *GitRepositoryService) prepareCheckout(checkout *git.Repository, username string, email string) (Repository, Worktree, string, error) {
-	config, err := checkout.Config()
-	if err != nil {
-		return checkout, nil, "", fmt.Errorf("failed to read git config: %w", err)
-	}
-	// Empty values (no platform to ask) leave the checkout's own identity in place.
-	if username != "" {
-		config.User.Name = username
-	}
-	if email != "" {
-		config.User.Email = email
-	}
-
-	// ...but a CI checkout has none at all, and go-git fails the first commit without one.
-	// Checked against the scoped config go-git resolves from, so a global user.name still wins.
+// checkout pairs a repository with its worktree and the identity its commits are by: the
+// platform's user, else the one git config already supplies, else drupdater's own.
+func (rs *GitRepositoryService) checkout(checkout *git.Repository, username string, email string) (Checkout, error) {
 	scoped, err := checkout.ConfigScoped(gitconfig.SystemScope)
 	if err != nil {
-		return checkout, nil, "", fmt.Errorf("failed to read scoped git config: %w", err)
+		return Checkout{}, fmt.Errorf("failed to read git config: %w", err)
 	}
-	if config.User.Name == "" && scoped.User.Name == "" {
-		config.User.Name = defaultCommitName
+	author := Identity{Name: username, Email: email}
+	if author.Name == "" {
+		author.Name = cmp.Or(scoped.User.Name, defaultCommitName)
 	}
-	if config.User.Email == "" && scoped.User.Email == "" {
-		config.User.Email = defaultCommitEmail
-	}
-
-	if err := checkout.SetConfig(config); err != nil {
-		return checkout, nil, "", err
+	if author.Email == "" {
+		author.Email = cmp.Or(scoped.User.Email, defaultCommitEmail)
 	}
 
 	w, err := checkout.Worktree()
 	if err != nil {
-		return checkout, nil, "", err
-	}
-	root := w.Filesystem.Root()
-
-	// `drush config:export --commit` shells out to real git, which does run hooks, and one that
-	// prompts would wedge a run that cannot pass --no-verify. Through the OS filesystem, since
-	// go-git's bound worktree rejects any path with a ".git" component.
-	hookPath := filepath.Join(root, ".git", "hooks", "prepare-commit-msg")
-	if _, err := rs.fs.Stat(hookPath); err == nil {
-		if err := rs.fs.Remove(hookPath); err != nil {
-			return checkout, w, "", fmt.Errorf("failed to remove prepare-commit-msg hook: %w", err)
-		}
+		return Checkout{}, err
 	}
 
-	return checkout, w, root, nil
+	return Checkout{
+		Repository: repository{checkout},
+		Worktree:   w,
+		Path:       w.Filesystem.Root(),
+		Author:     author,
+	}, nil
 }
 
 // BranchExists queries the remote: the cached refs/remotes/origin/* go stale the moment the host

@@ -50,15 +50,15 @@ not decide whether any of that is acceptable for your project.
 That is why the request description is as detailed as it is. The tool's output is
 information for a decision, not the decision.
 
-## It does not modify your working copy on failure
+## It does not modify your working copy
 
-A failed run restores the checkout to the commit it started from, discarding the throwaway
-work branch and any temporary state — including the permissive Composer plugin
-configuration that [`composer_allow_plugins`](../reference/addons/composer-allow-plugins.md)
-sets during the update.
+A run works in a [linked worktree](how-a-run-works.md#1-acquire-working-copy) of your
+checkout, never in the checkout itself: its branch, files, untracked files and git config
+are as they were whether the run succeeds or fails. The one thing it adds to the repository
+is the update branch — and a run that fails removes that again.
 
-A failed run should leave your checkout exactly as it found it, so that rerunning is safe
-and so that a developer machine is never left in a state that needs manual repair.
+So rerunning is always safe, and a developer machine is never left in a state that needs
+manual repair.
 
 Similarly, [`drupdater check --full`](../reference/cli/check.md) clones to a scratch
 directory rather than using the live working copy, precisely so a validation command can

@@ -1,8 +1,9 @@
 # How a run works
 
-Drupdater operates on a **single working directory** — the checkout your CI already
-provides, or a fresh clone with `--clone`. Old and new code live there sequentially. There
-is no second copy and no side-by-side comparison.
+Drupdater operates on a **single working directory** of its own — a linked worktree of the
+checkout your CI already provides, or a fresh clone with `--clone`. Old and new code live
+there sequentially. There is no second copy and no side-by-side comparison, and the
+checkout itself is never changed.
 
 ```mermaid
 flowchart LR
@@ -20,7 +21,21 @@ report](../reference/run-report.md)'s `phases` list.
 
 ### 1. `acquire working copy`
 
-Opens the existing checkout, or clones into a temporary directory with `--clone`.
+Adds a [linked worktree](https://git-scm.com/docs/git-worktree) of the existing checkout in
+a temporary directory, detached at the checkout's `HEAD` — or, with `--clone`, clones into a
+temporary directory.
+
+The worktree shares the checkout's history but has its own files and its own `HEAD`, so
+nothing the run does reaches the checkout: not its branch, not its working tree, not its
+untracked files. A worktree holds only tracked files, which is why the next phases install
+`vendor/` there from scratch, just as in a clone. Creating one needs the `git` CLI, which
+the Docker image includes. Drupdater's git commands pass `-c safe.directory=*`: a checkout
+mounted into the container belongs to another user, which git would otherwise refuse as
+"dubious ownership". Nothing is written to any git config for it.
+
+Commits are signed explicitly — the platform's user, else the identity git config supplies,
+else `drupdater <drupdater@localhost>` — so drupdater writes nothing into the repository's
+git config, and runs none of its hooks.
 
 This is a recorded phase rather than setup because a bad token, an unreachable host or an
 unreadable checkout is one of the most common real failures — and a failure here should be
@@ -45,22 +60,20 @@ Installs the current dependency tree, establishing the "before" state.
 Settles what the update changes and what its branch will be called, while touching only
 `composer.json` and `composer.lock`:
 
-1. Create and check out a throwaway work branch, `drupdater-work-<timestamp>`.
-2. Fire **`pre-composer-update`**. Addons mutate the event to steer what follows —
+1. Fire **`pre-composer-update`**. Addons mutate the event to steer what follows —
    [`composer_audit`](../reference/addons/composer-audit.md) restricts a `--security` run to
    the vulnerable packages, or aborts it when there are none;
    [`composer_patches`](../reference/addons/composer-patches.md) pins packages whose
    patches cannot be made to apply.
-3. Run `composer update --no-install` with those constraints. It resolves the update and
+2. Run `composer update --no-install` with those constraints. It resolves the update and
    bumps the constraints in `composer.json`, but leaves `vendor/` at the old code. **If
    nothing changed, the run aborts here.**
-4. Compute the branch name from the resolved `composer.lock` (see
+3. Compute the branch name from the resolved `composer.lock` (see
    [below](#content-addressed-branch-names)), and **abort if it already exists**, locally
    or on the remote.
 
-The work branch has a flat name rather than `drupdater/work-…` deliberately: a repository
-containing a branch literally named `drupdater` would make `refs/heads/drupdater` a file,
-blocking any nested ref beneath it.
+The run commits on its detached `HEAD`. No branch exists until the
+[`site update`](#7-site-update) phase has made the last commit.
 
 This phase comes before the baseline install because every way a run can find it has
 nothing to do is decided here. A nightly job on an up-to-date site, or a re-run while the
@@ -97,16 +110,21 @@ The centre of the run:
    paths are left alone: `vendor/`, `web/core` and the site's generated files belong to
    nobody.
 4. Fire **`post-code-update`** — Rector, PHPCBF, and the post-update security audit.
-5. Check out the branch named in phase 4 from the work branch's tip.
 
 ### 7. `site update`
 
 Per site, concurrently: configure the database, fire **`pre-site-update`**, run the update
-hooks, resave configuration, fire **`post-site-update`**, and export configuration.
+hooks, resave configuration, fire **`post-site-update`**, export configuration, and commit
+the site's config sync directory as `Update configuration <site>`.
 
-The commit step is serialised across sites even though the rest is concurrent. All sites
-share one worktree and one git index, and `drush config:export` shells out to git itself —
-so concurrent commits would race on the index.
+The commit step is serialised across sites even though the rest is concurrent: all sites
+share one worktree and one git index. Drupdater commits the export itself rather than
+letting `drush config:export --commit` run git, so no git hook or git-config identity is
+involved.
+
+Once every site is done, the update branch named in phase 4 is pointed at the result. Only
+now, because the run commits on a detached `HEAD`: a branch created earlier would not follow
+the configuration commits.
 
 ### 8. `render merge request`
 
@@ -169,18 +187,21 @@ including a timeout or `SIGTERM`.
 it runs last — so the report reflects everything that happened, including failures during
 other cleanup.
 
-**A failed run restores the original checkout.** The captured HEAD is force-checked-out,
-discarding stray commits on the work branch and — importantly — the temporary `"*": true` `allow-plugins` rule
-that [`composer_allow_plugins`](../reference/addons/composer-allow-plugins.md) left in
-`composer.json`. Errors during restore are logged but never returned: they must not mask
-the original failure.
+**The worktree is removed on every exit path**, together with its temporary directory, so
+whatever a failed run left half-done — the temporary `"*": true` `allow-plugins` rule
+[`composer_allow_plugins`](../reference/addons/composer-allow-plugins.md) adds, say — goes
+with it. The checkout was never touched, so there is nothing to restore. A removal that
+fails is logged, never returned: it must not change the run's outcome.
+
+**A failed run removes the update branch it created.** Left behind, it would make the next
+run stop as if the update were already done.
 
 **Site artefacts are removed.** Each site's SQLite database and private files live in
 one temporary directory of the run's own, removed whole when the run ends. Nothing is
 written beside the checkout, so a project's real `private/` directory is never touched.
 
-In clone mode the whole temporary directory is removed, guarded by a check that it really
-is inside the system temp directory.
+In clone mode the clone's temporary directory is removed instead, guarded by a check that
+it really is inside the system temp directory.
 
 ## Concurrency
 

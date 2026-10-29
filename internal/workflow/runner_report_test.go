@@ -3,6 +3,7 @@ package workflow
 import (
 	"context"
 	"errors"
+	"github.com/drupdater/drupdater/pkg/repo"
 	"testing"
 	"time"
 
@@ -74,7 +75,7 @@ func newReportHarness(t *testing.T, dryRun bool) *reportHarness {
 		RunAndReturn(func(context.Context) (composer.Versions, error) { return h.versions, h.versionsErr }).Maybe()
 	h.vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail").Maybe()
 	h.repoSvc.EXPECT().CloneRepository(h.config.RepositoryURL, h.config.Branch, h.config.Token, "user", "mail").
-		Return(h.repository, h.worktree, testCheckout, nil).Maybe()
+		Return(repo.Checkout{Repository: h.repository, Worktree: h.worktree, Path: testCheckout, Author: testAuthor}, nil).Maybe()
 	h.repoSvc.EXPECT().IsShallowClone(testCheckout).Return(false, nil).Maybe()
 	h.composer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil).Maybe()
 	h.composer.EXPECT().Install(anyCtx, testCheckout).Return(nil).Maybe()
@@ -89,13 +90,15 @@ func (h *reportHarness) expectFullRun(t *testing.T) {
 	h.worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil).Maybe()
 	h.worktree.EXPECT().AddGlob(mock.Anything).Return(nil).Maybe()
 	h.worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
-	h.worktree.EXPECT().Checkout(mock.Anything).Return(nil).Maybe()
 
 	h.installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil).Maybe()
 	h.installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil).Maybe()
 	h.installer.EXPECT().RestoreSettings(anyCtx, testCheckout, "site1").Return(nil).Maybe()
 	h.drush.EXPECT().UpdateSite(anyCtx, testCheckout, "site1").Return(nil).Maybe()
 	h.drush.EXPECT().ExportConfiguration(anyCtx, testCheckout, "site1").Return(nil).Maybe()
+	h.drush.EXPECT().GetConfigSyncDir(anyCtx, testCheckout, "site1", true).Return("config/sync", nil).Maybe()
+	h.worktree.EXPECT().Add("config/sync").Return(plumbing.ZeroHash, nil).Maybe()
+	expectUpdateBranch(h.repository)
 	h.drush.EXPECT().ConfigResave(anyCtx, testCheckout, "site1").Return(nil).Maybe()
 
 	h.repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound).Maybe()
@@ -217,7 +220,6 @@ func TestReportWrittenOnDryRun(t *testing.T) {
 // The most valuable case: a run that fails partway leaves a report naming the phase that failed.
 func TestReportWrittenOnFailureNamesThePhase(t *testing.T) {
 	h := newReportHarness(t, false)
-	h.worktree.EXPECT().Checkout(mock.Anything).Return(nil).Maybe()
 	h.installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(errors.New("drush exploded"))
 	h.repository.EXPECT().Head().Return(nil, plumbing.ErrReferenceNotFound).Maybe()
 	h.composer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).
@@ -243,7 +245,7 @@ func TestReportWrittenWhenAcquiringTheWorkingCopyFails(t *testing.T) {
 	h := newReportHarness(t, false)
 	h.repoSvc.ExpectedCalls = nil
 	h.repoSvc.EXPECT().CloneRepository(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-		Return(nil, nil, "", errors.New("authentication failed"))
+		Return(repo.Checkout{}, errors.New("authentication failed"))
 
 	err := h.run(t)
 
@@ -260,7 +262,6 @@ func TestReportWrittenWhenAcquiringTheWorkingCopyFails(t *testing.T) {
 // watching many repositories does not treat a healthy, up-to-date site as needing attention.
 func TestReportNoChangesIsNotAFailure(t *testing.T) {
 	h := newReportHarness(t, false)
-	h.worktree.EXPECT().Checkout(mock.Anything).Return(nil).Maybe()
 	h.installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil).Maybe()
 	h.installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil).Maybe()
 	h.installer.EXPECT().RestoreSettings(anyCtx, testCheckout, "site1").Return(nil).Maybe()
@@ -357,6 +358,9 @@ func TestReportNamesTheRenderPhaseWhenAssemblyFails(t *testing.T) {
 	assert.Equal(t, report.StatusFailed, h.got.Status)
 	assert.Equal(t, "render merge request", h.got.FailedPhase)
 	assert.Contains(t, h.got.Error, "failed to read the report's addon sections")
+	// A failure after the branch was created removes it, or the next run would stop on it.
+	h.repository.AssertCalled(t, "SetBranch", "update-dummy-hash", testHead.Hash())
+	h.repository.AssertCalled(t, "RemoveBranch", "update-dummy-hash")
 	assert.Empty(t, h.got.MergeRequestTitle)
 	assert.Empty(t, h.got.MergeRequestDescription)
 }

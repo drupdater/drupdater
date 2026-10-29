@@ -61,7 +61,7 @@ allow.
 ## Notes
 
 - If a run fails partway through, the temporary `"*": true` rule could in principle be
-  left in `composer.json`. It is not: a failing run restores the original checkout,
-  discarding that change along with any commits on the throwaway work branch.
+  left in `composer.json`. It is not: the run edits a worktree or clone of its own, which
+  is removed whichever way the run ends, and the checkout itself is never changed.
 - The new plugins are also in the [run report](../run-report.md), which the pull request
   section is rendered from.

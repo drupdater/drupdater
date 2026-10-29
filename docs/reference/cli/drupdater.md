@@ -22,12 +22,12 @@ them as well.
 | Flag | Type | Default | Description |
 |---|---|---|---|
 | `--branch` | string | `main` | Branch to update and target for the merge request. Only used with `--clone`; in checkout mode it is taken from the checkout, or from the CI branch variable when the checkout is in detached HEAD. |
-| `--working-dir` | string | `.` | Path to the existing checkout to update in place. Also where `.drupdater.yaml` is read from unless `--config` overrides it. |
+| `--working-dir` | string | `.` | Path to the existing checkout to update. The run works in a linked worktree of it, so the checkout itself is never changed; only the update branch is added to its repository. Also where `.drupdater.yaml` is read from unless `--config` overrides it. |
 | `--clone` | bool | `false` | Clone the repository instead of using the existing checkout. Requires `--repository-url`. Intended for local testing. |
 | `--repository-url` | string | *(from `origin`)* | Repository URL. Required with `--clone`; otherwise derived from the checkout's `origin` remote. |
 | `--security` | bool | `false` | Only apply security updates. Selects the `run_types.security` block in `.drupdater.yaml` and lets [`composer_audit`](../addons/composer-audit.md) — which runs either way — narrow the update to the vulnerable packages. Also turns off Composer's policy blocking, so an unfixable advisory cannot hold back the fixable ones. |
 | `--concurrency` | int | `GOMAXPROCS(0)` | Maximum number of sites to install and update concurrently. The default reflects the container's CPU quota, not just the host's core count. |
-| `--dry-run` | bool | `false` | Do not push the update branch or create a merge request. The branch and commits are still created locally. |
+| `--dry-run` | bool | `false` | Do not push the update branch or create a merge request. The branch and its commits are still created in the checkout's repository, for review. |
 | `--report` | string | *(disabled)* | Write a machine-readable [JSON report](../run-report.md) of the run to this path. Written on every outcome, including failures and `--dry-run`. |
 | `--verbose` | bool | `false` | Debug-level logging. Also logs the resolved configuration. |
 | `--config` | string | *(`<working-dir>/.drupdater.yaml`)* | Path to the config file. |
@@ -100,7 +100,7 @@ failure too.
 
 ## Examples
 
-Update in place in CI, writing a report:
+Update the CI checkout, writing a report:
 
 ```bash
 drupdater "$DRUPDATER_TOKEN" --report ./drupdater-report.json

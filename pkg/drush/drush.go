@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/maypok86/otter"
@@ -59,6 +60,19 @@ func (e *CLI) InstallSite(ctx context.Context, dir string, site string) error {
 	return nil
 }
 
+// relativeTo makes PHP's realpath() result relative to dir. dir is resolved too: realpath follows
+// symlinks, such as macOS's /tmp, and a prefix compared unresolved would never match.
+func relativeTo(dir string, path string) string {
+	root, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		root = dir
+	}
+	if rel, err := filepath.Rel(root, path); err == nil && filepath.IsAbs(path) {
+		return rel
+	}
+	return path
+}
+
 func (e *CLI) GetConfigSyncDir(ctx context.Context, dir string, site string, relative bool) (string, error) {
 	cacheKey := fmt.Sprintf("config-sync-dir_%s_%s_%t", dir, site, relative)
 	value, ok := e.cache.Get(cacheKey)
@@ -70,14 +84,14 @@ func (e *CLI) GetConfigSyncDir(ctx context.Context, dir string, site string, rel
 		return "", err
 	}
 	if relative {
-		configSyncDir = strings.TrimLeft(strings.TrimPrefix(configSyncDir, dir), "/")
+		configSyncDir = relativeTo(dir, configSyncDir)
 	}
 	e.cache.Set(cacheKey, configSyncDir)
 	return configSyncDir, nil
 }
 
 func (e *CLI) ExportConfiguration(ctx context.Context, dir string, site string) error {
-	_, err := e.execDrush(ctx, dir, site, "config:export", "--yes", "--commit", "--message=Update configuration "+site)
+	_, err := e.execDrush(ctx, dir, site, "config:export", "--yes")
 	return err
 }
 

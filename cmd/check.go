@@ -223,9 +223,9 @@ type fullCheckDeps struct {
 var newFullCheckDeps = func(logger *zap.Logger) fullCheckDeps {
 	return fullCheckDeps{
 		clone: func(repositoryURL string, branch string, token string) (string, error) {
-			_, _, path, err := repo.NewGitRepositoryService(logger).
+			checkout, err := repo.NewGitRepositoryService(logger).
 				CloneRepository(repositoryURL, branch, token, "", "")
-			return path, err
+			return checkout.Path, err
 		},
 		newComposer: func() fullCheckComposer { return composer.NewCLI(logger) },
 		newInstaller: func(c fullCheckComposer, dataDir string) (siteInstaller, error) {
