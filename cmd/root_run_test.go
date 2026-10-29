@@ -285,3 +285,9 @@ func TestCreateAddonsPassesEveryDependency(t *testing.T) {
 	assert.Equal(t, drupalOrgSvc, got.drupalOrg)
 	assert.Equal(t, got, second, "every addon receives the same dependency set")
 }
+
+func TestNewRunnerBuildsTheWorkflowRunner(t *testing.T) {
+	runner := newRunner(zap.NewNop(), internal.Config{}, nil, nil, nil, nil, nil)
+
+	assert.IsType(t, &workflow.Runner{}, runner)
+}
