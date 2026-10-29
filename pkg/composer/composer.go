@@ -468,7 +468,7 @@ func (s *CLI) Diff(ctx context.Context, dir string) ([]DiffEntry, error) {
 
 // decodeDiffEntries accepts both shapes composer-diff emits: PHP encodes an empty list as [].
 func decodeDiffEntries(data json.RawMessage, dev bool) ([]DiffEntry, error) {
-	if len(data) == 0 || string(data) == "[]" || string(data) == "null" {
+	if len(data) == 0 || string(data) == "[]" {
 		return nil, nil
 	}
 

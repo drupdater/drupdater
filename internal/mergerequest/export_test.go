@@ -1,6 +1,15 @@
 package mergerequest
 
-import "github.com/drupdater/drupdater/internal/report"
+import (
+	"text/template"
+
+	"github.com/drupdater/drupdater/internal/report"
+)
+
+// DescribeWith renders rep with tmpl in place of the embedded templates.
+func DescribeWith(tmpl *template.Template, rep report.Report) (string, error) {
+	return describe(tmpl, rep)
+}
 
 // RenderedSections returns each section the description of rep holds, by template name, in order.
 func RenderedSections(rep report.Report) (names []string, sections []string, err error) {

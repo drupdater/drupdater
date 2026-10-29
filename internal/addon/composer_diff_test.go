@@ -43,6 +43,20 @@ func TestComposerDiffRecordsAndLogsTheChanges(t *testing.T) {
 		"remove phpunit/phpunit (dev): 10.5.1 → -\n", logs.All()[0].Message)
 }
 
+func TestComposerDiffLogsASingleChange(t *testing.T) {
+	core, logs := observer.New(zap.InfoLevel)
+	mockComposer := NewMockComposer(t)
+	mockComposer.EXPECT().Diff(anyCtx, "/test/path").Return([]composer.DiffEntry{
+		{Package: "drupal/core", Operation: "change", From: "dev-main 1", To: "dev-main 2"},
+	}, nil)
+
+	cd := NewComposerDiff(zap.New(core), mockComposer)
+	require.NoError(t, cd.postComposerUpdateHandler(workflow.NewPostComposerUpdateEvent(t.Context(), "/test/path", nil)))
+
+	require.Equal(t, 1, logs.Len())
+	assert.Equal(t, "dependency diff\nchange drupal/core: dev-main 1 → dev-main 2\n", logs.All()[0].Message)
+}
+
 func TestComposerDiffLogsNothingWithoutChanges(t *testing.T) {
 	core, logs := observer.New(zap.InfoLevel)
 	mockComposer := NewMockComposer(t)

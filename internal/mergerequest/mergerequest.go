@@ -30,16 +30,27 @@ func Title(rep report.Report) string {
 // Description renders the addon sections rep carries. Over MaxDescriptionBytes it drops the
 // dependency links, the one part of the description that grows by more than a row per package.
 func Description(rep report.Report) (string, error) {
+	tmpl, err := parsedTemplates()
+	if err != nil {
+		return "", fmt.Errorf("failed to parse template: %w", err)
+	}
+	return describe(tmpl, rep)
+}
+
+func describe(tmpl *template.Template, rep report.Report) (string, error) {
 	s, err := readSections(rep)
 	if err != nil {
 		return "", err
 	}
 
-	description, err := render(s, true)
-	if err != nil || len(description) <= MaxDescriptionBytes {
-		return description, err
+	description, err := render(tmpl, s, true)
+	if err != nil {
+		return "", err
 	}
-	return render(s, false)
+	if len(description) <= MaxDescriptionBytes {
+		return description, nil
+	}
+	return render(tmpl, s, false)
 }
 
 // sections is this package's reading of the report's addons object: only what it renders.
@@ -113,13 +124,13 @@ type unsupportedModule struct {
 }
 
 func readSections(rep report.Report) (sections, error) {
-	var s sections
 	encoded, err := json.Marshal(rep.Addons)
 	if err != nil {
-		return s, fmt.Errorf("failed to encode the report's addon sections: %w", err)
+		return sections{}, fmt.Errorf("failed to encode the report's addon sections: %w", err)
 	}
+	var s sections
 	if err := json.Unmarshal(encoded, &s); err != nil {
-		return s, fmt.Errorf("failed to read the report's addon sections: %w", err)
+		return sections{}, fmt.Errorf("failed to read the report's addon sections: %w", err)
 	}
 	return s, nil
 }
@@ -220,12 +231,7 @@ func (s sections) sectionsInOrder(links bool) []section {
 	return out
 }
 
-func render(s sections, links bool) (string, error) {
-	tmpl, err := parsedTemplates()
-	if err != nil {
-		return "", fmt.Errorf("failed to parse template: %w", err)
-	}
-
+func render(tmpl *template.Template, s sections, links bool) (string, error) {
 	var rendered []string
 	for _, sec := range s.sectionsInOrder(links) {
 		out, err := renderSection(tmpl, sec)

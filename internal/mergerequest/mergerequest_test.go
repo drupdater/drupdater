@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"text/template"
 	"time"
 
 	"github.com/drupdater/drupdater/internal/addon"
@@ -84,12 +85,53 @@ func TestAnUnreadableSectionFailsTheDescription(t *testing.T) {
 	_, err := mergerequest.Description(withSections(map[string]any{"composer_audit": "not an object"}))
 
 	require.ErrorContains(t, err, "failed to read the report's addon sections")
+	var typeErr *json.UnmarshalTypeError
+	require.ErrorAs(t, err, &typeErr)
 }
 
 func TestAnUnencodableSectionFailsTheDescription(t *testing.T) {
 	_, err := mergerequest.Description(withSections(map[string]any{"composer_audit": func() {}}))
 
 	require.ErrorContains(t, err, "failed to encode the report's addon sections")
+	var typeErr *json.UnsupportedTypeError
+	require.ErrorAs(t, err, &typeErr)
+}
+
+func TestAFailingSectionTemplateFailsTheDescription(t *testing.T) {
+	tmpl := template.Must(template.New("").Parse(`{{ define "composer_allow_plugins.go.tmpl" }}{{ .Missing }}{{ end }}`))
+
+	description, err := mergerequest.DescribeWith(tmpl, withSections(map[string]any{
+		"composer_allow_plugins": addon.PluginAllowlist{Added: []string{"acme/plugin"}},
+	}))
+
+	require.ErrorContains(t, err, "failed to execute template composer_allow_plugins.go.tmpl")
+	assert.Empty(t, description)
+}
+
+func TestAPluginListRendersOnlyWhenSomethingWasAdded(t *testing.T) {
+	empty, err := mergerequest.Description(withSections(map[string]any{
+		"composer_allow_plugins": map[string]any{"added": []string{}},
+	}))
+	require.NoError(t, err)
+	assert.NotContains(t, empty, "New Composer plugins")
+
+	one, err := mergerequest.Description(withSections(map[string]any{
+		"composer_allow_plugins": addon.PluginAllowlist{Added: []string{"acme/plugin"}},
+	}))
+	require.NoError(t, err)
+	assert.Contains(t, one, "## 🔌 New Composer plugins")
+	assert.Contains(t, one, "composer config allow-plugins.acme/plugin true\n")
+}
+
+// One site needs no per-site heading; the published example covers several.
+func TestASingleSiteListsItsHooksWithoutASiteHeading(t *testing.T) {
+	description, err := mergerequest.Description(withSections(map[string]any{
+		"update_hooks": map[string]map[string]drush.UpdateHook{"default": {"token_update_8002": {Description: "Rebuild"}}},
+	}))
+
+	require.NoError(t, err)
+	assert.Contains(t, description, "| token_update_8002 | Rebuild |\n")
+	assert.NotContains(t, description, "### Site:")
 }
 
 // Sections the description does not render are read past, not rejected: the report may grow.
@@ -221,6 +263,23 @@ func TestAnOversizedDescriptionDropsTheDependencyLinks(t *testing.T) {
 	assert.NotContains(t, description, "[Compare]")
 	assert.NotContains(t, description, "| Link |")
 	assert.Contains(t, description, "| acme/p | Upgraded | 1.0 | 1.1 |\n")
+}
+
+// The limit is inclusive: a description of exactly MaxDescriptionBytes is accepted as it is.
+func TestADescriptionAtExactlyTheLimitKeepsItsLinks(t *testing.T) {
+	withName := func(name string) report.Report {
+		return withSections(map[string]any{"composer_diff": []addon.DependencyChange{
+			{Package: name, Operation: "upgrade", From: "1.0", To: "1.1", CompareURL: "https://c"},
+		}})
+	}
+	base, err := mergerequest.Description(withName("a"))
+	require.NoError(t, err)
+
+	description, err := mergerequest.Description(withName(strings.Repeat("a", 1+mergerequest.MaxDescriptionBytes-len(base))))
+
+	require.NoError(t, err)
+	assert.Len(t, description, mergerequest.MaxDescriptionBytes)
+	assert.Contains(t, description, "[Compare](https://c)")
 }
 
 func TestADescriptionWithinTheLimitKeepsItsLinks(t *testing.T) {

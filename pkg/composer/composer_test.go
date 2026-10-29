@@ -840,12 +840,20 @@ func TestDiff(t *testing.T) {
 }
 
 func TestDiffWithNothingChanged(t *testing.T) {
-	stubComposerOutput(t, `{"packages": [], "packages-dev": []}`)
+	for name, out := range map[string]string{
+		"empty lists":    `{"packages": [], "packages-dev": []}`,
+		"null lists":     `{"packages": null, "packages-dev": null}`,
+		"lists left out": `{}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			stubComposerOutput(t, out)
 
-	entries, err := (&CLI{logger: zap.NewNop()}).Diff(t.Context(), "/tmp")
+			entries, err := (&CLI{logger: zap.NewNop()}).Diff(t.Context(), "/tmp")
 
-	require.NoError(t, err)
-	assert.Empty(t, entries)
+			require.NoError(t, err)
+			assert.Empty(t, entries)
+		})
+	}
 }
 
 func TestDiffRejectsMalformedOutput(t *testing.T) {
@@ -860,6 +868,9 @@ func TestDiffRejectsMalformedOutput(t *testing.T) {
 			_, err := (&CLI{logger: zap.NewNop()}).Diff(t.Context(), "/tmp")
 
 			require.ErrorContains(t, err, "failed to parse composer diff output")
+			var syntaxErr *json.SyntaxError
+			var typeErr *json.UnmarshalTypeError
+			assert.True(t, errors.As(err, &syntaxErr) || errors.As(err, &typeErr), "the decode error is wrapped: %v", err)
 		})
 	}
 }
