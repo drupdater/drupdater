@@ -98,6 +98,45 @@ func TestGetComposerUpdatesMatchesEveryOccurrence(t *testing.T) {
 	assert.Empty(t, byAction["Install"][1].From, "an install has no previous version")
 }
 
+func TestUpdateReportsALockOnlyInstall(t *testing.T) {
+	service := &CLI{logger: zap.NewNop(), fs: afero.NewMemMapFs()}
+	updateWithOutput := func(t *testing.T, logData string) []PackageChange {
+		t.Helper()
+		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+			cs := []string{"-test.run=TestHelperProcess", "--", logData}
+			cs = append(cs, arg...)
+			cmd := exec.CommandContext(ctx, os.Args[0], cs...) //nolint:gosec // test helper process
+			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
+			return cmd
+		}
+		t.Cleanup(func() { execCommand = exec.CommandContext })
+
+		changes, err := service.Update(t.Context(), "/tmp", nil, nil, false, false)
+		require.NoError(t, err)
+		return changes
+	}
+	want := []PackageChange{
+		{Action: "Upgrade", Package: "drupal/core", From: "10.2.0", To: "10.3.1"},
+		{Action: "Install", Package: "drupal/new_module", To: "1.2.3"},
+	}
+
+	t.Run("a lock-only update never says Installing", func(t *testing.T) {
+		assert.Equal(t, want, updateWithOutput(t, `Lock file operations: 1 install, 1 update, 0 removals
+  - Locking drupal/new_module (1.2.3)
+  - Upgrading drupal/core (10.2.0 => 10.3.1)
+Writing lock file`))
+	})
+
+	t.Run("a full update says both, once each", func(t *testing.T) {
+		assert.Equal(t, want, updateWithOutput(t, `Lock file operations: 1 install, 1 update, 0 removals
+  - Locking drupal/new_module (1.2.3)
+  - Upgrading drupal/core (10.2.0 => 10.3.1)
+Writing lock file
+Package operations: 1 install, 1 update, 0 removals
+  - Installing drupal/new_module (1.2.3): Extracting archive`))
+	})
+}
+
 func TestGetComposerUpdates(t *testing.T) {
 
 	logData := `- Removing behat/mink-selenium2-driver (v1.7.0)

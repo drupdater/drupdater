@@ -17,6 +17,7 @@
           "acquire working copy",
           "preflight",
           "composer install",
+          "resolve update",
           "baseline site install",
           "update shared code",
           "site update",
@@ -41,6 +42,7 @@
           "acquire working copy",
           "preflight",
           "composer install",
+          "resolve update",
           "baseline site install",
           "update shared code",
           "site update",
@@ -72,6 +74,7 @@
           "acquire working copy",
           "preflight",
           "composer install",
+          "resolve update",
           "baseline site install",
           "update shared code",
           "site update",
@@ -94,6 +97,7 @@
           "acquire working copy",
           "preflight",
           "composer install",
+          "resolve update",
           "baseline site install",
           "update shared code",
           "site update",
@@ -128,6 +132,7 @@
           "acquire working copy",
           "preflight",
           "composer install",
+          "resolve update",
           "baseline site install",
           "update shared code",
           "site update",
@@ -198,7 +203,8 @@
         "phases": [
           "acquire working copy",
           "preflight",
-          "composer install"
+          "composer install",
+          "resolve update"
         ]
       }
     }

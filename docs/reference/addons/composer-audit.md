@@ -49,7 +49,8 @@ update is the user's to decide.
     On a `--security` run, if the audit finds nothing the addon aborts with `No security
     advisories found`. This is a **success**: the process exits `0` and the [run
     report](../run-report.md) records `status: "no_changes"`. A nightly security job on a
-    healthy site does nothing and stays green.
+    healthy site does nothing and stays green — and does it quickly, since the event fires
+    before any site is installed.
 
 ### After the code update — verifying the fix
 

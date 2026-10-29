@@ -226,6 +226,11 @@ func TestReportWrittenOnFailureNamesThePhase(t *testing.T) {
 	h.worktree.EXPECT().Checkout(mock.Anything).Return(nil).Maybe()
 	h.installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(errors.New("drush exploded"))
 	h.repository.EXPECT().Head().Return(nil, plumbing.ErrReferenceNotFound).Maybe()
+	h.composer.EXPECT().Update(anyCtx, "/tmp", mock.Anything, mock.Anything, false, false).
+		Return([]composer.PackageChange{{Action: "Upgrade", Package: "drupal/core", From: "9.0.0", To: "9.1.0"}}, nil)
+	h.composer.EXPECT().GetLockHash("/tmp").Return("dummy-hash", nil)
+	h.repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound)
+	h.repoSvc.EXPECT().BranchExists(h.repository, "update-dummy-hash", mock.Anything).Return(false, nil)
 
 	err := h.run(t)
 
@@ -235,6 +240,7 @@ func TestReportWrittenOnFailureNamesThePhase(t *testing.T) {
 	assert.Equal(t, "baseline site install", h.got.FailedPhase)
 	assert.Contains(t, h.got.Error, "drush exploded")
 	assert.Nil(t, h.got.MergeRequest)
+	assert.Len(t, h.got.Packages, 1, "the update is resolved before any site is installed")
 }
 
 // Acquiring the working copy is the first thing that can fail, and the case that "written on

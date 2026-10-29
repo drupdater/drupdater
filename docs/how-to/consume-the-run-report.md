@@ -91,7 +91,7 @@ Use it like this:
 ```bash
 EXPECT='{
   "status": ["success", "no_changes"],
-  "phases": ["composer install", "baseline site install", "update shared code"],
+  "phases": ["composer install", "resolve update", "baseline site install", "update shared code"],
   "addons": ["update_hooks", "code_beautifier"],
   "packages_match": ["^drupal/core"],
   "forbid_actions": ["Downgrade"],

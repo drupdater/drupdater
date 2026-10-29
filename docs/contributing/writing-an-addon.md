@@ -68,7 +68,7 @@ The `workflow.Addon` interface is the whole contract.
 | Event | Use for |
 |---|---|
 | `pre-composer-update` | Influencing what the update touches (mutable payload) |
-| `post-composer-update` | Reacting to the new lock file, before it is committed |
+| `post-composer-update` | Reacting to the new lock file and installed code, before it is committed |
 | `post-code-update` | Changing code — Rector, PHPCBF, and similar |
 | `pre-site-update` | Inspecting a site before its update hooks run |
 | `post-site-update` | Per-site work after hooks, before configuration export |

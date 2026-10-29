@@ -86,7 +86,7 @@ INFO  exporting configuration {"site": "default"}
 INFO  update finished
 ```
 
-The log does not announce the eight phases — those are recorded in the report, with their
+The log does not announce the nine phases — those are recorded in the report, with their
 durations, which you will read in the next step.
 
 Nothing is pushed and no request is created: that is the `publish` phase, and `--dry-run`
@@ -216,7 +216,7 @@ already gone — checkout-mode runs remove them.
 - `drupdater check` validates a project in about a second, and `--full` proves the site
   installs.
 - A checkout-mode `--dry-run` is completely safe and needs no credentials.
-- The run works through eight phases, and the report records each with its duration.
+- The run works through nine phases, and the report records each with its duration.
 - The report distinguishes `success`, `no_changes` and `failed`.
 - Update branches are content-addressed, so identical updates cannot duplicate.
 

@@ -273,10 +273,12 @@ func TestUpdateBuildsArgs(t *testing.T) {
 	assert.Contains(t, captured, "--minimal-changes")
 	assert.Contains(t, captured, "--dry-run")
 	assert.NotContains(t, captured, "--bump-after-update")
+	assert.NotContains(t, captured, "--no-install")
 
 	_, err = service.Update(t.Context(), "/tmp", nil, nil, false, false)
 	require.NoError(t, err)
 	assert.Contains(t, captured, "--bump-after-update")
+	assert.Contains(t, captured, "--no-install", "vendor/ must keep the old code for the baseline install")
 	assert.NotContains(t, captured, "--dry-run")
 	assert.NotContains(t, captured, "--minimal-changes")
 }
