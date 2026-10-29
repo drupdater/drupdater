@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"github.com/spf13/afero"
 	"go.uber.org/zap"
 
 	"github.com/drupdater/drupdater/pkg/composer"
@@ -16,6 +17,7 @@ var execCommand = exec.CommandContext
 
 type CLI struct {
 	logger *zap.Logger
+	fs     afero.Fs
 	// binDir holds drupdater's own rector; empty runs the project's through composer.
 	binDir string
 }
@@ -24,6 +26,7 @@ type CLI struct {
 func NewCLI(logger *zap.Logger) *CLI {
 	return &CLI{
 		logger: logger,
+		fs:     afero.NewOsFs(),
 	}
 }
 
@@ -31,6 +34,7 @@ func NewCLI(logger *zap.Logger) *CLI {
 func NewBundledCLI(logger *zap.Logger, binDir string) *CLI {
 	return &CLI{
 		logger: logger,
+		fs:     afero.NewOsFs(),
 		binDir: binDir,
 	}
 }
@@ -93,7 +97,35 @@ func (s *CLI) Run(ctx context.Context, dir string, customCodeDirectories []strin
 		return ReturnOutput{}, fmt.Errorf("failed to unmarshal JSON: %w", err)
 	}
 
+	for _, diff := range deprecationRemovalResult.FileDiffs {
+		if err := s.restoreFileDocBlock(dir, diff.File); err != nil {
+			return ReturnOutput{}, err
+		}
+	}
+
 	return deprecationRemovalResult, nil
+}
+
+func (s *CLI) restoreFileDocBlock(dir string, file string) error {
+	if !filepath.IsAbs(file) {
+		file = filepath.Join(dir, file)
+	}
+	content, err := afero.ReadFile(s.fs, file)
+	if err != nil {
+		return fmt.Errorf("failed to read %s after rector: %w", file, err)
+	}
+	fixed := fileDocBlockFirst(string(content))
+	if fixed == string(content) {
+		return nil
+	}
+	info, err := s.fs.Stat(file)
+	if err != nil {
+		return fmt.Errorf("failed to stat %s after rector: %w", file, err)
+	}
+	if err := afero.WriteFile(s.fs, file, []byte(fixed), info.Mode().Perm()); err != nil {
+		return fmt.Errorf("failed to restore the @file docblock in %s: %w", file, err)
+	}
+	return nil
 }
 
 // projectAutoloader honours vendor-dir, where Rector would only ever look under vendor/.

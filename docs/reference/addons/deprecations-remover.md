@@ -25,8 +25,13 @@ custom code to rewrite APIs deprecated by the new Drupal version.
       bundled one cannot run beside the project's. Add `palantirnet/drupal-rector` to
       `require-dev` to have its own Rector used instead.
 2. Rector runs over the project's custom code directories, using the `scripts/rector.php`
-   configuration shipped in the Docker image.
-3. Changed files are committed as `Remove deprecations`.
+   configuration shipped in the Docker image. Rector imports the classes its rewrites
+   name, adding `use` statements.
+3. In each file Rector changed, a `@file` docblock Rector's new imports ended up under is
+   moved back to the top. In a file without a namespace — a `.module` or `.install` file —
+   Rector puts imports straight after `<?php`, and Drupal's coding standard would then have
+   PHPCBF add a second, empty `@file` docblock above them.
+4. Changed files are committed as `Remove deprecations`.
 
 It runs at the **Change** stage on `post-code-update`, ahead of
 [`code_beautifier`](code-beautifier.md) at Format, so that PHPCBF formats the code Rector wrote.
