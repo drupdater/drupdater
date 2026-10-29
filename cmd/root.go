@@ -37,9 +37,7 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-// app is what the commands take from outside the process: the constructors of everything that
-// does real work, and the addons there are. productionApp is the real one; a test builds its own,
-// so no test swaps package state.
+// app holds everything the commands reach outside the process through; tests build their own.
 type app struct {
 	newRunner   func(logger *zap.Logger, cfg internal.Config, s workflowServices, opts ...workflow.Option) updateRunner
 	newPlatform func(repositoryURL string, token string, logger *zap.Logger) (codehosting.Platform, error)
@@ -71,8 +69,7 @@ type workflowServices struct {
 	composer  workflow.Composer
 }
 
-// options is what the command line sets, one per command tree, so neither the flags nor a run
-// carry anything into the next tree.
+// options is what one command tree's flags set; a run gets a copy, so nothing carries over.
 type options struct {
 	config internal.Config
 	// configFile is the path to .drupdater.yaml; empty means <working-dir>/.drupdater.yaml.
@@ -140,8 +137,7 @@ func validateFlags(config internal.Config) error {
 }
 
 // runUpdate is the body of the root command's RunE. Named rather than inline because a closure
-// assigned to RunE is invisible to `go tool cover -func`. opts is a copy: the run resolves the
-// token, the project file and the checkout into its config.
+// assigned to RunE is invisible to `go tool cover -func`.
 func (a app) runUpdate(cmd *cobra.Command, args []string, opts options) error {
 	config := opts.config
 

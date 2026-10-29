@@ -24,8 +24,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// Runner updates a project. It holds only what every run shares, so one Runner can run any
-// number of times.
+// Runner updates a project. It holds only what all its runs share, so it can run again.
 type Runner struct {
 	services
 
@@ -174,8 +173,7 @@ func (r *Runner) Run(ctx context.Context, addons []Addon) (err error) {
 	return err
 }
 
-// execute runs the update one recorded phase at a time. It returns the update branch it created,
-// or "" before it got that far, together with any error: a failed run's branch has to go again.
+// execute runs the phases, returning the update branch it created ("" if none) with any error.
 func (r *run) execute(ctx context.Context) (branch string, err error) {
 	// Fail fast on the prerequisites "drupdater check" shares. Extension requirements are
 	// deliberately not among them — see CheckPlatformReqs.
@@ -356,8 +354,7 @@ func (s services) forEachSite(ctx context.Context, fn func(context.Context, int,
 }
 
 // cleanup removes the run's working copy, whichever mode made it. Errors only warn: a run's
-// outcome is already decided, and a leftover temporary directory must not change it. Site
-// databases live in the installer's own directory, which its owner removes.
+// outcome is already decided, and a leftover temporary directory must not change it.
 func (s services) cleanup(ctx context.Context, path string) {
 	if !s.config.Clone {
 		if err := s.git.RemoveWorktree(ctx, s.config.WorkingDir, path); err != nil {
@@ -568,7 +565,7 @@ func (r *run) commitSiteChanges(ctx context.Context, site string) error {
 	if err != nil {
 		return fmt.Errorf("failed to locate the exported configuration: %w", err)
 	}
-	// The committer reads an empty r.path as the whole tree, which would sweep in unrelated changes.
+	// The committer reads an empty path as the whole tree, which would sweep in unrelated changes.
 	if configDir == "" {
 		return fmt.Errorf("failed to locate the exported configuration: site %s has no config sync directory", site)
 	}

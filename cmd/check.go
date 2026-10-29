@@ -52,8 +52,7 @@ Exits non-zero if any check fails, so it can gate a pipeline.`,
 	return check
 }
 
-// runCheck is the body of the check command's RunE. opts.checkFull adds the expensive tier:
-// clone, composer install and a real site install per site.
+// runCheck is the check command's RunE; opts.checkFull adds the clone and the site installs.
 func (a app) runCheck(cmd *cobra.Command, args []string, opts options) error {
 	cfg := opts.config
 	redactor := logging.NewRedactor()

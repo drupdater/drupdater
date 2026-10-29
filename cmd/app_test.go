@@ -6,8 +6,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// testApp is productionApp without its one write outside the test: trusting a checkout in the
-// global git config, which every checkout-mode run would otherwise add a temp dir to.
+// testApp is productionApp minus trusting checkouts, which writes the global git config.
 func testApp() app {
 	a := productionApp()
 	a.trustCheckout = func(context.Context, *zap.Logger, string) {}
