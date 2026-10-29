@@ -112,6 +112,14 @@ Dockerfile still sets both, and the values agree.
 **Setting either of these yourself has no effect on a Drupdater run.** Drupdater's
 correctness depends on them, so no configuration overrides them.
 
+### `COMPOSER_NO_BLOCKING`
+
+Set to `1` on every Composer invocation of a `--security` run, and left alone otherwise. It
+turns off Composer's policy blocking, so an advisory with no fixed version cannot stop the
+fixes that do exist; [`composer_audit`](addons/composer-audit.md#before-the-update-deciding-the-scope)
+explains why. A normal run keeps whatever the environment and the project's `policy` config
+say.
+
 ## Set inside the Docker image
 
 The published images bake in a Composer environment tuned for unattended runs. These are

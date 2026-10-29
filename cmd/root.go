@@ -109,7 +109,7 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	}
 
 	drush := drush.NewCLI(logger, cache)
-	composer := composer.NewCLI(logger)
+	composer := composer.NewCLI(logger, composerOptions(config)...)
 	// Patch checks leave a scratch project with a full vendor tree behind otherwise.
 	defer composer.Cleanup()
 	drupalOrg := drupalorg.NewHTTPClient(logger)
@@ -169,6 +169,15 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 // updateRunner is narrow so a test can drive runUpdate without a real repository or subprocesses.
 type updateRunner interface {
 	Run(ctx context.Context, addons []workflow.Addon) error
+}
+
+// composerOptions lets a security run keep an unfixable advisory, reported as unresolved, rather
+// than have it block every fixable one.
+func composerOptions(cfg internal.Config) []composer.Option {
+	if cfg.Security {
+		return []composer.Option{composer.WithoutBlocking()}
+	}
+	return nil
 }
 
 // newRunner is a variable purely as a test seam: only the run itself gets replaced.

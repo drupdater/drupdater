@@ -24,16 +24,34 @@ var execCommand = exec.CommandContext
 type CLI struct {
 	fs     afero.Fs
 	logger *zap.Logger
+	// extraEnv is added to every invocation; see WithoutBlocking.
+	extraEnv []string
 
 	tempDir  string
 	initOnce sync.Once
 	initErr  error
 }
 
-func NewCLI(logger *zap.Logger) *CLI {
-	return &CLI{
+func NewCLI(logger *zap.Logger, opts ...Option) *CLI {
+	s := &CLI{
 		fs:     afero.NewOsFs(),
 		logger: logger,
+	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
+}
+
+// Option configures a CLI.
+type Option func(*CLI)
+
+// WithoutBlocking lets composer resolve to versions its policy blocks, such as ones with security
+// advisories. A security run needs it: an advisory with no fixed version in range would otherwise
+// make every update unresolvable, holding back the fixes that do exist.
+func WithoutBlocking() Option {
+	return func(s *CLI) {
+		s.extraEnv = append(s.extraEnv, "COMPOSER_NO_BLOCKING=1")
 	}
 }
 
@@ -69,7 +87,7 @@ func Env(env []string) []string {
 
 // command is built per call so a test swapping execCommand later still diverts the subprocess.
 func (s *CLI) command(dir string) Command {
-	return Command{New: execCommand, Logger: s.logger, Dir: dir}
+	return Command{New: execCommand, Logger: s.logger, Dir: dir, ExtraEnv: s.extraEnv}
 }
 
 func (s *CLI) execComposer(ctx context.Context, dir string, args ...string) (string, error) {
