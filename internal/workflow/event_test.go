@@ -46,7 +46,6 @@ func TestNewPreComposerUpdateEvent(t *testing.T) {
 	committer := &fakeCommitter{result: true, err: assert.AnError}
 	evt := NewPreComposerUpdateEvent(ctx, "/repo", committer, []string{"drupal/core"}, []string{"keep/me"}, true)
 
-	assert.Equal(t, "pre-composer-update", evt.Name())
 	assert.Equal(t, ctx, evt.Context())
 	assert.Equal(t, "/repo", evt.Path())
 	assertCommitsThrough(t, evt, committer)
@@ -60,7 +59,6 @@ func TestNewPostComposerUpdateEvent(t *testing.T) {
 	committer := &fakeCommitter{result: true, err: assert.AnError}
 	evt := NewPostComposerUpdateEvent(ctx, "/repo", committer)
 
-	assert.Equal(t, "post-composer-update", evt.Name())
 	assert.Equal(t, ctx, evt.Context())
 	assert.Equal(t, "/repo", evt.Path())
 	assertCommitsThrough(t, evt, committer)
@@ -71,7 +69,6 @@ func TestNewPostCodeUpdateEvent(t *testing.T) {
 	committer := &fakeCommitter{result: true, err: assert.AnError}
 	evt := NewPostCodeUpdateEvent(ctx, "/repo", committer)
 
-	assert.Equal(t, "post-code-update", evt.Name())
 	assert.Equal(t, ctx, evt.Context())
 	assert.Equal(t, "/repo", evt.Path())
 	assertCommitsThrough(t, evt, committer)
@@ -82,7 +79,6 @@ func TestNewPreSiteUpdateEvent(t *testing.T) {
 	committer := &fakeCommitter{result: true, err: assert.AnError}
 	evt := NewPreSiteUpdateEvent(ctx, "/repo", committer, "default")
 
-	assert.Equal(t, "pre-site-update", evt.Name())
 	assert.Equal(t, ctx, evt.Context())
 	assert.Equal(t, "/repo", evt.Path())
 	assertCommitsThrough(t, evt, committer)
@@ -94,7 +90,6 @@ func TestNewPostSiteUpdateEvent(t *testing.T) {
 	committer := &fakeCommitter{result: true, err: assert.AnError}
 	evt := NewPostSiteUpdateEvent(ctx, "/repo", committer, "production")
 
-	assert.Equal(t, "post-site-update", evt.Name())
 	assert.Equal(t, ctx, evt.Context())
 	assert.Equal(t, "/repo", evt.Path())
 	assertCommitsThrough(t, evt, committer)
@@ -104,6 +99,5 @@ func TestNewPostSiteUpdateEvent(t *testing.T) {
 func TestNewPreMergeRequestCreateEvent(t *testing.T) {
 	evt := NewPreMergeRequestCreateEvent("June 2025: Drupal Updates")
 
-	assert.Equal(t, "pre-merge-request-create", evt.Name())
 	assert.Equal(t, "June 2025: Drupal Updates", evt.Title)
 }

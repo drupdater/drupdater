@@ -8,7 +8,6 @@ import (
 	"github.com/drupdater/drupdater/internal/golden"
 	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/drupdater/drupdater/pkg/composer"
-	"github.com/gookit/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -28,26 +27,6 @@ func TestNewComposerAudit(t *testing.T) {
 	assert.Equal(t, mockComposer, audit.composer)
 	assert.True(t, audit.current.After(before) || audit.current.Equal(before))
 	assert.True(t, audit.current.Before(after) || audit.current.Equal(after))
-}
-
-// TestComposerAudit_SubscribedEvents tests the event subscription
-func TestComposerAudit_SubscribedEvents(t *testing.T) {
-	audit := &ComposerAudit{}
-
-	events := audit.SubscribedEvents()
-
-	assert.Contains(t, events, "pre-composer-update")
-	assert.Contains(t, events, "post-code-update")
-	assert.Contains(t, events, "pre-merge-request-create")
-
-	preComposerEvent := events["pre-composer-update"].(event.ListenerItem)
-	assert.Equal(t, event.Max, preComposerEvent.Priority)
-
-	postCodeEvent := events["post-code-update"].(event.ListenerItem)
-	assert.Equal(t, event.BelowNormal, postCodeEvent.Priority)
-
-	preMergeEvent := events["pre-merge-request-create"].(event.ListenerItem)
-	assert.Equal(t, event.Normal, preMergeEvent.Priority)
 }
 
 // TestComposerAudit_PreComposerUpdateHandler_WithAdvisories tests handling security advisories
@@ -85,7 +64,6 @@ func TestComposerAudit_PreComposerUpdateHandler_WithAdvisories(t *testing.T) {
 	assert.Equal(t, mockAudit, audit.beforeAudit)
 	assert.Equal(t, []string{"drupal/core", "other/package", "drupal/core-recommended", "drupal/core-composer-scaffold"}, mockEvent.PackagesToUpdate)
 	assert.True(t, mockEvent.MinimalChanges)
-	assert.False(t, mockEvent.IsAborted())
 }
 
 // TestComposerAudit_PreComposerUpdateHandler_NoAdvisories tests when no security advisories are found
@@ -221,7 +199,6 @@ func TestComposerAudit_PreMergeRequestCreateHandler(t *testing.T) {
 	}
 
 	mockEvent := &workflow.PreMergeRequestCreateEvent{}
-	mockEvent.SetName("pre-merge-request-create")
 
 	err := audit.preMergeRequestCreateHandler(mockEvent)
 
@@ -361,7 +338,6 @@ func TestComposerAudit_PreMergeRequestCreateHandler_NormalMode(t *testing.T) {
 	}
 
 	mockEvent := &workflow.PreMergeRequestCreateEvent{Title: "July 2026: Drupal Maintenance Updates"}
-	mockEvent.SetName("pre-merge-request-create")
 
 	require.NoError(t, audit.preMergeRequestCreateHandler(mockEvent))
 	assert.Equal(t, "July 2026: Drupal Maintenance Updates", mockEvent.Title)
@@ -382,7 +358,6 @@ func TestComposerAudit_PreMergeRequestCreateHandler_PublishesAbandonedPackages(t
 	}
 
 	mockEvent := &workflow.PreMergeRequestCreateEvent{}
-	mockEvent.SetName("pre-merge-request-create")
 
 	require.NoError(t, audit.preMergeRequestCreateHandler(mockEvent))
 	// drupal/* is filtered out before the handoff, so the merged list cannot show one
@@ -442,7 +417,7 @@ func TestComposerAudit_AuditFailures(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to run composer audit")
 		// Not an abort: aborting reads as "nothing to do here" and exits 0.
-		assert.False(t, evt.IsAborted())
+		assert.NotErrorAs(t, err, &workflow.AbortError{})
 		assert.Empty(t, evt.PackagesToUpdate)
 	})
 

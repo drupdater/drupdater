@@ -7,7 +7,7 @@ whose patch cannot be made to apply.
 | | |
 |---|---|
 | Runs | **Always** — mandatory, cannot be disabled |
-| Events | `pre-composer-update` (Normal) |
+| Events | `pre-composer-update` (Change) |
 | Report key | `composer_patches` |
 | Pull request section | "🩹 Patch updates" |
 | Requires | [`DRUPALCODE_ACCESS_TOKEN`](../environment-variables.md#drupalcode_access_token) for the Drupal.org half |

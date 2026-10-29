@@ -1,16 +1,16 @@
 # The addon architecture
 
 Nearly everything Drupdater does beyond `composer update` itself is an addon: a unit that
-subscribes to workflow events and does one job when its event fires.
+hooks into workflow events and does one job when its event fires.
 
 ## Why events rather than a pipeline
 
-The obvious design is a list of steps the workflow calls in order. Drupdater uses an event
-bus instead, and the difference matters in one specific way: **addons never call each
-other.**
+The obvious design is a list of steps the workflow calls in order. Drupdater has each addon
+hand the workflow its hooks instead, and the difference matters in one specific way:
+**addons never call each other.**
 
 `code_beautifier` does not know `deprecations_remover` exists. `composer_patches` does not
-know whether `composer_audit` is running. Each subscribes to a moment in the workflow and
+know whether `composer_audit` is running. Each hooks into a moment in the workflow and
 reacts to whatever state it finds.
 
 The payoff is that the set of addons is genuinely configurable. A project can run five of
@@ -79,45 +79,56 @@ Two rules make that safe without any addon knowing about the others:
 
 Changes nobody names stay in the working tree, uncommitted.
 
-## Why priority matters
+## Stages
 
-Addons on the same event run in priority order, and for two events that order is load
-bearing rather than incidental.
+Each hook names a **stage**, and the stages run in a fixed order on every event:
+
+| Stage | For a hook that |
+|---|---|
+| `Prepare` | produces what the event's later hooks read |
+| `Change` | edits the project |
+| `Format` | rewrites what `Change` wrote into the project's style |
+| `Inspect` | reads the settled state and changes nothing |
+
+Hooks sharing a stage run in addon order. A stage says *why* a hook runs where it does,
+which a number cannot: an ordering dependency between two addons is visible in the stages
+they declare, and a new addon picks its stage from what it does rather than from where the
+others happen to sit.
+
+| Event | Prepare | Change | Format | Inspect |
+|---|---|---|---|---|
+| `pre-composer-update` | `composer_audit` | `composer_allow_plugins`, `composer_patches` | | |
+| `post-composer-update` | | `composer_allow_plugins` | `composer_normalizer` | `composer_diff` |
+| `post-code-update` | | `deprecations_remover` | `code_beautifier` | `composer_audit` |
+| `pre-site-update` | | | | `unsupported_modules`, `update_hooks` |
+| `post-site-update` | | `translations_updater` | | |
+| `pre-merge-request-create` | `composer_audit` | | | `unsupported_modules` |
+
+Three of those orders are load bearing rather than incidental.
 
 ### `pre-composer-update`
 
-`composer_audit` runs at the **highest** priority, because on a security run it decides the
-scope everything else works within. `composer_patches` then evaluates patches against an update whose shape
-is already fixed. Reversed, the patch handler would analyse an update far larger than the
-one that actually runs.
+`composer_audit` prepares, because on a security run it decides the scope everything else
+works within. `composer_patches` then evaluates patches against an update whose shape is
+already fixed. Reversed, the patch handler would analyse an update far larger than the one
+that actually runs.
 
 ### `post-code-update`
 
-The order is:
+`deprecations_remover` changes the code and `code_beautifier` formats it, so PHPCBF puts
+Rector's output right: Rector does not write to Drupal's coding standard. Commit hygiene
+does not depend on this order — each addon commits only the paths it names (see
+[Committing changes](#committing-changes)).
 
-1. `deprecations_remover` (above normal)
-2. `code_beautifier` (normal)
-3. `composer_audit` (below normal)
-
-`deprecations_remover` runs first so that PHPCBF formats the code Rector wrote: Rector's
-output is not written to Drupal's coding standard, and the coding-style pass is what puts
-it right. Commit hygiene no longer depends on this order — each addon commits only the
-paths it names (see [Committing changes](#committing-changes)).
-
-`composer_audit` runs last on this event because its job here is to verify which
+`composer_audit` inspects last on this event because its job here is to verify which
 advisories the update actually resolved. It must see the final code, after Rector and
 PHPCBF have finished.
 
 ### `pre-merge-request-create`
 
-`composer_audit` publishes at **normal** and `unsupported_modules` reads at **below normal**.
-Equal priorities would leave the order to the dispatcher, and the abandoned packages would
-sometimes be rendered before they were written — an empty table half the time, which is worse
-than a wrong one because nothing looks broken.
-
-The two addons that only observe — [`composer_diff`](../reference/addons/composer-diff.md)
-and [`update_hooks`](../reference/addons/update-hooks.md) — run at the **lowest** priority
-on their events, so they record the settled state.
+`composer_audit` prepares the abandoned packages and `unsupported_modules` inspects them.
+In the same stage the order would follow the addon list instead, and a reordered list would
+render an empty table — worse than a wrong one, because nothing looks broken.
 
 ## Mandatory versus configurable
 

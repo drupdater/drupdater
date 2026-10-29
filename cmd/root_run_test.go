@@ -118,7 +118,7 @@ func withFakeWorkflow(t *testing.T, fake *fakeWorkflow) {
 	newRunner = func(
 		*zap.Logger, internal.Config, workflow.Drush, codehosting.Platform,
 		workflow.Repository, workflow.Installer, workflow.Composer,
-		workflow.EventDispatcher, ...workflow.Option,
+		...workflow.Option,
 	) updateRunner {
 		return fake
 	}
@@ -284,4 +284,10 @@ func TestCreateAddonsPassesEveryDependency(t *testing.T) {
 	assert.Equal(t, composerSvc, got.composer)
 	assert.Equal(t, drupalOrgSvc, got.drupalOrg)
 	assert.Equal(t, got, second, "every addon receives the same dependency set")
+}
+
+func TestNewRunnerBuildsTheWorkflowRunner(t *testing.T) {
+	runner := newRunner(zap.NewNop(), internal.Config{}, nil, nil, nil, nil, nil)
+
+	assert.IsType(t, &workflow.Runner{}, runner)
 }

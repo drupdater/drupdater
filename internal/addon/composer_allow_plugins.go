@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/drupdater/drupdater/internal/workflow"
-	"github.com/gookit/event"
 	"go.uber.org/zap"
 )
 
@@ -23,16 +22,10 @@ func NewComposerAllowPlugins(logger *zap.Logger, composer Composer) *ComposerAll
 	}
 }
 
-func (ap *ComposerAllowPlugins) SubscribedEvents() map[string]any {
-	return map[string]any{
-		"pre-composer-update": event.ListenerItem{
-			Priority: event.Normal,
-			Listener: event.ListenerFunc(ap.preComposerUpdateHandler),
-		},
-		"post-composer-update": event.ListenerItem{
-			Priority: event.Normal,
-			Listener: event.ListenerFunc(ap.postComposerUpdateHandler),
-		},
+func (ap *ComposerAllowPlugins) Hooks() workflow.Hooks {
+	return workflow.Hooks{
+		PreComposerUpdate:  workflow.On(workflow.Change, ap.preComposerUpdateHandler),
+		PostComposerUpdate: workflow.On(workflow.Change, ap.postComposerUpdateHandler),
 	}
 }
 
@@ -47,8 +40,7 @@ func (ap *ComposerAllowPlugins) RenderTemplate() (string, error) {
 	})
 }
 
-func (ap *ComposerAllowPlugins) preComposerUpdateHandler(e event.Event) error {
-	evt := e.(*workflow.PreComposerUpdateEvent)
+func (ap *ComposerAllowPlugins) preComposerUpdateHandler(evt *workflow.PreComposerUpdateEvent) error {
 
 	var err error
 	ap.allowPlugins, err = ap.composer.GetAllowPlugins(evt.Context(), evt.Path())
@@ -59,8 +51,7 @@ func (ap *ComposerAllowPlugins) preComposerUpdateHandler(e event.Event) error {
 	return ap.composer.SetConfig(evt.Context(), evt.Path(), "allow-plugins", "true")
 }
 
-func (ap *ComposerAllowPlugins) postComposerUpdateHandler(e event.Event) error {
-	evt := e.(*workflow.PostComposerUpdateEvent)
+func (ap *ComposerAllowPlugins) postComposerUpdateHandler(evt *workflow.PostComposerUpdateEvent) error {
 
 	allPlugins, err := ap.composer.GetInstalledPlugins(evt.Context(), evt.Path())
 	if err != nil {

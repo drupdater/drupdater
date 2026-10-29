@@ -95,6 +95,7 @@ Where things live. For *how they work*, read `docs/explanation/` rather than dup
 | `cmd/check.go` | The `check` command and its cheap/full check tiers |
 | `internal/workflow/runner.go` | `Runner.Run` and the nine phases |
 | `internal/workflow/event.go` | The six workflow events and `AbortError` |
+| `internal/workflow/hooks.go` | Addon hooks, their stages, and the order they run in |
 | `internal/workflow/preflight.go` | Checks shared between `check` and the run's own `preflight` phase |
 | `internal/addon/` | The ten addons |
 | `internal/addon/report.go` | **Every addon's report contribution, together** — this file *is* the report's `addons` schema |
@@ -111,7 +112,7 @@ Where things live. For *how they work*, read `docs/explanation/` rather than dup
 
 - **Addons never call each other.** They communicate only through mutable event payloads (`PackagesToUpdate`, `PackagesToKeep`, `MinimalChanges`, `Title`).
 - **Addons never touch git.** They name the paths they changed to the event's `Commit`; the runner's committer (`internal/workflow/commit.go`) commits exactly those, and refuses when something else is already staged.
-- **Event priority is load-bearing** on `pre-composer-update` and `post-code-update`. See `docs/explanation/addon-architecture.md` before changing one.
+- **Hook stages are load-bearing** on `pre-composer-update`, `post-code-update` and `pre-merge-request-create`. See `docs/explanation/addon-architecture.md` before changing one.
 - **`internal/addon/report.go` is a published contract.** Renaming a field there is a breaking change to `schema_version`, and `internal/addon/testdata/run_report.json` is what makes such a rename fail rather than ship. A new reporting addon belongs in that golden's `reportingAddons()`.
 - **Report types mirror rather than reuse internal types** (`report.PackageChange` vs `composer.PackageChange`) so an internal refactor can't rename a published field.
 - **The report's deferred write is registered first**, so it runs last and is emitted on every exit path.
@@ -138,7 +139,7 @@ Hard rules:
   `// act` / `// assert` scaffolding.
 
 The comments worth keeping are the ones a reader can't derive: a workaround for an upstream bug (name
-it), a non-obvious ordering or concurrency constraint, an event-priority dependency, a deliberate
+it), a non-obvious ordering or concurrency constraint, a hook-stage dependency, a deliberate
 deviation from the obvious implementation. Everything else goes.
 
 ```go

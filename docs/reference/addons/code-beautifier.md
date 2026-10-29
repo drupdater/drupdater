@@ -6,7 +6,7 @@ a PHPCS configuration first if the project has none.
 | | |
 |---|---|
 | Runs | Configurable — in the `normal` defaults, not in `security` |
-| Events | `post-code-update` (Normal) |
+| Events | `post-code-update` (Format) |
 | Report key | `code_beautifier` |
 | Pull request section | *(none)* |
 | Commits | `Add PHPCS config`, `Install drupal/coder`, `Update coding styles`, `Remove temporary drupal/coder installation` |
@@ -80,6 +80,6 @@ Omitted when no files were fixed.
 
 ## Ordering
 
-This addon runs at **normal** priority on `post-code-update`, deliberately *after*
-[`deprecations_remover`](deprecations-remover.md), which runs above normal, so that PHPCBF
+This addon runs at the **Format** stage on `post-code-update`, deliberately *after*
+[`deprecations_remover`](deprecations-remover.md), which runs at Change, so that PHPCBF
 formats the code Rector wrote.

@@ -9,7 +9,6 @@ import (
 
 	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/drupdater/drupdater/pkg/composer"
-	"github.com/gookit/event"
 
 	"go.uber.org/zap"
 )
@@ -42,21 +41,11 @@ func NewComposerAudit(logger *zap.Logger, composer Composer, security bool) *Com
 	}
 }
 
-func (ca *ComposerAudit) SubscribedEvents() map[string]any {
-	return map[string]any{
-		"pre-composer-update": event.ListenerItem{
-			Priority: event.Max,
-			Listener: event.ListenerFunc(ca.preComposerUpdateHandler),
-		},
-		// BelowNormal: audits the final code, so it must run after the addons that rewrite it.
-		"post-code-update": event.ListenerItem{
-			Priority: event.BelowNormal,
-			Listener: event.ListenerFunc(ca.postCodeUpdateHandler),
-		},
-		"pre-merge-request-create": event.ListenerItem{
-			Priority: event.Normal,
-			Listener: event.ListenerFunc(ca.preMergeRequestCreateHandler),
-		},
+func (ca *ComposerAudit) Hooks() workflow.Hooks {
+	return workflow.Hooks{
+		PreComposerUpdate:     workflow.On(workflow.Prepare, ca.preComposerUpdateHandler),
+		PostCodeUpdate:        workflow.On(workflow.Inspect, ca.postCodeUpdateHandler),
+		PreMergeRequestCreate: workflow.On(workflow.Prepare, ca.preMergeRequestCreateHandler),
 	}
 }
 
@@ -76,8 +65,7 @@ func (ca *ComposerAudit) RenderTemplate() (string, error) {
 
 // preComposerUpdateHandler audits the pre-update code. A security run narrows the update to the
 // affected packages and aborts when there are none; a normal run only records the audit.
-func (ca *ComposerAudit) preComposerUpdateHandler(e event.Event) error {
-	evt := e.(*workflow.PreComposerUpdateEvent)
+func (ca *ComposerAudit) preComposerUpdateHandler(evt *workflow.PreComposerUpdateEvent) error {
 	var err error
 
 	ca.beforeAudit, err = ca.composer.Audit(evt.Context(), evt.Path())
@@ -115,8 +103,7 @@ func (ca *ComposerAudit) preComposerUpdateHandler(e event.Event) error {
 	return nil
 }
 
-func (ca *ComposerAudit) postCodeUpdateHandler(e event.Event) error {
-	evt := e.(*workflow.PostCodeUpdateEvent)
+func (ca *ComposerAudit) postCodeUpdateHandler(evt *workflow.PostCodeUpdateEvent) error {
 
 	var err error
 	ca.afterAudit, err = ca.composer.Audit(evt.Context(), evt.Path())
@@ -177,8 +164,7 @@ func advisoryKey(a composer.Advisory) string {
 
 // preMergeRequestCreateHandler publishes the abandoned packages for unsupported_modules and, on a
 // security run, relabels the merge request. Runs at Normal, above the BelowNormal consumer.
-func (ca *ComposerAudit) preMergeRequestCreateHandler(e event.Event) error {
-	evt := e.(*workflow.PreMergeRequestCreateEvent)
+func (ca *ComposerAudit) preMergeRequestCreateHandler(evt *workflow.PreMergeRequestCreateEvent) error {
 
 	for _, pkg := range ca.GetAbandonedPackages() {
 		evt.AbandonedPackages = append(evt.AbandonedPackages, workflow.AbandonedPackage{

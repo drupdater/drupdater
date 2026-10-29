@@ -8,7 +8,6 @@ import (
 	"github.com/drupdater/drupdater/internal/golden"
 	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/drupdater/drupdater/pkg/drush"
-	"github.com/gookit/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -25,15 +24,6 @@ func TestNewUpdateHooks(t *testing.T) {
 	assert.Equal(t, mockDrush, updateHooks.drush)
 	assert.NotNil(t, updateHooks.hooks)
 	assert.Empty(t, updateHooks.hooks)
-}
-
-func TestUpdateHooks_SubscribedEvents(t *testing.T) {
-	updateHooks := &UpdateHooks{}
-
-	events := updateHooks.SubscribedEvents()
-
-	assert.Contains(t, events, "pre-site-update")
-	assert.IsType(t, event.ListenerItem{}, events["pre-site-update"])
 }
 
 func TestUpdateHooks_RenderTemplate(t *testing.T) {

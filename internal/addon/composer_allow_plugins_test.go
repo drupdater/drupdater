@@ -22,18 +22,6 @@ func TestNewDefaultAllowPlugins(t *testing.T) {
 	assert.Equal(t, composerRunner, ap.composer)
 }
 
-func TestDefaultAllowPlugins_SubscribedEvents(t *testing.T) {
-	logger := zap.NewNop()
-	composerRunner := NewMockComposer(t)
-
-	ap := NewComposerAllowPlugins(logger, composerRunner)
-	events := ap.SubscribedEvents()
-
-	assert.Len(t, events, 2)
-	assert.Contains(t, events, "pre-composer-update")
-	assert.Contains(t, events, "post-composer-update")
-}
-
 func TestDefaultAllowPlugins_PreComposerUpdateHandler(t *testing.T) {
 	logger := zap.NewNop()
 	composerRunner := NewMockComposer(t)

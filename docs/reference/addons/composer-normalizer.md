@@ -6,7 +6,7 @@ canonical formatting.
 | | |
 |---|---|
 | Runs | Configurable — in the `normal` defaults, not in `security` |
-| Events | `post-composer-update` (Min) |
+| Events | `post-composer-update` (Format) |
 | Report key | *(none — deliberately)* |
 | Pull request section | *(none)* |
 
@@ -21,8 +21,8 @@ It never installs the normaliser itself. A project that has not adopted
 `ergebnis/composer-normalize` has not asked for its `composer.json` to be reordered, and
 doing so unprompted would produce a large, unreviewable diff.
 
-It runs at the **lowest** priority on `post-composer-update`, so it normalises the final
-state after every other addon on that event has finished.
+It runs at the **Format** stage on `post-composer-update`, so it normalises `composer.json`
+after every addon that changes it on that event has finished.
 
 ## Why it exists
 

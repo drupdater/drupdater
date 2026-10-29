@@ -9,7 +9,6 @@ import (
 	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/drush"
-	"github.com/gookit/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -26,22 +25,6 @@ func TestNewUnsupportedModules(t *testing.T) {
 	assert.Equal(t, mockDrush, um.drush)
 	assert.NotNil(t, um.modules)
 	assert.Empty(t, um.modules)
-}
-
-func TestUnsupportedModules_SubscribedEvents(t *testing.T) {
-	um := &UnsupportedModules{}
-
-	events := um.SubscribedEvents()
-
-	assert.Contains(t, events, "pre-site-update")
-	assert.IsType(t, event.ListenerItem{}, events["pre-site-update"])
-
-	// Strictly below the Normal composer_audit publishes at: at equal priority the list would
-	// sometimes be read before it is written.
-	assert.Contains(t, events, "pre-merge-request-create")
-	preMerge := events["pre-merge-request-create"].(event.ListenerItem)
-	assert.Equal(t, event.BelowNormal, preMerge.Priority)
-	assert.Less(t, preMerge.Priority, event.Normal)
 }
 
 func TestUnsupportedModules_RenderTemplate(t *testing.T) {
@@ -169,7 +152,6 @@ func TestUnsupportedModules_PreMergeRequestCreateHandler(t *testing.T) {
 	evt := &workflow.PreMergeRequestCreateEvent{
 		AbandonedPackages: []workflow.AbandonedPackage{{Name: "patchwork/jsqueeze"}},
 	}
-	evt.SetName("pre-merge-request-create")
 
 	require.NoError(t, um.preMergeRequestCreateHandler(evt))
 	assert.Equal(t, evt.AbandonedPackages, um.abandoned)
@@ -232,8 +214,8 @@ func TestUnsupportedModules_EndOfLifeEntries_Recommendations(t *testing.T) {
 	}, got)
 }
 
-// The whole handoff through a real dispatcher — the only test covering the wiring itself: the
-// subscription, and the priority that puts the write before the read.
+// The whole handoff through the addons' hooks, with the reader listed first: only the stages put
+// the write before the read.
 func TestUnsupportedModules_AbandonedHandoff(t *testing.T) {
 	audit := NewComposerAudit(zap.NewNop(), NewMockComposer(t), false)
 	audit.afterAudit = composer.Audit{
@@ -241,12 +223,8 @@ func TestUnsupportedModules_AbandonedHandoff(t *testing.T) {
 	}
 	um := NewUnsupportedModules(zap.NewNop(), NewMockDrush(t))
 
-	manager := event.NewManager("test")
-	manager.AddSubscriber(audit)
-	manager.AddSubscriber(um)
-
-	err := manager.FireEvent(workflow.NewPreMergeRequestCreateEvent("July 2026: Drupal Maintenance Updates"))
-	require.NoError(t, err)
+	evt := workflow.NewPreMergeRequestCreateEvent("July 2026: Drupal Maintenance Updates")
+	require.NoError(t, workflow.NewPipeline([]workflow.Addon{um, audit}).PreMergeRequestCreate(evt))
 
 	result, err := um.RenderTemplate()
 	require.NoError(t, err)

@@ -16,7 +16,6 @@ import (
 	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/drupalorg"
-	"github.com/gookit/event"
 	gitlab "gitlab.com/gitlab-org/api/client-go"
 	"go.uber.org/zap"
 )
@@ -97,12 +96,9 @@ func NewComposerPatches1(logger *zap.Logger, composer Composer, drupalOrg Drupal
 	}
 }
 
-func (h *ComposerPatches1) SubscribedEvents() map[string]any {
-	return map[string]any{
-		"pre-composer-update": event.ListenerItem{
-			Priority: event.Normal,
-			Listener: event.ListenerFunc(h.preComposerUpdateHandler),
-		},
+func (h *ComposerPatches1) Hooks() workflow.Hooks {
+	return workflow.Hooks{
+		PreComposerUpdate: workflow.On(workflow.Change, h.preComposerUpdateHandler),
 	}
 }
 
@@ -113,13 +109,12 @@ func (h *ComposerPatches1) RenderTemplate() (string, error) {
 	return render("composer_patches_1.go.tmpl", h.patchUpdates)
 }
 
-func (h *ComposerPatches1) preComposerUpdateHandler(e event.Event) error {
-	event := e.(*workflow.PreComposerUpdateEvent)
-	ctx := event.Context()
-	path := event.Path()
-	packagesToUpdate := event.PackagesToUpdate
-	minimalChanges := event.MinimalChanges
-	packagesToKeep := event.PackagesToKeep
+func (h *ComposerPatches1) preComposerUpdateHandler(evt *workflow.PreComposerUpdateEvent) error {
+	ctx := evt.Context()
+	path := evt.Path()
+	packagesToUpdate := evt.PackagesToUpdate
+	minimalChanges := evt.MinimalChanges
+	packagesToKeep := evt.PackagesToKeep
 
 	patches := make(map[string]map[string]string)
 	patchesString, err := h.composer.GetConfig(ctx, path, "extra.patches")
@@ -160,13 +155,13 @@ func (h *ComposerPatches1) preComposerUpdateHandler(e event.Event) error {
 			return fmt.Errorf("failed to update composer lock hash: %w", err)
 		}
 
-		if _, err := event.Commit("Update patches", h.patchUpdates.changedPaths("composer.json", "composer.lock")...); err != nil {
+		if _, err := evt.Commit("Update patches", h.patchUpdates.changedPaths("composer.json", "composer.lock")...); err != nil {
 			return fmt.Errorf("failed to commit patches: %w", err)
 		}
 	}
 
 	for _, patchUpdate := range patchUpdates.Conflicts {
-		event.PackagesToKeep = append(event.PackagesToKeep, fmt.Sprintf("%s:%s", patchUpdate.Package, patchUpdate.FixedVersion))
+		evt.PackagesToKeep = append(evt.PackagesToKeep, fmt.Sprintf("%s:%s", patchUpdate.Package, patchUpdate.FixedVersion))
 	}
 
 	return nil

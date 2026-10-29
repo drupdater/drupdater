@@ -7,7 +7,6 @@ import (
 	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/drupdater/drupdater/pkg/rector"
 
-	"github.com/gookit/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -29,15 +28,6 @@ func TestRecordFixes_DoesNotSortRectorsOutputInPlace(t *testing.T) {
 		"rector's own output was reordered")
 	assert.Equal(t, []string{"ARector", "ZRector"}, dr.fixes[0].AppliedRectors,
 		"the report section is still sorted")
-}
-
-func TestDeprecationsRemover_SubscribedEvents(t *testing.T) {
-	dr := &DeprecationsRemover{}
-	events := dr.SubscribedEvents()
-
-	assert.Contains(t, events, "post-code-update")
-	item := events["post-code-update"].(event.ListenerItem)
-	assert.Equal(t, event.AboveNormal, item.Priority)
 }
 
 func TestDeprecationsRemover_RenderTemplate(t *testing.T) {

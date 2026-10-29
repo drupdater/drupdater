@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/drupdater/drupdater/internal/workflow"
-	"github.com/gookit/event"
 	"go.uber.org/zap"
 )
 
@@ -20,12 +19,9 @@ func NewComposerNormalizer(logger *zap.Logger, composer Composer) *ComposerNorma
 	}
 }
 
-func (cn *ComposerNormalizer) SubscribedEvents() map[string]any {
-	return map[string]any{
-		"post-composer-update": event.ListenerItem{
-			Priority: event.Min,
-			Listener: event.ListenerFunc(cn.postComposerUpdateHandler),
-		},
+func (cn *ComposerNormalizer) Hooks() workflow.Hooks {
+	return workflow.Hooks{
+		PostComposerUpdate: workflow.On(workflow.Format, cn.postComposerUpdateHandler),
 	}
 }
 
@@ -34,8 +30,7 @@ func (cn *ComposerNormalizer) RenderTemplate() (string, error) {
 	return "", nil
 }
 
-func (cn *ComposerNormalizer) postComposerUpdateHandler(e event.Event) error {
-	evt := e.(*workflow.PostComposerUpdateEvent)
+func (cn *ComposerNormalizer) postComposerUpdateHandler(evt *workflow.PostComposerUpdateEvent) error {
 
 	installed, err := cn.composer.IsPackageInstalled(evt.Context(), evt.Path(), "ergebnis/composer-normalize")
 	if err != nil {

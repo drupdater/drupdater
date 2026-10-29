@@ -13,7 +13,6 @@ import (
 
 	"github.com/drupdater/drupdater/internal/workflow"
 
-	"github.com/gookit/event"
 	"go.uber.org/zap"
 )
 
@@ -35,12 +34,9 @@ func NewCodeBeautifier(logger *zap.Logger, phpcs PHPCS, composer Composer) *Code
 	}
 }
 
-func (cb *CodeBeautifier) SubscribedEvents() map[string]any {
-	return map[string]any{
-		"post-code-update": event.ListenerItem{
-			Priority: event.Normal,
-			Listener: event.ListenerFunc(cb.postCodeUpdateHandler),
-		},
+func (cb *CodeBeautifier) Hooks() workflow.Hooks {
+	return workflow.Hooks{
+		PostCodeUpdate: workflow.On(workflow.Format, cb.postCodeUpdateHandler),
 	}
 }
 
@@ -91,12 +87,11 @@ var hasPHPCSPathDefinitions = func(path string) (bool, error) {
 	return len(ruleset.Files) > 0, nil
 }
 
-func (cb *CodeBeautifier) postCodeUpdateHandler(e event.Event) (err error) { //nolint:cyclop
-	event := e.(*workflow.PostCodeUpdateEvent)
+func (cb *CodeBeautifier) postCodeUpdateHandler(evt *workflow.PostCodeUpdateEvent) (err error) { //nolint:cyclop
 	cb.logger.Info("updating coding styles")
 
-	if !fileExists(event.Path()) {
-		created, err := cb.CreatePHPCSConfig(event.Context(), event.Path(), event)
+	if !fileExists(evt.Path()) {
+		created, err := cb.CreatePHPCSConfig(evt.Context(), evt.Path(), evt)
 		if err != nil {
 			return err
 		}
@@ -105,7 +100,7 @@ func (cb *CodeBeautifier) postCodeUpdateHandler(e event.Event) (err error) { //n
 			return nil
 		}
 	} else {
-		hasPaths, err := hasPHPCSPathDefinitions(event.Path())
+		hasPaths, err := hasPHPCSPathDefinitions(evt.Path())
 		if err != nil {
 			return err
 		}
@@ -115,8 +110,8 @@ func (cb *CodeBeautifier) postCodeUpdateHandler(e event.Event) (err error) { //n
 		}
 	}
 
-	if installed, _ := cb.composer.IsPackageInstalled(event.Context(), event.Path(), "drupal/coder"); !installed {
-		if err := cb.InstallCoder(event.Context(), event.Path(), event); err != nil {
+	if installed, _ := cb.composer.IsPackageInstalled(evt.Context(), evt.Path(), "drupal/coder"); !installed {
+		if err := cb.InstallCoder(evt.Context(), evt.Path(), evt); err != nil {
 			return err
 		}
 		// Deferred, not called at the end: every path below returns early, and a coder left
@@ -124,13 +119,13 @@ func (cb *CodeBeautifier) postCodeUpdateHandler(e event.Event) (err error) { //n
 		defer func() {
 			// Equivalent mutant: without removeErr != nil, a nil removeErr is assigned to a nil err.
 			// mutator-disable-next-line expression/remove
-			if removeErr := cb.removeCoder(event.Context(), event.Path(), event); removeErr != nil && err == nil {
+			if removeErr := cb.removeCoder(evt.Context(), evt.Path(), evt); removeErr != nil && err == nil {
 				err = removeErr
 			}
 		}()
 	}
 
-	codingStyleUpdateResult, err := cb.phpcs.Run(event.Context(), event.Path())
+	codingStyleUpdateResult, err := cb.phpcs.Run(evt.Context(), evt.Path())
 	if err != nil {
 		return fmt.Errorf("failed to run phpcs: %w", err)
 	}
@@ -140,7 +135,7 @@ func (cb *CodeBeautifier) postCodeUpdateHandler(e event.Event) (err error) { //n
 		return nil
 	}
 
-	err = cb.phpcs.RunCBF(event.Context(), event.Path())
+	err = cb.phpcs.RunCBF(evt.Context(), evt.Path())
 	if err != nil {
 		cb.logger.Debug("remaining issues", zap.Error(err))
 	}
@@ -152,11 +147,11 @@ func (cb *CodeBeautifier) postCodeUpdateHandler(e event.Event) (err error) { //n
 		if (codingStyleUpdateResult.Files[file].Errors + codingStyleUpdateResult.Files[file].Warnings) == 0 {
 			continue
 		}
-		addedFiles = append(addedFiles, strings.TrimLeft(strings.TrimPrefix(file, event.Path()), "/"))
+		addedFiles = append(addedFiles, strings.TrimLeft(strings.TrimPrefix(file, evt.Path()), "/"))
 	}
 
 	// phpcbf may have changed nothing even where phpcs reported something fixable.
-	committed, err := event.Commit("Update coding styles", addedFiles...)
+	committed, err := evt.Commit("Update coding styles", addedFiles...)
 	if err != nil {
 		return err
 	}

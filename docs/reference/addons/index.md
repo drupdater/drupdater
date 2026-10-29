@@ -1,7 +1,7 @@
 # Addons
 
 Nearly everything Drupdater does beyond `composer update` itself is an addon: a unit that
-subscribes to [workflow events](../../explanation/addon-architecture.md) and does one job
+hooks into [workflow events](../../explanation/addon-architecture.md) and does one job
 when its event fires. Addons never call each other.
 
 Each addon may contribute a section to the pull or merge request description, a section
@@ -77,14 +77,13 @@ report](../../explanation/why-a-run-report.md).
 
 ## Order of execution
 
-Addons subscribing to the same event run in priority order, and for two events that order
-is deliberate rather than incidental:
+Each addon's hook on an event declares a stage — `Prepare`, `Change`, `Format`, `Inspect`,
+run in that order — and for three events that order is deliberate rather than incidental:
 
-- On `pre-composer-update`, `composer_audit` runs at the **highest** priority because on a
-  security run it decides *what* the update is allowed to touch. Everything else reacts to
-  that decision.
-- On `pre-merge-request-create`, `composer_audit` (Normal) hands its abandoned packages to
-  `unsupported_modules` (BelowNormal), which renders both kinds of finding as one list.
+- On `pre-composer-update`, `composer_audit` prepares, because on a security run it decides
+  *what* the update is allowed to touch. Everything else reacts to that decision.
+- On `pre-merge-request-create`, `composer_audit` (Prepare) hands its abandoned packages to
+  `unsupported_modules` (Inspect), which renders both kinds of finding as one list.
 - On `post-code-update`, the order is `deprecations_remover` → `code_beautifier` →
   `composer_audit`. PHPCBF formats what Rector wrote, and the final audit must see the
   final code.

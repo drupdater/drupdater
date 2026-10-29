@@ -6,7 +6,7 @@ custom code to rewrite APIs deprecated by the new Drupal version.
 | | |
 |---|---|
 | Runs | Configurable — in the `normal` defaults, not in `security` |
-| Events | `post-code-update` (**AboveNormal**) |
+| Events | `post-code-update` (**Change**) |
 | Report key | `deprecations_remover` |
 | Pull request section | *(none)* |
 | Commits | `Remove temporary drupal-rector installation`, `Remove deprecations` |
@@ -22,8 +22,8 @@ custom code to rewrite APIs deprecated by the new Drupal version.
    installation`.
 4. Changed files are committed as `Remove deprecations`.
 
-It runs **above normal** priority on `post-code-update`, ahead of
-[`code_beautifier`](code-beautifier.md), so that PHPCBF formats the code Rector wrote.
+It runs at the **Change** stage on `post-code-update`, ahead of
+[`code_beautifier`](code-beautifier.md) at Format, so that PHPCBF formats the code Rector wrote.
 
 ## Why it exists
 

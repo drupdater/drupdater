@@ -18,7 +18,7 @@ the behaviour makes sense rather than looking arbitrary.
     ---
 
     Why functionality is split into event subscribers, how addons steer the Composer
-    update without calling each other, and why their relative priority matters.
+    update without calling each other, and why the stages of their hooks matter.
 
 -   **[The configuration model](configuration-model.md)**
 

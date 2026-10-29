@@ -6,7 +6,7 @@ upgraded, downgraded or removed, with links to the upstream changelogs.
 | | |
 |---|---|
 | Runs | **Always** — mandatory, cannot be disabled |
-| Events | `post-composer-update` (Min) |
+| Events | `post-composer-update` (Inspect) |
 | Report key | *(none — deliberately)* |
 | Pull request section | "🛠️ Dependency updates" |
 
@@ -19,7 +19,7 @@ Runs `composer diff` twice against the pre-update and post-update lock files:
 - Once plain, logged at info level so the same information is in the run log without
   markdown noise.
 
-It runs at the **lowest** priority on `post-composer-update`, so any other addon on that
+It runs at the **Inspect** stage on `post-composer-update`, so every other addon on that
 event has already finished mutating the lock file before the diff is taken.
 
 ## Why it exists

@@ -16,7 +16,6 @@ import (
 	"github.com/drupdater/drupdater/pkg/composer"
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/gookit/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -88,7 +87,7 @@ func TestRun(t *testing.T) {
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
 	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
 
-	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
+	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
 	err := workflowService.Run(ctx, nil)
 
 	require.NoError(t, err)
@@ -163,7 +162,7 @@ func TestRunPublishUsesLiveContext(t *testing.T) {
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
 	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
 
-	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
+	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
 	err = workflowService.Run(ctx, nil)
 
 	require.NoError(t, err)
@@ -222,7 +221,7 @@ func TestRunSiteFailureDoesNotPublish(t *testing.T) {
 	updateErr := errors.New("drush updatedb crashed")
 	drush.EXPECT().UpdateSite(anyCtx, testCheckout, "site1").Return(updateErr)
 
-	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
+	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
 	err := workflowService.Run(ctx, nil)
 
 	// Assert: the error surfaces and no MR was published.
@@ -270,7 +269,7 @@ func TestRunTimeout(t *testing.T) {
 		return nil, ctx.Err()
 	}).Maybe()
 
-	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
+	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
 	err := workflowService.Run(ctx, nil)
 
 	// Assert: the deadline propagates and nothing is published.
@@ -312,7 +311,7 @@ func TestRunPlatformReqsFail(t *testing.T) {
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil).Maybe()
 	installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil).Maybe()
 
-	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
+	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
 	err := workflowService.Run(ctx, nil)
 
 	// Assert: aborts with a clear message and never updates or publishes.
@@ -354,7 +353,7 @@ func TestRunNoChanges(t *testing.T) {
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil).Once()
 	mockComposer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).Return([]composer.PackageChange{}, nil)
 
-	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
+	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
 	err := workflowService.Run(ctx, nil)
 
 	// Assert: should get an AbortError, not a nil or other error
@@ -388,12 +387,11 @@ func TestRunAbortedByAnAddonInstallsNoSite(t *testing.T) {
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil).Once()
 
-	dispatcher := event.NewManager("")
-	dispatcher.On("pre-composer-update", event.ListenerFunc(func(event.Event) error {
+	aborts := hookAddon{Hooks{PreComposerUpdate: On(Prepare, func(*PreComposerUpdateEvent) error {
 		return AbortError{Msg: "No security advisories found"}
-	}))
+	})}}
 
-	err := New(zap.NewNop(), config, NewMockDrush(t), vcsProvider, repositoryService, installer, mockComposer, dispatcher).Run(t.Context(), nil)
+	err := New(zap.NewNop(), config, NewMockDrush(t), vcsProvider, repositoryService, installer, mockComposer).Run(t.Context(), []Addon{aborts})
 
 	_, aborted := errors.AsType[AbortError](err)
 	require.True(t, aborted, "got %v", err)
@@ -451,7 +449,7 @@ func TestRunInstallsSitesAtTheOldCode(t *testing.T) {
 	drush.EXPECT().ExportConfiguration(anyCtx, testCheckout, "site1").Return(nil)
 
 	core, logs := observer.New(zap.InfoLevel)
-	err := New(zap.New(core), config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager("")).Run(t.Context(), nil)
+	err := New(zap.New(core), config, drush, vcsProvider, repositoryService, installer, mockComposer).Run(t.Context(), nil)
 
 	require.NoError(t, err)
 	assert.Equal(t, []string{"composer install", "composer update", "site install", "composer install", "site update"}, steps)
@@ -469,19 +467,15 @@ func TestRunInstallsSitesAtTheOldCode(t *testing.T) {
 }
 
 func TestUpdateSharedCodeFailures(t *testing.T) {
-	newRunner := func(t *testing.T) (*Runner, *MockComposer, *MockEventDispatcher, *MockWorktree) {
+	newRunner := func(t *testing.T, hooks Hooks) (*Runner, *MockComposer, *MockWorktree) {
 		t.Helper()
 		mockComposer := NewMockComposer(t)
-		dispatcher := NewMockEventDispatcher(t)
 		worktree := NewMockWorktree(t)
-		return &Runner{logger: zap.NewNop(), composer: mockComposer, dispatcher: dispatcher}, mockComposer, dispatcher, worktree
-	}
-	firesEvent := func(name string) any {
-		return mock.MatchedBy(func(e event.Event) bool { return e.Name() == name })
+		return &Runner{logger: zap.NewNop(), composer: mockComposer, hooks: NewPipeline([]Addon{hookAddon{hooks}})}, mockComposer, worktree
 	}
 
 	t.Run("installing the resolved lock", func(t *testing.T) {
-		ws, mockComposer, _, worktree := newRunner(t)
+		ws, mockComposer, worktree := newRunner(t, Hooks{})
 		mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(assert.AnError)
 
 		err := ws.updateSharedCode(t.Context(), worktree, testCheckout, "update-x")
@@ -490,19 +484,17 @@ func TestUpdateSharedCodeFailures(t *testing.T) {
 	})
 
 	t.Run("post-composer-update", func(t *testing.T) {
-		ws, mockComposer, dispatcher, worktree := newRunner(t)
+		ws, mockComposer, worktree := newRunner(t, Hooks{PostComposerUpdate: On(Change, failing[*PostComposerUpdateEvent])})
 		mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
-		dispatcher.EXPECT().FireEvent(firesEvent("post-composer-update")).Return(assert.AnError)
 
 		err := ws.updateSharedCode(t.Context(), worktree, testCheckout, "update-x")
 		require.ErrorIs(t, err, assert.AnError)
-		assert.Contains(t, err.Error(), "failed to fire event")
+		assert.Contains(t, err.Error(), "post-composer-update hook failed")
 	})
 
 	t.Run("staging composer files", func(t *testing.T) {
-		ws, mockComposer, dispatcher, worktree := newRunner(t)
+		ws, mockComposer, worktree := newRunner(t, Hooks{})
 		mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
-		dispatcher.EXPECT().FireEvent(firesEvent("post-composer-update")).Return(nil)
 		worktree.EXPECT().AddGlob("composer.*").Return(assert.AnError)
 
 		err := ws.updateSharedCode(t.Context(), worktree, testCheckout, "update-x")
@@ -511,9 +503,8 @@ func TestUpdateSharedCodeFailures(t *testing.T) {
 	})
 
 	t.Run("committing", func(t *testing.T) {
-		ws, mockComposer, dispatcher, worktree := newRunner(t)
+		ws, mockComposer, worktree := newRunner(t, Hooks{})
 		mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
-		dispatcher.EXPECT().FireEvent(firesEvent("post-composer-update")).Return(nil)
 		worktree.EXPECT().AddGlob("composer.*").Return(nil)
 		worktree.EXPECT().Status().Return(git.Status{}, nil)
 		worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.ZeroHash, assert.AnError)
@@ -524,23 +515,20 @@ func TestUpdateSharedCodeFailures(t *testing.T) {
 	})
 
 	t.Run("post-code-update", func(t *testing.T) {
-		ws, mockComposer, dispatcher, worktree := newRunner(t)
+		ws, mockComposer, worktree := newRunner(t, Hooks{PostCodeUpdate: On(Change, failing[*PostCodeUpdateEvent])})
 		mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
-		dispatcher.EXPECT().FireEvent(firesEvent("post-composer-update")).Return(nil)
-		dispatcher.EXPECT().FireEvent(firesEvent("post-code-update")).Return(assert.AnError)
 		worktree.EXPECT().AddGlob("composer.*").Return(nil)
 		worktree.EXPECT().Status().Return(git.Status{}, nil)
 		worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.ZeroHash, nil)
 
 		err := ws.updateSharedCode(t.Context(), worktree, testCheckout, "update-x")
 		require.ErrorIs(t, err, assert.AnError)
-		assert.Contains(t, err.Error(), "failed to fire event")
+		assert.Contains(t, err.Error(), "post-code-update hook failed")
 	})
 
 	t.Run("checking out the update branch", func(t *testing.T) {
-		ws, mockComposer, dispatcher, worktree := newRunner(t)
+		ws, mockComposer, worktree := newRunner(t, Hooks{})
 		mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
-		dispatcher.EXPECT().FireEvent(mock.Anything).Return(nil)
 		worktree.EXPECT().AddGlob("composer.*").Return(nil)
 		worktree.EXPECT().Status().Return(git.Status{}, nil)
 		worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.ZeroHash, nil)
@@ -595,7 +583,7 @@ func TestRunBranchAlreadyExists(t *testing.T) {
 	}, nil)
 	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
 
-	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
+	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
 	err := workflowService.Run(ctx, nil)
 
 	// Assert: should get an AbortError, not a nil or other error
@@ -646,7 +634,7 @@ func TestRunLocalBranchAlreadyExists(t *testing.T) {
 	}, nil)
 	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
 
-	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
+	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
 	err := workflowService.Run(ctx, nil)
 
 	var abortErr AbortError
@@ -695,7 +683,7 @@ func TestRunLocalBranchLookupError(t *testing.T) {
 	}, nil)
 	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
 
-	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
+	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
 	err := workflowService.Run(ctx, nil)
 
 	require.ErrorIs(t, err, lookupErr)
@@ -754,7 +742,7 @@ func TestRunWithDryRun(t *testing.T) {
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
 	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
 
-	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
+	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
 	err := workflowService.Run(ctx, nil)
 
 	require.NoError(t, err)
@@ -821,7 +809,7 @@ func TestRunCheckoutDryRunWithoutPlatform(t *testing.T) {
 	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
 
 	// Execute: platform is nil, exactly as cmd/root.go leaves it for this configuration.
-	workflowService := New(logger, config, drush, nil, repositoryService, installer, mockComposer, event.NewManager(""))
+	workflowService := New(logger, config, drush, nil, repositoryService, installer, mockComposer)
 	err := workflowService.Run(ctx, nil)
 
 	require.NoError(t, err)
@@ -891,7 +879,7 @@ func TestPublishWorkDeletesBranchOnMRFailure(t *testing.T) {
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
 	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
 
-	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
+	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
 	err := workflowService.Run(ctx, nil)
 
 	require.ErrorIs(t, err, mrErr)
@@ -955,7 +943,7 @@ func TestPublishWorkLogsWarningWhenDeleteBranchFails(t *testing.T) {
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
 	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
 
-	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
+	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
 	err := workflowService.Run(ctx, nil)
 
 	// The original MR error surfaces; the delete error is only logged.
@@ -1016,7 +1004,7 @@ func TestPublishWorkPushFails(t *testing.T) {
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
 	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
 
-	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
+	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
 	err := workflowService.Run(ctx, nil)
 
 	require.ErrorIs(t, err, pushErr)
@@ -1059,7 +1047,7 @@ func TestRunGetLockHashError(t *testing.T) {
 	hashErr := errors.New("composer.lock not found")
 	mockComposer.EXPECT().GetLockHash(testCheckout).Return("", hashErr)
 
-	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
+	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
 	err := workflowService.Run(ctx, nil)
 
 	require.ErrorIs(t, err, hashErr)
@@ -1105,7 +1093,7 @@ func TestRunBranchExistsError(t *testing.T) {
 	repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound)
 	repositoryService.EXPECT().BranchExists(repository, mock.Anything, mock.Anything).Return(false, branchErr)
 
-	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
+	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
 	err := workflowService.Run(ctx, nil)
 
 	require.ErrorContains(t, err, "failed to check if branch exists")
@@ -1160,7 +1148,7 @@ func TestRunConfigResaveError(t *testing.T) {
 	}, nil)
 	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
 
-	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
+	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
 	err := workflowService.Run(ctx, nil)
 
 	require.ErrorIs(t, err, resaveErr)
@@ -1215,7 +1203,7 @@ func TestRunExportConfigurationError(t *testing.T) {
 	}, nil)
 	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
 
-	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
+	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
 	err := workflowService.Run(ctx, nil)
 
 	require.ErrorIs(t, err, exportErr)
@@ -1279,7 +1267,7 @@ func TestRunWithAutoMerge(t *testing.T) {
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
 	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
 
-	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
+	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
 	err = workflowService.Run(ctx, nil)
 
 	require.NoError(t, err)
@@ -1343,7 +1331,7 @@ func TestRunAutoMergeError(t *testing.T) {
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
 	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
 
-	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
+	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
 	err := workflowService.Run(ctx, nil)
 
 	require.NoError(t, err, "a failed auto-merge must not fail the run — the MR was created")
@@ -1408,7 +1396,7 @@ func TestRunAutoMergeSkippedWhenDisabled(t *testing.T) {
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
 	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
 
-	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
+	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
 	err = workflowService.Run(ctx, nil)
 
 	require.NoError(t, err)
@@ -1425,7 +1413,6 @@ func TestRunFireEventError(t *testing.T) {
 	mockComposer := NewMockComposer(t)
 	expectVersionLookup(mockComposer)
 	drush := NewMockDrush(t)
-	dispatcher := NewMockEventDispatcher(t)
 	ctx := context.Background()
 
 	config := internal.Config{
@@ -1451,9 +1438,9 @@ func TestRunFireEventError(t *testing.T) {
 	repositoryService.EXPECT().IsShallowClone(testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
 
-	// The dispatcher returns an error on the first FireEvent call (PreComposerUpdateEvent).
-	fireErr := errors.New("event bus unavailable")
-	dispatcher.EXPECT().FireEvent(mock.Anything).Return(fireErr)
+	fails := hookAddon{Hooks{PreComposerUpdate: On(Change, func(*PreComposerUpdateEvent) error {
+		return errors.New("audit unavailable")
+	})}}
 
 	// installSite may or may not run before the context is cancelled.
 	installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil).Maybe()
@@ -1463,11 +1450,11 @@ func TestRunFireEventError(t *testing.T) {
 	drush.EXPECT().ExportConfiguration(anyCtx, testCheckout, "site1").Return(nil).Maybe()
 	drush.EXPECT().ConfigResave(anyCtx, testCheckout, "site1").Return(nil).Maybe()
 
-	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, dispatcher)
-	err := workflowService.Run(ctx, nil)
+	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
+	err := workflowService.Run(ctx, []Addon{fails})
 
-	require.ErrorContains(t, err, "failed to fire event")
-	require.ErrorContains(t, err, "event bus unavailable")
+	require.ErrorContains(t, err, "pre-composer-update hook failed")
+	require.ErrorContains(t, err, "audit unavailable")
 }
 
 func TestRunUsesExistingCheckout(t *testing.T) {
@@ -1527,7 +1514,7 @@ func TestRunUsesExistingCheckout(t *testing.T) {
 	mockComposer.EXPECT().Install(anyCtx, checkout).Return(nil)
 	mockComposer.EXPECT().GetLockHash(checkout).Return("dummy-hash", nil)
 
-	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
+	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
 	err = workflowService.Run(ctx, nil)
 
 	require.NoError(t, err)
@@ -1566,7 +1553,7 @@ func TestRunWorkBranchCheckoutError(t *testing.T) {
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
 
-	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
+	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
 	err := workflowService.Run(ctx, nil)
 
 	require.ErrorIs(t, err, checkoutErr)
@@ -1621,7 +1608,7 @@ func TestRunRestoresCheckoutOnFailureInCheckoutMode(t *testing.T) {
 	drush.EXPECT().ExportConfiguration(anyCtx, testCheckout, "site1").Return(nil).Maybe()
 	drush.EXPECT().ConfigResave(anyCtx, testCheckout, "site1").Return(nil).Maybe()
 
-	workflowService := New(logger, config, drush, nil, repositoryService, installer, mockComposer, event.NewManager(""))
+	workflowService := New(logger, config, drush, nil, repositoryService, installer, mockComposer)
 	err := workflowService.Run(ctx, nil)
 
 	var abortErr AbortError
@@ -1688,7 +1675,7 @@ func TestRunDoesNotRestoreCheckoutOnSuccess(t *testing.T) {
 	mockComposer.EXPECT().Install(anyCtx, checkout).Return(nil)
 	mockComposer.EXPECT().GetLockHash(checkout).Return("dummy-hash", nil)
 
-	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
+	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
 	err = workflowService.Run(ctx, nil)
 
 	require.NoError(t, err)
@@ -1826,14 +1813,34 @@ func TestCleanup(t *testing.T) {
 }
 
 func TestUpdateSiteRestoresSettings(t *testing.T) {
-	newRunner := func(t *testing.T) (*Runner, *MockInstaller, *MockDrush) {
+	newRunner := func(t *testing.T, addons ...Addon) (*Runner, *MockInstaller, *MockDrush) {
 		t.Helper()
 		installer := NewMockInstaller(t)
 		drush := NewMockDrush(t)
-		dispatcher := NewMockEventDispatcher(t)
-		dispatcher.EXPECT().FireEvent(mock.Anything).Return(nil).Maybe()
-		return &Runner{logger: zap.NewNop(), installer: installer, drush: drush, dispatcher: dispatcher}, installer, drush
+		return &Runner{logger: zap.NewNop(), installer: installer, drush: drush, hooks: NewPipeline(addons)}, installer, drush
 	}
+
+	t.Run("after a failed pre-site-update hook, which stops the update", func(t *testing.T) {
+		ws, installer, _ := newRunner(t, hookAddon{Hooks{PreSiteUpdate: On(Inspect, failing[*PreSiteUpdateEvent])}})
+		installer.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(nil)
+		installer.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(nil).Once()
+
+		err := ws.updateSite(t.Context(), "/project", "site1")
+		require.ErrorIs(t, err, assert.AnError)
+		assert.Contains(t, err.Error(), "pre-site-update hook failed")
+	})
+
+	t.Run("after a failed post-site-update hook, which stops the export", func(t *testing.T) {
+		ws, installer, drush := newRunner(t, hookAddon{Hooks{PostSiteUpdate: On(Change, failing[*PostSiteUpdateEvent])}})
+		installer.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(nil)
+		drush.EXPECT().UpdateSite(anyCtx, "/project", "site1").Return(nil)
+		drush.EXPECT().ConfigResave(anyCtx, "/project", "site1").Return(nil)
+		installer.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(nil).Once()
+
+		err := ws.updateSite(t.Context(), "/project", "site1")
+		require.ErrorIs(t, err, assert.AnError)
+		assert.Contains(t, err.Error(), "post-site-update hook failed")
+	})
 
 	t.Run("after a failed update hook", func(t *testing.T) {
 		ws, installer, drush := newRunner(t)
@@ -2115,7 +2122,7 @@ func TestRunFailsWhenScaffoldChangesCannotBeStaged(t *testing.T) {
 	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
 	repositoryService.EXPECT().BranchExists(repository, "update-dummy-hash", "token").Return(false, nil)
 
-	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
+	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
 	err := workflowService.Run(context.Background(), nil)
 
 	require.ErrorIs(t, err, assert.AnError)
@@ -2162,24 +2169,35 @@ func TestRunHandsAddonsTheRunsContextAndCommitter(t *testing.T) {
 	drush.EXPECT().ExportConfiguration(anyCtx, testCheckout, "site1").Return(nil)
 
 	ctx := context.WithValue(t.Context(), runKey{}, "this run")
-	dispatcher := event.NewManager("")
 	seen := map[string]bool{}
-	for _, name := range []string{"pre-composer-update", "post-composer-update", "post-code-update", "pre-site-update", "post-site-update"} {
-		dispatcher.On(name, event.ListenerFunc(func(e event.Event) error {
-			addonEvent := e.(interface {
-				Context() context.Context
-				Commit(string, ...string) (bool, error)
-			})
-			seen[name] = addonEvent.Context().Value(runKey{}) == "this run"
-			if name == "post-code-update" {
-				_, err := addonEvent.Commit("Remove deprecations", "web/modules/custom/a.php")
-				return err
-			}
-			return nil
-		}))
+	carriesRun := func(name string, e interface{ Context() context.Context }) {
+		seen[name] = e.Context().Value(runKey{}) == "this run"
 	}
+	observer := hookAddon{Hooks{
+		PreComposerUpdate: On(Change, func(e *PreComposerUpdateEvent) error {
+			carriesRun("pre-composer-update", e)
+			return nil
+		}),
+		PostComposerUpdate: On(Change, func(e *PostComposerUpdateEvent) error {
+			carriesRun("post-composer-update", e)
+			return nil
+		}),
+		PostCodeUpdate: On(Change, func(e *PostCodeUpdateEvent) error {
+			carriesRun("post-code-update", e)
+			_, err := e.Commit("Remove deprecations", "web/modules/custom/a.php")
+			return err
+		}),
+		PreSiteUpdate: On(Change, func(e *PreSiteUpdateEvent) error {
+			carriesRun("pre-site-update", e)
+			return nil
+		}),
+		PostSiteUpdate: On(Change, func(e *PostSiteUpdateEvent) error {
+			carriesRun("post-site-update", e)
+			return nil
+		}),
+	}}
 
-	err := New(zap.NewNop(), config, drush, vcsProvider, repositoryService, installer, mockComposer, dispatcher).Run(ctx, nil)
+	err := New(zap.NewNop(), config, drush, vcsProvider, repositoryService, installer, mockComposer).Run(ctx, []Addon{observer})
 
 	require.NoError(t, err)
 	assert.Equal(t, map[string]bool{

@@ -5,7 +5,6 @@ import (
 	"sync"
 
 	"github.com/drupdater/drupdater/internal/workflow"
-	"github.com/gookit/event"
 
 	"go.uber.org/zap"
 )
@@ -26,12 +25,9 @@ func NewTranslationsUpdater(logger *zap.Logger, drush Drush) *TranslationsUpdate
 	}
 }
 
-func (tu *TranslationsUpdater) SubscribedEvents() map[string]any {
-	return map[string]any{
-		"post-site-update": event.ListenerItem{
-			Priority: event.Normal,
-			Listener: event.ListenerFunc(tu.postSiteUpdateHandler),
-		},
+func (tu *TranslationsUpdater) Hooks() workflow.Hooks {
+	return workflow.Hooks{
+		PostSiteUpdate: workflow.On(workflow.Change, tu.postSiteUpdateHandler),
 	}
 }
 
@@ -39,8 +35,7 @@ func (tu *TranslationsUpdater) RenderTemplate() (string, error) {
 	return "", nil
 }
 
-func (tu *TranslationsUpdater) postSiteUpdateHandler(e event.Event) error {
-	evt := e.(*workflow.PostSiteUpdateEvent)
+func (tu *TranslationsUpdater) postSiteUpdateHandler(evt *workflow.PostSiteUpdateEvent) error {
 
 	enabled, err := tu.drush.IsModuleEnabled(evt.Context(), evt.Path(), evt.Site(), "locale_deploy")
 	if err != nil {

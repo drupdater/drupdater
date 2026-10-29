@@ -6,7 +6,7 @@ update: it decides which packages may be touched, and retitles the pull request.
 | | |
 |---|---|
 | Runs | **Always.** Mandatory in both modes, not something you put in `.drupdater.yaml` |
-| Events | `pre-composer-update` (**Max**), `post-code-update` (BelowNormal), `pre-merge-request-create` (Normal) |
+| Events | `pre-composer-update` (**Prepare**), `post-code-update` (Inspect), `pre-merge-request-create` (Prepare) |
 | Report key | `composer_audit` |
 | Pull request section | "🛡️ Security Report", plus the abandoned packages in [`unsupported_modules`](unsupported-modules.md)' section |
 
@@ -38,7 +38,7 @@ advisories. It then sets, on the `pre-composer-update` event:
   cannot move without them.
 - **`MinimalChanges: true`** — Composer is asked to disturb as little else as possible.
 
-It subscribes at the **highest** priority on this event precisely because it decides the
+It runs at the **Prepare** stage on this event precisely because it decides the
 scope that every other addon then works within.
 
 On a normal run this step records the audit and stops there: the scope of a maintenance
@@ -58,7 +58,7 @@ Re-runs the audit against the updated tree and computes which advisories were re
 matching on CVE, then advisory ID, then package plus title. The result is the `fixed` and
 `remaining` split.
 
-It runs at a **below-normal** priority on `post-code-update`, so it sees the final code —
+It runs at the **Inspect** stage on `post-code-update`, so it sees the final code —
 after Rector and PHPCBF have finished.
 
 ### After the code update — abandoned packages
@@ -74,8 +74,8 @@ The list is taken from the audit **after** the update, like the remaining adviso
 describes the code the pull request actually contains.
 
 It is **not rendered in this addon's section.** On `pre-merge-request-create` the list is put
-on the event, and [`unsupported_modules`](unsupported-modules.md) — which subscribes at a lower
-priority — renders it in the same table as the unsupported modules. An abandoned package and
+on the event, and [`unsupported_modules`](unsupported-modules.md) — which reads it at the later
+Inspect stage — renders it in the same table as the unsupported modules. An abandoned package and
 an unsupported module are the same finding to a reviewer, and which addon found one is not a
 reason to put them in different sections. The [run report](../run-report.md) keeps `abandoned`
 here, under the audit that produced it.

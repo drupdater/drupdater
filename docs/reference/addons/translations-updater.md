@@ -6,7 +6,7 @@ result.
 | | |
 |---|---|
 | Runs | Configurable — in the `normal` defaults, not in `security` |
-| Events | `post-site-update` (Normal) |
+| Events | `post-site-update` (Change) |
 | Report key | `translations_updater` |
 | Pull request section | *(none)* |
 | Commits | `Update translations` |
