@@ -1734,7 +1734,7 @@ func TestForEachSite(t *testing.T) {
 		ws := &Runner{logger: logger, config: internal.Config{Sites: sites, Concurrency: 1}}
 
 		var current, peak atomic.Int32
-		err := ws.forEachSite(context.Background(), func(_ context.Context, _ string) error {
+		err := ws.forEachSite(context.Background(), func(_ context.Context, _ int, _ string) error {
 			n := current.Add(1)
 			defer current.Add(-1)
 			for {
@@ -1755,7 +1755,7 @@ func TestForEachSite(t *testing.T) {
 		ws := &Runner{logger: logger, config: internal.Config{Sites: sites}}
 
 		var calls atomic.Int32
-		err := ws.forEachSite(context.Background(), func(_ context.Context, _ string) error {
+		err := ws.forEachSite(context.Background(), func(_ context.Context, _ int, _ string) error {
 			calls.Add(1)
 			return nil
 		})
@@ -1768,7 +1768,7 @@ func TestForEachSite(t *testing.T) {
 		ws := &Runner{logger: logger, config: internal.Config{Sites: sites, Concurrency: 2}}
 		boom := errors.New("boom")
 
-		err := ws.forEachSite(context.Background(), func(_ context.Context, site string) error {
+		err := ws.forEachSite(context.Background(), func(_ context.Context, _ int, site string) error {
 			if site == "site1" {
 				return boom
 			}
@@ -1836,7 +1836,7 @@ func TestUpdateSiteRestoresSettings(t *testing.T) {
 		installer.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(nil)
 		installer.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(nil).Once()
 
-		err := ws.updateSite(t.Context(), "/project", "site1")
+		err := ws.updateSite(t.Context(), "/project", "site1", yourTurn(), make(chan struct{}))
 		require.ErrorIs(t, err, assert.AnError)
 		assert.Contains(t, err.Error(), "pre-site-update hook failed")
 	})
@@ -1848,7 +1848,7 @@ func TestUpdateSiteRestoresSettings(t *testing.T) {
 		drush.EXPECT().ConfigResave(anyCtx, "/project", "site1").Return(nil)
 		installer.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(nil).Once()
 
-		err := ws.updateSite(t.Context(), "/project", "site1")
+		err := ws.updateSite(t.Context(), "/project", "site1", yourTurn(), make(chan struct{}))
 		require.ErrorIs(t, err, assert.AnError)
 		assert.Contains(t, err.Error(), "post-site-update hook failed")
 	})
@@ -1859,7 +1859,7 @@ func TestUpdateSiteRestoresSettings(t *testing.T) {
 		drush.EXPECT().UpdateSite(anyCtx, "/project", "site1").Return(assert.AnError)
 		installer.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(nil).Once()
 
-		err := ws.updateSite(t.Context(), "/project", "site1")
+		err := ws.updateSite(t.Context(), "/project", "site1", yourTurn(), make(chan struct{}))
 		require.ErrorIs(t, err, assert.AnError)
 		assert.NotContains(t, err.Error(), "restore")
 	})
@@ -1874,7 +1874,7 @@ func TestUpdateSiteRestoresSettings(t *testing.T) {
 		})
 		installer.EXPECT().RestoreSettings(mock.MatchedBy(func(ctx context.Context) bool { return ctx.Err() == nil }), "/project", "site1").Return(nil).Once()
 
-		require.ErrorIs(t, ws.updateSite(ctx, "/project", "site1"), context.Canceled)
+		require.ErrorIs(t, ws.updateSite(ctx, "/project", "site1", yourTurn(), make(chan struct{})), context.Canceled)
 	})
 
 	t.Run("a failed restore fails the site", func(t *testing.T) {
@@ -1889,7 +1889,7 @@ func TestUpdateSiteRestoresSettings(t *testing.T) {
 		ws.committer = committer
 		installer.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(assert.AnError)
 
-		err := ws.updateSite(t.Context(), "/project", "site1")
+		err := ws.updateSite(t.Context(), "/project", "site1", yourTurn(), make(chan struct{}))
 		require.ErrorIs(t, err, assert.AnError)
 		assert.Contains(t, err.Error(), "failed to restore settings")
 	})
@@ -1898,7 +1898,7 @@ func TestUpdateSiteRestoresSettings(t *testing.T) {
 		ws, installer, _ := newRunner(t)
 		installer.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(assert.AnError)
 
-		require.ErrorIs(t, ws.updateSite(t.Context(), "/project", "site1"), assert.AnError)
+		require.ErrorIs(t, ws.updateSite(t.Context(), "/project", "site1", yourTurn(), make(chan struct{})), assert.AnError)
 	})
 }
 
@@ -2274,4 +2274,11 @@ func TestRunHandsAddonsTheRunsContextAndCommitter(t *testing.T) {
 		"pre-composer-update": true, "post-composer-update": true, "post-code-update": true,
 		"pre-site-update": true, "post-site-update": true,
 	}, seen, "every addon event carries the run's context")
+}
+
+// yourTurn is a turn that has already come, for a site updated on its own.
+func yourTurn() <-chan struct{} {
+	turn := make(chan struct{})
+	close(turn)
+	return turn
 }

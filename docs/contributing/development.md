@@ -209,14 +209,16 @@ So the concurrency tests and the detector are one tool, not two:
 | `internal/addon/concurrency_test.go` | Each addon's per-site handler, fired from all sites at once |
 | `TestPerSiteUnderConcurrentSites` | `workflow.PerSite` itself, written from many sites at once |
 | `TestForEachSite` | The fan-out itself: the concurrency bound, and cancellation on first error |
+| `TestUpdateSites…` | The sites' turns: tails run in `--sites` order however the sites finish, with one site at a time too, and none runs after an earlier site fails |
 
 Deleting the lock from `PerSite` makes these tests fail under `-race` and **pass without it**.
 When you add an addon with a per-site hook, add it to `concurrency_test.go` too.
 
 Where the shared resource is not memory, the detector cannot help and the test has to assert
-directly. `siteCommitMu` serialises the tail of `updateSite` because the sites share one git
-index — which is mocked in the suite, so there is no shared memory to observe.
-`TestRunWithConcurrentSites` measures peak occupancy instead.
+directly. The sites' turns (`Runner.updateSites`) serialise the tail of `updateSite` because
+the sites share one git index — which is mocked in the suite, so there is no shared memory to
+observe. `TestRunWithConcurrentSites` measures peak occupancy instead, and the
+`TestUpdateSites…` tests record the order the tails ran in.
 
 ## Mutation testing
 

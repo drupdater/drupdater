@@ -292,4 +292,3 @@ func TestComposerAudit_AuditFailures(t *testing.T) {
 		assert.Contains(t, err.Error(), "failed to run composer audit after update")
 	})
 }
-

@@ -24,8 +24,8 @@ other one is disabled" — because none of them ever depended on another being t
 | `pre-composer-update` | Before `composer update`, which only writes the lock — before any site is installed | The update plan, read-only; hooks return proposals |
 | `post-composer-update` | After the resolved update is installed into `vendor/`, before the commit | — |
 | `post-code-update` | After `composer.json`/`.lock` are committed | — |
-| `pre-site-update` | Before each site's update hooks | — (carries the site name) |
-| `post-site-update` | After each site's hooks, before config export | — (carries the site name) |
+| `pre-site-update` | Before each site's update hooks, concurrently across sites | — (carries the site name) |
+| `post-site-update` | After each site's hooks, before config export; one site at a time, in `--sites` order | — (carries the site name) |
 
 Each carries the run context, the working directory path, and a way to commit: see
 [Committing changes](#committing-changes).

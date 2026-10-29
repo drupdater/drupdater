@@ -9,7 +9,6 @@ import (
 	"runtime"
 	"slices"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/drupdater/drupdater/internal"
@@ -43,10 +42,6 @@ type Runner struct {
 
 	// hooks are the run's addons' hooks, set when the run starts.
 	hooks *Pipeline
-
-	// siteCommitMu serializes the git-committing tail of updateSite: sites update concurrently
-	// but share one working tree and index.
-	siteCommitMu sync.Mutex
 
 	// reportSink receives the run report on every exit path. nil when --report was not given.
 	reportSink func(report.Report)
@@ -195,7 +190,7 @@ func (r *Runner) runPhases(ctx context.Context, rec *report.Recorder, checkout r
 
 	// Install each site at the current (old) code to create the baseline database.
 	if err := rec.Run("baseline site install", func() error {
-		return r.forEachSite(ctx, func(ctx context.Context, site string) error {
+		return r.forEachSite(ctx, func(ctx context.Context, _ int, site string) error {
 			if err := r.installer.Install(ctx, path, site); err != nil {
 				return fmt.Errorf("site %s installation failed: %w", site, err)
 			}
@@ -216,9 +211,7 @@ func (r *Runner) runPhases(ctx context.Context, rec *report.Recorder, checkout r
 	// Run the update hooks and export config per site against the now-updated code, then point the
 	// update branch at the result.
 	if err := rec.Run("site update", func() error {
-		if err := r.forEachSite(ctx, func(ctx context.Context, site string) error {
-			return r.updateSite(ctx, path, site)
-		}); err != nil {
+		if err := r.updateSites(ctx, path); err != nil {
 			return err
 		}
 		return r.createUpdateBranch(repository, updateBranchName)
@@ -319,17 +312,17 @@ func (r *Runner) stageScaffoldChanges(ctx context.Context, path string, worktree
 }
 
 // forEachSite runs fn per site concurrently, bounded by config.Concurrency, cancelling the rest
-// on the first error.
-func (r *Runner) forEachSite(ctx context.Context, fn func(context.Context, string) error) error {
+// on the first error. Sites start in config order, which updateSite's turns rely on.
+func (r *Runner) forEachSite(ctx context.Context, fn func(context.Context, int, string) error) error {
 	g, groupCtx := errgroup.WithContext(ctx)
 	limit := r.config.Concurrency
 	if limit <= 0 {
 		limit = runtime.GOMAXPROCS(0)
 	}
 	g.SetLimit(limit)
-	for _, site := range r.config.Sites {
+	for i, site := range r.config.Sites {
 		g.Go(func() error {
-			return fn(groupCtx, site)
+			return fn(groupCtx, i, site)
 		})
 	}
 	return g.Wait()
@@ -480,7 +473,23 @@ func (r *Runner) ensureUpdateBranchAvailable(repository GitRepository, updateBra
 	return nil
 }
 
-func (r *Runner) updateSite(ctx context.Context, path string, site string) (err error) {
+// updateSites runs updateSite for every site, handing each its turn: turns[i] closes once site i
+// may write into the working tree, which happens only after every earlier site has.
+func (r *Runner) updateSites(ctx context.Context, path string) error {
+	turns := make([]chan struct{}, len(r.config.Sites)+1)
+	for i := range turns {
+		turns[i] = make(chan struct{})
+	}
+	close(turns[0])
+	return r.forEachSite(ctx, func(ctx context.Context, i int, site string) error {
+		return r.updateSite(ctx, path, site, turns[i], turns[i+1])
+	})
+}
+
+// updateSite updates the site's database concurrently with the other sites, then waits for its
+// turn to write into the shared working tree: two sites may share a config or translation
+// directory, and the commits land in --sites order however the sites finish.
+func (r *Runner) updateSite(ctx context.Context, path string, site string, turn <-chan struct{}, next chan<- struct{}) (err error) {
 	r.logger.Info("updating site", zap.String("site", site))
 
 	if err := r.installer.ConfigureDatabase(ctx, path, site); err != nil {
@@ -508,15 +517,19 @@ func (r *Runner) updateSite(ctx context.Context, path string, site string) (err 
 
 	}
 
-	// The remaining steps commit into the shared working tree, so one site at a time.
-	return r.commitSiteChanges(ctx, path, site)
+	select {
+	case <-turn:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+	if err := r.commitSiteChanges(ctx, path, site); err != nil {
+		return err
+	}
+	close(next)
+	return nil
 }
 
-// commitSiteChanges holds a lock so concurrently-updated sites don't race on the shared index.
 func (r *Runner) commitSiteChanges(ctx context.Context, path string, site string) error {
-	r.siteCommitMu.Lock()
-	defer r.siteCommitMu.Unlock()
-
 	postSiteUpdateEvent := NewPostSiteUpdateEvent(ctx, path, r.committer, site)
 	if err := r.hooks.PostSiteUpdate(postSiteUpdateEvent); err != nil {
 		return err
