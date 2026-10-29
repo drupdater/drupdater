@@ -75,10 +75,10 @@ func newReportHarness(t *testing.T, dryRun bool) *reportHarness {
 		RunAndReturn(func(context.Context) (composer.Versions, error) { return h.versions, h.versionsErr }).Maybe()
 	h.vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail").Maybe()
 	h.repoSvc.EXPECT().CloneRepository(h.config.RepositoryURL, h.config.Branch, h.config.Token, "user", "mail").
-		Return(h.repository, h.worktree, "/tmp", nil).Maybe()
-	h.repoSvc.EXPECT().IsShallowClone("/tmp").Return(false, nil).Maybe()
-	h.composer.EXPECT().CheckPlatformReqs(anyCtx, "/tmp").Return("", nil).Maybe()
-	h.composer.EXPECT().Install(anyCtx, "/tmp").Return(nil).Maybe()
+		Return(h.repository, h.worktree, testCheckout, nil).Maybe()
+	h.repoSvc.EXPECT().IsShallowClone(testCheckout).Return(false, nil).Maybe()
+	h.composer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil).Maybe()
+	h.composer.EXPECT().Install(anyCtx, testCheckout).Return(nil).Maybe()
 
 	return h
 }
@@ -92,17 +92,17 @@ func (h *reportHarness) expectFullRun(t *testing.T) {
 	h.worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	h.worktree.EXPECT().Checkout(mock.Anything).Return(nil).Maybe()
 
-	h.installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil).Maybe()
-	h.installer.EXPECT().ConfigureDatabase(anyCtx, "/tmp", "site1").Return(nil).Maybe()
-	h.installer.EXPECT().RestoreSettings(anyCtx, "/tmp", "site1").Return(nil).Maybe()
-	h.drush.EXPECT().UpdateSite(anyCtx, "/tmp", "site1").Return(nil).Maybe()
-	h.drush.EXPECT().ExportConfiguration(anyCtx, "/tmp", "site1").Return(nil).Maybe()
-	h.drush.EXPECT().ConfigResave(anyCtx, "/tmp", "site1").Return(nil).Maybe()
+	h.installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil).Maybe()
+	h.installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil).Maybe()
+	h.installer.EXPECT().RestoreSettings(anyCtx, testCheckout, "site1").Return(nil).Maybe()
+	h.drush.EXPECT().UpdateSite(anyCtx, testCheckout, "site1").Return(nil).Maybe()
+	h.drush.EXPECT().ExportConfiguration(anyCtx, testCheckout, "site1").Return(nil).Maybe()
+	h.drush.EXPECT().ConfigResave(anyCtx, testCheckout, "site1").Return(nil).Maybe()
 
 	h.repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound).Maybe()
 	h.repoSvc.EXPECT().BranchExists(h.repository, mock.Anything, mock.Anything).Return(false, nil).Maybe()
-	h.composer.EXPECT().GetLockHash("/tmp").Return("dummy-hash", nil).Maybe()
-	h.composer.EXPECT().Update(anyCtx, "/tmp", mock.Anything, mock.Anything, false, false).
+	h.composer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil).Maybe()
+	h.composer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).
 		Return([]composer.PackageChange{{Action: "Upgrade", Package: "drupal/core", From: "9.0.0", To: "9.1.0"}}, nil).Maybe()
 }
 
@@ -225,11 +225,11 @@ func TestReportWrittenOnDryRun(t *testing.T) {
 func TestReportWrittenOnFailureNamesThePhase(t *testing.T) {
 	h := newReportHarness(t, false)
 	h.worktree.EXPECT().Checkout(mock.Anything).Return(nil).Maybe()
-	h.installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(errors.New("drush exploded"))
+	h.installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(errors.New("drush exploded"))
 	h.repository.EXPECT().Head().Return(nil, plumbing.ErrReferenceNotFound).Maybe()
-	h.composer.EXPECT().Update(anyCtx, "/tmp", mock.Anything, mock.Anything, false, false).
+	h.composer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).
 		Return([]composer.PackageChange{{Action: "Upgrade", Package: "drupal/core", From: "9.0.0", To: "9.1.0"}}, nil)
-	h.composer.EXPECT().GetLockHash("/tmp").Return("dummy-hash", nil)
+	h.composer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
 	h.repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound)
 	h.repoSvc.EXPECT().BranchExists(h.repository, "update-dummy-hash", mock.Anything).Return(false, nil)
 
@@ -268,11 +268,11 @@ func TestReportWrittenWhenAcquiringTheWorkingCopyFails(t *testing.T) {
 func TestReportNoChangesIsNotAFailure(t *testing.T) {
 	h := newReportHarness(t, false)
 	h.worktree.EXPECT().Checkout(mock.Anything).Return(nil).Maybe()
-	h.installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil).Maybe()
-	h.installer.EXPECT().ConfigureDatabase(anyCtx, "/tmp", "site1").Return(nil).Maybe()
-	h.installer.EXPECT().RestoreSettings(anyCtx, "/tmp", "site1").Return(nil).Maybe()
+	h.installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil).Maybe()
+	h.installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil).Maybe()
+	h.installer.EXPECT().RestoreSettings(anyCtx, testCheckout, "site1").Return(nil).Maybe()
 	h.repository.EXPECT().Head().Return(nil, plumbing.ErrReferenceNotFound).Maybe()
-	h.composer.EXPECT().Update(anyCtx, "/tmp", mock.Anything, mock.Anything, false, false).
+	h.composer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).
 		Return([]composer.PackageChange{}, nil)
 
 	err := h.run(t)

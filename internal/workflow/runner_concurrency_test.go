@@ -80,24 +80,24 @@ func TestRunWithConcurrentSites(t *testing.T) {
 	commitTail := newOccupancyProbe()
 
 	for _, site := range sites {
-		installer.EXPECT().Install(anyCtx, "/tmp", site).RunAndReturn(baseline.probe)
-		installer.EXPECT().ConfigureDatabase(anyCtx, "/tmp", site).Return(nil)
-		installer.EXPECT().RestoreSettings(anyCtx, "/tmp", site).Return(nil)
-		drush.EXPECT().UpdateSite(anyCtx, "/tmp", site).Return(nil)
-		drush.EXPECT().ExportConfiguration(anyCtx, "/tmp", site).RunAndReturn(commitTail.probe)
-		drush.EXPECT().ConfigResave(anyCtx, "/tmp", site).Return(nil)
+		installer.EXPECT().Install(anyCtx, testCheckout, site).RunAndReturn(baseline.probe)
+		installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, site).Return(nil)
+		installer.EXPECT().RestoreSettings(anyCtx, testCheckout, site).Return(nil)
+		drush.EXPECT().UpdateSite(anyCtx, testCheckout, site).Return(nil)
+		drush.EXPECT().ExportConfiguration(anyCtx, testCheckout, site).RunAndReturn(commitTail.probe)
+		drush.EXPECT().ConfigResave(anyCtx, testCheckout, site).Return(nil)
 	}
 
-	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil)
-	repositoryService.EXPECT().IsShallowClone("/tmp").Return(false, nil)
+	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, testCheckout, nil)
+	repositoryService.EXPECT().IsShallowClone(testCheckout).Return(false, nil)
 	repositoryService.EXPECT().BranchExists(repository, mock.Anything, mock.Anything).Return(false, nil)
 	repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound)
 	repository.EXPECT().Push(mock.Anything).Return(nil)
 
-	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, "/tmp").Return("", nil)
-	mockComposer.EXPECT().Install(anyCtx, "/tmp").Return(nil)
-	mockComposer.EXPECT().GetLockHash("/tmp").Return("dummy-hash", nil)
-	mockComposer.EXPECT().Update(anyCtx, "/tmp", mock.Anything, mock.Anything, false, false).
+	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
+	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
+	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
+	mockComposer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).
 		Return([]composer.PackageChange{{Package: "drupal/core", From: "9.0.0", To: "9.1.0"}}, nil)
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
