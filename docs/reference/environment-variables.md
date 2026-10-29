@@ -94,9 +94,10 @@ Set on **every** Composer invocation, to `0` and `1` respectively. A value inher
 the surrounding environment is replaced; everything else in the environment — including
 `COMPOSER_AUTH` — is passed through untouched.
 
-That covers the tools Drupdater runs *through* Composer as well: Drush, PHPCS/PHPCBF and
-Rector are all invoked as `composer exec -- <tool>`, which makes them subprocesses of
-Composer and so subject to the same process timeout. A `drush updatedb` on a large site
+That covers the tools Drupdater runs *through* Composer as well: Drush, and a project's own
+PHPCS/PHPCBF or Rector, are invoked as `composer exec -- <tool>`, which makes them subprocesses
+of Composer and so subject to the same process timeout. The [bundled
+tools](docker-images.md#bundled-tools) run directly, with the same environment. A `drush updatedb` on a large site
 is exactly the kind of call that outlasts the default.
 
 | Variable | Forced value | Why Drupdater requires it |

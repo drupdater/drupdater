@@ -125,7 +125,6 @@ jq -r '.packages[] | "\(.action) \(.package) \(.from // "-") → \(.to // "-")"'
 ```text
 Upgrade drupal/core 10.1.8 → 10.2.0
 Upgrade drupal/token 1.12.0 → 1.13.0
-Install drupal/coder - → 8.3.24
 ```
 
 Where the time went:

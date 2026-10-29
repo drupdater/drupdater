@@ -9,18 +9,24 @@ custom code to rewrite APIs deprecated by the new Drupal version.
 | Events | `post-code-update` (**Change**) |
 | Report key | `deprecations_remover` |
 | Pull request section | *(none)* |
-| Commits | `Remove temporary drupal-rector installation`, `Remove deprecations` |
+| Commits | `Remove deprecations` |
 
 ## What it does
 
-1. If `palantirnet/drupal-rector` is not already a project dependency, it is required
-   temporarily.
+1. It picks a Rector:
+    - A project that depends on `palantirnet/drupal-rector` runs its own, through
+      `composer exec`.
+    - A project with no Rector at all runs the copy [bundled in the Docker
+      image](../docker-images.md#bundled-tools), which loads the project's code through its
+      `vendor/autoload.php`, wherever `vendor-dir` points. Nothing is installed into the
+      project.
+    - A project that requires `rector/rector` but not `palantirnet/drupal-rector` is
+      **skipped with a warning**. Two Rector versions cannot load into one process, so the
+      bundled one cannot run beside the project's. Add `palantirnet/drupal-rector` to
+      `require-dev` to have its own Rector used instead.
 2. Rector runs over the project's custom code directories, using the `scripts/rector.php`
    configuration shipped in the Docker image.
-3. The temporary Rector installation is removed again, and any residual `composer.json`
-   or `composer.lock` change is committed as `Remove temporary drupal-rector
-   installation`.
-4. Changed files are committed as `Remove deprecations`.
+3. Changed files are committed as `Remove deprecations`.
 
 It runs at the **Change** stage on `post-code-update`, ahead of
 [`code_beautifier`](code-beautifier.md) at Format, so that PHPCBF formats the code Rector wrote.
@@ -65,8 +71,9 @@ Omitted when Rector changed nothing.
 ## Configuration
 
 The Rector rule set comes from `scripts/rector.php` inside the Docker image — Drupal
-Rector's own set provider plus the deprecation-helper rule. It is not currently
-configurable per project.
+Rector's Drupal 8, 9 and 10 deprecation sets plus the deprecation-helper rule. Each rule
+checks the installed `drupal/core` version itself, so none rewrites code for an API the
+site's core has not deprecated yet. It is not currently configurable per project.
 
 Only the project's **custom** code directories are processed, as resolved from
 `composer.json`. Contributed and core code is never rewritten.
