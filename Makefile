@@ -45,7 +45,7 @@ clean: ## Clean build artifacts
 	go clean
 
 mock: ## Generate mocks
-	docker run -v "$${PWD}":/src -w /src -e GOFLAGS="-buildvcs=false" vektra/mockery:3.7
+	docker run -v "$${PWD}":/src -w /src -e GOFLAGS="-buildvcs=false" vektra/mockery:3.9
 
 lint: ## Run linters
 	golangci-lint run ./...

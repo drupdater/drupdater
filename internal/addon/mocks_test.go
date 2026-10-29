@@ -22,10 +22,19 @@ func NewMockComposer(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *MockComposer {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &MockComposer{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -755,8 +764,8 @@ func (_c *MockComposer_GetInstalledPlugins_Call) Run(run func(ctx context.Contex
 	return _c
 }
 
-func (_c *MockComposer_GetInstalledPlugins_Call) Return(stringToV map[string]any, err error) *MockComposer_GetInstalledPlugins_Call {
-	_c.Call.Return(stringToV, err)
+func (_c *MockComposer_GetInstalledPlugins_Call) Return(stringToAnyMoqParam map[string]any, err error) *MockComposer_GetInstalledPlugins_Call {
+	_c.Call.Return(stringToAnyMoqParam, err)
 	return _c
 }
 
@@ -1352,10 +1361,19 @@ func NewMockDrush(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *MockDrush {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &MockDrush{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -1746,10 +1764,19 @@ func NewMockPHPCS(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *MockPHPCS {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &MockPHPCS{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -1896,10 +1923,19 @@ func NewMockDrupalOrg(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *MockDrupalOrg {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &MockDrupalOrg{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -2051,10 +2087,19 @@ func NewMockRector(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *MockRector {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &MockRector{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
@@ -2150,10 +2195,19 @@ func NewMockHTTPClient(t interface {
 	mock.TestingT
 	Cleanup(func())
 }) *MockHTTPClient {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
 	mock := &MockHTTPClient{}
 	mock.Mock.Test(t)
 
-	t.Cleanup(func() { mock.AssertExpectations(t) })
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
 
 	return mock
 }
