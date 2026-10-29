@@ -6,12 +6,12 @@ import (
 	"github.com/drupdater/drupdater/internal/codehosting"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/repo"
-	"github.com/gookit/event"
 )
 
-// Addon subscribes to workflow events and renders a merge request section.
+// Addon hooks into workflow events and renders a merge request section.
 type Addon interface {
-	event.Subscriber
+	// Hooks is read once per run, before the first event fires.
+	Hooks() Hooks
 
 	// RenderTemplate returns "" when the addon has nothing to say, which omits the section.
 	RenderTemplate() (string, error)
@@ -58,10 +58,4 @@ type Platform interface {
 	DeleteBranch(ctx context.Context, branch string) error
 	GetUser(ctx context.Context) (name string, email string)
 	EnableAutoMerge(ctx context.Context, mr codehosting.MergeRequest) error
-}
-
-// EventDispatcher abstracts the event bus so it can be injected and tested independently.
-type EventDispatcher interface {
-	FireEvent(e event.Event) error
-	AddSubscriber(subscriber event.Subscriber)
 }

@@ -6,15 +6,15 @@ reviewer knows what will run on deploy.
 | | |
 |---|---|
 | Runs | **Always** — mandatory, cannot be disabled |
-| Events | `pre-site-update` (Min) |
+| Events | `pre-site-update` (Inspect) |
 | Report key | `update_hooks` |
 | Pull request section | "📄 Job Logs" → "⚙️ Update Hooks" |
 
 ## What it does
 
 Runs immediately before each site's update hooks are executed, and asks Drush for the
-pending hook list. It runs at the **lowest** priority on `pre-site-update` so it observes
-the state after any other addon on that event has finished.
+pending hook list. It runs at the **Inspect** stage on `pre-site-update`, so it observes the state after any
+addon that changes the site on that event has finished.
 
 Sites are processed concurrently, so the collected map is mutex-guarded and keyed by
 site: the same module can have different pending hooks on different sites.

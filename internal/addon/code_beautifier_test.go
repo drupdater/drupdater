@@ -11,21 +11,11 @@ import (
 	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/drupdater/drupdater/pkg/phpcs"
 
-	"github.com/gookit/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
-
-func TestCodeBeautifier_SubscribedEvents(t *testing.T) {
-	cb := &CodeBeautifier{}
-	events := cb.SubscribedEvents()
-
-	assert.Contains(t, events, "post-code-update")
-	item := events["post-code-update"].(event.ListenerItem)
-	assert.Equal(t, event.Normal, item.Priority)
-}
 
 func TestCodeBeautifier_RenderTemplate(t *testing.T) {
 	cb := &CodeBeautifier{}

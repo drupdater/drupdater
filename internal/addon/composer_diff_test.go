@@ -6,7 +6,6 @@ import (
 
 	"github.com/drupdater/drupdater/internal/golden"
 	"github.com/drupdater/drupdater/internal/workflow"
-	"github.com/gookit/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -21,15 +20,6 @@ func TestNewComposerDiff(t *testing.T) {
 	assert.NotNil(t, diff)
 	assert.Equal(t, logger, diff.logger)
 	assert.Equal(t, mockComposer, diff.composer)
-}
-
-func TestComposerDiff_SubscribedEvents(t *testing.T) {
-	diff := &ComposerDiff{}
-
-	events := diff.SubscribedEvents()
-
-	assert.Contains(t, events, "post-composer-update")
-	assert.IsType(t, event.ListenerItem{}, events["post-composer-update"])
 }
 
 func TestComposerDiff_PostComposerUpdateHandler_Success(t *testing.T) {

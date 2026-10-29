@@ -6,7 +6,6 @@ import (
 
 	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/drupdater/drupdater/pkg/rector"
-	"github.com/gookit/event"
 
 	"go.uber.org/zap"
 )
@@ -28,14 +27,9 @@ func NewDeprecationsRemover(logger *zap.Logger, rector Rector, composer Composer
 	}
 }
 
-func (dr *DeprecationsRemover) SubscribedEvents() map[string]any {
-	return map[string]any{
-		// AboveNormal: this temporarily requires drupal-rector, and code_beautifier (Normal)
-		// commits composer.* via AddGlob — interleaving sweeps a half-finished diff into it.
-		"post-code-update": event.ListenerItem{
-			Priority: event.AboveNormal,
-			Listener: event.ListenerFunc(dr.postCodeUpdateHandler),
-		},
+func (dr *DeprecationsRemover) Hooks() workflow.Hooks {
+	return workflow.Hooks{
+		PostCodeUpdate: workflow.On(workflow.Change, dr.postCodeUpdateHandler),
 	}
 }
 
@@ -43,8 +37,7 @@ func (dr *DeprecationsRemover) RenderTemplate() (string, error) {
 	return "", nil
 }
 
-func (dr *DeprecationsRemover) postCodeUpdateHandler(e event.Event) error {
-	evt := e.(*workflow.PostCodeUpdateEvent)
+func (dr *DeprecationsRemover) postCodeUpdateHandler(evt *workflow.PostCodeUpdateEvent) error {
 
 	dr.logger.Info("removing deprecations")
 

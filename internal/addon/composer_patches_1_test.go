@@ -12,7 +12,6 @@ import (
 	"github.com/drupdater/drupdater/internal/golden"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/drupalorg"
-	"github.com/gookit/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -57,15 +56,6 @@ func TestCleanURLString(t *testing.T) {
 			assert.NotContains(t, got, "/") // never yields a path separator
 		})
 	}
-}
-
-func TestComposerPatches1_SubscribedEvents(t *testing.T) {
-	h := &ComposerPatches1{}
-	events := h.SubscribedEvents()
-
-	assert.Contains(t, events, "pre-composer-update")
-	item := events["pre-composer-update"].(event.ListenerItem)
-	assert.Equal(t, event.Normal, item.Priority)
 }
 
 func TestComposerPatches1_RenderTemplate_NoChanges(t *testing.T) {

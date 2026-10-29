@@ -118,7 +118,7 @@ func withFakeWorkflow(t *testing.T, fake *fakeWorkflow) {
 	newRunner = func(
 		*zap.Logger, internal.Config, workflow.Drush, codehosting.Platform,
 		workflow.Repository, workflow.Installer, workflow.Composer,
-		workflow.EventDispatcher, ...workflow.Option,
+		...workflow.Option,
 	) updateRunner {
 		return fake
 	}

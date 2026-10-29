@@ -16,7 +16,6 @@ import (
 	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/drupalorg"
-	"github.com/gookit/event"
 	gitlab "gitlab.com/gitlab-org/api/client-go"
 	"go.uber.org/zap"
 )
@@ -97,12 +96,9 @@ func NewComposerPatches1(logger *zap.Logger, composer Composer, drupalOrg Drupal
 	}
 }
 
-func (h *ComposerPatches1) SubscribedEvents() map[string]any {
-	return map[string]any{
-		"pre-composer-update": event.ListenerItem{
-			Priority: event.Normal,
-			Listener: event.ListenerFunc(h.preComposerUpdateHandler),
-		},
+func (h *ComposerPatches1) Hooks() workflow.Hooks {
+	return workflow.Hooks{
+		PreComposerUpdate: workflow.On(workflow.Change, h.preComposerUpdateHandler),
 	}
 }
 
@@ -113,8 +109,7 @@ func (h *ComposerPatches1) RenderTemplate() (string, error) {
 	return render("composer_patches_1.go.tmpl", h.patchUpdates)
 }
 
-func (h *ComposerPatches1) preComposerUpdateHandler(e event.Event) error {
-	event := e.(*workflow.PreComposerUpdateEvent)
+func (h *ComposerPatches1) preComposerUpdateHandler(event *workflow.PreComposerUpdateEvent) error {
 	ctx := event.Context()
 	path := event.Path()
 	packagesToUpdate := event.PackagesToUpdate

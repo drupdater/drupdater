@@ -6,20 +6,10 @@ import (
 
 	"github.com/drupdater/drupdater/internal/workflow"
 
-	"github.com/gookit/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
-
-func TestTranslationsUpdater_SubscribedEvents(t *testing.T) {
-	tu := &TranslationsUpdater{}
-	events := tu.SubscribedEvents()
-
-	assert.Contains(t, events, "post-site-update")
-	item := events["post-site-update"].(event.ListenerItem)
-	assert.Equal(t, event.Normal, item.Priority)
-}
 
 func TestTranslationsUpdater_RenderTemplate(t *testing.T) {
 	tu := &TranslationsUpdater{}

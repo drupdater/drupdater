@@ -13,7 +13,6 @@ import (
 
 	"github.com/drupdater/drupdater/internal/workflow"
 
-	"github.com/gookit/event"
 	"go.uber.org/zap"
 )
 
@@ -35,12 +34,9 @@ func NewCodeBeautifier(logger *zap.Logger, phpcs PHPCS, composer Composer) *Code
 	}
 }
 
-func (cb *CodeBeautifier) SubscribedEvents() map[string]any {
-	return map[string]any{
-		"post-code-update": event.ListenerItem{
-			Priority: event.Normal,
-			Listener: event.ListenerFunc(cb.postCodeUpdateHandler),
-		},
+func (cb *CodeBeautifier) Hooks() workflow.Hooks {
+	return workflow.Hooks{
+		PostCodeUpdate: workflow.On(workflow.Format, cb.postCodeUpdateHandler),
 	}
 }
 
@@ -91,8 +87,7 @@ var hasPHPCSPathDefinitions = func(path string) (bool, error) {
 	return len(ruleset.Files) > 0, nil
 }
 
-func (cb *CodeBeautifier) postCodeUpdateHandler(e event.Event) (err error) { //nolint:cyclop
-	event := e.(*workflow.PostCodeUpdateEvent)
+func (cb *CodeBeautifier) postCodeUpdateHandler(event *workflow.PostCodeUpdateEvent) (err error) { //nolint:cyclop
 	cb.logger.Info("updating coding styles")
 
 	if !fileExists(event.Path()) {

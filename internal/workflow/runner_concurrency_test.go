@@ -11,7 +11,6 @@ import (
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/gookit/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -104,7 +103,7 @@ func TestRunWithConcurrentSites(t *testing.T) {
 	vcsProvider.EXPECT().CreateMergeRequest(anyCtx, mock.Anything, mock.Anything, mock.Anything, config.Branch).
 		Return(codehosting.MergeRequest{}, nil)
 
-	workflowService := New(zap.NewNop(), config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
+	workflowService := New(zap.NewNop(), config, drush, vcsProvider, repositoryService, installer, mockComposer)
 
 	require.NoError(t, workflowService.Run(context.Background(), nil))
 

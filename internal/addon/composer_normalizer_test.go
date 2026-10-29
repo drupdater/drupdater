@@ -5,22 +5,10 @@ import (
 	"testing"
 
 	"github.com/drupdater/drupdater/internal/workflow"
-	"github.com/gookit/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
-
-func TestDefaultComposerNormalize_SubscribedEvents(t *testing.T) {
-	logger := zap.NewNop()
-	composer := NewMockComposer(t)
-
-	normalize := NewComposerNormalizer(logger, composer)
-	events := normalize.SubscribedEvents()
-
-	assert.Contains(t, events, "post-composer-update", "Should subscribe to post-composer-update event")
-	assert.Equal(t, event.Min, events["post-composer-update"].(event.ListenerItem).Priority, "Should have minimum priority")
-}
 
 func TestDefaultComposerNormalize_PostComposerUpdateHandler_PackageInstalled(t *testing.T) {
 	logger := zap.NewNop()

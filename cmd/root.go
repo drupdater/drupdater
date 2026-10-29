@@ -30,7 +30,6 @@ import (
 	"github.com/drupdater/drupdater/pkg/phpcs"
 	"github.com/drupdater/drupdater/pkg/rector"
 	"github.com/drupdater/drupdater/pkg/repo"
-	"github.com/gookit/event"
 	"github.com/maypok86/otter"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
@@ -149,13 +148,12 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	dispatcher := createDispatcher(addons)
 
 	var opts []workflow.Option
 	if config.ReportPath != "" {
 		opts = append(opts, workflow.WithReportSink(reportSink(logger, redactor, config.ReportPath)))
 	}
-	runner := newRunner(logger, config, drush, platform, git, installer, composer, dispatcher, opts...)
+	runner := newRunner(logger, config, drush, platform, git, installer, composer, opts...)
 
 	err = runner.Run(cmd.Context(), addons)
 	if err != nil {
@@ -182,10 +180,9 @@ var newRunner = func(
 	gitSvc workflow.Repository,
 	installerSvc workflow.Installer,
 	composerSvc workflow.Composer,
-	dispatcher workflow.EventDispatcher,
 	opts ...workflow.Option,
 ) updateRunner {
-	return workflow.New(logger, cfg, drushSvc, platform, gitSvc, installerSvc, composerSvc, dispatcher, opts...)
+	return workflow.New(logger, cfg, drushSvc, platform, gitSvc, installerSvc, composerSvc, opts...)
 }
 
 // reportSink writes the run report to path. A write failure is logged, never returned: on the
@@ -461,15 +458,6 @@ var addonsCmd = &cobra.Command{
 			fmt.Fprintf(out, "  %s\n", n)
 		}
 	},
-}
-
-// createDispatcher subscribes every addon to a new event manager.
-func createDispatcher(addons []workflow.Addon) workflow.EventDispatcher {
-	dispatcher := event.NewManager("")
-	for _, addon := range addons {
-		dispatcher.AddSubscriber(addon)
-	}
-	return dispatcher
 }
 
 // handleWorkflowError logs AbortErrors as warnings (non-fatal) and all others as errors (fatal).

@@ -1,6 +1,6 @@
 # Writing an addon
 
-An addon is a unit of work that subscribes to a [workflow
+An addon is a unit of work that hooks into a [workflow
 event](../explanation/addon-architecture.md) and does one job when it fires. Adding a
 capability to Drupdater almost always means adding an addon rather than touching the
 workflow.
@@ -8,7 +8,7 @@ workflow.
 ## The rules
 
 **Addons never call each other.** If your addon needs another one to have run first,
-express that as event priority, not as a reference. If it needs to influence what another
+express that as the stage of its hook, not as a reference. If it needs to influence what another
 addon does, do it through the mutable event payload.
 
 **Addons swallow their own failures** where the work is optional. A transient failure in
@@ -17,14 +17,13 @@ also exactly why your addon must report to the run report — see step 4.
 
 ## 1. Implement the interface
 
-Create `internal/addon/your_addon.go`. An addon needs to subscribe to events and render a
+Create `internal/addon/your_addon.go`. An addon hands the workflow its hooks and renders a
 description section:
 
 ```go
 package addon
 
 import (
-	"github.com/gookit/event"
 	"go.uber.org/zap"
 
 	"github.com/drupdater/drupdater/internal/workflow"
@@ -39,17 +38,13 @@ func NewYourAddon(logger *zap.Logger) *YourAddon {
 	return &YourAddon{logger: logger}
 }
 
-func (a *YourAddon) SubscribedEvents() map[string]any {
-	return map[string]any{
-		"post-code-update": event.ListenerItem{
-			Priority: event.Normal,
-			Listener: event.ListenerFunc(a.OnPostCodeUpdate),
-		},
+func (a *YourAddon) Hooks() workflow.Hooks {
+	return workflow.Hooks{
+		PostCodeUpdate: workflow.On(workflow.Change, a.postCodeUpdate),
 	}
 }
 
-func (a *YourAddon) OnPostCodeUpdate(e event.Event) error {
-	evt := e.(*workflow.PostCodeUpdateEvent)
+func (a *YourAddon) postCodeUpdate(evt *workflow.PostCodeUpdateEvent) error {
 	// Change files under evt.Path(), then name them; false means nothing changed.
 	_, err := evt.Commit("Describe the change", "web/modules/custom")
 	return err
@@ -66,7 +61,7 @@ The `workflow.Addon` interface is the whole contract. An addon that changes file
 them by naming them to the event, never through git itself — see [Committing
 changes](../explanation/addon-architecture.md#committing-changes).
 
-### Choosing an event and priority
+### Choosing an event and stage
 
 | Event | Use for |
 |---|---|
@@ -77,11 +72,11 @@ changes](../explanation/addon-architecture.md#committing-changes).
 | `post-site-update` | Per-site work after hooks, before configuration export |
 | `pre-merge-request-create` | Changing the request title (mutable payload) |
 
-Priority is only meaningful relative to the other subscribers on the same event, and it is
-load-bearing on two of them. Read [why priority
-matters](../explanation/addon-architecture.md#why-priority-matters) before picking one.
-
-Use the lowest priority for an addon that only observes, so it records the settled state.
+Pick the stage from what the hook does: `Prepare` if later hooks on the event read what it
+writes, `Change` if it edits the project, `Format` if it restyles what `Change` wrote, and
+`Inspect` if it only observes, so it records the settled state. Read
+[Stages](../explanation/addon-architecture.md#stages) before picking one, and add your
+addon to `TestAddonHookStages`.
 
 ### Concurrency
 
@@ -176,12 +171,12 @@ and `--dry-run` still generates it.
 
 ## Checklist
 
-- [ ] Implements the addon interface, subscribes at a justified priority
+- [ ] Implements the addon interface, each hook at a justified stage
 - [ ] Registered in `addonRegistry` under the name users will write
 - [ ] Mandatory or configurable decided, and defaults updated if needed
 - [ ] `ReportKey`/`ReportData` in `internal/addon/report.go`, returning `nil` when empty
 - [ ] Output sorted for deterministic reports
-- [ ] Per-site state mutex-guarded, if it subscribes to a site event
+- [ ] Per-site state mutex-guarded, if it hooks into a site event
 - [ ] Template and golden file, if it appears in the request
 - [ ] Tests, package at ≥ 90% coverage
 - [ ] Documented: a page under `docs/reference/addons/`, listed in the catalogue table, and

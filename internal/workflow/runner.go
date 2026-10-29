@@ -38,11 +38,13 @@ type Runner struct {
 	repository Repository
 	installer  Installer
 	composer   Composer
-	dispatcher EventDispatcher
 	current    time.Time
 
 	// committer is the one addons commit through, set once the working copy is acquired.
 	committer Committer
+
+	// hooks are the run's addons' hooks, set when the run starts.
+	hooks *pipeline
 
 	// siteCommitMu serializes the git-committing tail of updateSite: sites update concurrently
 	// but share one working tree and index.
@@ -70,7 +72,6 @@ func New(
 	repository Repository,
 	installer Installer,
 	composerService Composer,
-	dispatcher EventDispatcher,
 	opts ...Option,
 ) *Runner {
 	r := &Runner{
@@ -81,7 +82,6 @@ func New(
 		repository: repository,
 		installer:  installer,
 		composer:   composerService,
-		dispatcher: dispatcher,
 		current:    time.Now(),
 	}
 	for _, opt := range opts {
@@ -93,6 +93,7 @@ func New(
 
 func (r *Runner) Run(ctx context.Context, addons []Addon) (err error) {
 	start := time.Now()
+	r.hooks = newPipeline(addons)
 
 	mode := report.ModeNormal
 	if r.config.Security {
@@ -260,8 +261,8 @@ func (r *Runner) runPhases(
 // default and is offered to the addons — how composer_audit re-labels a security run.
 func (r *Runner) renderMergeRequest(addons []Addon) (string, string, error) {
 	e := NewPreMergeRequestCreateEvent(fmt.Sprintf("%s: Drupal Maintenance Updates", r.current.Format("January 2006")))
-	if err := r.dispatcher.FireEvent(e); err != nil {
-		return "", "", fmt.Errorf("failed to fire event: %w", err)
+	if err := fire("pre-merge-request-create", r.hooks.preMergeRequestCreate, e); err != nil {
+		return "", "", err
 	}
 
 	description, err := renderDescription(addons)
@@ -403,8 +404,8 @@ func (r *Runner) resolveUpdate(ctx context.Context, repository GitRepository, wo
 	}
 
 	preComposerUpdateEvent := NewPreComposerUpdateEvent(ctx, path, r.committer, []string{}, []string{}, false)
-	if err := r.dispatcher.FireEvent(preComposerUpdateEvent); err != nil {
-		return "", fmt.Errorf("failed to fire event: %w", err)
+	if err := fire("pre-composer-update", r.hooks.preComposerUpdate, preComposerUpdateEvent); err != nil {
+		return "", err
 	}
 
 	changes, err := r.composer.Update(ctx, path, preComposerUpdateEvent.PackagesToUpdate, preComposerUpdateEvent.PackagesToKeep, preComposerUpdateEvent.MinimalChanges, false)
@@ -451,8 +452,8 @@ func (r *Runner) updateSharedCode(ctx context.Context, worktree Worktree, path s
 	}
 
 	postComposerUpdateEvent := NewPostComposerUpdateEvent(ctx, path, r.committer)
-	if err := r.dispatcher.FireEvent(postComposerUpdateEvent); err != nil {
-		return fmt.Errorf("failed to fire event: %w", err)
+	if err := fire("post-composer-update", r.hooks.postComposerUpdate, postComposerUpdateEvent); err != nil {
+		return err
 	}
 
 	if err := worktree.AddGlob("composer.*"); err != nil {
@@ -466,8 +467,8 @@ func (r *Runner) updateSharedCode(ctx context.Context, worktree Worktree, path s
 	}
 
 	postCodeUpdateEvent := NewPostCodeUpdateEvent(ctx, path, r.committer)
-	if err := r.dispatcher.FireEvent(postCodeUpdateEvent); err != nil {
-		return fmt.Errorf("failed to fire event: %w", err)
+	if err := fire("post-code-update", r.hooks.postCodeUpdate, postCodeUpdateEvent); err != nil {
+		return err
 	}
 
 	// Create the final branch from the work branch's tip (carrying the accumulated commits).
@@ -524,8 +525,8 @@ func (r *Runner) updateSite(ctx context.Context, path string, site string) (err 
 	}()
 
 	preSiteUpdateEvent := NewPreSiteUpdateEvent(ctx, path, r.committer, site)
-	if err := r.dispatcher.FireEvent(preSiteUpdateEvent); err != nil {
-		return fmt.Errorf("failed to fire event: %w", err)
+	if err := fire("pre-site-update", r.hooks.preSiteUpdate, preSiteUpdateEvent); err != nil {
+		return err
 	}
 
 	if err := r.drush.UpdateSite(ctx, path, site); err != nil {
@@ -548,8 +549,8 @@ func (r *Runner) commitSiteChanges(ctx context.Context, path string, site string
 	defer r.siteCommitMu.Unlock()
 
 	postSiteUpdateEvent := NewPostSiteUpdateEvent(ctx, path, r.committer, site)
-	if err := r.dispatcher.FireEvent(postSiteUpdateEvent); err != nil {
-		return fmt.Errorf("failed to fire event: %w", err)
+	if err := fire("post-site-update", r.hooks.postSiteUpdate, postSiteUpdateEvent); err != nil {
+		return err
 	}
 
 	r.logger.Info("exporting configuration", zap.String("site", site))

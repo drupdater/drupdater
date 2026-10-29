@@ -1,10 +1,6 @@
 package workflow
 
-import (
-	"context"
-
-	"github.com/gookit/event"
-)
+import "context"
 
 type AbortError struct {
 	Msg string
@@ -39,7 +35,6 @@ func newBasicAddonEvent(ctx context.Context, path string, committer Committer) B
 }
 
 type PreComposerUpdateEvent struct {
-	event.BasicEvent
 	BasicAddonEvent
 	PackagesToUpdate []string
 	PackagesToKeep   []string
@@ -47,55 +42,44 @@ type PreComposerUpdateEvent struct {
 }
 
 func NewPreComposerUpdateEvent(ctx context.Context, path string, committer Committer, packagesToUpdate []string, packagesToKeep []string, minimalChanges bool) *PreComposerUpdateEvent {
-	evt := &PreComposerUpdateEvent{
+	return &PreComposerUpdateEvent{
 		BasicAddonEvent:  newBasicAddonEvent(ctx, path, committer),
 		PackagesToUpdate: packagesToUpdate,
 		PackagesToKeep:   packagesToKeep,
 		MinimalChanges:   minimalChanges,
 	}
-	evt.SetName("pre-composer-update")
-	return evt
 }
 
 type PostComposerUpdateEvent struct {
-	event.BasicEvent
 	BasicAddonEvent
 }
 
 func NewPostComposerUpdateEvent(ctx context.Context, path string, committer Committer) *PostComposerUpdateEvent {
-	evt := &PostComposerUpdateEvent{
+	return &PostComposerUpdateEvent{
 		BasicAddonEvent: newBasicAddonEvent(ctx, path, committer),
 	}
-	evt.SetName("post-composer-update")
-	return evt
 }
 
 type PostCodeUpdateEvent struct {
-	event.BasicEvent
 	BasicAddonEvent
 }
 
 func NewPostCodeUpdateEvent(ctx context.Context, path string, committer Committer) *PostCodeUpdateEvent {
-	evt := &PostCodeUpdateEvent{
+	return &PostCodeUpdateEvent{
 		BasicAddonEvent: newBasicAddonEvent(ctx, path, committer),
 	}
-	evt.SetName("post-code-update")
-	return evt
 }
 
 type PreSiteUpdateEvent struct {
-	event.BasicEvent
 	BasicAddonEvent
 	site string
 }
 
 func NewPreSiteUpdateEvent(ctx context.Context, path string, committer Committer, site string) *PreSiteUpdateEvent {
-	evt := &PreSiteUpdateEvent{
+	return &PreSiteUpdateEvent{
 		BasicAddonEvent: newBasicAddonEvent(ctx, path, committer),
 		site:            site,
 	}
-	evt.SetName("pre-site-update")
-	return evt
 }
 
 func (e *PreSiteUpdateEvent) Site() string {
@@ -103,18 +87,15 @@ func (e *PreSiteUpdateEvent) Site() string {
 }
 
 type PostSiteUpdateEvent struct {
-	event.BasicEvent
 	BasicAddonEvent
 	site string
 }
 
 func NewPostSiteUpdateEvent(ctx context.Context, path string, committer Committer, site string) *PostSiteUpdateEvent {
-	evt := &PostSiteUpdateEvent{
+	return &PostSiteUpdateEvent{
 		BasicAddonEvent: newBasicAddonEvent(ctx, path, committer),
 		site:            site,
 	}
-	evt.SetName("post-site-update")
-	return evt
 }
 
 func (e *PostSiteUpdateEvent) Site() string {
@@ -129,17 +110,13 @@ type AbandonedPackage struct {
 }
 
 type PreMergeRequestCreateEvent struct {
-	event.BasicEvent
 	Title string
-	// Written by composer_audit at Normal, read by unsupported_modules at BelowNormal — that
-	// priority gap is what fills the list before it is read.
+	// Written by composer_audit at Prepare, read by unsupported_modules at Inspect.
 	AbandonedPackages []AbandonedPackage
 }
 
 func NewPreMergeRequestCreateEvent(title string) *PreMergeRequestCreateEvent {
-	evt := &PreMergeRequestCreateEvent{
+	return &PreMergeRequestCreateEvent{
 		Title: title,
 	}
-	evt.SetName("pre-merge-request-create")
-	return evt
 }

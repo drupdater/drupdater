@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/drupdater/drupdater/internal/workflow"
-	"github.com/gookit/event"
 	"go.uber.org/zap"
 )
 
@@ -22,12 +21,9 @@ func NewComposerDiff(logger *zap.Logger, composer Composer) *ComposerDiff {
 	}
 }
 
-func (cd *ComposerDiff) SubscribedEvents() map[string]any {
-	return map[string]any{
-		"post-composer-update": event.ListenerItem{
-			Priority: event.Min,
-			Listener: event.ListenerFunc(cd.postComposerUpdateHandler),
-		},
+func (cd *ComposerDiff) Hooks() workflow.Hooks {
+	return workflow.Hooks{
+		PostComposerUpdate: workflow.On(workflow.Inspect, cd.postComposerUpdateHandler),
 	}
 }
 
@@ -39,8 +35,7 @@ func (cd *ComposerDiff) RenderTemplate() (string, error) {
 	return render("composer_diff.go.tmpl", cd.table)
 }
 
-func (cd *ComposerDiff) postComposerUpdateHandler(e event.Event) error {
-	evt := e.(*workflow.PostComposerUpdateEvent)
+func (cd *ComposerDiff) postComposerUpdateHandler(evt *workflow.PostComposerUpdateEvent) error {
 
 	table, err := cd.composer.Diff(evt.Context(), evt.Path(), true)
 	if err != nil {

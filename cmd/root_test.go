@@ -138,23 +138,6 @@ func TestHandleWorkflowError(t *testing.T) {
 	})
 }
 
-func TestCreateDispatcher(t *testing.T) {
-	logger := zaptest.NewLogger(t)
-
-	t.Run("returns a non-nil dispatcher with addons subscribed", func(t *testing.T) {
-		config := internal.Config{RunTypes: internal.RunTypesConfig{Normal: internal.RunTypeConfig{Addons: []string{"composer_normalizer"}}}}
-		addons, err := createAddons(logger, config, nil, nil, nil)
-		require.NoError(t, err)
-		dispatcher := createDispatcher(addons)
-		assert.NotNil(t, dispatcher)
-	})
-
-	t.Run("works with an empty addon list", func(t *testing.T) {
-		dispatcher := createDispatcher(nil)
-		assert.NotNil(t, dispatcher)
-	})
-}
-
 func TestCreateAddons(t *testing.T) {
 	logger := zaptest.NewLogger(t)
 
@@ -185,7 +168,7 @@ func TestCreateAddons(t *testing.T) {
 		require.NoError(t, err)
 
 		evt := workflow.NewPreMergeRequestCreateEvent("July 2026: Drupal Maintenance Updates")
-		require.NoError(t, createDispatcher(addons).FireEvent(evt))
+		require.NoError(t, firePreMergeRequestCreate(addons, evt))
 		assert.Contains(t, evt.Title, "Drupal Security Updates")
 	})
 
@@ -195,7 +178,7 @@ func TestCreateAddons(t *testing.T) {
 		require.NoError(t, err)
 
 		evt := workflow.NewPreMergeRequestCreateEvent("July 2026: Drupal Maintenance Updates")
-		require.NoError(t, createDispatcher(addons).FireEvent(evt))
+		require.NoError(t, firePreMergeRequestCreate(addons, evt))
 		assert.Equal(t, "July 2026: Drupal Maintenance Updates", evt.Title)
 	})
 
@@ -328,4 +311,18 @@ func TestResolveCheckoutBranch(t *testing.T) {
 		assert.Contains(t, err.Error(), "failed to determine branch from checkout")
 		require.ErrorIs(t, err, git.ErrRepositoryNotExists, "the cause must survive the wrapper")
 	})
+}
+
+// firePreMergeRequestCreate runs the addons' hooks for evt in stage order, as a run would.
+func firePreMergeRequestCreate(addons []workflow.Addon, evt *workflow.PreMergeRequestCreateEvent) error {
+	for stage := workflow.Prepare; stage <= workflow.Inspect; stage++ {
+		for _, a := range addons {
+			if h := a.Hooks().PreMergeRequestCreate; h != nil && h.Stage == stage {
+				if err := h.Run(evt); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
 }

@@ -6,7 +6,7 @@ release, and packages their maintainers have abandoned — as one list.
 | | |
 |---|---|
 | Runs | **Always.** Mandatory in both modes, not something you put in `.drupdater.yaml` |
-| Events | `pre-site-update` (Normal), `pre-merge-request-create` (BelowNormal) |
+| Events | `pre-site-update` (Inspect), `pre-merge-request-create` (Inspect) |
 | Report key | `unsupported_modules` |
 | Pull request section | "⚠️ Unsupported modules and abandoned packages" |
 
@@ -24,8 +24,8 @@ list the same module several times.
 
 On `pre-merge-request-create`, [`composer_audit`](composer-audit.md) puts the packages
 Composer reported as abandoned on the event, and this addon renders them in the same table.
-Priority is what makes that work: `composer_audit` publishes at Normal, this addon reads at
-BelowNormal.
+The stages are what make that work: `composer_audit` publishes at Prepare, this addon reads at
+Inspect.
 
 They come from Packagist rather than Drupal.org and cover the non-Drupal libraries this addon
 cannot see — but they say the same thing to a reviewer, so they belong in the same list rather

@@ -12,7 +12,6 @@ import (
 	"github.com/drupdater/drupdater/pkg/composer"
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/gookit/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -115,14 +114,8 @@ func (h *reportHarness) withAddons(addons ...Addon) {
 func (h *reportHarness) run(t *testing.T) error {
 	t.Helper()
 
-	dispatcher := event.NewManager("")
-	for _, addon := range h.addons {
-		dispatcher.AddSubscriber(addon)
-	}
-
 	svc := New(
 		zap.NewNop(), h.config, h.drush, h.vcsProvider, h.repoSvc, h.installer, h.composer,
-		dispatcher,
 		WithReportSink(func(rep report.Report) { h.got = &rep }),
 	)
 
@@ -291,7 +284,6 @@ func TestRunWithoutReportSinkIsUnaffected(t *testing.T) {
 
 	svc := New(
 		zap.NewNop(), h.config, h.drush, h.vcsProvider, h.repoSvc, h.installer, h.composer,
-		event.NewManager(""),
 	)
 
 	require.NoError(t, svc.Run(context.Background(), nil))
@@ -308,20 +300,14 @@ type mergeRequestAddon struct {
 	renderErr error
 }
 
-func (a *mergeRequestAddon) SubscribedEvents() map[string]any {
-	return map[string]any{
-		"pre-merge-request-create": event.ListenerItem{
-			Priority: event.Normal,
-			Listener: event.ListenerFunc(func(e event.Event) error {
-				if a.err != nil {
-					return a.err
-				}
-				e.(*PreMergeRequestCreateEvent).Title = a.title
-
-				return nil
-			}),
-		},
-	}
+func (a *mergeRequestAddon) Hooks() Hooks {
+	return Hooks{PreMergeRequestCreate: On(Change, func(e *PreMergeRequestCreateEvent) error {
+		if a.err != nil {
+			return a.err
+		}
+		e.Title = a.title
+		return nil
+	})}
 }
 
 func (a *mergeRequestAddon) RenderTemplate() (string, error) { return a.section, a.renderErr }
@@ -389,7 +375,7 @@ func TestReportNamesTheRenderPhaseWhenAssemblyFails(t *testing.T) {
 		require.NotNil(t, h.got)
 		assert.Equal(t, report.StatusFailed, h.got.Status)
 		assert.Equal(t, "render merge request", h.got.FailedPhase)
-		assert.Contains(t, h.got.Error, "failed to fire event")
+		assert.Contains(t, h.got.Error, "pre-merge-request-create hook failed")
 		assert.Contains(t, h.got.Error, "addon could not produce a title")
 		assert.Empty(t, h.got.MergeRequestTitle)
 		assert.Empty(t, h.got.MergeRequestDescription)

@@ -8,7 +8,6 @@ import (
 
 	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/drupdater/drupdater/pkg/drush"
-	"github.com/gookit/event"
 	"go.uber.org/zap"
 )
 
@@ -48,18 +47,10 @@ func NewUnsupportedModules(logger *zap.Logger, drushClient Drush) *UnsupportedMo
 	}
 }
 
-func (um *UnsupportedModules) SubscribedEvents() map[string]any {
-	return map[string]any{
-		"pre-site-update": event.ListenerItem{
-			Priority: event.Normal,
-			Listener: event.ListenerFunc(um.preSiteUpdateHandler),
-		},
-		// BelowNormal: composer_audit writes the abandoned packages at Normal. At equal
-		// priority the list would sometimes be read before it is written.
-		"pre-merge-request-create": event.ListenerItem{
-			Priority: event.BelowNormal,
-			Listener: event.ListenerFunc(um.preMergeRequestCreateHandler),
-		},
+func (um *UnsupportedModules) Hooks() workflow.Hooks {
+	return workflow.Hooks{
+		PreSiteUpdate:         workflow.On(workflow.Inspect, um.preSiteUpdateHandler),
+		PreMergeRequestCreate: workflow.On(workflow.Inspect, um.preMergeRequestCreateHandler),
 	}
 }
 
@@ -120,8 +111,7 @@ func (um *UnsupportedModules) collectModules() []drush.UnsupportedModule {
 }
 
 // preMergeRequestCreateHandler takes composer_audit's abandoned packages, to render alongside.
-func (um *UnsupportedModules) preMergeRequestCreateHandler(e event.Event) error {
-	evt := e.(*workflow.PreMergeRequestCreateEvent)
+func (um *UnsupportedModules) preMergeRequestCreateHandler(evt *workflow.PreMergeRequestCreateEvent) error {
 
 	um.abandoned = evt.AbandonedPackages
 
@@ -129,8 +119,7 @@ func (um *UnsupportedModules) preMergeRequestCreateHandler(e event.Event) error 
 }
 
 // preSiteUpdateHandler checks a site. Best-effort: an unreachable status service is not an error.
-func (um *UnsupportedModules) preSiteUpdateHandler(e event.Event) error {
-	evt := e.(*workflow.PreSiteUpdateEvent)
+func (um *UnsupportedModules) preSiteUpdateHandler(evt *workflow.PreSiteUpdateEvent) error {
 
 	modules, err := um.drush.GetUnsupportedModules(evt.Context(), evt.Path(), evt.Site())
 	if err != nil {

@@ -6,7 +6,7 @@ new plugins for you to review.
 | | |
 |---|---|
 | Runs | **Always** — mandatory, cannot be disabled |
-| Events | `pre-composer-update` (Normal), `post-composer-update` (Normal) |
+| Events | `pre-composer-update` (Change), `post-composer-update` (Change) |
 | Report key | *(none)* |
 | Pull request section | "🔌 New Composer plugins", when new plugins were found |
 

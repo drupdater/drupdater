@@ -6,7 +6,6 @@ import (
 
 	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/drupdater/drupdater/pkg/drush"
-	"github.com/gookit/event"
 	"go.uber.org/zap"
 )
 
@@ -29,12 +28,9 @@ func NewUpdateHooks(logger *zap.Logger, drush Drush) *UpdateHooks {
 	}
 }
 
-func (uh *UpdateHooks) SubscribedEvents() map[string]any {
-	return map[string]any{
-		"pre-site-update": event.ListenerItem{
-			Priority: event.Min,
-			Listener: event.ListenerFunc(uh.preSiteUpdateHandler),
-		},
+func (uh *UpdateHooks) Hooks() workflow.Hooks {
+	return workflow.Hooks{
+		PreSiteUpdate: workflow.On(workflow.Inspect, uh.preSiteUpdateHandler),
 	}
 }
 
@@ -49,8 +45,7 @@ func (uh *UpdateHooks) RenderTemplate() (string, error) {
 	return render("update_hooks.go.tmpl", uh.hooks)
 }
 
-func (uh *UpdateHooks) preSiteUpdateHandler(e event.Event) error {
-	evt := e.(*workflow.PreSiteUpdateEvent)
+func (uh *UpdateHooks) preSiteUpdateHandler(evt *workflow.PreSiteUpdateEvent) error {
 
 	hooks, err := uh.drush.GetUpdateHooks(evt.Context(), evt.Path(), evt.Site())
 	uh.logger.Debug("update hooks", zap.Any("hooks", hooks))
