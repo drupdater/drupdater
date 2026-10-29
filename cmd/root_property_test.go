@@ -138,13 +138,13 @@ func TestPropertyRegisterComposerAuthFallsBackToTheRawValue(t *testing.T) {
 
 func TestPropertyConfigurableAddonsMatchesTheRegistry(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
-		names := configurableAddons()
+		names := builtinAddons().configurable()
 
 		// What `drupdater addons` prints is what a user may write, so a new registry entry
 		// must not be able to go unlisted.
-		want := make([]string, 0, len(addonRegistry))
-		for name := range addonRegistry {
-			if name != "composer_audit" && !slices.Contains(mandatoryAddons, name) {
+		want := make([]string, 0, len(builtinAddons().factories))
+		for name := range builtinAddons().factories {
+			if name != "composer_audit" && !slices.Contains(builtinAddons().mandatory, name) {
 				want = append(want, name)
 			}
 		}
@@ -155,7 +155,7 @@ func TestPropertyConfigurableAddonsMatchesTheRegistry(t *testing.T) {
 		// Round-trip: every name it offers is a name validateAddons accepts, under either run
 		// type, since a typo in one block aborts a run in the other too.
 		split := rapid.IntRange(0, len(names)).Draw(t, "split")
-		assert.NoError(t, validateAddons(internal.Config{RunTypes: internal.RunTypesConfig{
+		assert.NoError(t, builtinAddons().validate(internal.Config{RunTypes: internal.RunTypesConfig{
 			Normal:   internal.RunTypeConfig{Addons: names[:split]},
 			Security: internal.RunTypeConfig{Addons: names[split:]},
 		}}))
@@ -165,9 +165,9 @@ func TestPropertyConfigurableAddonsMatchesTheRegistry(t *testing.T) {
 func TestPropertyValidateAddonsRejectsUnknownNamesInEitherRunType(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		unknown := rapid.StringMatching(`[a-z_]{1,20}`).
-			Filter(func(s string) bool { _, ok := addonRegistry[s]; return !ok }).
+			Filter(func(s string) bool { _, ok := builtinAddons().factories[s]; return !ok }).
 			Draw(t, "unknown")
-		known := rapid.SliceOfNDistinct(rapid.SampledFrom(configurableAddons()), 0, 3, rapid.ID).Draw(t, "known")
+		known := rapid.SliceOfNDistinct(rapid.SampledFrom(builtinAddons().configurable()), 0, 3, rapid.ID).Draw(t, "known")
 		inSecurity := rapid.Bool().Draw(t, "inSecurity")
 
 		config := internal.Config{RunTypes: internal.RunTypesConfig{
@@ -181,7 +181,7 @@ func TestPropertyValidateAddonsRejectsUnknownNamesInEitherRunType(t *testing.T) 
 		}
 
 		// Symmetric on purpose, so a typo surfaces the first time the tool runs at all.
-		err := validateAddons(config)
+		err := builtinAddons().validate(config)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), unknown)
 	})

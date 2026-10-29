@@ -92,7 +92,7 @@ Where things live. For *how they work*, read `docs/explanation/` rather than dup
 
 | Path | Contains |
 |---|---|
-| `main.go` → `cmd/root.go` | Cobra commands, flag parsing, service construction, `addonRegistry`, `mandatoryAddons` |
+| `main.go` → `cmd/root.go` | Cobra commands built per call by `app`, which holds every outside dependency; `builtinAddons()` |
 | `cmd/check.go` | The `check` command and its cheap/full check tiers |
 | `internal/workflow/runner.go` | `Runner.Run` and the nine phases |
 | `internal/workflow/event.go` | The five workflow events and `AbortError` |
@@ -120,6 +120,8 @@ Where things live. For *how they work*, read `docs/explanation/` rather than dup
 - **`internal/addon/report.go` is a published contract.** Renaming a field there is a breaking change to `schema_version`, and `internal/addon/testdata/run_report.json` is what makes such a rename fail rather than ship. A new reporting addon belongs in that golden's `reportingAddons()`.
 - **Report types mirror rather than reuse internal types** (`report.PackageChange` vs `composer.PackageChange`) so an internal refactor can't rename a published field.
 - **The report's deferred write is registered first**, so it runs last and is emitted on every exit path.
+- **`cmd` has no mutable package state.** Everything that reaches outside the process — building the runner and the platform, the `--full` tier's clone, trusting a checkout in the global git config — is a field of `app`, and commands are built per call by `app.newRootCmd()`. A test overrides a field on its own `testApp()`; it never swaps a package variable.
+- **A `workflow.Runner` holds only its shared `services`.** Per-run state lives on `run`, built complete by `newRun` once the working copy exists; nothing on it is assigned later.
 - **Per-site events fire from a goroutine per site.** `pre-site-update` runs concurrently; `post-site-update`, config export and the site's commit wait their turn in `--sites` order (`Runner.updateSites`). An addon with a per-site hook keeps what it finds in a `workflow.PerSite` — one value per site, locked inside, copied on read — and has no map, slice or mutex field of its own; `TestPerSiteHooksShareStateOnlyThroughPerSite` fails the build otherwise. Add the addon to `internal/addon/concurrency_test.go` too, which drives it from many sites at once under `-race`.
 
 ## Comments

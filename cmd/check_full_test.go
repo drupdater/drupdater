@@ -47,14 +47,12 @@ func (f *fakeInstaller) Install(_ context.Context, dir string, site string) erro
 	return f.failFor[site]
 }
 
-// stubFullCheckDeps swaps in doubles for the real clone, composer install and site install,
-// without which the tier's control flow is untestable.
-func stubFullCheckDeps(t *testing.T, clonePath string, cloneErr error, composerDouble *fakeComposer, installer siteInstaller, installerErr error) *[]string {
-	t.Helper()
-
+// appWithFullCheckDoubles is an app whose --full tier clones, installs and installs sites with
+// doubles, without which the tier's control flow is untestable. It records the clone's arguments.
+func appWithFullCheckDoubles(clonePath string, cloneErr error, composerDouble *fakeComposer, installer siteInstaller, installerErr error) (app, *[]string) {
 	cloneArgs := &[]string{}
-	original := newFullCheckDeps
-	newFullCheckDeps = func(*zap.Logger) fullCheckDeps {
+	a := testApp()
+	a.newFullCheckDeps = func(*zap.Logger) fullCheckDeps {
 		return fullCheckDeps{
 			clone: func(repositoryURL string, branch string, token string) (string, error) {
 				*cloneArgs = []string{repositoryURL, branch, token}
@@ -69,18 +67,16 @@ func stubFullCheckDeps(t *testing.T, clonePath string, cloneErr error, composerD
 			},
 		}
 	}
-	t.Cleanup(func() { newFullCheckDeps = original })
-
-	return cloneArgs
+	return a, cloneArgs
 }
 
 func TestRunFullChecksClonesTheConfiguredBranch(t *testing.T) {
 	comp := &fakeComposer{}
 	inst := &fakeInstaller{}
-	cloneArgs := stubFullCheckDeps(t, t.TempDir(), nil, comp, inst, nil)
+	a, cloneArgs := appWithFullCheckDoubles(t.TempDir(), nil, comp, inst, nil)
 
 	cfg := internal.Config{RepositoryURL: "https://example.com/acme/site.git", Branch: "develop", Sites: []string{"default"}}
-	results := runFullChecks(t.Context(), zap.NewNop(), cfg, "tok")
+	results := a.runFullChecks(t.Context(), zap.NewNop(), cfg, "tok")
 
 	assert.Equal(t, []string{"https://example.com/acme/site.git", "develop", "tok"}, *cloneArgs)
 	require.Len(t, results, 2)
@@ -95,10 +91,10 @@ func TestRunFullChecksClonesTheConfiguredBranch(t *testing.T) {
 }
 
 func TestRunFullChecksDefaultsToMain(t *testing.T) {
-	cloneArgs := stubFullCheckDeps(t, t.TempDir(), nil, &fakeComposer{}, &fakeInstaller{}, nil)
+	a, cloneArgs := appWithFullCheckDoubles(t.TempDir(), nil, &fakeComposer{}, &fakeInstaller{}, nil)
 
 	cfg := internal.Config{RepositoryURL: "https://example.com/acme/site.git"}
-	runFullChecks(t.Context(), zap.NewNop(), cfg, "")
+	a.runFullChecks(t.Context(), zap.NewNop(), cfg, "")
 
 	require.Len(t, *cloneArgs, 3)
 	assert.Equal(t, "main", (*cloneArgs)[1], "an unset branch must fall back to main, not clone HEAD")
@@ -107,10 +103,10 @@ func TestRunFullChecksDefaultsToMain(t *testing.T) {
 func TestRunFullChecksStopsAtComposerInstall(t *testing.T) {
 	comp := &fakeComposer{installErr: errors.New("lock file out of date")}
 	inst := &fakeInstaller{}
-	stubFullCheckDeps(t, t.TempDir(), nil, comp, inst, nil)
+	a, _ := appWithFullCheckDoubles(t.TempDir(), nil, comp, inst, nil)
 
 	cfg := internal.Config{RepositoryURL: "https://example.com/acme/site.git", Sites: []string{"default"}}
-	results := runFullChecks(t.Context(), zap.NewNop(), cfg, "")
+	results := a.runFullChecks(t.Context(), zap.NewNop(), cfg, "")
 
 	// Installing a site on top of a failed composer install would fail for a reason that has
 	// nothing to do with the site's configuration, so the tier stops here.
@@ -124,10 +120,10 @@ func TestRunFullChecksStopsAtComposerInstall(t *testing.T) {
 
 func TestRunFullChecksReportsInstallerConstructionFailure(t *testing.T) {
 	comp := &fakeComposer{}
-	stubFullCheckDeps(t, t.TempDir(), nil, comp, nil, errors.New("cache unavailable"))
+	a, _ := appWithFullCheckDoubles(t.TempDir(), nil, comp, nil, errors.New("cache unavailable"))
 
 	cfg := internal.Config{RepositoryURL: "https://example.com/acme/site.git", Sites: []string{"default"}}
-	results := runFullChecks(t.Context(), zap.NewNop(), cfg, "")
+	results := a.runFullChecks(t.Context(), zap.NewNop(), cfg, "")
 
 	// The composer install already passed, so its result is kept alongside the failure.
 	require.Len(t, results, 2)
@@ -140,13 +136,13 @@ func TestRunFullChecksReportsInstallerConstructionFailure(t *testing.T) {
 func TestRunFullChecksCollectsPerSiteFailures(t *testing.T) {
 	comp := &fakeComposer{}
 	inst := &fakeInstaller{failFor: map[string]error{"broken": errors.New("missing config")}}
-	stubFullCheckDeps(t, "/clone", nil, comp, inst, nil)
+	a, _ := appWithFullCheckDoubles("/clone", nil, comp, inst, nil)
 
 	cfg := internal.Config{
 		RepositoryURL: "https://example.com/acme/site.git",
 		Sites:         []string{"first", "broken", "last"},
 	}
-	results := runFullChecks(t.Context(), zap.NewNop(), cfg, "")
+	results := a.runFullChecks(t.Context(), zap.NewNop(), cfg, "")
 
 	// One site failing must not hide the others: the point of the tier is to report every
 	// site's verdict in a single run.
@@ -160,10 +156,10 @@ func TestRunFullChecksCollectsPerSiteFailures(t *testing.T) {
 
 func TestRunFullChecksStopsAtCloneFailure(t *testing.T) {
 	comp := &fakeComposer{}
-	stubFullCheckDeps(t, "", errors.New("authentication failed"), comp, &fakeInstaller{}, nil)
+	a, _ := appWithFullCheckDoubles("", errors.New("authentication failed"), comp, &fakeInstaller{}, nil)
 
 	cfg := internal.Config{RepositoryURL: "https://example.com/acme/site.git", Sites: []string{"default"}}
-	results := runFullChecks(t.Context(), zap.NewNop(), cfg, "")
+	results := a.runFullChecks(t.Context(), zap.NewNop(), cfg, "")
 
 	require.Len(t, results, 1)
 	assert.Equal(t, "clone for full check", results[0].Name)
@@ -178,10 +174,10 @@ func TestRunFullChecksRemovesTheCloneAndSiteData(t *testing.T) {
 	clone := filepath.Join(t.TempDir(), "repo123")
 	require.NoError(t, os.MkdirAll(clone, 0o755))
 	inst := &fakeInstaller{}
-	stubFullCheckDeps(t, clone, nil, &fakeComposer{}, inst, nil)
+	a, _ := appWithFullCheckDoubles(clone, nil, &fakeComposer{}, inst, nil)
 
 	cfg := internal.Config{RepositoryURL: "https://example.com/acme/site.git", Sites: []string{"default"}}
-	runFullChecks(t.Context(), zap.NewNop(), cfg, "")
+	a.runFullChecks(t.Context(), zap.NewNop(), cfg, "")
 
 	require.NotEmpty(t, inst.dataDir)
 	assert.True(t, inst.dataDirExisted, "the installer's data directory must exist while sites install")

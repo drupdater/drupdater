@@ -13,7 +13,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/drupdater/drupdater/internal"
-	"github.com/drupdater/drupdater/internal/codehosting"
 	"github.com/drupdater/drupdater/internal/workflow"
 	git "github.com/go-git/go-git/v5"
 	gitConfig "github.com/go-git/go-git/v5/config"
@@ -23,9 +22,9 @@ import (
 	"go.uber.org/zap"
 )
 
-// runUpdateWith calls runUpdate the way cobra would, with its output discarded so a failing
+// runUpdateWith calls a's runUpdate the way cobra would, with its output discarded so a failing
 // run does not scribble over the test log.
-func runUpdateWith(t *testing.T, cfg internal.Config, cfgFile string, args ...string) error {
+func runUpdateWith(t *testing.T, a app, opts options, args ...string) error {
 	t.Helper()
 	var out bytes.Buffer
 	cmd := &cobra.Command{}
@@ -33,13 +32,13 @@ func runUpdateWith(t *testing.T, cfg internal.Config, cfgFile string, args ...st
 	cmd.SetErr(&out)
 	cmd.SetContext(t.Context())
 
-	return runUpdate(cmd, args, cfg, cfgFile)
+	return a.runUpdate(cmd, args, opts)
 }
 
 func TestRunUpdateRequiresATokenWhenItWillPublish(t *testing.T) {
 	// A publishing run must fail up front, not after doing all the work it cannot deliver.
 	t.Setenv("DRUPDATER_TOKEN", "")
-	err := runUpdateWith(t, internal.Config{WorkingDir: t.TempDir()}, "")
+	err := runUpdateWith(t, testApp(), options{config: internal.Config{WorkingDir: t.TempDir()}})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no token provided")
 }
@@ -48,7 +47,7 @@ func TestRunUpdateTakesTheTokenFromTheArgument(t *testing.T) {
 	// The positional argument wins over the environment. This gets past token resolution and
 	// then fails on the checkout, which is what proves the token was accepted.
 	t.Setenv("DRUPDATER_TOKEN", "")
-	err := runUpdateWith(t, internal.Config{WorkingDir: t.TempDir()}, "", "token-from-argument")
+	err := runUpdateWith(t, testApp(), options{config: internal.Config{WorkingDir: t.TempDir()}}, "token-from-argument")
 	require.Error(t, err)
 	assert.NotContains(t, err.Error(), "no token provided",
 		"the argument has to satisfy the token requirement")
@@ -62,7 +61,7 @@ func TestRunUpdateRejectsAnUnreadableConfigFile(t *testing.T) {
 	require.NoError(t, os.WriteFile(cfgPath, []byte("\tnot: [valid yaml"), 0o600))
 
 	t.Setenv("DRUPDATER_TOKEN", "dummy-token")
-	err := runUpdateWith(t, internal.Config{WorkingDir: dir, DryRun: true}, cfgPath)
+	err := runUpdateWith(t, testApp(), options{config: internal.Config{WorkingDir: dir, DryRun: true}, configFile: cfgPath})
 	require.Error(t, err)
 	assert.NotContains(t, err.Error(), "no token provided")
 }
@@ -76,7 +75,7 @@ func TestRunUpdateFailsOnACheckoutWithoutAnOrigin(t *testing.T) {
 
 	// A checkout-mode dry run needs no token at all, so this reaches the checkout resolution.
 	t.Setenv("DRUPDATER_TOKEN", "")
-	err = runUpdateWith(t, internal.Config{WorkingDir: dir, DryRun: true, Sites: []string{"default"}}, "")
+	err = runUpdateWith(t, testApp(), options{config: internal.Config{WorkingDir: dir, DryRun: true, Sites: []string{"default"}}})
 	require.Error(t, err)
 	assert.NotContains(t, err.Error(), "no token provided",
 		"a checkout-mode dry run must not demand credentials it will never use")
@@ -84,9 +83,10 @@ func TestRunUpdateFailsOnACheckoutWithoutAnOrigin(t *testing.T) {
 
 // fakeWorkflow stands in for the real update workflow so runUpdate can be driven to the end.
 type fakeWorkflow struct {
-	called bool
-	addons int
-	err    error
+	called   bool
+	addons   int
+	services workflowServices
+	err      error
 }
 
 func (f *fakeWorkflow) Run(_ context.Context, addons []workflow.Addon) error {
@@ -95,18 +95,14 @@ func (f *fakeWorkflow) Run(_ context.Context, addons []workflow.Addon) error {
 	return f.err
 }
 
-// withFakeWorkflow swaps the workflow constructor for one returning fake.
-func withFakeWorkflow(t *testing.T, fake *fakeWorkflow) {
-	t.Helper()
-	old := newRunner
-	newRunner = func(
-		*zap.Logger, internal.Config, workflow.Drush, codehosting.Platform,
-		workflow.Repository, workflow.Installer, workflow.Composer,
-		...workflow.Option,
-	) updateRunner {
+// appWithWorkflow is an app whose runs all go to fake, with the services they were given.
+func appWithWorkflow(fake *fakeWorkflow) app {
+	a := testApp()
+	a.newRunner = func(_ *zap.Logger, _ internal.Config, s workflowServices, _ ...workflow.Option) updateRunner {
+		fake.services = s
 		return fake
 	}
-	t.Cleanup(func() { newRunner = old })
+	return a
 }
 
 // checkoutWithOrigin returns a git checkout whose origin points at a GitHub URL, which is what
@@ -137,14 +133,14 @@ func checkoutWithOrigin(t *testing.T) string {
 func TestRunUpdateWiresUpAndStartsTheWorkflow(t *testing.T) {
 	// Everything up to the workflow runs for real; only the run itself is replaced.
 	fake := &fakeWorkflow{}
-	withFakeWorkflow(t, fake)
+	a := appWithWorkflow(fake)
 
 	t.Setenv("DRUPDATER_TOKEN", "dummy-token")
-	require.NoError(t, runUpdateWith(t, internal.Config{
+	require.NoError(t, runUpdateWith(t, a, options{config: internal.Config{
 		WorkingDir: checkoutWithOrigin(t),
 		DryRun:     true,
 		Sites:      []string{"default"},
-	}, ""))
+	}}))
 	assert.True(t, fake.called, "the workflow has to actually be started")
 	assert.Positive(t, fake.addons, "the mandatory addons must reach the workflow")
 }
@@ -153,14 +149,14 @@ func TestRunUpdateReportsAWorkflowFailure(t *testing.T) {
 	// A workflow error must surface. handleWorkflowError decides whether it is fatal; an
 	// ordinary error is, and swallowing it would report a failed update as a success.
 	fake := &fakeWorkflow{err: assert.AnError}
-	withFakeWorkflow(t, fake)
+	a := appWithWorkflow(fake)
 
 	t.Setenv("DRUPDATER_TOKEN", "dummy-token")
-	err := runUpdateWith(t, internal.Config{
+	err := runUpdateWith(t, a, options{config: internal.Config{
 		WorkingDir: checkoutWithOrigin(t),
 		DryRun:     true,
 		Sites:      []string{"default"},
-	}, "")
+	}})
 	require.Error(t, err)
 	require.ErrorIs(t, err, assert.AnError)
 }
@@ -168,74 +164,62 @@ func TestRunUpdateReportsAWorkflowFailure(t *testing.T) {
 func TestRunUpdateWritesTheRunReport(t *testing.T) {
 	// The workflow writes the file and is faked here, so this pins only the option wiring.
 	fake := &fakeWorkflow{}
-	withFakeWorkflow(t, fake)
+	a := appWithWorkflow(fake)
 
 	t.Setenv("DRUPDATER_TOKEN", "dummy-token")
-	require.NoError(t, runUpdateWith(t, internal.Config{
+	require.NoError(t, runUpdateWith(t, a, options{config: internal.Config{
 		WorkingDir: checkoutWithOrigin(t),
 		DryRun:     true,
 		Sites:      []string{"default"},
 		ReportPath: filepath.Join(t.TempDir(), "run.json"),
-	}, ""))
+	}}))
 	assert.True(t, fake.called)
 }
 
-// withCommand makes Execute run a command whose RunE is runE, with no arguments and no output.
-func withCommand(t *testing.T, runE func(*cobra.Command, []string) error) {
-	t.Helper()
-	old := newCommand
-	newCommand = func() *cobra.Command {
-		cmd := &cobra.Command{Args: cobra.ArbitraryArgs, RunE: runE}
-		cmd.SetOut(&bytes.Buffer{})
-		cmd.SetErr(&bytes.Buffer{})
-		// Without this cobra parses os.Args, which are the test binary's flags.
-		cmd.SetArgs([]string{})
-		return cmd
-	}
-	t.Cleanup(func() { newCommand = old })
+// stubCommand is a command that runs runE with no arguments and prints nothing.
+func stubCommand(runE func(*cobra.Command, []string) error) *cobra.Command {
+	cmd := &cobra.Command{Args: cobra.ArbitraryArgs, RunE: runE}
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+	// Without this cobra parses os.Args, which are the test binary's flags.
+	cmd.SetArgs([]string{})
+	return cmd
 }
 
+// execute turns a failed run into a non-zero exit status, which is what a CI pipeline reads.
 func TestExecuteExitsNonZeroOnFailure(t *testing.T) {
-	// Execute is the process entry point: its whole job is turning a failed run into a non-zero
-	// exit status, which is what a CI pipeline reads. Nothing else asserts that.
-	var codes []int
-	oldExit := osExit
-	osExit = func(code int) { codes = append(codes, code) }
-	t.Cleanup(func() { osExit = oldExit })
-
-	withCommand(t, func(*cobra.Command, []string) error { return assert.AnError })
-
-	Execute()
-	assert.Equal(t, []int{1}, codes)
+	assert.Equal(t, 1, execute(t.Context(), stubCommand(func(*cobra.Command, []string) error { return assert.AnError })))
 }
 
-func TestExecuteDoesNotExitOnSuccess(t *testing.T) {
-	var codes []int
-	oldExit := osExit
-	osExit = func(code int) { codes = append(codes, code) }
-	t.Cleanup(func() { osExit = oldExit })
+func TestExecuteExitsZeroOnSuccess(t *testing.T) {
+	assert.Equal(t, 0, execute(t.Context(), stubCommand(func(*cobra.Command, []string) error { return nil })))
+}
 
-	withCommand(t, func(*cobra.Command, []string) error { return nil })
-
-	Execute()
-	assert.Empty(t, codes, "a successful run must not exit non-zero")
+func TestExecutePassesTheContextOn(t *testing.T) {
+	type key struct{}
+	ctx := context.WithValue(t.Context(), key{}, "this run")
+	var got any
+	execute(ctx, stubCommand(func(cmd *cobra.Command, _ []string) error {
+		got = cmd.Context().Value(key{})
+		return nil
+	}))
+	assert.Equal(t, "this run", got, "the signal-cancelled context has to reach the run")
 }
 
 func TestCreateAddonsPassesEveryDependency(t *testing.T) {
 	// Nothing downstream reports a missing dependency: it surfaces as a nil-pointer panic
 	// mid-run.
-	var got addonDeps
-	oldRegistry, oldMandatory := addonRegistry, mandatoryAddons
+	var got, second addonDeps
 	// Real factories, and two of them, so the same struct is shown to reach every addon.
-	var second addonDeps
-	realFactory := oldRegistry["composer_diff"]
+	realFactory := builtinAddons().factories["composer_diff"]
 	require.NotNil(t, realFactory)
-	addonRegistry = map[string]func(addonDeps) workflow.Addon{
-		"probe":       func(d addonDeps) workflow.Addon { got = d; return realFactory(d) },
-		"probe_other": func(d addonDeps) workflow.Addon { second = d; return realFactory(d) },
+	catalog := addonCatalog{
+		factories: map[string]func(addonDeps) workflow.Addon{
+			"probe":       func(d addonDeps) workflow.Addon { got = d; return realFactory(d) },
+			"probe_other": func(d addonDeps) workflow.Addon { second = d; return realFactory(d) },
+		},
+		mandatory: []string{"probe", "probe_other"},
 	}
-	mandatoryAddons = []string{"probe", "probe_other"}
-	t.Cleanup(func() { addonRegistry, mandatoryAddons = oldRegistry, oldMandatory })
 
 	logger := zap.NewNop()
 	cache, err := NewCache()
@@ -245,7 +229,7 @@ func TestCreateAddonsPassesEveryDependency(t *testing.T) {
 	t.Cleanup(composerSvc.Cleanup)
 	drupalOrgSvc := drupalorg.NewHTTPClient(logger)
 
-	_, err = createAddons(logger, internal.Config{}, drushSvc, composerSvc, drupalOrgSvc)
+	_, err = catalog.create(logger, internal.Config{}, drushSvc, composerSvc, drupalOrgSvc)
 	require.NoError(t, err)
 
 	assert.Same(t, logger, got.logger)
@@ -256,7 +240,7 @@ func TestCreateAddonsPassesEveryDependency(t *testing.T) {
 }
 
 func TestNewRunnerBuildsTheWorkflowRunner(t *testing.T) {
-	runner := newRunner(zap.NewNop(), internal.Config{}, nil, nil, nil, nil, nil)
+	runner := productionApp().newRunner(zap.NewNop(), internal.Config{}, workflowServices{})
 
 	assert.IsType(t, &workflow.Runner{}, runner)
 }

@@ -24,7 +24,7 @@ import (
 type reportHarness struct {
 	config      internal.Config
 	installer   *MockInstaller
-	repoSvc     *MockRepository
+	repoSvc     *MockGitService
 	vcsProvider *MockPlatform
 	repository  *MockGitRepository
 	composer    *MockComposer
@@ -61,7 +61,7 @@ func newReportHarness(t *testing.T, dryRun bool) *reportHarness {
 			DryRun:        dryRun,
 		},
 		installer:   NewMockInstaller(t),
-		repoSvc:     NewMockRepository(t),
+		repoSvc:     NewMockGitService(t),
 		vcsProvider: NewMockPlatform(t),
 		repository:  NewMockGitRepository(t),
 		composer:    NewMockComposer(t),
@@ -114,15 +114,17 @@ func (h *reportHarness) withAddons(addons ...Addon) {
 	h.addons = addons
 }
 
-func (h *reportHarness) run(t *testing.T) error {
-	t.Helper()
-
-	svc := New(
+// runner is the harness's Runner. Every call builds a new one; run it more than once to reuse it.
+func (h *reportHarness) runner() *Runner {
+	return New(
 		zap.NewNop(), h.config, h.drush, h.vcsProvider, h.repoSvc, h.installer, h.composer,
 		WithReportSink(func(rep report.Report) { h.got = &rep }),
 	)
+}
 
-	return svc.Run(context.Background(), h.addons)
+func (h *reportHarness) run(t *testing.T) error {
+	t.Helper()
+	return h.runner().Run(context.Background(), h.addons)
 }
 
 func TestReportWrittenOnSuccessfulRun(t *testing.T) {

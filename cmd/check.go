@@ -24,7 +24,7 @@ import (
 )
 
 // newCheckCmd shares opts with the root command, whose persistent flags it reads.
-func newCheckCmd(opts *options) *cobra.Command {
+func (a app) newCheckCmd(opts *options) *cobra.Command {
 	check := &cobra.Command{
 		Use:   "check",
 		Short: "Validate prerequisites without running an update",
@@ -43,7 +43,7 @@ Exits non-zero if any check fails, so it can gate a pipeline.`,
 			cmd.SilenceUsage = true
 			cmd.SilenceErrors = true
 
-			return runCheck(cmd, args, opts.config, opts.configFile, opts.checkFull)
+			return a.runCheck(cmd, args, *opts)
 		},
 	}
 	check.Flags().BoolVar(&opts.checkFull, "full", false,
@@ -52,9 +52,10 @@ Exits non-zero if any check fails, so it can gate a pipeline.`,
 	return check
 }
 
-// runCheck is the body of the check command's RunE; full adds the expensive tier: clone,
-// composer install and a real site install per site.
-func runCheck(cmd *cobra.Command, args []string, cfg internal.Config, configFile string, full bool) error {
+// runCheck is the body of the check command's RunE. opts.checkFull adds the expensive tier:
+// clone, composer install and a real site install per site.
+func (a app) runCheck(cmd *cobra.Command, args []string, opts options) error {
+	cfg := opts.config
 	redactor := logging.NewRedactor()
 	registerEnvSecrets(redactor)
 	logger, err := NewLogger(cfg, redactor)
@@ -77,10 +78,10 @@ func runCheck(cmd *cobra.Command, args []string, cfg internal.Config, configFile
 	defer composerCLI.Cleanup()
 
 	ctx := cmd.Context()
-	results := runCheapChecks(ctx, logger, configFilePath(configFile, cfg.WorkingDir), &cfg, gitSvc, composerCLI, afero.NewOsFs(), token, resolveErr)
+	results := a.runCheapChecks(ctx, logger, configFilePath(opts.configFile, cfg.WorkingDir), &cfg, gitSvc, composerCLI, afero.NewOsFs(), token, resolveErr)
 
-	if full {
-		results = append(results, runFullChecks(ctx, logger, cfg, token)...)
+	if opts.checkFull {
+		results = append(results, a.runFullChecks(ctx, logger, cfg, token)...)
 	}
 
 	printCheckResults(cmd.OutOrStdout(), results, redactor)
@@ -101,7 +102,7 @@ type cheapChecksComposer interface {
 }
 
 // runCheapChecks runs the free checks: no install, no network beyond one optional VCS call.
-func runCheapChecks(
+func (a app) runCheapChecks(
 	ctx context.Context,
 	logger *zap.Logger,
 	cfgFilePath string,
@@ -113,13 +114,13 @@ func runCheapChecks(
 	resolveErr error,
 ) []workflow.CheckResult {
 	var results []workflow.CheckResult
-	results = append(results, checkConfigAndAddons(cfgFilePath, cfg)...)
+	results = append(results, checkConfigAndAddons(a.addons, cfgFilePath, cfg)...)
 	results = append(results, workflow.CheckGitHistoryComplete(repository, cfg.WorkingDir))
 	results = append(results, workflow.CheckPlatformRequirements(ctx, composerSvc, cfg.WorkingDir))
 	for _, site := range cfg.Sites {
 		results = append(results, workflow.CheckSiteSettings(ctx, composerSvc, fs, cfg.WorkingDir, site))
 	}
-	results = append(results, checkVCS(ctx, logger, cfg.RepositoryURL, token, resolveErr)...)
+	results = append(results, a.checkVCS(ctx, logger, cfg.RepositoryURL, token, resolveErr)...)
 	return results
 }
 
@@ -156,7 +157,7 @@ func checkToken(args []string) string {
 }
 
 // checkConfigAndAddons validates .drupdater.yaml and its addon names, and fills cfg for the rest.
-func checkConfigAndAddons(path string, cfg *internal.Config) []workflow.CheckResult {
+func checkConfigAndAddons(catalog addonCatalog, path string, cfg *internal.Config) []workflow.CheckResult {
 	if _, err := internal.LoadConfigFile(path, cfg); err != nil {
 		return []workflow.CheckResult{workflow.CheckFailed(".drupdater.yaml valid", err.Error())}
 	}
@@ -166,18 +167,15 @@ func checkConfigAndAddons(path string, cfg *internal.Config) []workflow.CheckRes
 	}
 
 	const addonsName = "addon names resolve"
-	if err := validateAddons(*cfg); err != nil {
+	if err := catalog.validate(*cfg); err != nil {
 		return append(results, workflow.CheckFailed(addonsName, err.Error()))
 	}
 	return append(results, workflow.CheckOK(addonsName))
 }
 
-// newVcsProvider is a variable so the token check can be tested without a real GetUser request.
-var newVcsProvider = codehosting.New
-
 // checkVCS reports whether the URL routes to a known provider and, with a token, authenticates.
 // resolveErr is surfaced here because this is the only check it would otherwise silently fail.
-func checkVCS(ctx context.Context, logger *zap.Logger, repositoryURL string, token string, resolveErr error) []workflow.CheckResult {
+func (a app) checkVCS(ctx context.Context, logger *zap.Logger, repositoryURL string, token string, resolveErr error) []workflow.CheckResult {
 	const name = "repository host recognized (GitHub/GitLab)"
 
 	if repositoryURL == "" {
@@ -197,7 +195,7 @@ func checkVCS(ctx context.Context, logger *zap.Logger, repositoryURL string, tok
 	}
 
 	const tokenCheckName = "token authenticates"
-	platform, err := newVcsProvider(repositoryURL, token, logger)
+	platform, err := a.newPlatform(repositoryURL, token, logger)
 	if err != nil {
 		return append(results, workflow.CheckFailed(tokenCheckName, err.Error()))
 	}
@@ -228,8 +226,8 @@ type fullCheckDeps struct {
 	newInstaller func(c fullCheckComposer, dataDir string) (siteInstaller, error)
 }
 
-// newFullCheckDeps builds the real dependencies. A variable so tests can substitute doubles.
-var newFullCheckDeps = func(logger *zap.Logger) fullCheckDeps {
+// realFullCheckDeps builds the dependencies that really clone and install.
+func realFullCheckDeps(logger *zap.Logger) fullCheckDeps {
 	return fullCheckDeps{
 		clone: func(repositoryURL string, branch string, token string) (string, error) {
 			checkout, err := repo.NewGitRepositoryService(logger).
@@ -248,7 +246,7 @@ var newFullCheckDeps = func(logger *zap.Logger) fullCheckDeps {
 }
 
 // runFullChecks clones to a scratch directory, never the live working copy, and installs each site.
-func runFullChecks(ctx context.Context, logger *zap.Logger, cfg internal.Config, token string) []workflow.CheckResult {
+func (a app) runFullChecks(ctx context.Context, logger *zap.Logger, cfg internal.Config, token string) []workflow.CheckResult {
 	if cfg.RepositoryURL == "" {
 		return []workflow.CheckResult{workflow.CheckFailed("sites install from configuration",
 			"no repository URL to clone (pass --repository-url or run inside a checkout "+
@@ -259,7 +257,7 @@ func runFullChecks(ctx context.Context, logger *zap.Logger, cfg internal.Config,
 		branch = "main"
 	}
 
-	deps := newFullCheckDeps(logger)
+	deps := a.newFullCheckDeps(logger)
 
 	path, err := deps.clone(cfg.RepositoryURL, branch, token)
 	if err != nil {

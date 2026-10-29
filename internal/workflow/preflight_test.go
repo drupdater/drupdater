@@ -12,7 +12,7 @@ import (
 
 func TestCheckGitHistoryComplete(t *testing.T) {
 	t.Run("a full clone passes", func(t *testing.T) {
-		repository := NewMockRepository(t)
+		repository := NewMockGitService(t)
 		repository.EXPECT().IsShallowClone("/tmp").Return(false, nil)
 
 		result := CheckGitHistoryComplete(repository, "/tmp")
@@ -24,7 +24,7 @@ func TestCheckGitHistoryComplete(t *testing.T) {
 	})
 
 	t.Run("a shallow clone fails with an actionable message", func(t *testing.T) {
-		repository := NewMockRepository(t)
+		repository := NewMockGitService(t)
 		repository.EXPECT().IsShallowClone("/tmp").Return(true, nil)
 
 		result := CheckGitHistoryComplete(repository, "/tmp")
@@ -35,7 +35,7 @@ func TestCheckGitHistoryComplete(t *testing.T) {
 	})
 
 	t.Run("an error determining depth fails the check", func(t *testing.T) {
-		repository := NewMockRepository(t)
+		repository := NewMockGitService(t)
 		repository.EXPECT().IsShallowClone("/tmp").Return(false, errors.New("open failed"))
 
 		result := CheckGitHistoryComplete(repository, "/tmp")

@@ -77,7 +77,7 @@ func TestPersistentFlagDefaults(t *testing.T) {
 		{flag: "report", want: ""},
 	}
 
-	flags := newRootCmd().PersistentFlags()
+	flags := testApp().newRootCmd().PersistentFlags()
 	for _, tt := range tests {
 		t.Run(tt.flag, func(t *testing.T) {
 			f := flags.Lookup(tt.flag)
@@ -151,19 +151,19 @@ func TestCreateAddons(t *testing.T) {
 		config := internal.Config{
 			RunTypes: internal.RunTypesConfig{Normal: internal.RunTypeConfig{Addons: []string{"code_beautifier"}}},
 		}
-		addons, err := createAddons(logger, config, nil, nil, nil)
+		addons, err := builtinAddons().create(logger, config, nil, nil, nil)
 		require.NoError(t, err)
-		assert.Len(t, addons, len(mandatoryAddons)+1)
+		assert.Len(t, addons, len(builtinAddons().mandatory)+1)
 	})
 
 	t.Run("composer_audit and unsupported_modules run on a normal update", func(t *testing.T) {
 		// Both are mandatory: the description joins them into one list, so either alone shows half of it.
 		config := internal.Config{RunTypes: internal.RunTypesConfig{Normal: internal.RunTypeConfig{}}}
-		addons, err := createAddons(logger, config, nil, nil, nil)
+		addons, err := builtinAddons().create(logger, config, nil, nil, nil)
 		require.NoError(t, err)
-		assert.Len(t, addons, len(mandatoryAddons))
-		assert.Contains(t, mandatoryAddons, "composer_audit")
-		assert.Contains(t, mandatoryAddons, "unsupported_modules")
+		assert.Len(t, addons, len(builtinAddons().mandatory))
+		assert.Contains(t, builtinAddons().mandatory, "composer_audit")
+		assert.Contains(t, builtinAddons().mandatory, "unsupported_modules")
 	})
 
 	// composer_audit runs in both modes, so --security must reach it some other way. Pinned on
@@ -177,10 +177,10 @@ func TestCreateAddons(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			config := internal.Config{Security: tt.security}
-			addons, err := createAddons(logger, config, nil, cleanAudit{}, nil)
+			addons, err := builtinAddons().create(logger, config, nil, cleanAudit{}, nil)
 			require.NoError(t, err)
 
-			audit := addons[slices.Index(mandatoryAddons, "composer_audit")]
+			audit := addons[slices.Index(builtinAddons().mandatory, "composer_audit")]
 			_, err = audit.Hooks().PreComposerUpdate.Run(workflow.NewPreComposerUpdateEvent(t.Context(), "/repo", nil, workflow.UpdatePlan{}))
 
 			_, aborted := errors.AsType[workflow.AbortError](err)
@@ -190,14 +190,14 @@ func TestCreateAddons(t *testing.T) {
 
 	t.Run("a mandatory addon listed in the YAML is not duplicated", func(t *testing.T) {
 		config := internal.Config{RunTypes: internal.RunTypesConfig{Normal: internal.RunTypeConfig{Addons: []string{"update_hooks"}}}}
-		addons, err := createAddons(logger, config, nil, nil, nil)
+		addons, err := builtinAddons().create(logger, config, nil, nil, nil)
 		require.NoError(t, err)
-		assert.Len(t, addons, len(mandatoryAddons)) // update_hooks is already mandatory
+		assert.Len(t, addons, len(builtinAddons().mandatory)) // update_hooks is already mandatory
 	})
 
 	t.Run("an unknown addon name is an error", func(t *testing.T) {
 		config := internal.Config{RunTypes: internal.RunTypesConfig{Normal: internal.RunTypeConfig{Addons: []string{"does_not_exist"}}}}
-		_, err := createAddons(logger, config, nil, nil, nil)
+		_, err := builtinAddons().create(logger, config, nil, nil, nil)
 		require.Error(t, err)
 	})
 }
@@ -208,12 +208,12 @@ func TestValidateAddons(t *testing.T) {
 			Normal:   internal.RunTypeConfig{Addons: []string{"code_beautifier", "update_hooks"}},
 			Security: internal.RunTypeConfig{Addons: []string{"composer_normalizer"}},
 		}}
-		require.NoError(t, validateAddons(config))
+		require.NoError(t, builtinAddons().validate(config))
 	})
 
 	t.Run("unknown name in the normal list is an error", func(t *testing.T) {
 		config := internal.Config{RunTypes: internal.RunTypesConfig{Normal: internal.RunTypeConfig{Addons: []string{"nope"}}}}
-		err := validateAddons(config)
+		err := builtinAddons().validate(config)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "nope")
 	})
@@ -221,12 +221,12 @@ func TestValidateAddons(t *testing.T) {
 	t.Run("unknown name in the security list is caught regardless of mode", func(t *testing.T) {
 		// Security: false, yet a bad security-list name must still be rejected.
 		config := internal.Config{RunTypes: internal.RunTypesConfig{Security: internal.RunTypeConfig{Addons: []string{"typo"}}}}
-		require.Error(t, validateAddons(config))
+		require.Error(t, builtinAddons().validate(config))
 	})
 }
 
 func TestConfigurableAddons(t *testing.T) {
-	names := configurableAddons()
+	names := builtinAddons().configurable()
 
 	// Exactly the four configurable addons, sorted, and nothing mandatory.
 	assert.Equal(t, []string{
@@ -236,14 +236,14 @@ func TestConfigurableAddons(t *testing.T) {
 		"translations_updater",
 	}, names)
 
-	for _, mandatory := range append(mandatoryAddons, "composer_audit") {
+	for _, mandatory := range append(builtinAddons().mandatory, "composer_audit") {
 		assert.NotContains(t, names, mandatory)
 	}
 }
 
 func TestAddonsCommand(t *testing.T) {
 	var buf bytes.Buffer
-	addons := newAddonsCmd()
+	addons := testApp().newAddonsCmd()
 	addons.SetOut(&buf)
 	addons.Run(addons, nil)
 	out := buf.String()
@@ -334,17 +334,17 @@ func (cleanAudit) Audit(context.Context, string) (composer.Audit, error) {
 }
 
 func TestCommandTreesShareNoFlagState(t *testing.T) {
-	first := newRootCmd()
+	first := testApp().newRootCmd()
 	require.NoError(t, first.PersistentFlags().Parse([]string{"--branch", "develop", "--dry-run"}))
 
-	second := newRootCmd()
+	second := testApp().newRootCmd()
 
 	assert.Equal(t, "main", second.PersistentFlags().Lookup("branch").Value.String())
 	assert.Equal(t, "false", second.PersistentFlags().Lookup("dry-run").Value.String())
 }
 
 func TestRootCommandValidatesTheFlagsItParsed(t *testing.T) {
-	cmd := newRootCmd()
+	cmd := testApp().newRootCmd()
 	cmd.SetArgs([]string{"--clone"})
 	cmd.SetOut(&bytes.Buffer{})
 	cmd.SetErr(&bytes.Buffer{})
@@ -358,7 +358,7 @@ func TestCheckCommandReadsTheRootFlags(t *testing.T) {
 	require.NoError(t, err)
 	reportPath := filepath.Join(t.TempDir(), "check.json")
 
-	root := newRootCmd()
+	root := testApp().newRootCmd()
 	root.SetArgs([]string{"check", "--working-dir", dir, "--report", reportPath})
 	root.SetOut(&bytes.Buffer{})
 	root.SetErr(&bytes.Buffer{})
@@ -368,7 +368,7 @@ func TestCheckCommandReadsTheRootFlags(t *testing.T) {
 }
 
 func TestCheckCommandHasTheFullFlag(t *testing.T) {
-	check, _, err := newRootCmd().Find([]string{"check"})
+	check, _, err := testApp().newRootCmd().Find([]string{"check"})
 	require.NoError(t, err)
 
 	full := check.Flags().Lookup("full")

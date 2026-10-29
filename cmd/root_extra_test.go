@@ -178,7 +178,7 @@ func TestLoadProjectConfig(t *testing.T) {
 
 	t.Run("a missing file applies the defaults", func(t *testing.T) {
 		cfg := internal.Config{}
-		require.NoError(t, loadProjectConfig(logger, filepath.Join(t.TempDir(), ".drupdater.yaml"), &cfg))
+		require.NoError(t, loadProjectConfig(logger, builtinAddons(), filepath.Join(t.TempDir(), ".drupdater.yaml"), &cfg))
 
 		assert.Equal(t, []string{"default"}, cfg.Sites)
 		assert.Equal(t, 30*time.Minute, cfg.Timeout)
@@ -189,7 +189,7 @@ func TestLoadProjectConfig(t *testing.T) {
 		require.NoError(t, os.WriteFile(path, []byte("sites: [default, sub]\ntimeout: 90s\n"), 0o600))
 
 		cfg := internal.Config{}
-		require.NoError(t, loadProjectConfig(logger, path, &cfg))
+		require.NoError(t, loadProjectConfig(logger, builtinAddons(), path, &cfg))
 		assert.Equal(t, []string{"default", "sub"}, cfg.Sites)
 		assert.Equal(t, 90*time.Second, cfg.Timeout)
 	})
@@ -199,7 +199,7 @@ func TestLoadProjectConfig(t *testing.T) {
 		require.NoError(t, os.WriteFile(path, []byte("timeout: nope\n"), 0o600))
 
 		cfg := internal.Config{}
-		require.Error(t, loadProjectConfig(logger, path, &cfg))
+		require.Error(t, loadProjectConfig(logger, builtinAddons(), path, &cfg))
 	})
 
 	t.Run("an unknown addon name is an error", func(t *testing.T) {
@@ -207,7 +207,7 @@ func TestLoadProjectConfig(t *testing.T) {
 		require.NoError(t, os.WriteFile(path, []byte("run_types:\n  normal:\n    addons: [no_such_addon]\n"), 0o600))
 
 		cfg := internal.Config{}
-		err := loadProjectConfig(logger, path, &cfg)
+		err := loadProjectConfig(logger, builtinAddons(), path, &cfg)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no_such_addon")
 	})

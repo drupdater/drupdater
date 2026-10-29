@@ -37,7 +37,7 @@ func TestCheckToken(t *testing.T) {
 func TestCheckConfigAndAddons(t *testing.T) {
 	t.Run("a missing file applies the defaults and passes", func(t *testing.T) {
 		cfg := internal.Config{}
-		results := checkConfigAndAddons(filepath.Join(t.TempDir(), ".drupdater.yaml"), &cfg)
+		results := checkConfigAndAddons(builtinAddons(), filepath.Join(t.TempDir(), ".drupdater.yaml"), &cfg)
 
 		require.Len(t, results, 2)
 		assert.True(t, results[0].OK)
@@ -51,7 +51,7 @@ func TestCheckConfigAndAddons(t *testing.T) {
 		require.NoError(t, os.WriteFile(path, []byte("timeout: nope\n"), 0o600))
 
 		cfg := internal.Config{}
-		results := checkConfigAndAddons(path, &cfg)
+		results := checkConfigAndAddons(builtinAddons(), path, &cfg)
 
 		require.Len(t, results, 1)
 		assert.False(t, results[0].OK)
@@ -63,7 +63,7 @@ func TestCheckConfigAndAddons(t *testing.T) {
 		require.NoError(t, os.WriteFile(path, []byte("run_types:\n  normal:\n    addons: [no_such_addon]\n"), 0o600))
 
 		cfg := internal.Config{}
-		results := checkConfigAndAddons(path, &cfg)
+		results := checkConfigAndAddons(builtinAddons(), path, &cfg)
 
 		require.Len(t, results, 2)
 		assert.True(t, results[0].OK)
@@ -81,7 +81,7 @@ func TestCheckVCS(t *testing.T) {
 	const hostCheck = "repository host recognized (GitHub/GitLab)"
 
 	t.Run("no repository URL and no resolve error", func(t *testing.T) {
-		results := checkVCS(ctx, logger, "", "", nil)
+		results := testApp().checkVCS(ctx, logger, "", "", nil)
 		require.Len(t, results, 1)
 		assert.Equal(t, hostCheck, results[0].Name)
 		assert.False(t, results[0].OK)
@@ -89,7 +89,7 @@ func TestCheckVCS(t *testing.T) {
 	})
 
 	t.Run("no repository URL surfaces the resolve error", func(t *testing.T) {
-		results := checkVCS(ctx, logger, "", "", errors.New("no origin remote"))
+		results := testApp().checkVCS(ctx, logger, "", "", errors.New("no origin remote"))
 		require.Len(t, results, 1)
 		assert.Equal(t, hostCheck, results[0].Name)
 		assert.False(t, results[0].OK)
@@ -97,7 +97,7 @@ func TestCheckVCS(t *testing.T) {
 	})
 
 	t.Run("an unrecognized host fails", func(t *testing.T) {
-		results := checkVCS(ctx, logger, "not a url", "", nil)
+		results := testApp().checkVCS(ctx, logger, "not a url", "", nil)
 		require.Len(t, results, 1)
 		assert.Equal(t, hostCheck, results[0].Name)
 		assert.False(t, results[0].OK)
@@ -105,7 +105,7 @@ func TestCheckVCS(t *testing.T) {
 	})
 
 	t.Run("a recognized host with no token stops after the host check", func(t *testing.T) {
-		results := checkVCS(ctx, logger, "https://github.com/acme/site.git", "", nil)
+		results := testApp().checkVCS(ctx, logger, "https://github.com/acme/site.git", "", nil)
 		require.Len(t, results, 1)
 		assert.Equal(t, hostCheck, results[0].Name)
 		assert.True(t, results[0].OK)
@@ -190,7 +190,7 @@ func TestRunCheapChecks(t *testing.T) {
 		repository := fakeShallowCloneChecker{shallow: false}
 		composerSvc := fakeCheapChecksComposer{webRoot: "web"}
 
-		results := runCheapChecks(ctx, logger, filepath.Join(t.TempDir(), ".drupdater.yaml"), cfg, repository, composerSvc, newFS(t, "/project", "default"), "", nil)
+		results := testApp().runCheapChecks(ctx, logger, filepath.Join(t.TempDir(), ".drupdater.yaml"), cfg, repository, composerSvc, newFS(t, "/project", "default"), "", nil)
 
 		require.False(t, anyCheckFailed(results))
 		// config valid, addons resolve, git history, platform reqs, site settings, VCS host.
@@ -202,7 +202,7 @@ func TestRunCheapChecks(t *testing.T) {
 		repository := fakeShallowCloneChecker{shallow: true}
 		composerSvc := fakeCheapChecksComposer{platformReqsOut: "php 8.1 required", platformReqsErr: errors.New("unmet")}
 
-		results := runCheapChecks(ctx, logger, filepath.Join(t.TempDir(), ".drupdater.yaml"), cfg, repository, composerSvc, newFS(t, "/project", "default"), "", nil)
+		results := testApp().runCheapChecks(ctx, logger, filepath.Join(t.TempDir(), ".drupdater.yaml"), cfg, repository, composerSvc, newFS(t, "/project", "default"), "", nil)
 
 		require.True(t, anyCheckFailed(results))
 		var names []string
@@ -225,7 +225,7 @@ func TestRunCheapChecks(t *testing.T) {
 		repository := fakeShallowCloneChecker{}
 		composerSvc := fakeCheapChecksComposer{webRoot: "web"}
 
-		results := runCheapChecks(ctx, logger, cfgPath, cfg, repository, composerSvc, newFS(t, "/project", "default"), "", nil)
+		results := testApp().runCheapChecks(ctx, logger, cfgPath, cfg, repository, composerSvc, newFS(t, "/project", "default"), "", nil)
 
 		var siteFailures int
 		for _, r := range results {
@@ -238,7 +238,7 @@ func TestRunCheapChecks(t *testing.T) {
 }
 
 func TestRunFullChecksNoRepositoryURL(t *testing.T) {
-	results := runFullChecks(t.Context(), zap.NewNop(), internal.Config{}, "")
+	results := testApp().runFullChecks(t.Context(), zap.NewNop(), internal.Config{}, "")
 	require.Len(t, results, 1)
 	assert.Equal(t, "sites install from configuration", results[0].Name)
 	assert.False(t, results[0].OK)
@@ -250,7 +250,7 @@ func TestRunFullChecksDefaultsToMainBranch(t *testing.T) {
 	// names the branch it tried.
 	cfg := internal.Config{RepositoryURL: t.TempDir()}
 
-	results := runFullChecks(t.Context(), zap.NewNop(), cfg, "")
+	results := testApp().runFullChecks(t.Context(), zap.NewNop(), cfg, "")
 	require.Len(t, results, 1)
 	assert.Equal(t, "clone for full check", results[0].Name)
 	assert.False(t, results[0].OK)
@@ -262,7 +262,7 @@ func TestRunFullChecksCloneFailure(t *testing.T) {
 	// this exercises the clone-error branch without needing composer or drush at all.
 	cfg := internal.Config{RepositoryURL: t.TempDir(), Branch: "main"}
 
-	results := runFullChecks(t.Context(), zap.NewNop(), cfg, "")
+	results := testApp().runFullChecks(t.Context(), zap.NewNop(), cfg, "")
 	require.Len(t, results, 1)
 	assert.False(t, results[0].OK)
 	assert.Equal(t, "clone for full check", results[0].Name)
