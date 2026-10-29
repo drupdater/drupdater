@@ -43,20 +43,29 @@ def phase_order: [
   "publish"
 ];
 
-# Addons that both report structured data and render a section into the merge
-# request description, with the heading that section starts with.
-#
-# The two have to agree: an addon that told the report it did something while
-# leaving the description silent about it produces a merge request whose
-# reviewer is never told what changed. Only addons that render a section belong
-# here -- code_beautifier, deprecations_remover and translations_updater report
-# without contributing one, and are deliberately absent.
-def addon_sections: {
-  "composer_audit":      "## 🛡️ Security Report",
-  "composer_patches":    "## 🩹 Patch updates",
-  "unsupported_modules": "## ⚠️ Unsupported modules",
-  "update_hooks":        "## 📄 Job Logs"
-};
+# The headings the merge request description must carry, given the report's
+# addon sections: the description is rendered from those sections, so a
+# section with data and no heading means the rendering lost it. code_beautifier,
+# deprecations_remover and translations_updater report without contributing a
+# heading, and are deliberately absent.
+def expected_headings($addons):
+  def has_any($v): ($v // []) | length > 0;
+  [ ( if has_any($addons.composer_allow_plugins.added) then
+        {key: "composer_allow_plugins", heading: "## 🔌 New Composer plugins"} else empty end ),
+    ( if $addons | has("composer_patches") then
+        {key: "composer_patches", heading: "## 🩹 Patch updates"} else empty end ),
+    ( if has_any($addons.composer_diff) then
+        {key: "composer_diff", heading: "## 🛠️ Dependency updates"} else empty end ),
+    ( if has_any($addons.composer_audit.fixed) or has_any($addons.composer_audit.remaining) then
+        {key: "composer_audit", heading: "## 🛡️ Security Report"} else empty end ),
+    # Abandoned packages share the unsupported modules' table.
+    ( if has_any($addons.composer_audit.abandoned) then
+        {key: "composer_audit", heading: "## ⚠️ Unsupported modules"} else empty end ),
+    ( if has_any($addons.unsupported_modules) then
+        {key: "unsupported_modules", heading: "## ⚠️ Unsupported modules"} else empty end ),
+    ( if $addons | has("update_hooks") then
+        {key: "update_hooks", heading: "## 📄 Job Logs"} else empty end )
+  ][];
 
 # An advisory's identity, for comparing the fixed and remaining lists. Mirrors
 # the key composer_audit itself uses: CVE first, then the advisory id, then the
@@ -254,12 +263,10 @@ def secrets: (env.DRUPDATER_ASSERT_SECRETS // "") | split("\n") | map(select(len
     else empty end ),
 
   # What an addon reported and what the reviewer is told must be the same story.
-  ( addon_sections
-    | to_entries[]
-    | . as $section
-    | select(($addons | has($section.key)) and ($description | length) > 0)
-    | select(($description | contains($section.value)) | not)
-    | "merge_request_description: \($section.key) reported data but rendered no \"\($section.value)\" section" ),
+  ( select(($description | length) > 0)
+    | expected_headings($addons)
+    | select(.heading as $heading | $description | contains($heading) | not)
+    | "merge_request_description: \(.key) reported data but rendered no \"\(.heading)\" section" ),
 
   # Site-keyed addon sections can only be about sites the run was configured for.
   ( ["update_hooks", "translations_updater"][]
