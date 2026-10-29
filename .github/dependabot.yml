@@ -27,10 +27,6 @@ updates:
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
-    ignore:
-      # drupal-rector 0.21's sets reference PHPUnit sets that Rector 2.6 removed.
-      - dependency-name: "rector/rector"
-        versions: [">=2.6.0"]
 
   - package-ecosystem: "github-actions"
     directory: "/"

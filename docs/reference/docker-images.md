@@ -103,8 +103,8 @@ them once into `/opt/drupdater/tools/`, from the repository's `tools/composer.lo
 them against the project from there. A project that already depends on `drupal/coder` or
 `palantirnet/drupal-rector` runs its own copy instead.
 
-`rector/rector` is held at 2.5: the latest Drupal Rector release relies on PHPUnit rule sets
-that Rector 2.6 removed.
+`rector/rector` stays below 2.6.2, which removed rule sets Drupal Rector still relies on;
+Drupal Rector's own `conflict` holds it there.
 
 The Composer environment is tuned for unattended runs; see [environment
 variables](environment-variables.md#set-inside-the-docker-image) for the values and why.

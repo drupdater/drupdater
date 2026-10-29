@@ -70,10 +70,18 @@ Omitted when Rector changed nothing.
 
 ## Configuration
 
-The Rector rule set comes from `scripts/rector.php` inside the Docker image — Drupal
-Rector's Drupal 8, 9 and 10 deprecation sets plus the deprecation-helper rule. Each rule
-checks the installed `drupal/core` version itself, so none rewrites code for an API the
-site's core has not deprecated yet. It is not currently configurable per project.
+The Rector rule set comes from `scripts/rector.php` inside the Docker image:
+
+- Drupal Rector's **composer-based sets**, chosen from the installed `drupal/core` version.
+  They cover the installed major up to the installed minor, including the renames that
+  only become safe from that minor on, and never a later minor's deprecations.
+- Its **Drupal 10 set**, because the composer-based sets stop at the major: an API
+  deprecated in 10.x still exists on 11 until 12 removes it.
+- The deprecation-helper rule, which unwraps `DeprecationHelper::backwardsCompatibleCall()`
+  for deprecations older than the installed core. A site runs one core version, so no
+  backward-compatibility wrappers are written either.
+
+It is not currently configurable per project.
 
 Only the project's **custom** code directories are processed, as resolved from
 `composer.json`. Contributed and core code is never rewritten.
