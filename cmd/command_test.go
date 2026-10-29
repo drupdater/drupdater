@@ -6,6 +6,8 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strconv"
 	"testing"
 
 	"github.com/drupdater/drupdater/internal"
@@ -108,7 +110,8 @@ func TestCheckResolvesTheCheckoutOnlyInCheckoutMode(t *testing.T) {
 }
 
 func TestCheckRunsTheFullTierOnlyWhenAskedTo(t *testing.T) {
-	a, _ := appWithFullCheckDoubles(t.TempDir(), nil, &fakeComposer{}, &fakeInstaller{}, nil)
+	installer := &fakeInstaller{}
+	a, _ := appWithFullCheckDoubles(t.TempDir(), nil, &fakeComposer{}, installer, nil)
 	dir := bareCheckout(t, t.TempDir())
 	cfg := internal.Config{WorkingDir: dir, Clone: true, RepositoryURL: "https://github.com/acme/site.git", Sites: []string{"default"}}
 
@@ -117,6 +120,8 @@ func TestCheckRunsTheFullTierOnlyWhenAskedTo(t *testing.T) {
 
 	out, _ = runCheckCmd(t, a, options{config: cfg, checkFull: true})
 	assert.Contains(t, out, "✓ composer install")
+	require.Len(t, installer.contexts, 1)
+	assert.NotNil(t, installer.contexts[0], "the command's context has to reach the site installs")
 }
 
 func TestValidateFlagsAcceptsCloneWithARepositoryURL(t *testing.T) {
@@ -133,7 +138,10 @@ func TestRunUpdateTrustsOnlyACheckoutItUpdatesInPlace(t *testing.T) {
 	t.Setenv("DRUPDATER_TOKEN", "dummy-token")
 	trust := func(a app) (app, *[]string) {
 		var trusted []string
-		a.trustCheckout = func(_ context.Context, _ *zap.Logger, dir string) { trusted = append(trusted, dir) }
+		a.trustCheckout = func(ctx context.Context, _ *zap.Logger, dir string) {
+			assert.NotNil(t, ctx, "trusting runs git, which the run's context has to be able to stop")
+			trusted = append(trusted, dir)
+		}
 		return a, &trusted
 	}
 
@@ -175,4 +183,65 @@ func TestRunUpdateBuildsNoPlatformForATokenFreeDryRun(t *testing.T) {
 	require.NoError(t, runUpdateWith(t, appWithWorkflow(fake), options{config: internal.Config{WorkingDir: checkoutWithOrigin(t), DryRun: true}}))
 
 	assert.Nil(t, fake.services.platform, "a checkout-mode dry run neither clones nor publishes")
+}
+
+func TestProductionAppWiresEveryDependency(t *testing.T) {
+	a := productionApp()
+
+	assert.NotNil(t, a.newRunner)
+	assert.NotNil(t, a.newPlatform)
+	assert.NotNil(t, a.newFullCheckDeps)
+	assert.NotNil(t, a.trustCheckout)
+	assert.Equal(t, builtinAddons().configurable(), a.addons.configurable())
+	assert.Equal(t, builtinAddons().mandatory, a.addons.mandatory)
+}
+
+func TestEveryBuiltinAddonBuildsUnderItsOwnName(t *testing.T) {
+	deps := addonDeps{logger: zap.NewNop()}
+	for name, factory := range builtinAddons().factories {
+		built := factory(deps)
+		require.NotNil(t, built, "%s builds nothing", name)
+		// A report reads the way the project is configured only when the keys are the names.
+		if reporter, ok := built.(interface{ ReportKey() string }); ok {
+			assert.Equal(t, name, reporter.ReportKey())
+		}
+	}
+}
+
+func TestRootCommandTakesAtMostOneArgument(t *testing.T) {
+	_, err := executeTree(t, testApp(), "one", "two")
+	require.ErrorContains(t, err, "accepts at most 1 arg")
+}
+
+func TestRootCommandFailsWithoutPrintingUsage(t *testing.T) {
+	t.Setenv("DRUPDATER_TOKEN", "dummy-token")
+
+	out, err := executeTree(t, appWithWorkflow(&fakeWorkflow{err: assert.AnError}), "--working-dir", checkoutWithOrigin(t), "--dry-run")
+
+	require.ErrorIs(t, err, assert.AnError)
+	assert.NotContains(t, out, "Usage:", "a failed update is not a usage error")
+	assert.NotContains(t, out, "Error:", "Execute reports the failure; cobra must not")
+}
+
+func TestBuildingTheCommandLeavesGOMAXPROCSAlone(t *testing.T) {
+	want := runtime.GOMAXPROCS(0)
+
+	flags := testApp().newRootCmd().PersistentFlags()
+
+	assert.Equal(t, want, runtime.GOMAXPROCS(0), "the --concurrency default must read GOMAXPROCS, not set it")
+	assert.Equal(t, strconv.Itoa(want), flags.Lookup("concurrency").DefValue)
+}
+
+func TestRunUpdateWritesAReportOnlyWhenAskedTo(t *testing.T) {
+	t.Setenv("DRUPDATER_TOKEN", "dummy-token")
+
+	without := &fakeWorkflow{}
+	require.NoError(t, runUpdateWith(t, appWithWorkflow(without), options{config: internal.Config{WorkingDir: checkoutWithOrigin(t), DryRun: true}}))
+	assert.Zero(t, without.options, "no --report, no report sink")
+
+	with := &fakeWorkflow{}
+	require.NoError(t, runUpdateWith(t, appWithWorkflow(with), options{config: internal.Config{
+		WorkingDir: checkoutWithOrigin(t), DryRun: true, ReportPath: filepath.Join(t.TempDir(), "run.json"),
+	}}))
+	assert.Equal(t, 1, with.options)
 }

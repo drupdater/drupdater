@@ -70,7 +70,12 @@ func newReportHarness(t *testing.T, dryRun bool) *reportHarness {
 
 		versions: composer.Versions{Composer: "2.10.2", PHP: "8.3.14"},
 	}
+	return h
+}
 
+// expectDefaults lets every run get as far as resolving its update. Registered when the run
+// starts, after the test's own expectations, so those answer first.
+func (h *reportHarness) expectDefaults() {
 	h.composer.EXPECT().Version(anyCtx).
 		RunAndReturn(func(context.Context) (composer.Versions, error) { return h.versions, h.versionsErr }).Maybe()
 	h.vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail").Maybe()
@@ -79,8 +84,6 @@ func newReportHarness(t *testing.T, dryRun bool) *reportHarness {
 	h.repoSvc.EXPECT().IsShallowClone(testCheckout).Return(false, nil).Maybe()
 	h.composer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil).Maybe()
 	h.composer.EXPECT().Install(anyCtx, testCheckout).Return(nil).Maybe()
-
-	return h
 }
 
 // expectFullRun adds the expectations for a run that gets all the way through the update.
@@ -116,6 +119,7 @@ func (h *reportHarness) withAddons(addons ...Addon) {
 
 // runner is the harness's Runner. Every call builds a new one; run it more than once to reuse it.
 func (h *reportHarness) runner() *Runner {
+	h.expectDefaults()
 	return New(
 		zap.NewNop(), h.config, h.drush, h.vcsProvider, h.repoSvc, h.installer, h.composer,
 		WithReportSink(func(rep report.Report) { h.got = &rep }),
@@ -284,6 +288,7 @@ func TestReportNoChangesIsNotAFailure(t *testing.T) {
 func TestRunWithoutReportSinkIsUnaffected(t *testing.T) {
 	h := newReportHarness(t, true)
 	h.expectFullRun(t)
+	h.expectDefaults()
 
 	svc := New(
 		zap.NewNop(), h.config, h.drush, h.vcsProvider, h.repoSvc, h.installer, h.composer,

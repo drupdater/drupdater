@@ -38,9 +38,12 @@ type fakeInstaller struct {
 
 	dataDir        string
 	dataDirExisted bool
+	// contexts are the contexts the installs ran under, so a dropped one shows.
+	contexts []context.Context
 }
 
-func (f *fakeInstaller) Install(_ context.Context, dir string, site string) error {
+func (f *fakeInstaller) Install(ctx context.Context, dir string, site string) error {
+	f.contexts = append(f.contexts, ctx)
 	f.calls = append(f.calls, dir+"/"+site)
 	_, err := os.Stat(f.dataDir)
 	f.dataDirExisted = err == nil

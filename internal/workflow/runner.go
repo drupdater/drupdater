@@ -186,7 +186,7 @@ func (r *run) execute(ctx context.Context) (branch string, err error) {
 		}
 		return nil
 	}); err != nil {
-		return branch, err
+		return "", err
 	}
 
 	if err := r.rec.Run("composer install", func() error {
@@ -196,7 +196,7 @@ func (r *run) execute(ctx context.Context) (branch string, err error) {
 		}
 		return nil
 	}); err != nil {
-		return branch, err
+		return "", err
 	}
 
 	// Ahead of the baseline install, so a run with nothing to do stops before installing any site.
@@ -206,7 +206,7 @@ func (r *run) execute(ctx context.Context) (branch string, err error) {
 		updateBranchName, err = r.resolveUpdate(ctx)
 		return err
 	}); err != nil {
-		return branch, err
+		return "", err
 	}
 
 	// Install each site at the current (old) code to create the baseline database.
@@ -218,14 +218,14 @@ func (r *run) execute(ctx context.Context) (branch string, err error) {
 			return nil
 		})
 	}); err != nil {
-		return branch, err
+		return "", err
 	}
 
 	// Update the shared code: install the resolved update and commit it.
 	if err := r.rec.Run("update shared code", func() error {
 		return r.updateSharedCode(ctx)
 	}); err != nil {
-		return branch, err
+		return "", err
 	}
 	r.rec.SetUpdateBranch(updateBranchName)
 
@@ -241,7 +241,7 @@ func (r *run) execute(ctx context.Context) (branch string, err error) {
 		branch = updateBranchName
 		return nil
 	}); err != nil {
-		return branch, err
+		return "", err
 	}
 
 	// Ahead of publish so it runs under --dry-run too: rendered later, a broken template would
@@ -257,6 +257,8 @@ func (r *run) execute(ctx context.Context) (branch string, err error) {
 	r.rec.SetMergeRequestContent(mrTitle, mrDescription)
 
 	if r.config.DryRun {
+		// Equivalent mutant: Run reads the branch only on failure, and this is success.
+		// mutator-disable-next-line statement/return
 		return branch, nil
 	}
 	return branch, r.rec.Run("publish", func() error {

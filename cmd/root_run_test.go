@@ -86,7 +86,9 @@ type fakeWorkflow struct {
 	called   bool
 	addons   int
 	services workflowServices
-	err      error
+	// options counts the workflow options the runner was built with.
+	options int
+	err     error
 }
 
 func (f *fakeWorkflow) Run(_ context.Context, addons []workflow.Addon) error {
@@ -98,8 +100,9 @@ func (f *fakeWorkflow) Run(_ context.Context, addons []workflow.Addon) error {
 // appWithWorkflow is an app whose runs all go to fake, with the services they were given.
 func appWithWorkflow(fake *fakeWorkflow) app {
 	a := testApp()
-	a.newRunner = func(_ *zap.Logger, _ internal.Config, s workflowServices, _ ...workflow.Option) updateRunner {
+	a.newRunner = func(_ *zap.Logger, _ internal.Config, s workflowServices, opts ...workflow.Option) updateRunner {
 		fake.services = s
+		fake.options = len(opts)
 		return fake
 	}
 	return a

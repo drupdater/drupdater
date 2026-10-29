@@ -5,9 +5,7 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
-	"runtime"
 	"slices"
-	"strconv"
 	"testing"
 
 	"github.com/drupdater/drupdater/internal"
@@ -86,12 +84,6 @@ func TestPersistentFlagDefaults(t *testing.T) {
 			assert.NotEmpty(t, f.Usage, "every flag needs help text")
 		})
 	}
-
-	// Not a literal: it reflects the container's CPU quota, so pin the source rather than a
-	// number that differs per machine.
-	concurrency := flags.Lookup("concurrency")
-	require.NotNil(t, concurrency)
-	assert.Equal(t, strconv.Itoa(runtime.GOMAXPROCS(0)), concurrency.DefValue)
 }
 
 func TestNewCache(t *testing.T) {

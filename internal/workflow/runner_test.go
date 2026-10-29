@@ -913,6 +913,30 @@ func TestASecondRunLeavesTheFirstRunsBranchAlone(t *testing.T) {
 	h.repository.AssertNotCalled(t, "RemoveBranch", mock.Anything)
 }
 
+func TestRunFailsWhenComposerInstallFails(t *testing.T) {
+	h := newReportHarness(t, true)
+	h.composer.EXPECT().Install(anyCtx, testCheckout).Return(assert.AnError)
+
+	err := h.run(t)
+
+	require.ErrorIs(t, err, assert.AnError)
+	require.ErrorContains(t, err, "failed to run composer install")
+	assert.Equal(t, "composer install", h.got.FailedPhase)
+	h.composer.AssertNotCalled(t, "Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestRunRemovesTheBranchWhenPublishingFails(t *testing.T) {
+	h := newReportHarness(t, false)
+	h.expectFullRun(t)
+	h.repository.EXPECT().Push(mock.Anything).Return(assert.AnError)
+
+	err := h.run(t)
+
+	require.ErrorContains(t, err, "failed to push changes")
+	assert.Equal(t, "publish", h.got.FailedPhase)
+	h.repository.AssertCalled(t, "RemoveBranch", "update-dummy-hash")
+}
+
 func TestRunRemovesNoBranchWhenCreatingItFails(t *testing.T) {
 	h := newReportHarness(t, true)
 	// Ahead of expectFullRun, whose branch expectations would otherwise answer first.
