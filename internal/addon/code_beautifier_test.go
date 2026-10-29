@@ -760,3 +760,27 @@ func TestCoderInstallCommitFailureStopsTheHandler(t *testing.T) {
 	err := cb.postCodeUpdateHandler(workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", &fakeCommitter{err: assert.AnError}))
 	require.ErrorIs(t, err, assert.AnError)
 }
+
+func TestCodingStyleCommitFailureFailsTheHandler(t *testing.T) {
+	fileExists = func(_ string) bool { return true }
+	oldFn := hasPHPCSPathDefinitions
+	hasPHPCSPathDefinitions = func(_ string) (bool, error) { return true, nil }
+	defer func() { hasPHPCSPathDefinitions = oldFn }()
+
+	runner := NewMockPHPCS(t)
+	runner.EXPECT().Run(anyCtx, "/path/to/repo").Return(phpcs.ReturnOutput{
+		Totals: phpcs.ReturnOutputTotals{Warnings: 1, Fixable: 1},
+		Files: map[string]phpcs.ReturnOutputFile{
+			"file1.php": {Warnings: 1, Messages: []phpcs.ReturnOutputFileMessage{{Fixable: true}}},
+		},
+	}, nil)
+	runner.EXPECT().RunCBF(anyCtx, "/path/to/repo").Return(nil)
+	composer := NewMockComposer(t)
+	composer.EXPECT().IsPackageInstalled(anyCtx, "/path/to/repo", "drupal/coder").Return(true, nil)
+
+	cb := NewCodeBeautifier(zap.NewNop(), runner, composer)
+	err := cb.postCodeUpdateHandler(workflow.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", &fakeCommitter{err: assert.AnError}))
+
+	require.ErrorIs(t, err, assert.AnError)
+	assert.Empty(t, cb.fixedFiles, "fixes that never reached the branch are not reported")
+}
