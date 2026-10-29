@@ -318,59 +318,70 @@ jobs:
           cd ./run/project
           echo "### Working copy" >> "$GITHUB_STEP_SUMMARY"
 
-          # A mismatch means the report describes a branch that is not there.
+          # The run works in a linked worktree, so the user's checkout is exactly as cloned.
           current="$(git rev-parse --abbrev-ref HEAD)"
-          if [ "$current" != "$UPDATE_BRANCH" ]; then
-            echo "::error::checkout is on $current, report says $UPDATE_BRANCH"
+          if [ "$current" != "$TARGET_BRANCH" ]; then
+            echo "::error::the checkout was moved to $current"
             exit 1
           fi
-
-          # Additive: the base branch stays put and the update branch descends from it.
-          if ! git merge-base --is-ancestor "origin/$TARGET_BRANCH" HEAD; then
-            echo "::error::$UPDATE_BRANCH does not descend from origin/$TARGET_BRANCH"
-            exit 1
-          fi
-          if [ "$(git rev-parse "$TARGET_BRANCH")" != "$(git rev-parse "origin/$TARGET_BRANCH")" ]; then
+          if [ "$(git rev-parse HEAD)" != "$(git rev-parse "origin/$TARGET_BRANCH")" ]; then
             echo "::error::the local $TARGET_BRANCH branch was moved"
             exit 1
           fi
+          dirty="$(git status --porcelain)"
+          if [ -n "$dirty" ]; then
+            echo "::error::the run changed the checkout"
+            echo "$dirty"
+            exit 1
+          fi
+          if [ "$(git worktree list --porcelain | grep -c '^worktree ')" -ne 1 ]; then
+            echo "::error::the run left a worktree behind"
+            git worktree list
+            exit 1
+          fi
 
-          commits="$(git rev-list --count "origin/$TARGET_BRANCH..HEAD")"
+          # A missing ref means the report describes a branch that is not there.
+          if ! git rev-parse --verify --quiet "refs/heads/$UPDATE_BRANCH" > /dev/null; then
+            echo "::error::the report says $UPDATE_BRANCH, but no such branch exists"
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor "origin/$TARGET_BRANCH" "$UPDATE_BRANCH"; then
+            echo "::error::$UPDATE_BRANCH does not descend from origin/$TARGET_BRANCH"
+            exit 1
+          fi
+
+          commits="$(git rev-list --count "origin/$TARGET_BRANCH..$UPDATE_BRANCH")"
           if [ "$commits" -lt 1 ]; then
             echo "::error::a successful run left no commits on $UPDATE_BRANCH"
             exit 1
           fi
           echo "$commits commits on \`$UPDATE_BRANCH\`:" >> "$GITHUB_STEP_SUMMARY"
-          git log --oneline "origin/$TARGET_BRANCH..HEAD" >> "$GITHUB_STEP_SUMMARY"
-
-          # Addons commit as they go, so an uncommitted change is work that would never reach
-          # the merge request. settings.php is excluded because ConfigureDatabase appends the
-          # test database to it; untracked files are out of scope, vendor/ lives here too.
-          dirty="$(git status --porcelain --untracked-files=no \
-                   | grep -v 'sites/[^/]*/settings\.php$' || true)"
-          if [ -n "$dirty" ]; then
-            echo "::error::uncommitted changes left behind"
-            echo "$dirty"
-            exit 1
-          fi
+          git log --oneline "origin/$TARGET_BRANCH..$UPDATE_BRANCH" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Verify the report against composer.lock
         if: always() && steps.report.outputs.status == 'success'
+        env:
+          UPDATE_BRANCH: ${{ steps.report.outputs.update_branch }}
         run: |
           set -euo pipefail
           # The report's package list is parsed out of composer's console output, and the
           # committed lock is the independent check on that parsing.
           git -C ./run/project show "origin/$TARGET_BRANCH:composer.lock" > /tmp/base-composer.lock
+          git -C ./run/project show "$UPDATE_BRANCH:composer.lock" > /tmp/update-composer.lock
           jq -n -e -r \
             --slurpfile before /tmp/base-composer.lock \
-            --slurpfile after ./run/project/composer.lock \
+            --slurpfile after /tmp/update-composer.lock \
             --slurpfile report ./run/report.json \
             -f .github/assert-lock-matches-report.jq | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Verify composer.json and composer.lock are usable
         if: always() && steps.report.outputs.status == 'success'
+        env:
+          UPDATE_BRANCH: ${{ steps.report.outputs.update_branch }}
         run: |
           set -euo pipefail
+          # The run left the checkout on the base branch; what the merge request carries is here.
+          git -C ./run/project checkout --quiet "$UPDATE_BRANCH"
           # A lock that does not match composer.json makes the merge request useless however
           # good the changelog looks. Run with the image's composer, the one the update used.
           #

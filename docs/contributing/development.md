@@ -530,10 +530,10 @@ non-zero, and the leg fails if it exits `0` instead.
 The run report is the verdict, not the exit status — Drupdater exits `0` on an abort, and a run
 reports `success` even when an addon logged and swallowed its own failure. On top of
 `assert-report.jq` (see [Consume the run report](../how-to/consume-the-run-report.md)), a
-successful leg also checks the repository the run left behind: that HEAD is the branch the report
-names, that it descends from the base branch, that nothing is left uncommitted, that
-`composer.lock` agrees with the report's package list, and that running Drupdater a second time
-finds nothing left to do.
+successful leg also checks the repository the run left behind: that the checkout is still on the
+base branch, unmoved and unmodified, with no worktree left registered; that the branch the report
+names exists and descends from the base branch; that its `composer.lock` agrees with the report's
+package list; and that running Drupdater a second time finds nothing left to do.
 
 ## Mocks
 
