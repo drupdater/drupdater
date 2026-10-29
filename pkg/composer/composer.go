@@ -122,6 +122,8 @@ type PackageChange struct {
 	To      string
 }
 
+// Update resolves into composer.json and composer.lock only; Install brings vendor/ to the result.
+// A dry run writes nothing.
 func (s *CLI) Update(ctx context.Context, dir string, packages []string, packagesToKeep []string, minimalChanges bool, dryRun bool) ([]PackageChange, error) {
 	args := append([]string{"update", "--no-interaction", "--no-progress", "--optimize-autoloader", "--with-all-dependencies", "--no-ansi", "--ignore-platform-reqs"}, packages...)
 	for _, packageToKeep := range packagesToKeep {
@@ -133,13 +135,18 @@ func (s *CLI) Update(ctx context.Context, dir string, packages []string, package
 	if dryRun {
 		args = append(args, "--dry-run")
 	} else {
-		args = append(args, "--bump-after-update")
+		// Lock only: vendor/ keeps the old code until Install, so sites can still be installed
+		// at it after the update is known to change anything.
+		args = append(args, "--bump-after-update", "--no-install")
 	}
 	var changes []PackageChange
 	out, err := s.execComposer(ctx, dir, args...)
 	if err != nil {
 		return changes, fmt.Errorf("failed to update dependencies: %w, output: %s, arg: %v", err, out, args)
 	}
+
+	// A lock-only update says "Locking" where an install says "Installing".
+	out = strings.ReplaceAll(out, "- Locking ", "- Installing ")
 
 	// Grouped by action, not scanned line by line, so the result stays ordered however composer
 	// interleaved its output. Deduplicated because composer reports a version change twice, once

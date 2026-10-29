@@ -128,8 +128,9 @@ Adds `error` when `ok` is `false`. The phase names, in order:
 | `acquire working copy` | Opening the checkout, or cloning |
 | `preflight` | Git history depth and PHP platform requirements |
 | `composer install` | Installing the current dependency tree |
+| `resolve update` | `composer update` into the lock only, and naming the update branch. All three ways of ending as `no_changes` happen here |
 | `baseline site install` | Installing each site at the old code |
-| `update shared code` | `composer update`, addon events, commits, branch creation |
+| `update shared code` | Installing the resolved update, addon events, commits, branch creation |
 | `site update` | Update hooks and configuration export per site |
 | `render merge request` | Assembling the title and description from the addons — runs under `--dry-run` too |
 | `publish` | Push and open the request — absent under `--dry-run` |

@@ -6,13 +6,14 @@ is no second copy and no side-by-side comparison.
 
 ```mermaid
 flowchart LR
-    A[Acquire checkout<br/>+ composer install] --> B[Install site<br/>baseline DB]
-    B --> C[composer update<br/>+ code fixes<br/>+ commit branch]
+    A[Acquire checkout<br/>+ composer install] --> R[Resolve update<br/>into the lock]
+    R --> B[Install site<br/>baseline DB]
+    B --> C[Install update<br/>+ code fixes<br/>+ commit branch]
     C --> D[Run update hooks<br/>+ export config]
     D --> E[Open PR / MR<br/>with changelog]
 ```
 
-## The eight phases
+## The nine phases
 
 Phases run linearly. Their names are exactly the strings that appear in the [run
 report](../reference/run-report.md)'s `phases` list.
@@ -39,50 +40,66 @@ message that does not mention shallowness.
 
 Installs the current dependency tree, establishing the "before" state.
 
-### 4. `baseline site install`
+### 4. `resolve update`
+
+Settles what the update changes and what its branch will be called, while touching only
+`composer.json` and `composer.lock`:
+
+1. Create and check out a throwaway work branch, `drupdater-work-<timestamp>`.
+2. Fire **`pre-composer-update`**. Addons mutate the event to steer what follows —
+   [`composer_audit`](../reference/addons/composer-audit.md) restricts a `--security` run to
+   the vulnerable packages, or aborts it when there are none;
+   [`composer_patches`](../reference/addons/composer-patches.md) pins packages whose
+   patches cannot be made to apply.
+3. Run `composer update --no-install` with those constraints. It resolves the update and
+   bumps the constraints in `composer.json`, but leaves `vendor/` at the old code. **If
+   nothing changed, the run aborts here.**
+4. Compute the branch name from the resolved `composer.lock` (see
+   [below](#content-addressed-branch-names)), and **abort if it already exists**, locally
+   or on the remote.
+
+The work branch has a flat name rather than `drupdater/work-…` deliberately: a repository
+containing a branch literally named `drupdater` would make `refs/heads/drupdater` a file,
+blocking any nested ref beneath it.
+
+This phase comes before the baseline install because every way a run can find it has
+nothing to do is decided here. A nightly job on an up-to-date site, or a re-run while the
+previous request is still open, stops after one `composer update` instead of installing
+every site first.
+
+### 5. `baseline site install`
 
 Installs each configured site via Drush, at the **old** code, building a baseline
-database.
+database. `vendor/` still holds it: the update so far exists only in the lock.
 
-This is what makes the update hooks in phase 6 meaningful. Running `updatedb` requires a
+This is what makes the update hooks in phase 7 meaningful. Running `updatedb` requires a
 database at the pre-update schema; without a baseline there would be nothing for the
 hooks to update, and no way to discover which hooks the update introduces.
 
 The database is SQLite, in a directory of the system temp dir that belongs to this run.
 Drupal reads its database settings only from `settings.php`, so Drupdater appends a
 block pointing there, and cuts it off again as soon as the install finishes. The same
-happens around each site's update in phase 6. That leaves `settings.php` byte-for-byte
+happens around each site's update in phase 7. That leaves `settings.php` byte-for-byte
 as the project has it whenever anything is staged or committed.
 
 Sites are installed concurrently, limited by `--concurrency`.
 
-### 5. `update shared code`
+### 6. `update shared code`
 
 The centre of the run:
 
-1. Create and check out a throwaway work branch, `drupdater-work-<timestamp>`.
-2. Fire **`pre-composer-update`**. Addons mutate the event to steer what follows —
-   [`composer_audit`](../reference/addons/composer-audit.md) restricts a `--security` run to
-   the vulnerable packages; [`composer_patches`](../reference/addons/composer-patches.md) pins
-   packages whose patches cannot be made to apply.
-3. Run `composer update` with those constraints. **If nothing changed, the run aborts
-   here** — reported as `no_changes`, exit `0`.
-4. Fire **`post-composer-update`** — the dependency diff and normalisation.
-5. Commit `composer.json` and `composer.lock`, together with anything else the update
+1. Run `composer install`, bringing `vendor/` to the lock resolved in phase 4. Patches and
+   scaffolding are applied here.
+2. Fire **`post-composer-update`** — the dependency diff and normalisation.
+3. Commit `composer.json` and `composer.lock`, together with anything else the update
    rewrote that git already tracks — `drupal-scaffold` owns files in the web root such as
    `.htaccess`, `robots.txt` and `index.php`, and a core update changes them. Untracked
    paths are left alone: `vendor/`, `web/core` and the site's generated files belong to
    nobody.
-6. Fire **`post-code-update`** — Rector, PHPCBF, and the post-update security audit.
-7. Compute the final branch name from a hash of the resulting `composer.lock`, and check
-   it does not already exist.
-8. Check out that branch from the work branch's tip.
+4. Fire **`post-code-update`** — Rector, PHPCBF, and the post-update security audit.
+5. Check out the branch named in phase 4 from the work branch's tip.
 
-The work branch has a flat name rather than `drupdater/work-…` deliberately: a repository
-containing a branch literally named `drupdater` would make `refs/heads/drupdater` a file,
-blocking any nested ref beneath it.
-
-### 6. `site update`
+### 7. `site update`
 
 Per site, concurrently: configure the database, fire **`pre-site-update`**, run the update
 hooks, resave configuration, fire **`post-site-update`**, and export configuration.
@@ -91,7 +108,7 @@ The commit step is serialised across sites even though the rest is concurrent. A
 share one worktree and one git index, and `drush config:export` shells out to git itself —
 so concurrent commits would race on the index.
 
-### 7. `render merge request`
+### 8. `render merge request`
 
 Fire **`pre-merge-request-create`** (where a security run retitles the request) and
 assemble the description from every addon's template.
@@ -102,11 +119,11 @@ description are recorded in the [run report](../reference/run-report.md#merge-re
 whether or not a request is opened — so a dry run can be reviewed, and a broken template
 fails there instead of surfacing on a real run that has already pushed.
 
-### 8. `publish`
+### 9. `publish`
 
 **Skipped entirely under `--dry-run`.**
 
-Push the branch and create the request with the title and description rendered in phase 7.
+Push the branch and create the request with the title and description rendered in phase 8.
 
 If creating the request fails after the push succeeded, the just-pushed remote branch is
 deleted on a best-effort basis — otherwise a failed run would leave an orphan branch that
@@ -117,8 +134,9 @@ logged and recorded but does not fail the run.
 
 ## Content-addressed branch names
 
-The update branch is named `update-<hash>`, where the hash comes from the resulting
-`composer.lock`.
+The update branch is named `update-<hash>`, where the hash is the `content-hash` of
+`composer.lock` as `composer update` resolved it — before any addon rewrites
+`composer.json`, so that it is known before a single site is installed.
 
 This makes the name a function of the *outcome*, not of the time. Two runs that produce
 identical dependencies produce the same branch name — so the second one detects the branch
@@ -126,7 +144,8 @@ already exists and aborts rather than opening a duplicate request.
 
 ## "Nothing to do" is a success
 
-Three conditions stop a run early, and all three exit `0`:
+Three conditions stop a run early, all three in the `resolve update` phase, before any site
+is installed. All three exit `0`:
 
 | Condition | Message |
 |---|---|

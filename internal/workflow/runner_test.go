@@ -342,30 +342,17 @@ func TestRunNoChanges(t *testing.T) {
 		DryRun:        false,
 	}
 
-	// installCode runs concurrently with updateSharedCode and always completes.
-	// installSite may or may not run depending on goroutine scheduling after cancel.
 	worktree := NewMockWorktree(t)
-	// updateSharedCode checks out a dedicated work branch before doing any work.
-	worktree.EXPECT().Checkout(mock.Anything).Return(nil).Maybe()
+	worktree.EXPECT().Checkout(workBranchCheckout).Return(nil)
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
 
-	// installCode: one CloneRepository + Install
-	// updateSharedCode: one CloneRepository + Update (returns empty → AbortError)
 	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil)
 	repositoryService.EXPECT().IsShallowClone("/tmp").Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, "/tmp").Return("", nil)
 
-	mockComposer.EXPECT().Install(anyCtx, "/tmp").Return(nil)
+	mockComposer.EXPECT().Install(anyCtx, "/tmp").Return(nil).Once()
 	mockComposer.EXPECT().Update(anyCtx, "/tmp", mock.Anything, mock.Anything, false, false).Return([]composer.PackageChange{}, nil)
-
-	// installSite and updateSite may not run if ctx is cancelled in time.
-	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil).Maybe()
-	installer.EXPECT().ConfigureDatabase(anyCtx, "/tmp", "site1").Return(nil).Maybe()
-	installer.EXPECT().RestoreSettings(anyCtx, "/tmp", "site1").Return(nil).Maybe()
-	drush.EXPECT().UpdateSite(anyCtx, "/tmp", "site1").Return(nil).Maybe()
-	drush.EXPECT().ExportConfiguration(anyCtx, "/tmp", "site1").Return(nil).Maybe()
-	drush.EXPECT().ConfigResave(anyCtx, "/tmp", "site1").Return(nil).Maybe()
 
 	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
 	err := workflowService.Run(ctx, nil)
@@ -373,12 +360,198 @@ func TestRunNoChanges(t *testing.T) {
 	// Assert: should get an AbortError, not a nil or other error
 	var abortErr AbortError
 	require.ErrorAs(t, err, &abortErr)
-	installer.AssertExpectations(t)
+	installer.AssertNotCalled(t, "Install", mock.Anything, mock.Anything, mock.Anything)
 	repositoryService.AssertExpectations(t)
 	repository.AssertExpectations(t)
 	drush.AssertExpectations(t)
 	mockComposer.AssertExpectations(t)
 	vcsProvider.AssertExpectations(t)
+}
+
+func TestRunAbortedByAnAddonInstallsNoSite(t *testing.T) {
+	// A --security run on a site without advisories aborts in pre-composer-update. It must do so
+	// before the baseline install, the most expensive step of a run.
+	installer := NewMockInstaller(t)
+	repositoryService := NewMockRepository(t)
+	vcsProvider := NewMockPlatform(t)
+	repository := NewMockGitRepository(t)
+	mockComposer := NewMockComposer(t)
+	expectVersionLookup(mockComposer)
+
+	config := internal.Config{RepositoryURL: "https://example.com/repo.git", Branch: "main", Token: "token", Clone: true, Sites: []string{"site1"}}
+
+	worktree := NewMockWorktree(t)
+	worktree.EXPECT().Checkout(workBranchCheckout).Return(nil)
+	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
+	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil)
+	repositoryService.EXPECT().IsShallowClone("/tmp").Return(false, nil)
+	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, "/tmp").Return("", nil)
+	mockComposer.EXPECT().Install(anyCtx, "/tmp").Return(nil).Once()
+
+	dispatcher := event.NewManager("")
+	dispatcher.On("pre-composer-update", event.ListenerFunc(func(event.Event) error {
+		return AbortError{Msg: "No security advisories found"}
+	}))
+
+	err := New(zap.NewNop(), config, NewMockDrush(t), vcsProvider, repositoryService, installer, mockComposer, dispatcher).Run(t.Context(), nil)
+
+	_, aborted := errors.AsType[AbortError](err)
+	require.True(t, aborted, "got %v", err)
+	installer.AssertNotCalled(t, "Install", mock.Anything, mock.Anything, mock.Anything)
+	mockComposer.AssertNotCalled(t, "Update", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestRunInstallsSitesAtTheOldCode(t *testing.T) {
+	// vendor/ must still hold the old code when the baseline is installed: the update is resolved
+	// into the lock first, and only installed once every site has its baseline database.
+	installer := NewMockInstaller(t)
+	repositoryService := NewMockRepository(t)
+	vcsProvider := NewMockPlatform(t)
+	repository := NewMockGitRepository(t)
+	mockComposer := NewMockComposer(t)
+	expectVersionLookup(mockComposer)
+	drush := NewMockDrush(t)
+
+	config := internal.Config{RepositoryURL: "https://example.com/repo.git", Branch: "main", Token: "token", Clone: true, Sites: []string{"site1"}, DryRun: true}
+
+	worktree := NewMockWorktree(t)
+	worktree.EXPECT().Checkout(workBranchCheckout).Return(nil)
+	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
+	worktree.EXPECT().Status().Return(git.Status{}, nil)
+	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.ZeroHash, nil)
+
+	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
+	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repository, worktree, "/tmp", nil)
+	repositoryService.EXPECT().IsShallowClone("/tmp").Return(false, nil)
+	repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound)
+	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, "/tmp").Return("", nil)
+	mockComposer.EXPECT().GetLockHash("/tmp").Return("dummy-hash", nil)
+
+	var steps []string
+	mockComposer.EXPECT().Install(anyCtx, "/tmp").RunAndReturn(func(context.Context, string) error {
+		steps = append(steps, "composer install")
+		return nil
+	})
+	mockComposer.EXPECT().Update(anyCtx, "/tmp", mock.Anything, mock.Anything, false, false).
+		RunAndReturn(func(context.Context, string, []string, []string, bool, bool) ([]composer.PackageChange, error) {
+			steps = append(steps, "composer update")
+			return []composer.PackageChange{{Action: "Upgrade", Package: "drupal/core", From: "9.0.0", To: "9.1.0"}}, nil
+		})
+	installer.EXPECT().Install(anyCtx, "/tmp", "site1").RunAndReturn(func(context.Context, string, string) error {
+		steps = append(steps, "site install")
+		return nil
+	})
+	installer.EXPECT().ConfigureDatabase(anyCtx, "/tmp", "site1").RunAndReturn(func(context.Context, string, string) error {
+		steps = append(steps, "site update")
+		return nil
+	})
+	installer.EXPECT().RestoreSettings(anyCtx, "/tmp", "site1").Return(nil)
+	drush.EXPECT().UpdateSite(anyCtx, "/tmp", "site1").Return(nil)
+	drush.EXPECT().ConfigResave(anyCtx, "/tmp", "site1").Return(nil)
+	drush.EXPECT().ExportConfiguration(anyCtx, "/tmp", "site1").Return(nil)
+
+	core, logs := observer.New(zap.InfoLevel)
+	err := New(zap.New(core), config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager("")).Run(t.Context(), nil)
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"composer install", "composer update", "site install", "composer install", "site update"}, steps)
+
+	// The log is the only trace of where a run spent its time between phases.
+	var messages []string
+	for _, entry := range logs.All() {
+		messages = append(messages, entry.Message)
+	}
+	assert.Subset(t, messages, []string{"resolving dependency updates", "dependencies resolved", "installing updated dependencies"})
+	resolved := logs.FilterMessage("dependencies resolved").All()
+	require.Len(t, resolved, 1)
+	assert.EqualValues(t, 1, resolved[0].ContextMap()["total"])
+	assert.EqualValues(t, 1, resolved[0].ContextMap()["upgraded"])
+}
+
+func TestUpdateSharedCodeFailures(t *testing.T) {
+	newRunner := func(t *testing.T) (*Runner, *MockComposer, *MockEventDispatcher, *MockWorktree) {
+		t.Helper()
+		mockComposer := NewMockComposer(t)
+		dispatcher := NewMockEventDispatcher(t)
+		worktree := NewMockWorktree(t)
+		return &Runner{logger: zap.NewNop(), composer: mockComposer, dispatcher: dispatcher}, mockComposer, dispatcher, worktree
+	}
+	firesEvent := func(name string) any {
+		return mock.MatchedBy(func(e event.Event) bool { return e.Name() == name })
+	}
+
+	t.Run("installing the resolved lock", func(t *testing.T) {
+		ws, mockComposer, _, worktree := newRunner(t)
+		mockComposer.EXPECT().Install(anyCtx, "/tmp").Return(assert.AnError)
+
+		err := ws.updateSharedCode(t.Context(), worktree, "/tmp", "update-x")
+		require.ErrorIs(t, err, assert.AnError)
+		assert.Contains(t, err.Error(), "failed to install updated dependencies")
+	})
+
+	t.Run("post-composer-update", func(t *testing.T) {
+		ws, mockComposer, dispatcher, worktree := newRunner(t)
+		mockComposer.EXPECT().Install(anyCtx, "/tmp").Return(nil)
+		dispatcher.EXPECT().FireEvent(firesEvent("post-composer-update")).Return(assert.AnError)
+
+		err := ws.updateSharedCode(t.Context(), worktree, "/tmp", "update-x")
+		require.ErrorIs(t, err, assert.AnError)
+		assert.Contains(t, err.Error(), "failed to fire event")
+	})
+
+	t.Run("staging composer files", func(t *testing.T) {
+		ws, mockComposer, dispatcher, worktree := newRunner(t)
+		mockComposer.EXPECT().Install(anyCtx, "/tmp").Return(nil)
+		dispatcher.EXPECT().FireEvent(firesEvent("post-composer-update")).Return(nil)
+		worktree.EXPECT().AddGlob("composer.*").Return(assert.AnError)
+
+		err := ws.updateSharedCode(t.Context(), worktree, "/tmp", "update-x")
+		require.ErrorIs(t, err, assert.AnError)
+		assert.Contains(t, err.Error(), "failed to add composer.* files")
+	})
+
+	t.Run("committing", func(t *testing.T) {
+		ws, mockComposer, dispatcher, worktree := newRunner(t)
+		mockComposer.EXPECT().Install(anyCtx, "/tmp").Return(nil)
+		dispatcher.EXPECT().FireEvent(firesEvent("post-composer-update")).Return(nil)
+		worktree.EXPECT().AddGlob("composer.*").Return(nil)
+		worktree.EXPECT().Status().Return(git.Status{}, nil)
+		worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.ZeroHash, assert.AnError)
+
+		err := ws.updateSharedCode(t.Context(), worktree, "/tmp", "update-x")
+		require.ErrorIs(t, err, assert.AnError)
+		assert.Contains(t, err.Error(), "failed to commit composer.json and composer.lock")
+	})
+
+	t.Run("post-code-update", func(t *testing.T) {
+		ws, mockComposer, dispatcher, worktree := newRunner(t)
+		mockComposer.EXPECT().Install(anyCtx, "/tmp").Return(nil)
+		dispatcher.EXPECT().FireEvent(firesEvent("post-composer-update")).Return(nil)
+		dispatcher.EXPECT().FireEvent(firesEvent("post-code-update")).Return(assert.AnError)
+		worktree.EXPECT().AddGlob("composer.*").Return(nil)
+		worktree.EXPECT().Status().Return(git.Status{}, nil)
+		worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.ZeroHash, nil)
+
+		err := ws.updateSharedCode(t.Context(), worktree, "/tmp", "update-x")
+		require.ErrorIs(t, err, assert.AnError)
+		assert.Contains(t, err.Error(), "failed to fire event")
+	})
+
+	t.Run("checking out the update branch", func(t *testing.T) {
+		ws, mockComposer, dispatcher, worktree := newRunner(t)
+		mockComposer.EXPECT().Install(anyCtx, "/tmp").Return(nil)
+		dispatcher.EXPECT().FireEvent(mock.Anything).Return(nil)
+		worktree.EXPECT().AddGlob("composer.*").Return(nil)
+		worktree.EXPECT().Status().Return(git.Status{}, nil)
+		worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.ZeroHash, nil)
+		worktree.EXPECT().Checkout(mock.MatchedBy(func(opts *git.CheckoutOptions) bool {
+			return opts.Branch.Short() == "update-x" && opts.Create
+		})).Return(assert.AnError)
+
+		err := ws.updateSharedCode(t.Context(), worktree, "/tmp", "update-x")
+		require.ErrorIs(t, err, assert.AnError)
+		assert.Contains(t, err.Error(), "failed to checkout branch")
+	})
 }
 
 func TestRunBranchAlreadyExists(t *testing.T) {
@@ -402,10 +575,6 @@ func TestRunBranchAlreadyExists(t *testing.T) {
 	}
 
 	worktree := NewMockWorktree(t)
-	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
-	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
-	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
-	// updateSharedCode checks out a dedicated work branch before doing any work.
 	worktree.EXPECT().Checkout(mock.Anything).Return(nil).Maybe()
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
@@ -426,13 +595,6 @@ func TestRunBranchAlreadyExists(t *testing.T) {
 	}, nil)
 	mockComposer.EXPECT().GetLockHash("/tmp").Return("dummy-hash", nil)
 
-	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil).Maybe()
-	installer.EXPECT().ConfigureDatabase(anyCtx, "/tmp", "site1").Return(nil).Maybe()
-	installer.EXPECT().RestoreSettings(anyCtx, "/tmp", "site1").Return(nil).Maybe()
-	drush.EXPECT().UpdateSite(anyCtx, "/tmp", "site1").Return(nil).Maybe()
-	drush.EXPECT().ExportConfiguration(anyCtx, "/tmp", "site1").Return(nil).Maybe()
-	drush.EXPECT().ConfigResave(anyCtx, "/tmp", "site1").Return(nil).Maybe()
-
 	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
 	err := workflowService.Run(ctx, nil)
 
@@ -441,6 +603,7 @@ func TestRunBranchAlreadyExists(t *testing.T) {
 	require.ErrorAs(t, err, &abortErr)
 	assert.Contains(t, err.Error(), "already exists")
 	repositoryService.AssertExpectations(t)
+	installer.AssertNotCalled(t, "Install", mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestRunLocalBranchAlreadyExists(t *testing.T) {
@@ -467,9 +630,6 @@ func TestRunLocalBranchAlreadyExists(t *testing.T) {
 	}
 
 	worktree := NewMockWorktree(t)
-	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
-	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
-	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	worktree.EXPECT().Checkout(mock.Anything).Return(nil).Maybe()
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
@@ -486,13 +646,6 @@ func TestRunLocalBranchAlreadyExists(t *testing.T) {
 	}, nil)
 	mockComposer.EXPECT().GetLockHash("/tmp").Return("dummy-hash", nil)
 
-	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil).Maybe()
-	installer.EXPECT().ConfigureDatabase(anyCtx, "/tmp", "site1").Return(nil).Maybe()
-	installer.EXPECT().RestoreSettings(anyCtx, "/tmp", "site1").Return(nil).Maybe()
-	drush.EXPECT().UpdateSite(anyCtx, "/tmp", "site1").Return(nil).Maybe()
-	drush.EXPECT().ExportConfiguration(anyCtx, "/tmp", "site1").Return(nil).Maybe()
-	drush.EXPECT().ConfigResave(anyCtx, "/tmp", "site1").Return(nil).Maybe()
-
 	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
 	err := workflowService.Run(ctx, nil)
 
@@ -500,6 +653,7 @@ func TestRunLocalBranchAlreadyExists(t *testing.T) {
 	require.ErrorAs(t, err, &abortErr)
 	assert.Contains(t, err.Error(), "already exists locally")
 	repositoryService.AssertNotCalled(t, "BranchExists", mock.Anything, mock.Anything, mock.Anything)
+	installer.AssertNotCalled(t, "Install", mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestRunLocalBranchLookupError(t *testing.T) {
@@ -525,9 +679,6 @@ func TestRunLocalBranchLookupError(t *testing.T) {
 	}
 
 	worktree := NewMockWorktree(t)
-	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
-	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
-	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
 	worktree.EXPECT().Checkout(mock.Anything).Return(nil).Maybe()
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
@@ -544,18 +695,12 @@ func TestRunLocalBranchLookupError(t *testing.T) {
 	}, nil)
 	mockComposer.EXPECT().GetLockHash("/tmp").Return("dummy-hash", nil)
 
-	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil).Maybe()
-	installer.EXPECT().ConfigureDatabase(anyCtx, "/tmp", "site1").Return(nil).Maybe()
-	installer.EXPECT().RestoreSettings(anyCtx, "/tmp", "site1").Return(nil).Maybe()
-	drush.EXPECT().UpdateSite(anyCtx, "/tmp", "site1").Return(nil).Maybe()
-	drush.EXPECT().ExportConfiguration(anyCtx, "/tmp", "site1").Return(nil).Maybe()
-	drush.EXPECT().ConfigResave(anyCtx, "/tmp", "site1").Return(nil).Maybe()
-
 	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
 	err := workflowService.Run(ctx, nil)
 
 	require.ErrorIs(t, err, lookupErr)
 	repositoryService.AssertNotCalled(t, "BranchExists", mock.Anything, mock.Anything, mock.Anything)
+	installer.AssertNotCalled(t, "Install", mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestRunWithDryRun(t *testing.T) {
@@ -879,7 +1024,7 @@ func TestPublishWorkPushFails(t *testing.T) {
 }
 
 func TestRunGetLockHashError(t *testing.T) {
-	// If GetLockHash fails, updateSharedCode propagates the error.
+	// If GetLockHash fails, resolveUpdate propagates the error.
 	logger := zap.NewNop()
 	installer := NewMockInstaller(t)
 	repositoryService := NewMockRepository(t)
@@ -900,10 +1045,6 @@ func TestRunGetLockHashError(t *testing.T) {
 	}
 
 	worktree := NewMockWorktree(t)
-	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
-	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
-	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
-	// updateSharedCode checks out a dedicated work branch before doing any work.
 	worktree.EXPECT().Checkout(mock.Anything).Return(nil).Maybe()
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
@@ -918,17 +1059,16 @@ func TestRunGetLockHashError(t *testing.T) {
 	hashErr := errors.New("composer.lock not found")
 	mockComposer.EXPECT().GetLockHash("/tmp").Return("", hashErr)
 
-	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil).Maybe()
-
 	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
 	err := workflowService.Run(ctx, nil)
 
 	require.ErrorIs(t, err, hashErr)
 	repository.AssertNotCalled(t, "Push", mock.Anything)
+	installer.AssertNotCalled(t, "Install", mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestRunBranchExistsError(t *testing.T) {
-	// If BranchExists returns an error, updateSharedCode propagates it.
+	// If BranchExists returns an error, resolveUpdate propagates it.
 	logger := zap.NewNop()
 	installer := NewMockInstaller(t)
 	repositoryService := NewMockRepository(t)
@@ -949,10 +1089,6 @@ func TestRunBranchExistsError(t *testing.T) {
 	}
 
 	worktree := NewMockWorktree(t)
-	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
-	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
-	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
-	// updateSharedCode checks out a dedicated work branch before doing any work.
 	worktree.EXPECT().Checkout(mock.Anything).Return(nil).Maybe()
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
@@ -969,13 +1105,12 @@ func TestRunBranchExistsError(t *testing.T) {
 	repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound)
 	repositoryService.EXPECT().BranchExists(repository, mock.Anything, mock.Anything).Return(false, branchErr)
 
-	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil).Maybe()
-
 	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
 	err := workflowService.Run(ctx, nil)
 
 	require.ErrorContains(t, err, "failed to check if branch exists")
 	require.ErrorIs(t, err, branchErr)
+	installer.AssertNotCalled(t, "Install", mock.Anything, mock.Anything, mock.Anything)
 }
 
 func TestRunConfigResaveError(t *testing.T) {
@@ -1401,7 +1536,7 @@ func TestRunUsesExistingCheckout(t *testing.T) {
 }
 
 func TestRunWorkBranchCheckoutError(t *testing.T) {
-	// If the up-front work-branch checkout fails, updateSharedCode aborts before touching
+	// If the up-front work-branch checkout fails, resolveUpdate aborts before touching
 	// dependencies and nothing is published.
 	logger := zap.NewNop()
 	installer := NewMockInstaller(t)
@@ -1430,7 +1565,6 @@ func TestRunWorkBranchCheckoutError(t *testing.T) {
 	repositoryService.EXPECT().IsShallowClone("/tmp").Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, "/tmp").Return("", nil)
 	mockComposer.EXPECT().Install(anyCtx, "/tmp").Return(nil)
-	installer.EXPECT().Install(anyCtx, "/tmp", "site1").Return(nil)
 
 	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
 	err := workflowService.Run(ctx, nil)
@@ -1975,6 +2109,8 @@ func TestRunFailsWhenScaffoldChangesCannotBeStaged(t *testing.T) {
 	mockComposer.EXPECT().Install(anyCtx, "/tmp").Return(nil)
 	mockComposer.EXPECT().Update(anyCtx, "/tmp", mock.Anything, mock.Anything, false, false).
 		Return([]composer.PackageChange{{Package: "drupal/core", From: "9.0.0", To: "9.1.0"}}, nil)
+	mockComposer.EXPECT().GetLockHash("/tmp").Return("dummy-hash", nil)
+	repositoryService.EXPECT().BranchExists(repository, "update-dummy-hash", "token").Return(false, nil)
 
 	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer, event.NewManager(""))
 	err := workflowService.Run(context.Background(), nil)

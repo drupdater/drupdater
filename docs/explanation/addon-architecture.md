@@ -21,8 +21,8 @@ other one is disabled" — because none of them ever depended on another being t
 
 | Event | Fired | Mutable payload |
 |---|---|---|
-| `pre-composer-update` | Before `composer update` | `PackagesToUpdate`, `PackagesToKeep`, `MinimalChanges` |
-| `post-composer-update` | After the update, before the commit | — |
+| `pre-composer-update` | Before `composer update`, which only writes the lock — before any site is installed | `PackagesToUpdate`, `PackagesToKeep`, `MinimalChanges` |
+| `post-composer-update` | After the resolved update is installed into `vendor/`, before the commit | — |
 | `post-code-update` | After `composer.json`/`.lock` are committed | — |
 | `pre-site-update` | Before each site's update hooks | — (carries the site name) |
 | `post-site-update` | After each site's hooks, before config export | — (carries the site name) |

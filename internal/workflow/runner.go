@@ -192,6 +192,16 @@ func (r *Runner) runPhases(
 		return err
 	}
 
+	// Ahead of the baseline install, so a run with nothing to do stops before installing any site.
+	var updateBranchName string
+	if err := rec.Run("resolve update", func() error {
+		var err error
+		updateBranchName, err = r.resolveUpdate(ctx, repository, worktree, path, rec)
+		return err
+	}); err != nil {
+		return err
+	}
+
 	// Install each site at the current (old) code to create the baseline database.
 	if err := rec.Run("baseline site install", func() error {
 		return r.forEachSite(ctx, func(ctx context.Context, site string) error {
@@ -204,12 +214,9 @@ func (r *Runner) runPhases(
 		return err
 	}
 
-	// Update the shared code: composer update, commit, and create the update branch.
-	var updateBranchName string
+	// Update the shared code: install the resolved update, commit, and create the update branch.
 	if err := rec.Run("update shared code", func() error {
-		var err error
-		updateBranchName, err = r.updateSharedCode(ctx, repository, worktree, path, rec)
-		return err
+		return r.updateSharedCode(ctx, worktree, path, updateBranchName)
 	}); err != nil {
 		return err
 	}
@@ -373,8 +380,10 @@ func (r *Runner) cleanup(path string) {
 	}
 }
 
-func (r *Runner) updateSharedCode(ctx context.Context, repository GitRepository, worktree Worktree, path string, rec *report.Recorder) (string, error) {
-	r.logger.Info("updating dependencies")
+// resolveUpdate settles what the update changes and what its branch is called, touching only
+// composer.json and composer.lock: vendor/ keeps the old code for the baseline install.
+func (r *Runner) resolveUpdate(ctx context.Context, repository GitRepository, worktree Worktree, path string, rec *report.Recorder) (string, error) {
+	r.logger.Info("resolving dependency updates")
 
 	// A dedicated branch: the addons commit as they go, and a mid-run failure would otherwise
 	// strand those commits on the user's own branch. Flat name, not "drupdater/work-<ts>":
@@ -406,7 +415,7 @@ func (r *Runner) updateSharedCode(ctx context.Context, repository GitRepository,
 	for _, c := range changes {
 		byAction[c.Action]++
 	}
-	r.logger.Info("dependencies updated",
+	r.logger.Info("dependencies resolved",
 		zap.Int("total", len(changes)),
 		zap.Int("installed", byAction["Install"]),
 		zap.Int("upgraded", byAction["Upgrade"]),
@@ -414,35 +423,46 @@ func (r *Runner) updateSharedCode(ctx context.Context, repository GitRepository,
 		zap.Int("removed", byAction["Remove"]),
 	)
 
-	postComposerUpdateEvent := NewPostComposerUpdateEvent(ctx, path, worktree)
-	if err := r.dispatcher.FireEvent(postComposerUpdateEvent); err != nil {
-		return "", fmt.Errorf("failed to fire event: %w", err)
-	}
-
-	if err := worktree.AddGlob("composer.*"); err != nil {
-		return "", fmt.Errorf("failed to add composer.* files: %w", err)
-	}
-	if err := r.stageScaffoldChanges(ctx, path, worktree); err != nil {
-		return "", err
-	}
-	if _, err := worktree.Commit("Update composer.json and composer.lock", &git.CommitOptions{}); err != nil {
-		return "", fmt.Errorf("failed to commit composer.json and composer.lock: %w", err)
-	}
-
-	postCodeUpdateEvent := NewPostCodeUpdateEvent(ctx, path, worktree)
-	if err := r.dispatcher.FireEvent(postCodeUpdateEvent); err != nil {
-		return "", fmt.Errorf("failed to fire event: %w", err)
-	}
-
+	// Named from the lock as resolved, before any addon rewrites composer.json, so the name can
+	// be checked here rather than after the site installs.
 	composerLockHash, err := r.composer.GetLockHash(path)
 	if err != nil {
 		return "", err
 	}
-
 	updateBranchName := fmt.Sprintf("update-%s", composerLockHash)
 
 	if err := r.ensureUpdateBranchAvailable(repository, updateBranchName); err != nil {
 		return "", err
+	}
+	return updateBranchName, nil
+}
+
+// updateSharedCode brings vendor/ to the resolved lock, lets the addons work on the new code, and
+// moves the accumulated commits onto updateBranchName.
+func (r *Runner) updateSharedCode(ctx context.Context, worktree Worktree, path string, updateBranchName string) error {
+	r.logger.Info("installing updated dependencies")
+	if err := r.composer.Install(ctx, path); err != nil {
+		return fmt.Errorf("failed to install updated dependencies: %w", err)
+	}
+
+	postComposerUpdateEvent := NewPostComposerUpdateEvent(ctx, path, worktree)
+	if err := r.dispatcher.FireEvent(postComposerUpdateEvent); err != nil {
+		return fmt.Errorf("failed to fire event: %w", err)
+	}
+
+	if err := worktree.AddGlob("composer.*"); err != nil {
+		return fmt.Errorf("failed to add composer.* files: %w", err)
+	}
+	if err := r.stageScaffoldChanges(ctx, path, worktree); err != nil {
+		return err
+	}
+	if _, err := worktree.Commit("Update composer.json and composer.lock", &git.CommitOptions{}); err != nil {
+		return fmt.Errorf("failed to commit composer.json and composer.lock: %w", err)
+	}
+
+	postCodeUpdateEvent := NewPostCodeUpdateEvent(ctx, path, worktree)
+	if err := r.dispatcher.FireEvent(postCodeUpdateEvent); err != nil {
+		return fmt.Errorf("failed to fire event: %w", err)
 	}
 
 	// Create the final branch from the work branch's tip (carrying the accumulated commits).
@@ -452,10 +472,10 @@ func (r *Runner) updateSharedCode(ctx context.Context, repository GitRepository,
 		Force:  false,
 		Keep:   true,
 	}); err != nil {
-		return "", fmt.Errorf("failed to checkout branch: %w", err)
+		return fmt.Errorf("failed to checkout branch: %w", err)
 	}
 
-	return updateBranchName, nil
+	return nil
 }
 
 // ensureUpdateBranchAvailable returns an AbortError if updateBranchName is already taken, locally

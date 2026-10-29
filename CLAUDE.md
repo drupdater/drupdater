@@ -93,7 +93,7 @@ Where things live. For *how they work*, read `docs/explanation/` rather than dup
 |---|---|
 | `main.go` → `cmd/root.go` | Cobra commands, flag parsing, service construction, `addonRegistry`, `mandatoryAddons` |
 | `cmd/check.go` | The `check` command and its cheap/full check tiers |
-| `internal/workflow/runner.go` | `Runner.Run` and the eight phases |
+| `internal/workflow/runner.go` | `Runner.Run` and the nine phases |
 | `internal/workflow/event.go` | The six workflow events and `AbortError` |
 | `internal/workflow/preflight.go` | Checks shared between `check` and the run's own `preflight` phase |
 | `internal/addon/` | The ten addons |

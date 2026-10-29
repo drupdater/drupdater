@@ -35,6 +35,7 @@ def phase_order: [
   "acquire working copy",
   "preflight",
   "composer install",
+  "resolve update",
   "baseline site install",
   "update shared code",
   "site update",

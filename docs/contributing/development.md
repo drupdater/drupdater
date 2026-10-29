@@ -512,7 +512,7 @@ Adding one is appending an entry — the workflow needs no edit.
 The last four exist because assertions that only ever see a successful run cannot catch a
 regression that makes Drupdater fail in the wrong place, or report a failure as a success.
 
-No fixture covers a failure in `update shared code`. `composer install` validates the lock
+No fixture covers a failure in `resolve update`. `composer install` validates the lock
 against `composer.json`, so almost any breakage of the latter is caught one phase earlier; a
 failure that first appears during the update needs a lock that agrees with `composer.json` but
 cannot be resolved forward, which depends on upstream state no fixture can pin down.
