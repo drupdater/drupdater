@@ -123,7 +123,7 @@ func TestConfigureDatabaseIsIdempotent(t *testing.T) {
 
 func TestRestoreSettingsPutsBackTheProjectsFileExactly(t *testing.T) {
 	const original = "<?php\n\n$settings['config_sync_directory'] = '../config/sync';\n"
-	installer, fs, drush, composer := newTestInstaller(t, coreExtensionWithSqlite, original)
+	installer, fs, drush, composer, logs := newTestInstallerWithLogs(t, coreExtensionWithSqlite, original)
 
 	composer.EXPECT().GetConfig(t.Context(), "/project", "extra.drupal-scaffold.locations.web-root").Return("web", nil)
 	drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1", false).Return("/config/sync", nil)
@@ -138,6 +138,13 @@ func TestRestoreSettingsPutsBackTheProjectsFileExactly(t *testing.T) {
 	restored, err := afero.ReadFile(fs, "/project/web/sites/site1/settings.php")
 	require.NoError(t, err)
 	assert.Equal(t, original, string(restored))
+
+	// Debug output is the only trace of which file a run rewrote.
+	for _, msg := range []string{"writing settings", "restoring settings"} {
+		entries := logs.FilterMessage(msg).All()
+		require.Len(t, entries, 1, msg)
+		assert.Equal(t, "/project/web/sites/site1/settings.php", entries[0].ContextMap()["path"], msg)
+	}
 }
 
 func TestRestoreSettingsWithoutABlockDoesNotWrite(t *testing.T) {
@@ -172,6 +179,8 @@ func TestStripSettingsBlock(t *testing.T) {
 		"only the one newline the block starts with is removed")
 	assert.Equal(t, "<?php", string(stripSettingsBlock([]byte("<?php\n"+settingsMarker+"\n"))))
 	assert.Empty(t, stripSettingsBlock([]byte(settingsMarker+"\n")))
+	assert.Equal(t, "<?php", string(stripSettingsBlock([]byte("<?php"+settingsMarker+"\n"))),
+		"a character other than a newline before the marker is the project's")
 	assert.Equal(t, "<?php\n", string(stripSettingsBlock([]byte("<?php\n"))))
 }
 

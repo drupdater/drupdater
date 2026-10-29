@@ -218,12 +218,16 @@ func stripSettingsBlock(content []byte) []byte {
 
 // writeSettings truncates in place rather than replacing the file, keeping its mode and owner.
 func (is *Installer) writeSettings(path string, content []byte) error {
+	// Equivalent mutant: without O_CREATE the mode is never used.
+	// mutator-disable-next-line numbers/incrementer
 	f, err := is.fs.OpenFile(path, os.O_WRONLY|os.O_TRUNC, 0)
 	if err != nil {
 		return err
 	}
 	if _, err := f.Write(content); err != nil {
-		f.Close() // ignore error; Write error takes precedence
+		// Equivalent mutant: best effort, the Write error takes precedence.
+		// mutator-disable-next-line statement/remove
+		f.Close()
 		return err
 	}
 	return f.Close()

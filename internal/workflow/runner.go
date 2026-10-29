@@ -364,13 +364,12 @@ func (r *Runner) forEachSite(ctx context.Context, fn func(context.Context, strin
 // cleanup removes a clone-mode run's temp clone. Site databases live in the installer's own
 // directory, which its owner removes.
 func (r *Runner) cleanup(path string) {
-	if !r.config.Clone {
-		return
-	}
-	// This run's own directory, not the shared per-URL parent, so a concurrent run of the same
-	// repository isn't wiped out. The Rel guard keeps the temp dir itself safe.
-	if rel, err := filepath.Rel(os.TempDir(), path); err == nil && rel != "." && !strings.HasPrefix(rel, "..") {
-		os.RemoveAll(path)
+	if r.config.Clone {
+		// This run's own directory, not the shared per-URL parent, so a concurrent run of the
+		// same repository isn't wiped out. The Rel guard keeps the temp dir itself safe.
+		if rel, err := filepath.Rel(os.TempDir(), path); err == nil && rel != "." && !strings.HasPrefix(rel, "..") {
+			os.RemoveAll(path)
+		}
 	}
 }
 
