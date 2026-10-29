@@ -18,8 +18,8 @@ type Composer interface {
 	Diff(ctx context.Context, path string) ([]composer.DiffEntry, error)
 
 	GetInstalledPackageVersion(ctx context.Context, dir string, packageName string) (string, error)
-	GetAllowPlugins(ctx context.Context, dir string) (map[string]bool, error)
-	SetAllowPlugins(ctx context.Context, dir string, plugins map[string]bool) error
+	GetAllowPlugins(dir string) (composer.AllowPlugins, error)
+	UnsetConfig(ctx context.Context, dir string, key string) error
 	GetConfig(ctx context.Context, dir string, key string) (string, error)
 	SetConfig(ctx context.Context, dir string, key string, value string) error
 	GetDependencyPatches(ctx context.Context, dir string) (map[string]map[string]bool, error)

@@ -170,7 +170,7 @@ it runs last — so the report reflects everything that happened, including fail
 other cleanup.
 
 **A failed run restores the original checkout.** The captured HEAD is force-checked-out,
-discarding stray commits on the work branch and — importantly — any `allow-plugins: true`
+discarding stray commits on the work branch and — importantly — the temporary `"*": true` `allow-plugins` rule
 that [`composer_allow_plugins`](../reference/addons/composer-allow-plugins.md) left in
 `composer.json`. Errors during restore are logged but never returned: they must not mask
 the original failure.

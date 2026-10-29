@@ -48,48 +48,85 @@ func TestNewCLI(t *testing.T) {
 	assert.NotNil(t, cli.fs)
 }
 
-func TestGetAllowPluginsPolymorphicShapes(t *testing.T) {
-	// Only the object form carries entries; the rest mean "nothing to merge" and must not fail
-	// the run, since composer_allow_plugins is mandatory.
-	for _, shape := range []string{"true", "false", "[]", "null", ""} {
-		t.Run("shape "+shape, func(t *testing.T) {
-			stubComposerOutput(t, shape)
+func allowPluginsFrom(t *testing.T, manifest string) (AllowPlugins, error) {
+	t.Helper()
+	fs := afero.NewMemMapFs()
+	require.NoError(t, afero.WriteFile(fs, "/project/composer.json", []byte(manifest), 0o644))
+	return (&CLI{logger: zap.NewNop(), fs: fs}).GetAllowPlugins("/project")
+}
 
-			service := &CLI{logger: zap.NewNop()}
-			plugins, err := service.GetAllowPlugins(t.Context(), "/tmp")
+func TestGetAllowPluginsReadsEveryShape(t *testing.T) {
+	yes, no := true, false
+	for name, tt := range map[string]struct {
+		manifest string
+		want     AllowPlugins
+	}{
+		"absent":       {`{"config": {}}`, AllowPlugins{}},
+		"no config":    {`{}`, AllowPlugins{}},
+		"null":         {`{"config": {"allow-plugins": null}}`, AllowPlugins{}},
+		"true":         {`{"config": {"allow-plugins": true}}`, AllowPlugins{Set: true, All: &yes}},
+		"false":        {`{"config": {"allow-plugins": false}}`, AllowPlugins{Set: true, All: &no}},
+		"empty object": {`{"config": {"allow-plugins": {}}}`, AllowPlugins{Set: true, Rules: map[string]bool{}}},
+		"empty array":  {`{"config": {"allow-plugins": []}}`, AllowPlugins{Set: true, Rules: map[string]bool{}}},
+		"rules": {`{"config": {"allow-plugins": {"drupal/*": true, "phpro/grumphp-shim": false}}}`,
+			AllowPlugins{Set: true, Rules: map[string]bool{"drupal/*": true, "phpro/grumphp-shim": false}}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			got, err := allowPluginsFrom(t, tt.manifest)
+
 			require.NoError(t, err)
-			require.NotNil(t, plugins, "the result is written to by callers and must never be nil")
-			assert.Empty(t, plugins)
+			assert.Equal(t, tt.want, got)
 		})
 	}
+}
 
-	t.Run("an unset key is not a failure", func(t *testing.T) {
-		// `composer config allow-plugins` exits non-zero when the key is absent.
-		stubComposerFailure(t)
-
-		service := &CLI{logger: zap.NewNop()}
-		plugins, err := service.GetAllowPlugins(t.Context(), "/tmp")
-		require.NoError(t, err)
-		require.NotNil(t, plugins)
-		assert.Empty(t, plugins)
+func TestGetAllowPluginsErrors(t *testing.T) {
+	t.Run("no composer.json", func(t *testing.T) {
+		_, err := (&CLI{logger: zap.NewNop(), fs: afero.NewMemMapFs()}).GetAllowPlugins("/project")
+		require.ErrorContains(t, err, "failed to read composer.json")
 	})
-
-	t.Run("malformed JSON is still an error", func(t *testing.T) {
-		stubComposerOutput(t, `{"broken": `)
-
-		service := &CLI{logger: zap.NewNop()}
-		_, err := service.GetAllowPlugins(t.Context(), "/tmp")
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to parse composer allow-plugins config")
+	t.Run("composer.json is not JSON", func(t *testing.T) {
+		_, err := allowPluginsFrom(t, `{"config": `)
+		require.ErrorContains(t, err, "failed to parse composer.json")
+	})
+	t.Run("a rule that is not a boolean", func(t *testing.T) {
+		_, err := allowPluginsFrom(t, `{"config": {"allow-plugins": {"a/b": "yes"}}}`)
+		require.ErrorContains(t, err, `failed to parse composer allow-plugins config {"a/b": "yes"}`)
 	})
 }
 
-func TestSetAllowPluginsPropagatesError(t *testing.T) {
-	stubComposerFailure(t)
+// The patterns behave as in Composer's PluginManager: anchored, case-insensitive, * for anything.
+func TestAllowPluginsDecides(t *testing.T) {
+	yes := true
+	rules := AllowPlugins{Set: true, Rules: map[string]bool{"drupal/*": true, "cweagans/composer-patches": false, "a.b/c": true}}
 
-	service := &CLI{logger: zap.NewNop()}
-	err := service.SetAllowPlugins(t.Context(), "/tmp", map[string]bool{"a/b": true})
-	require.Error(t, err)
+	assert.True(t, rules.Decides("drupal/core-composer-scaffold"), "matched by a wildcard")
+	assert.True(t, rules.Decides("Drupal/Core-Composer-Scaffold"), "case-insensitive")
+	assert.True(t, rules.Decides("cweagans/composer-patches"), "a denial decides too")
+	assert.False(t, rules.Decides("cweagans/composer-patches-extra"), "anchored at the end")
+	assert.False(t, rules.Decides("acme/drupal/x"), "anchored at the start")
+	assert.False(t, rules.Decides("aXb/c"), "a dot is literal")
+	assert.False(t, rules.Decides("php-http/discovery"))
+	assert.False(t, AllowPlugins{}.Decides("drupal/core"), "no setting decides nothing")
+	assert.True(t, AllowPlugins{Set: true, All: &yes}.Decides("anything/at-all"))
+}
+
+func TestUnsetConfig(t *testing.T) {
+	var args []string
+	execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+		args = arg
+		cs := append([]string{"-test.run=TestHelperProcess", "--", ""}, arg...)
+		cmd := exec.CommandContext(ctx, os.Args[0], cs...)
+		cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
+		return cmd
+	}
+	t.Cleanup(func() { execCommand = exec.CommandContext })
+
+	require.NoError(t, (&CLI{logger: zap.NewNop()}).UnsetConfig(t.Context(), "/tmp", "allow-plugins.*"))
+	assert.Equal(t, []string{"config", "--unset", "allow-plugins.*"}, args)
+
+	stubComposerFailure(t)
+	require.Error(t, (&CLI{logger: zap.NewNop()}).UnsetConfig(t.Context(), "/tmp", "allow-plugins.*"))
 }
 
 func TestCleanup(t *testing.T) {
