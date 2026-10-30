@@ -91,6 +91,7 @@ func TestRunWithConcurrentSites(t *testing.T) {
 		drush.EXPECT().ExportConfiguration(anyCtx, testCheckout, site).RunAndReturn(commitTail.probe)
 		worktree.EXPECT().Add("config/"+site).Return(plumbing.ZeroHash, nil)
 		drush.EXPECT().ConfigResave(anyCtx, testCheckout, site).Return(nil)
+		drush.EXPECT().LocalFacts(anyCtx, testCheckout, site).Return(syncFacts(testCheckout+"/config/"+site), nil)
 	}
 
 	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
@@ -144,6 +145,7 @@ func turnsRunner(t *testing.T, sites []string, concurrency int, stub func(site s
 			return stub(site)
 		})
 		drush.EXPECT().ConfigResave(anyCtx, testCheckout, site).Return(nil).Maybe()
+		drush.EXPECT().LocalFacts(anyCtx, testCheckout, site).Return(syncFacts(testCheckout+"/config/"+site), nil).Maybe()
 		drush.EXPECT().ExportConfiguration(anyCtx, testCheckout, site).RunAndReturn(func(context.Context, string, string) error {
 			mu.Lock()
 			defer mu.Unlock()

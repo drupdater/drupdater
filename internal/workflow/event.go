@@ -112,7 +112,7 @@ func (e *PreSiteUpdateEvent) Site() string {
 	return e.site
 }
 
-// Facts is what the site reported before its database was updated.
+// Facts is what the site reported before its update hooks ran.
 func (e *PreSiteUpdateEvent) Facts() drush.Facts {
 	return e.facts.Clone()
 }
@@ -139,7 +139,7 @@ func (e *PostSiteUpdateEvent) Site() string {
 	return e.site
 }
 
-// Facts is what the site reported before its database was updated.
+// Facts is what the site reported after its update hooks ran, without UnsupportedModules.
 func (e *PostSiteUpdateEvent) Facts() drush.Facts {
 	return e.facts.Clone()
 }

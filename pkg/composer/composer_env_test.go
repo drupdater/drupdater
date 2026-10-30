@@ -2,6 +2,7 @@ package composer
 
 import (
 	"context"
+	"github.com/drupdater/drupdater/pkg/php"
 	"os"
 	"os/exec"
 	"testing"
@@ -17,88 +18,14 @@ func helperEnv(extra ...string) []string {
 	return append([]string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}, extra...)
 }
 
-// fakeComposer replaces execCommand with the helper process for the duration of the test and
-// gives it the supplied environment.
-func fakeComposer(t *testing.T, env []string) {
-	t.Helper()
-	execCommand = func(ctx context.Context, name string, arg ...string) *exec.Cmd {
+// composerWithEnv is the helper process, given the supplied environment.
+func composerWithEnv(env []string) php.CommandFactory {
+	return func(ctx context.Context, name string, arg ...string) *exec.Cmd {
 		cs := append([]string{"-test.run=TestHelperProcess", "--", name}, arg...)
 		cmd := exec.CommandContext(ctx, os.Args[0], cs...) //nolint:gosec // test helper process
 		cmd.Env = env
 		return cmd
 	}
-	t.Cleanup(func() { execCommand = exec.CommandContext })
-}
-
-func TestComposerEnv(t *testing.T) {
-	t.Run("forces the settings drupdater depends on when they are absent", func(t *testing.T) {
-		got := Env([]string{"PATH=/usr/bin"})
-
-		assert.Contains(t, got, "PATH=/usr/bin", "unrelated entries must survive")
-		assert.Contains(t, got, "COMPOSER_PROCESS_TIMEOUT=0")
-		assert.Contains(t, got, "COMPOSER_NO_AUDIT=1")
-	})
-
-	t.Run("overrides an inherited value, leaving exactly one entry per variable", func(t *testing.T) {
-		got := Env([]string{
-			"COMPOSER_PROCESS_TIMEOUT=300",
-			"COMPOSER_NO_AUDIT=0",
-			"COMPOSER_AUTH={}",
-		})
-
-		// Not merely "the forced value is present": an inherited entry left in place would make
-		// the result depend on os/exec's de-duplication order rather than on this function.
-		assert.Equal(t, 1, countKey(got, "COMPOSER_PROCESS_TIMEOUT"))
-		assert.Equal(t, 1, countKey(got, "COMPOSER_NO_AUDIT"))
-		assert.Contains(t, got, "COMPOSER_PROCESS_TIMEOUT=0")
-		assert.Contains(t, got, "COMPOSER_NO_AUDIT=1")
-		assert.NotContains(t, got, "COMPOSER_PROCESS_TIMEOUT=300")
-		assert.NotContains(t, got, "COMPOSER_NO_AUDIT=0")
-		assert.Contains(t, got, "COMPOSER_AUTH={}", "COMPOSER_AUTH must be passed through untouched")
-	})
-
-	t.Run("leaves the image's policy variables to the environment", func(t *testing.T) {
-		// These are deployment policy, not correctness: forcing them would override a developer
-		// running the binary outside the image with a composer home of their own choosing.
-		got := Env([]string{
-			"COMPOSER_HOME=/home/dev/.composer",
-			"COMPOSER_CACHE_DIR=/home/dev/.cache/composer",
-			"COMPOSER_ALLOW_SUPERUSER=0",
-			"COMPOSER_FUND=1",
-		})
-
-		assert.Contains(t, got, "COMPOSER_HOME=/home/dev/.composer")
-		assert.Contains(t, got, "COMPOSER_CACHE_DIR=/home/dev/.cache/composer")
-		assert.Contains(t, got, "COMPOSER_ALLOW_SUPERUSER=0")
-		assert.Contains(t, got, "COMPOSER_FUND=1")
-	})
-
-	t.Run("keeps entries that are not KEY=VALUE", func(t *testing.T) {
-		// Including a bare variable name: os.Environ() does not promise every entry has "=",
-		// and a name alone assigns — and so overrides — nothing.
-		got := Env([]string{"NOT_AN_ASSIGNMENT", "COMPOSER_PROCESS_TIMEOUT"})
-
-		assert.Contains(t, got, "NOT_AN_ASSIGNMENT")
-		assert.Contains(t, got, "COMPOSER_PROCESS_TIMEOUT")
-	})
-
-	t.Run("preserves the order of the entries it keeps", func(t *testing.T) {
-		got := Env([]string{"A=1", "COMPOSER_NO_AUDIT=0", "B=2", "C=3"})
-
-		assert.Equal(t, []string{"A=1", "B=2", "C=3"}, withoutRequired(got),
-			"removing a forced entry must not reorder the rest")
-	})
-}
-
-// countKey returns how many entries of env assign key.
-func countKey(env []string, key string) int {
-	count := 0
-	for _, entry := range env {
-		if len(entry) > len(key) && entry[:len(key)+1] == key+"=" {
-			count++
-		}
-	}
-	return count
 }
 
 func TestExecComposerEnvironmentReachesTheSubprocess(t *testing.T) {
@@ -107,7 +34,7 @@ func TestExecComposerEnvironmentReachesTheSubprocess(t *testing.T) {
 	t.Run("execComposer forces the process timeout over an inherited one", func(t *testing.T) {
 		// Asserted on what the subprocess sees, not the slice drupdater built, so a value
 		// that never survives into the child is caught.
-		fakeComposer(t, helperEnv(
+		service.newCommand = composerWithEnv(helperEnv(
 			"GO_HELPER_PROCESS_PRINT_ENV=COMPOSER_PROCESS_TIMEOUT",
 			"COMPOSER_PROCESS_TIMEOUT=300",
 		))
@@ -118,7 +45,7 @@ func TestExecComposerEnvironmentReachesTheSubprocess(t *testing.T) {
 	})
 
 	t.Run("execComposer disables the implicit audit", func(t *testing.T) {
-		fakeComposer(t, helperEnv("GO_HELPER_PROCESS_PRINT_ENV=COMPOSER_NO_AUDIT"))
+		service.newCommand = composerWithEnv(helperEnv("GO_HELPER_PROCESS_PRINT_ENV=COMPOSER_NO_AUDIT"))
 
 		out, err := service.execComposer(t.Context(), "/tmp", "update")
 		require.NoError(t, err)
@@ -126,7 +53,7 @@ func TestExecComposerEnvironmentReachesTheSubprocess(t *testing.T) {
 	})
 
 	t.Run("execComposer passes the rest of the environment through", func(t *testing.T) {
-		fakeComposer(t, helperEnv(
+		service.newCommand = composerWithEnv(helperEnv(
 			"GO_HELPER_PROCESS_PRINT_ENV=COMPOSER_AUTH",
 			`COMPOSER_AUTH={"http-basic":{}}`,
 		))
@@ -137,7 +64,7 @@ func TestExecComposerEnvironmentReachesTheSubprocess(t *testing.T) {
 	})
 
 	t.Run("execComposerJSON forces the same settings", func(t *testing.T) {
-		fakeComposer(t, helperEnv(
+		service.newCommand = composerWithEnv(helperEnv(
 			"GO_HELPER_PROCESS_PRINT_ENV=COMPOSER_PROCESS_TIMEOUT",
 			"COMPOSER_PROCESS_TIMEOUT=300",
 		))
@@ -148,7 +75,7 @@ func TestExecComposerEnvironmentReachesTheSubprocess(t *testing.T) {
 	})
 
 	t.Run("execComposerJSON passes the rest of the environment through", func(t *testing.T) {
-		fakeComposer(t, helperEnv(
+		service.newCommand = composerWithEnv(helperEnv(
 			"GO_HELPER_PROCESS_PRINT_ENV=COMPOSER_AUTH",
 			`COMPOSER_AUTH={"http-basic":{}}`,
 		))
@@ -166,11 +93,10 @@ func TestExecComposerEnvironmentReachesTheSubprocess(t *testing.T) {
 		t.Setenv("GO_HELPER_PROCESS_PRINT_ENV", "COMPOSER_AUTH")
 		t.Setenv("COMPOSER_AUTH", "inherited")
 
-		execCommand = func(ctx context.Context, name string, arg ...string) *exec.Cmd {
+		service.newCommand = func(ctx context.Context, name string, arg ...string) *exec.Cmd {
 			cs := append([]string{"-test.run=TestHelperProcess", "--", name}, arg...)
 			return exec.CommandContext(ctx, os.Args[0], cs...) //nolint:gosec // test helper process
 		}
-		t.Cleanup(func() { execCommand = exec.CommandContext })
 
 		out, err := service.execComposer(t.Context(), "/tmp", "update")
 		require.NoError(t, err)
@@ -179,30 +105,28 @@ func TestExecComposerEnvironmentReachesTheSubprocess(t *testing.T) {
 }
 
 func TestWithoutBlocking(t *testing.T) {
-	printBlocking := func(t *testing.T) {
-		t.Helper()
-		execCommand = func(ctx context.Context, _ string, _ ...string) *exec.Cmd {
-			return exec.CommandContext(ctx, "sh", "-c", `printf %s "${COMPOSER_NO_BLOCKING-unset}"`) //nolint:gosec // fixed test script
-		}
-		t.Cleanup(func() { execCommand = exec.CommandContext })
+	printBlocking := func(ctx context.Context, _ string, _ ...string) *exec.Cmd {
+		return exec.CommandContext(ctx, "sh", "-c", `printf %s "${COMPOSER_NO_BLOCKING-unset}"`) //nolint:gosec // fixed test script
 	}
 
 	t.Run("turns composer's policy blocking off for every invocation", func(t *testing.T) {
-		printBlocking(t)
 		t.Setenv("COMPOSER_NO_BLOCKING", "0")
+		service := NewCLI(zap.NewNop(), WithoutBlocking())
+		service.newCommand = printBlocking
 
-		out, err := NewCLI(zap.NewNop(), WithoutBlocking()).execComposer(t.Context(), t.TempDir(), "update")
+		out, err := service.execComposer(t.Context(), t.TempDir(), "update")
 		require.NoError(t, err)
 
 		assert.Equal(t, "1", out, "it must also win over an inherited value")
 	})
 
 	t.Run("leaves blocking to the environment otherwise", func(t *testing.T) {
-		printBlocking(t)
 		t.Setenv("COMPOSER_NO_BLOCKING", "")
 		os.Unsetenv("COMPOSER_NO_BLOCKING")
+		service := NewCLI(zap.NewNop())
+		service.newCommand = printBlocking
 
-		out, err := NewCLI(zap.NewNop()).execComposer(t.Context(), t.TempDir(), "update")
+		out, err := service.execComposer(t.Context(), t.TempDir(), "update")
 		require.NoError(t, err)
 
 		assert.Equal(t, "unset", out)

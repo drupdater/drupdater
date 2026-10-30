@@ -79,26 +79,33 @@ func TestNewInstaller(t *testing.T) {
 func TestInstallStopsAtTheFirstFailure(t *testing.T) {
 	// Each guard must stop the run: continuing past a failed database configuration installs
 	// the site against the project's real database.
+	t.Run("config sync dir lookup fails", func(t *testing.T) {
+		installer, _, drush, _ := newTestInstaller(t, coreExtensionWithSqlite, "<?php\n")
+		drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1").Return("", assert.AnError)
+
+		require.ErrorIs(t, installer.Install(t.Context(), "/project", "site1"), assert.AnError)
+	})
+
 	t.Run("database configuration fails", func(t *testing.T) {
-		installer, _, _, composer := newTestInstaller(t, coreExtensionWithSqlite, "<?php\n")
+		installer, _, drush, composer := newTestInstaller(t, coreExtensionWithSqlite, "<?php\n")
+		drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1").Return("/config/sync", nil)
 		composer.EXPECT().GetConfig(t.Context(), "/project", "extra.drupal-scaffold.locations.web-root").
 			Return("", assert.AnError)
 
-		// No drush expectations: reaching RemoveProfile or InstallSite would fail the mock.
+		// No InstallSite expectation: reaching it would fail the mock.
 		err := installer.Install(t.Context(), "/project", "site1")
 		require.Error(t, err)
 		require.ErrorIs(t, err, assert.AnError)
 	})
 }
 
-func TestInstallerLooksUpTheConfigSyncDirectoryOncePerSite(t *testing.T) {
+func TestInstallLooksUpTheConfigSyncDirectoryOnce(t *testing.T) {
 	installer, _, drush, composer := newTestInstaller(t, coreExtensionWithoutSqlite, "<?php\n")
 	composer.EXPECT().GetConfig(t.Context(), "/project", "extra.drupal-scaffold.locations.web-root").Return("web", nil)
 	drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1").Return("/config/sync", nil).Once()
 	drush.EXPECT().InstallSite(t.Context(), "/project", "site1").Return(nil)
 
 	require.NoError(t, installer.Install(t.Context(), "/project", "site1"))
-	require.NoError(t, installer.ConfigureDatabase(t.Context(), "/project", "site1"))
 }
 
 func TestConfigureDatabaseIsIdempotent(t *testing.T) {
@@ -202,8 +209,16 @@ func TestConfigureDatabaseEnablesSqliteWhenMissing(t *testing.T) {
 }
 
 func TestConfigureDatabaseErrors(t *testing.T) {
+	t.Run("config sync dir lookup fails", func(t *testing.T) {
+		installer, _, drush, _ := newTestInstaller(t, coreExtensionWithSqlite, "<?php\n")
+		drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1").Return("", assert.AnError)
+
+		require.ErrorIs(t, installer.ConfigureDatabase(t.Context(), "/project", "site1"), assert.AnError)
+	})
+
 	t.Run("web root lookup fails", func(t *testing.T) {
-		installer, _, _, composer := newTestInstaller(t, coreExtensionWithSqlite, "<?php\n")
+		installer, _, drush, composer := newTestInstaller(t, coreExtensionWithSqlite, "<?php\n")
+		drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1").Return("/config/sync", nil)
 		composer.EXPECT().GetConfig(t.Context(), "/project", "extra.drupal-scaffold.locations.web-root").
 			Return("", assert.AnError)
 
@@ -242,19 +257,17 @@ func TestConfigureDatabaseErrors(t *testing.T) {
 
 func TestIsSqliteModuleEnabled(t *testing.T) {
 	t.Run("reports enabled when listed with weight 0", func(t *testing.T) {
-		installer, _, drush, _ := newTestInstaller(t, coreExtensionWithSqlite, "")
-		drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1").Return("/config/sync", nil)
+		installer, _, _, _ := newTestInstaller(t, coreExtensionWithSqlite, "")
 
-		enabled, err := installer.isSqliteModuleEnabled(t.Context(), "/project", "site1")
+		enabled, err := installer.isSqliteModuleEnabled("/config/sync/core.extension.yml")
 		require.NoError(t, err)
 		assert.True(t, enabled)
 	})
 
 	t.Run("reports not enabled when absent", func(t *testing.T) {
-		installer, _, drush, _ := newTestInstaller(t, coreExtensionWithoutSqlite, "")
-		drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1").Return("/config/sync", nil)
+		installer, _, _, _ := newTestInstaller(t, coreExtensionWithoutSqlite, "")
 
-		enabled, err := installer.isSqliteModuleEnabled(t.Context(), "/project", "site1")
+		enabled, err := installer.isSqliteModuleEnabled("/config/sync/core.extension.yml")
 		require.NoError(t, err)
 		assert.False(t, enabled)
 	})
@@ -262,38 +275,26 @@ func TestIsSqliteModuleEnabled(t *testing.T) {
 	t.Run("reports not enabled when listed with a non-zero weight", func(t *testing.T) {
 		// Both halves of the check matter: the key being present is not enough, its weight has
 		// to be 0. Without this case the "exists" and "weight is 0" clauses are interchangeable.
-		installer, _, drush, _ := newTestInstaller(t, "module:\n  node: 0\n  sqlite: 10\n", "")
-		drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1").Return("/config/sync", nil)
+		installer, _, _, _ := newTestInstaller(t, "module:\n  node: 0\n  sqlite: 10\n", "")
 
-		enabled, err := installer.isSqliteModuleEnabled(t.Context(), "/project", "site1")
+		enabled, err := installer.isSqliteModuleEnabled("/config/sync/core.extension.yml")
 		require.NoError(t, err)
 		assert.False(t, enabled)
 	})
 
-	t.Run("errors when the config sync dir cannot be resolved", func(t *testing.T) {
-		installer, _, drush, _ := newTestInstaller(t, coreExtensionWithSqlite, "")
-		drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1").Return("", assert.AnError)
-
-		_, err := installer.isSqliteModuleEnabled(t.Context(), "/project", "site1")
-		require.Error(t, err)
-		require.ErrorIs(t, err, assert.AnError, "the lookup failure must be returned as-is")
-	})
-
 	t.Run("errors when core.extension.yml is missing", func(t *testing.T) {
-		installer, _, drush, _ := newTestInstaller(t, coreExtensionWithSqlite, "")
-		drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1").Return("/nowhere", nil)
+		installer, _, _, _ := newTestInstaller(t, coreExtensionWithSqlite, "")
 
-		_, err := installer.isSqliteModuleEnabled(t.Context(), "/project", "site1")
+		_, err := installer.isSqliteModuleEnabled("/nowhere/core.extension.yml")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to read core extension file")
 		require.ErrorIs(t, err, os.ErrNotExist, "the underlying read error must stay unwrappable")
 	})
 
 	t.Run("errors on malformed YAML", func(t *testing.T) {
-		installer, _, drush, _ := newTestInstaller(t, "- a\n- b\n", "")
-		drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1").Return("/config/sync", nil)
+		installer, _, _, _ := newTestInstaller(t, "- a\n- b\n", "")
 
-		_, err := installer.isSqliteModuleEnabled(t.Context(), "/project", "site1")
+		_, err := installer.isSqliteModuleEnabled("/config/sync/core.extension.yml")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to unmarshal core extension file")
 		var typeErr *yaml.TypeError
@@ -301,38 +302,29 @@ func TestIsSqliteModuleEnabled(t *testing.T) {
 	})
 
 	t.Run("errors when there is no module section", func(t *testing.T) {
-		installer, _, drush, _ := newTestInstaller(t, "theme:\n  stark: 0\n", "")
-		drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1").Return("/config/sync", nil)
+		installer, _, _, _ := newTestInstaller(t, "theme:\n  stark: 0\n", "")
 
-		_, err := installer.isSqliteModuleEnabled(t.Context(), "/project", "site1")
+		_, err := installer.isSqliteModuleEnabled("/config/sync/core.extension.yml")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "has no module section")
 	})
 }
 
 func TestAddSqliteModuleErrors(t *testing.T) {
-	t.Run("config sync dir lookup fails", func(t *testing.T) {
-		installer, _, drush, _ := newTestInstaller(t, coreExtensionWithoutSqlite, "")
-		drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1").Return("", assert.AnError)
-
-		require.Error(t, installer.addSqliteModule(t.Context(), "/project", "site1"))
-	})
 
 	t.Run("core.extension.yml is missing", func(t *testing.T) {
-		installer, _, drush, _ := newTestInstaller(t, coreExtensionWithoutSqlite, "")
-		drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1").Return("/nowhere", nil)
+		installer, _, _, _ := newTestInstaller(t, coreExtensionWithoutSqlite, "")
 
-		err := installer.addSqliteModule(t.Context(), "/project", "site1")
+		err := installer.addSqliteModule("/nowhere/core.extension.yml")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to read core extension file")
 		require.ErrorIs(t, err, os.ErrNotExist, "the underlying read error must stay unwrappable")
 	})
 
 	t.Run("malformed YAML", func(t *testing.T) {
-		installer, _, drush, _ := newTestInstaller(t, "- a\n- b\n", "")
-		drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1").Return("/config/sync", nil)
+		installer, _, _, _ := newTestInstaller(t, "- a\n- b\n", "")
 
-		err := installer.addSqliteModule(t.Context(), "/project", "site1")
+		err := installer.addSqliteModule("/config/sync/core.extension.yml")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to unmarshal core extension file")
 		var typeErr *yaml.TypeError
@@ -340,35 +332,26 @@ func TestAddSqliteModuleErrors(t *testing.T) {
 	})
 
 	t.Run("no module section", func(t *testing.T) {
-		installer, _, drush, _ := newTestInstaller(t, "theme:\n  stark: 0\n", "")
-		drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1").Return("/config/sync", nil)
+		installer, _, _, _ := newTestInstaller(t, "theme:\n  stark: 0\n", "")
 
-		err := installer.addSqliteModule(t.Context(), "/project", "site1")
+		err := installer.addSqliteModule("/config/sync/core.extension.yml")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "has no module section")
 	})
 }
 
 func TestRemoveProfileErrors(t *testing.T) {
-	t.Run("config sync dir lookup fails", func(t *testing.T) {
-		installer, _, drush, _ := newTestInstaller(t, coreExtensionWithSqlite, "")
-		drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1").Return("", assert.AnError)
-
-		require.Error(t, installer.RemoveProfile(t.Context(), "/project", "site1"))
-	})
 
 	t.Run("core.extension.yml is missing", func(t *testing.T) {
-		installer, _, drush, _ := newTestInstaller(t, coreExtensionWithSqlite, "")
-		drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1").Return("/nowhere", nil)
+		installer, _, _, _ := newTestInstaller(t, coreExtensionWithSqlite, "")
 
-		require.Error(t, installer.RemoveProfile(t.Context(), "/project", "site1"))
+		require.Error(t, installer.removeProfile("/nowhere/core.extension.yml"))
 	})
 
 	t.Run("a profile line that is not the configured one is kept", func(t *testing.T) {
-		installer, fs, drush, _ := newTestInstaller(t, "module:\n  node: 0\n  thunder: 1000\nprofile: thunder\n", "")
-		drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1").Return("/config/sync", nil)
+		installer, fs, _, _ := newTestInstaller(t, "module:\n  node: 0\n  thunder: 1000\nprofile: thunder\n", "")
 
-		require.NoError(t, installer.RemoveProfile(t.Context(), "/project", "site1"))
+		require.NoError(t, installer.removeProfile("/config/sync/core.extension.yml"))
 
 		out, err := afero.ReadFile(fs, "/config/sync/core.extension.yml")
 		require.NoError(t, err)

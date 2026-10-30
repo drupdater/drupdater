@@ -38,6 +38,9 @@ type fakeInstaller struct {
 
 	dataDir        string
 	dataDirExisted bool
+	drushInclude   string
+	// commandsExisted records whether drupdater's drush commands were on disk during the install.
+	commandsExisted bool
 	// contexts are the contexts the installs ran under, so a dropped one shows.
 	contexts []context.Context
 }
@@ -47,6 +50,8 @@ func (f *fakeInstaller) Install(ctx context.Context, dir string, site string) er
 	f.calls = append(f.calls, dir+"/"+site)
 	_, err := os.Stat(f.dataDir)
 	f.dataDirExisted = err == nil
+	_, err = os.Stat(filepath.Join(f.drushInclude, "Commands", "DrupdaterCommands.php"))
+	f.commandsExisted = err == nil
 	return f.failFor[site]
 }
 
@@ -62,9 +67,10 @@ func appWithFullCheckDoubles(clonePath string, cloneErr error, composerDouble *f
 				return clonePath, cloneErr
 			},
 			newComposer: func() fullCheckComposer { return composerDouble },
-			newInstaller: func(_ fullCheckComposer, dataDir string) (siteInstaller, error) {
+			newInstaller: func(_ fullCheckComposer, dataDir string, drushInclude string) (siteInstaller, error) {
 				if fake, ok := installer.(*fakeInstaller); ok {
 					fake.dataDir = dataDir
+					fake.drushInclude = drushInclude
 				}
 				return installer, installerErr
 			},
@@ -187,4 +193,15 @@ func TestRunFullChecksRemovesTheCloneAndSiteData(t *testing.T) {
 	assert.NotEqual(t, filepath.Dir(clone), filepath.Dir(inst.dataDir), "site data must not land beside the clone")
 	assert.NoDirExists(t, inst.dataDir)
 	assert.NoDirExists(t, clone)
+}
+
+func TestRunFullChecksGivesTheInstallerDrupdatersDrushCommands(t *testing.T) {
+	inst := &fakeInstaller{}
+	a, _ := appWithFullCheckDoubles(t.TempDir(), nil, &fakeComposer{}, inst, nil)
+
+	cfg := config.Config{RepositoryURL: "https://example.com/acme/site.git", Sites: []string{"default"}}
+	a.runFullChecks(t.Context(), zap.NewNop(), cfg, "")
+
+	assert.True(t, inst.commandsExisted)
+	assert.NoDirExists(t, inst.drushInclude, "the extracted scripts must be removed afterwards")
 }

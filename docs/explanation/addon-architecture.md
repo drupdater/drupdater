@@ -28,8 +28,10 @@ other one is disabled" — because none of them ever depended on another being t
 | `post-site-update` | After each site's hooks, before config export; one site at a time, in `--sites` order | The site name and its facts |
 
 A site's facts — config sync directory, translation path, enabled modules, pending update hooks,
-unsupported modules — are read once, before `pre-site-update` fires, so an addon asks the event
-rather than Drush. They describe the site before its update hooks ran, and each call to
+unsupported modules — are read from the site, so an addon asks the event rather than Drush.
+`pre-site-update` carries them as they were before the update hooks ran; `post-site-update`
+carries them read again afterwards, since a hook can enable a module or move a path, and
+without the unsupported modules, which only `pre-site-update` asks drupal.org for. Each call to
 `Facts()` returns a copy, so no hook can change what the next one reads.
 
 Each carries the run context, the working directory path, and a way to commit: see

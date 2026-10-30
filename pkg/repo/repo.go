@@ -84,6 +84,8 @@ func (r repository) RemoveBranch(name string) error {
 type GitRepositoryService struct {
 	logger *zap.Logger
 	fs     afero.Fs
+	// newCommand runs git for what go-git cannot do: linked worktrees.
+	newCommand func(ctx context.Context, name string, args ...string) *exec.Cmd
 }
 
 // BasicAuth is the credential go-git needs for an authenticated fetch, list or push.
@@ -109,8 +111,9 @@ func (rs *GitRepositoryService) open(path string) (*git.Repository, error) {
 
 func NewGitRepositoryService(logger *zap.Logger) *GitRepositoryService {
 	return &GitRepositoryService{
-		logger: logger,
-		fs:     afero.NewOsFs(),
+		logger:     logger,
+		fs:         afero.NewOsFs(),
+		newCommand: exec.CommandContext,
 	}
 }
 
@@ -157,7 +160,7 @@ func (rs *GitRepositoryService) AddWorktree(ctx context.Context, source string, 
 		return Checkout{}, fmt.Errorf("failed to create temporary directory: %w", err)
 	}
 	path := filepath.Join(parent, "checkout")
-	if out, err := runGit(ctx, source, "worktree", "add", "--detach", path, "HEAD"); err != nil {
+	if out, err := rs.runGit(ctx, source, "worktree", "add", "--detach", path, "HEAD"); err != nil {
 		_ = os.RemoveAll(parent)
 		return Checkout{}, fmt.Errorf("failed to add a worktree of %s: %w: %s", source, err, out)
 	}
@@ -172,25 +175,23 @@ func (rs *GitRepositoryService) AddWorktree(ctx context.Context, source string, 
 
 // RemoveWorktree removes a worktree AddWorktree added, its directory included.
 func (rs *GitRepositoryService) RemoveWorktree(ctx context.Context, source string, path string) error {
-	out, err := runGit(ctx, source, "worktree", "remove", "--force", path)
+	out, err := rs.runGit(ctx, source, "worktree", "remove", "--force", path)
 	// The temporary parent goes either way; after a failed remove, prune drops the registration.
 	if removeErr := os.RemoveAll(filepath.Dir(path)); removeErr != nil && err == nil {
 		return fmt.Errorf("failed to remove the worktree directory: %w", removeErr)
 	}
 	if err != nil {
-		if _, pruneErr := runGit(ctx, source, "worktree", "prune"); pruneErr != nil {
+		if _, pruneErr := rs.runGit(ctx, source, "worktree", "prune"); pruneErr != nil {
 			return fmt.Errorf("failed to remove the worktree at %s: %w: %s", path, err, out)
 		}
 	}
 	return nil
 }
 
-var execCommand = exec.CommandContext
-
 // runGit trusts the repository for this one command: a checkout mounted into the container is
 // owned by another user, which git refuses as "dubious ownership" — and go-git never checks.
-func runGit(ctx context.Context, dir string, args ...string) (string, error) {
-	command := execCommand(ctx, "git", append([]string{"-c", "safe.directory=*"}, args...)...)
+func (rs *GitRepositoryService) runGit(ctx context.Context, dir string, args ...string) (string, error) {
+	command := rs.newCommand(ctx, "git", append([]string{"-c", "safe.directory=*"}, args...)...)
 	command.Dir = dir
 	out, err := command.CombinedOutput()
 	return strings.TrimSpace(string(out)), err

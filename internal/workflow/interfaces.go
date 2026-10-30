@@ -28,6 +28,7 @@ type Composer interface {
 
 type Drush interface {
 	Facts(ctx context.Context, dir string, site string) (drush.Facts, error)
+	LocalFacts(ctx context.Context, dir string, site string) (drush.Facts, error)
 	UpdateSite(ctx context.Context, dir string, site string) error
 	ExportConfiguration(ctx context.Context, dir string, site string) error
 	ConfigResave(ctx context.Context, dir string, site string) error

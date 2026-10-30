@@ -4,6 +4,7 @@ package scripts
 
 import (
 	"embed"
+	"io/fs"
 	"os"
 	"path/filepath"
 )
@@ -11,9 +12,21 @@ import (
 //go:embed *.php drush/Commands/*.php
 var files embed.FS
 
-// Extract writes the embedded files into dir, keeping their layout.
-func Extract(dir string) error {
-	return os.CopyFS(dir, files)
+// Extract writes the embedded files into a new temporary directory, which the caller removes.
+func Extract() (string, error) {
+	return extract(files)
+}
+
+func extract(fsys fs.FS) (string, error) {
+	dir, err := os.MkdirTemp("", "drupdater-scripts-")
+	if err != nil {
+		return "", err
+	}
+	if err := os.CopyFS(dir, fsys); err != nil {
+		os.RemoveAll(dir)
+		return "", err
+	}
+	return dir, nil
 }
 
 // RectorConfig is the Rector config inside a directory Extract wrote.

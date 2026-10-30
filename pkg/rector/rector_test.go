@@ -23,13 +23,13 @@ func newTestCLI(t *testing.T) (*CLI, *observer.ObservedLogs) {
 	return NewCLI(zap.New(core), "/opt/drupdater/rector.php"), logs
 }
 
-// stubExec replaces execCommand with the helper-process pattern and records what the
+// stubExec gives cli the helper-process pattern for its subprocesses and records what the
 // production code asked for. The returned pointers are populated by the time Run returns.
-func stubExec(t *testing.T, stdout string, wantErr bool) (name *string, args *[]string, cmd **exec.Cmd) {
+func stubExec(t *testing.T, cli *CLI, stdout string, wantErr bool) (name *string, args *[]string, cmd **exec.Cmd) {
 	t.Helper()
 	name, args, cmd = new(string), new([]string), new(*exec.Cmd)
 
-	execCommand = func(ctx context.Context, n string, arg ...string) *exec.Cmd {
+	cli.newCommand = func(ctx context.Context, n string, arg ...string) *exec.Cmd {
 		*name = n
 		*args = append([]string(nil), arg...)
 
@@ -43,7 +43,6 @@ func stubExec(t *testing.T, stdout string, wantErr bool) (name *string, args *[]
 		*cmd = c
 		return c
 	}
-	t.Cleanup(func() { execCommand = exec.CommandContext })
 
 	return name, args, cmd
 }
@@ -52,11 +51,10 @@ func TestRectorRun(t *testing.T) {
 	t.Run("empty directories skips exec", func(t *testing.T) {
 		cli, logs := newTestCLI(t)
 
-		execCommand = func(_ context.Context, _ string, _ ...string) *exec.Cmd {
+		cli.newCommand = func(_ context.Context, _ string, _ ...string) *exec.Cmd {
 			t.Fatal("exec should not be called with empty directories")
 			return nil
 		}
-		t.Cleanup(func() { execCommand = exec.CommandContext })
 
 		result, err := cli.Run(t.Context(), "/tmp", []string{})
 		require.NoError(t, err)
@@ -79,7 +77,7 @@ func TestRectorRun(t *testing.T) {
 		cli, logs := newTestCLI(t)
 
 		data := `{"totals":{"changed_files":1,"errors":2},"file_diffs":[{"file":"test.php","diff":"@@ ... @@","applied_rectors":["SomeRector"]}],"changed_files":["test.php"]}`
-		name, args, cmd := stubExec(t, data, false)
+		name, args, cmd := stubExec(t, cli, data, false)
 
 		// A real directory, because the command actually chdir's into it.
 		workDir := t.TempDir()
@@ -127,7 +125,7 @@ func TestRectorRun(t *testing.T) {
 
 	t.Run("exec error", func(t *testing.T) {
 		cli, _ := newTestCLI(t)
-		stubExec(t, "", true)
+		stubExec(t, cli, "", true)
 
 		_, err := cli.Run(t.Context(), "/tmp", []string{"web/modules/custom"})
 		require.Error(t, err)
@@ -141,7 +139,7 @@ func TestRectorRun(t *testing.T) {
 
 	t.Run("invalid JSON", func(t *testing.T) {
 		cli, _ := newTestCLI(t)
-		stubExec(t, "not-json", false)
+		stubExec(t, cli, "not-json", false)
 
 		_, err := cli.Run(t.Context(), "/tmp", []string{"web/modules/custom"})
 		require.Error(t, err)
@@ -158,13 +156,13 @@ type call struct {
 	args []string
 }
 
-// stubExecEach answers the nth subprocess with outputs[n] and records every call; an output of
+// stubExecEach answers cli's nth subprocess with outputs[n] and records every call; an output of
 // "!fail" makes that call exit non-zero.
-func stubExecEach(t *testing.T, outputs ...string) *[]call {
+func stubExecEach(t *testing.T, cli *CLI, outputs ...string) *[]call {
 	t.Helper()
 	calls := new([]call)
 
-	execCommand = func(ctx context.Context, n string, arg ...string) *exec.Cmd {
+	cli.newCommand = func(ctx context.Context, n string, arg ...string) *exec.Cmd {
 		require.Less(t, len(*calls), len(outputs), "more subprocesses than the test expects")
 		out := outputs[len(*calls)]
 		*calls = append(*calls, call{name: n, args: append([]string(nil), arg...)})
@@ -176,23 +174,24 @@ func stubExecEach(t *testing.T, outputs ...string) *[]call {
 		}
 		return c
 	}
-	t.Cleanup(func() { execCommand = exec.CommandContext })
 
 	return calls
 }
 
 func TestBundledRectorRun(t *testing.T) {
-	newBundledCLI := func() *CLI {
-		return NewBundledCLI(zap.NewNop(), "/opt/drupdater/tools/vendor/bin", "/opt/drupdater/rector.php")
+	newBundledCLI := func(t *testing.T, outputs ...string) (*CLI, *[]call) {
+		t.Helper()
+		cli := NewBundledCLI(zap.NewNop(), "/opt/drupdater/tools/vendor/bin", "/opt/drupdater/rector.php")
+		return cli, stubExecEach(t, cli, outputs...)
 	}
 
 	t.Run("loads the project's autoloader from its vendor-dir", func(t *testing.T) {
-		calls := stubExecEach(t,
+		cli, calls := newBundledCLI(t,
 			"/project/libraries/vendor",
 			`{"totals":{"changed_files":1},"file_diffs":[],"changed_files":["web/modules/custom/a.php"]}`,
 		)
 
-		result, err := newBundledCLI().Run(t.Context(), t.TempDir(), []string{"web/modules/custom"})
+		result, err := cli.Run(t.Context(), t.TempDir(), []string{"web/modules/custom"})
 		require.NoError(t, err)
 
 		require.Len(t, *calls, 2)
@@ -207,9 +206,9 @@ func TestBundledRectorRun(t *testing.T) {
 	})
 
 	t.Run("runs nothing when the vendor-dir cannot be resolved", func(t *testing.T) {
-		calls := stubExecEach(t, "!fail")
+		cli, calls := newBundledCLI(t, "!fail")
 
-		_, err := newBundledCLI().Run(t.Context(), t.TempDir(), []string{"web/modules/custom"})
+		_, err := cli.Run(t.Context(), t.TempDir(), []string{"web/modules/custom"})
 
 		require.ErrorContains(t, err, "failed to resolve the project's vendor directory")
 		var exitErr *exec.ExitError
@@ -218,9 +217,9 @@ func TestBundledRectorRun(t *testing.T) {
 	})
 
 	t.Run("a failing rector", func(t *testing.T) {
-		stubExecEach(t, "/project/vendor", "!fail")
+		cli, _ := newBundledCLI(t, "/project/vendor", "!fail")
 
-		_, err := newBundledCLI().Run(t.Context(), t.TempDir(), []string{"web/modules/custom"})
+		_, err := cli.Run(t.Context(), t.TempDir(), []string{"web/modules/custom"})
 
 		require.ErrorContains(t, err, "failed to run rector")
 	})

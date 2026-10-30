@@ -16,7 +16,7 @@ result.
 
 For each site, after that site's update hooks have run and before its configuration export:
 
-1. Checks whether the `locale_deploy` module is enabled, as the site reported before its
+1. Checks whether the `locale_deploy` module is enabled, as the site reported after its
    update hooks ran. If not, the site is **skipped**.
 2. Updates the interface translations via Drush.
 3. Checks the site's translation path. If none is configured, or it is not an existing

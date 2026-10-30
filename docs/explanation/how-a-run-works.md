@@ -118,8 +118,8 @@ The centre of the run:
 Each site's work has two halves:
 
 1. **Concurrently, across sites:** configure the database, read the site's facts, fire
-   **`pre-site-update`**, run the update hooks and resave configuration. This half touches
-   only the site's database.
+   **`pre-site-update`**, run the update hooks, resave configuration and read the facts
+   again. This half touches only the site's database.
 2. **One site at a time, in `--sites` order:** fire **`post-site-update`**, export
    configuration, and commit the site's config sync directory as `Update configuration
    <site>`.
@@ -129,7 +129,9 @@ The facts are everything drupdater reads from a site, gathered by one call to it
 --include`: the config sync directory, the translation path, the enabled modules, the pending
 update hooks and the unsupported modules. One Drupal bootstrap per site answers all of them,
 under Drush's update kernel, because the code is already updated and the schema is not. Both
-site events carry them, and the config export is committed from the directory they name.
+site events carry them: `pre-site-update` the facts from before the update hooks,
+`post-site-update` the ones read after them, without the drupal.org request for unsupported
+modules. The config export is committed from the directory the second read names.
 
 The second half writes into the working tree. Sites share that working tree and its git
 index, and two sites can name the same config or translation directory. A site starts its

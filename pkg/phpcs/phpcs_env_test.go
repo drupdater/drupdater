@@ -12,7 +12,7 @@ import (
 func TestComposerEnvironment(t *testing.T) {
 	t.Run("Run", func(t *testing.T) {
 		cli, _ := newTestCLI(t)
-		_, _, cmd := stubExec(t, `{"files":{},"totals":{"errors":0,"warnings":0,"fixable":0}}`, false)
+		_, _, cmd := stubExec(t, cli, `{"files":{},"totals":{"errors":0,"warnings":0,"fixable":0}}`, false)
 
 		_, err := cli.Run(t.Context(), "/tmp")
 		require.NoError(t, err)
@@ -22,7 +22,7 @@ func TestComposerEnvironment(t *testing.T) {
 
 	t.Run("RunCBF", func(t *testing.T) {
 		cli, _ := newTestCLI(t)
-		_, _, cmd := stubExec(t, "", false)
+		_, _, cmd := stubExec(t, cli, "", false)
 
 		require.NoError(t, cli.RunCBF(t.Context(), "/tmp"))
 

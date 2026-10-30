@@ -154,16 +154,12 @@ func (a app) runUpdate(cmd *cobra.Command, args []string, opts options) error {
 		return err
 	}
 
-	scriptsDir, err := os.MkdirTemp("", "drupdater-scripts-")
+	scriptsDir, err := scripts.Extract()
 	if err != nil {
-		logger.Error("failed to create the scripts directory", zap.Error(err))
-		return err
-	}
-	defer os.RemoveAll(scriptsDir)
-	if err := scripts.Extract(scriptsDir); err != nil {
 		logger.Error("failed to extract the bundled scripts", zap.Error(err))
 		return err
 	}
+	defer os.RemoveAll(scriptsDir)
 
 	drush := drush.NewCLI(logger, scripts.DrushInclude(scriptsDir))
 	composer := composer.NewCLI(logger, composerOptions(cfg)...)

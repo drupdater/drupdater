@@ -15,15 +15,16 @@ use Drush\Boot\DrupalBootLevels;
 final class DrupdaterCommands extends DrushCommands
 {
     /**
-     * Prints, as JSON, everything drupdater reads from a site before updating its database.
+     * Prints, as JSON, everything drupdater reads from a site.
      */
     // The update kernel, as updatedb:status uses: the code is already updated, the schema is not.
     #[CLI\Command(name: 'drupdater:facts')]
+    #[CLI\Option(name: 'skip-update-status', description: 'Do not ask drupal.org which modules are unsupported.')]
     #[CLI\Bootstrap(level: DrupalBootLevels::FULL)]
     #[CLI\Kernel(name: 'update')]
-    public function facts(): string
+    public function facts(array $options = ['skip-update-status' => false]): string
     {
-        [$unsupported, $unsupportedError] = $this->unsupportedModules();
+        [$unsupported, $unsupportedError] = $options['skip-update-status'] ? [[], ''] : $this->unsupportedModules();
         return json_encode([
             'config_sync_directory' => $this->absolute((string) Settings::get('config_sync_directory')),
             'translation_path' => $this->absolute((string) \Drupal::config('locale.settings')->get('translation.path')),

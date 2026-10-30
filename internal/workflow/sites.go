@@ -78,12 +78,18 @@ func (r *run) updateSite(ctx context.Context, site string, turn <-chan struct{},
 
 	}
 
+	// Read again: an update hook may enable a module or move a path the facts named before.
+	updated, err := r.drush.LocalFacts(ctx, r.path, site)
+	if err != nil {
+		return err
+	}
+
 	select {
 	case <-turn:
 	case <-ctx.Done():
 		return ctx.Err()
 	}
-	if err := r.commitSiteChanges(ctx, site, facts); err != nil {
+	if err := r.commitSiteChanges(ctx, site, updated); err != nil {
 		return err
 	}
 	close(next)

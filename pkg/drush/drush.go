@@ -3,6 +3,7 @@ package drush
 import (
 	"context"
 	"fmt"
+	"github.com/drupdater/drupdater/pkg/php"
 	"maps"
 	"os/exec"
 	"path/filepath"
@@ -10,30 +11,28 @@ import (
 	"strings"
 
 	"go.uber.org/zap"
-
-	"github.com/drupdater/drupdater/pkg/composer"
 )
 
-var execCommand = exec.CommandContext
-
 type CLI struct {
-	logger *zap.Logger
+	logger     *zap.Logger
+	newCommand php.CommandFactory
 	// include holds drupdater's own drush commands, passed to drush --include.
 	include string
 }
 
 func NewCLI(logger *zap.Logger, include string) *CLI {
 	return &CLI{
-		logger:  logger,
-		include: include,
+		logger:     logger,
+		newCommand: exec.CommandContext,
+		include:    include,
 	}
 }
 
 // command runs drush through `composer exec`, inheriting its process timeout. SITE_NAME comes
 // after that environment so it wins over any value the parent process set.
-func (e *CLI) command(dir string, site string) composer.Command {
-	return composer.Command{
-		New:      execCommand,
+func (e *CLI) command(dir string, site string) php.Command {
+	return php.Command{
+		New:      e.newCommand,
 		Logger:   e.logger,
 		Dir:      dir,
 		ExtraEnv: []string{"SITE_NAME=" + site},
@@ -77,7 +76,7 @@ func RelativeTo(dir string, path string) string {
 // GetConfigSyncDir returns the site's absolute config sync directory. Unlike Facts it needs no
 // database, so it works before the site is installed.
 func (e *CLI) GetConfigSyncDir(ctx context.Context, dir string, site string) (string, error) {
-	status, err := composer.JSON[struct {
+	status, err := php.JSON[struct {
 		ConfigSync string `json:"config-sync"`
 		Root       string `json:"root"`
 	}](ctx, e.command(dir, site), drushArgs([]string{"status", "--fields=config-sync,root", "--format=json"})...)
@@ -127,8 +126,8 @@ type UnsupportedModule struct {
 	RecommendedVersion string `json:"recommended_version"`
 }
 
-// Facts is what drupdater reads from a site before updating its database, in one bootstrap.
-// Paths are absolute and may not exist yet.
+// Facts is what drupdater reads from a site, in one bootstrap. Paths are absolute and may not
+// exist yet.
 type Facts struct {
 	ConfigSyncDirectory string                `json:"config_sync_directory"`
 	TranslationPath     string                `json:"translation_path"`
@@ -146,7 +145,17 @@ func (f Facts) ModuleEnabled(module string) bool {
 // Facts runs drupdater:facts, which reads the site under drush's update kernel: the code is
 // already updated, the schema is not.
 func (e *CLI) Facts(ctx context.Context, dir string, site string) (Facts, error) {
-	facts, err := composer.JSON[Facts](ctx, e.command(dir, site), drushArgs([]string{"--include=" + e.include, "drupdater:facts"})...)
+	return e.facts(ctx, dir, site)
+}
+
+// LocalFacts is Facts without the drupal.org request, so UnsupportedModules stays empty.
+func (e *CLI) LocalFacts(ctx context.Context, dir string, site string) (Facts, error) {
+	return e.facts(ctx, dir, site, "--skip-update-status")
+}
+
+func (e *CLI) facts(ctx context.Context, dir string, site string, options ...string) (Facts, error) {
+	args := append([]string{"--include=" + e.include, "drupdater:facts"}, options...)
+	facts, err := php.JSON[Facts](ctx, e.command(dir, site), drushArgs(args)...)
 	if err != nil {
 		return Facts{}, fmt.Errorf("failed to read the facts of site %s: %w", site, err)
 	}

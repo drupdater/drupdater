@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/drupdater/drupdater/pkg/php"
 	"slices"
 	"strings"
 )
@@ -31,7 +32,7 @@ func (s *CLI) Diff(ctx context.Context, dir string) ([]DiffEntry, error) {
 }
 
 func (s *CLI) diff(ctx context.Context, dir string, args ...string) ([]DiffEntry, error) {
-	raw, err := JSON[struct {
+	raw, err := php.JSON[struct {
 		Packages    json.RawMessage `json:"packages"`
 		PackagesDev json.RawMessage `json:"packages-dev"`
 	}](ctx, s.command(dir), append([]string{"diff", "--format=json"}, args...)...)

@@ -1097,6 +1097,78 @@ func (_c *MockDrush_Facts_Call) RunAndReturn(run func(ctx context.Context, dir s
 	return _c
 }
 
+// LocalFacts provides a mock function for the type MockDrush
+func (_mock *MockDrush) LocalFacts(ctx context.Context, dir string, site string) (drush.Facts, error) {
+	ret := _mock.Called(ctx, dir, site)
+
+	if len(ret) == 0 {
+		panic("no return value specified for LocalFacts")
+	}
+
+	var r0 drush.Facts
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) (drush.Facts, error)); ok {
+		return returnFunc(ctx, dir, site)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) drush.Facts); ok {
+		r0 = returnFunc(ctx, dir, site)
+	} else {
+		r0 = ret.Get(0).(drush.Facts)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
+		r1 = returnFunc(ctx, dir, site)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockDrush_LocalFacts_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'LocalFacts'
+type MockDrush_LocalFacts_Call struct {
+	*mock.Call
+}
+
+// LocalFacts is a helper method to define mock.On call
+//   - ctx context.Context
+//   - dir string
+//   - site string
+func (_e *MockDrush_Expecter) LocalFacts(ctx any, dir any, site any) *MockDrush_LocalFacts_Call {
+	return &MockDrush_LocalFacts_Call{Call: _e.mock.On("LocalFacts", ctx, dir, site)}
+}
+
+func (_c *MockDrush_LocalFacts_Call) Run(run func(ctx context.Context, dir string, site string)) *MockDrush_LocalFacts_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *MockDrush_LocalFacts_Call) Return(facts drush.Facts, err error) *MockDrush_LocalFacts_Call {
+	_c.Call.Return(facts, err)
+	return _c
+}
+
+func (_c *MockDrush_LocalFacts_Call) RunAndReturn(run func(ctx context.Context, dir string, site string) (drush.Facts, error)) *MockDrush_LocalFacts_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // UpdateSite provides a mock function for the type MockDrush
 func (_mock *MockDrush) UpdateSite(ctx context.Context, dir string, site string) error {
 	ret := _mock.Called(ctx, dir, site)

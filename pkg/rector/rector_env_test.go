@@ -11,7 +11,7 @@ import (
 // pass over a large custom-code tree exceeds it.
 func TestComposerEnvironment(t *testing.T) {
 	cli, _ := newTestCLI(t)
-	_, _, cmd := stubExec(t, `{"totals":{"changed_files":0},"file_diffs":[]}`, false)
+	_, _, cmd := stubExec(t, cli, `{"totals":{"changed_files":0},"file_diffs":[]}`, false)
 
 	_, err := cli.Run(t.Context(), "/tmp", []string{"web/modules/custom"})
 	require.NoError(t, err)

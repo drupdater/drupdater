@@ -566,7 +566,9 @@ package it mocks. Do not edit those files by hand.
 
 `pkg/` wraps one external tool per directory: `composer`, `drush`, `repo` (go-git),
 `phpcs`, `rector`, `drupal` (site installer) and `drupalorg` (Drupal.org issues, and the
-git.drupalcode.org GitLab).
+git.drupalcode.org GitLab). `php` holds what the PHP wrappers share: running a command under
+the environment Composer needs, and decoding its JSON output. Each wrapper takes the
+`php.CommandFactory` that builds its processes as a field, which is where a test fakes one.
 
 For how these fit together, read [Explanation](../explanation/index.md) — in particular
 [How a run works](../explanation/how-a-run-works.md) and [The addon

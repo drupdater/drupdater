@@ -23,12 +23,11 @@ func TestExecDrush(t *testing.T) {
 		// in the real process environment via t.Setenv.
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
 		t.Setenv("GOCOVERDIR", "/tmp")
-		execCommand = func(ctx context.Context, name string, arg ...string) *exec.Cmd {
+		executor.newCommand = func(ctx context.Context, name string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", name}
 			cs = append(cs, arg...)
 			return exec.CommandContext(ctx, os.Args[0], cs...)
 		}
-		defer func() { execCommand = exec.CommandContext }()
 
 		output, err := executor.execDrush(t.Context(), "/tmp", "test_site", "status")
 		require.NoError(t, err)
@@ -45,14 +44,13 @@ func TestExecDrush(t *testing.T) {
 		// Capture the *exec.Cmd that execDrush builds so we can inspect its
 		// Env slice after execDrush has mutated it.
 		var cmdRef *exec.Cmd
-		execCommand = func(ctx context.Context, name string, arg ...string) *exec.Cmd {
+		executor.newCommand = func(ctx context.Context, name string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", name}
 			cs = append(cs, arg...)
 			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 			cmdRef = cmd
 			return cmd
 		}
-		defer func() { execCommand = exec.CommandContext }()
 
 		_, err := executor.execDrush(t.Context(), "/tmp", "expected_site", "status")
 		require.NoError(t, err)
@@ -67,12 +65,11 @@ func TestExecDrush(t *testing.T) {
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
 		t.Setenv("GO_HELPER_PROCESS_ERROR", "1")
 		t.Setenv("GOCOVERDIR", "/tmp")
-		execCommand = func(ctx context.Context, name string, arg ...string) *exec.Cmd {
+		executor.newCommand = func(ctx context.Context, name string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", name}
 			cs = append(cs, arg...)
 			return exec.CommandContext(ctx, os.Args[0], cs...)
 		}
-		defer func() { execCommand = exec.CommandContext }()
 
 		output, err := executor.execDrush(t.Context(), "/tmp", "test_site", "status")
 		require.Error(t, err)
@@ -87,24 +84,22 @@ func TestInstallSite(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
 		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
-		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+		cli.newCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", "ok"}
 			cs = append(cs, arg...)
 			return exec.CommandContext(ctx, os.Args[0], cs...)
 		}
-		defer func() { execCommand = exec.CommandContext }()
 		require.NoError(t, cli.InstallSite(t.Context(), "/tmp", "default"))
 	})
 
 	t.Run("error", func(t *testing.T) {
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
 		t.Setenv("GO_HELPER_PROCESS_ERROR", "1")
-		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+		cli.newCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--"}
 			cs = append(cs, arg...)
 			return exec.CommandContext(ctx, os.Args[0], cs...)
 		}
-		defer func() { execCommand = exec.CommandContext }()
 		err := cli.InstallSite(t.Context(), "/tmp", "default")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "default")
@@ -119,13 +114,12 @@ func TestExportConfiguration(t *testing.T) {
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
 		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
 		var args []string
-		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+		cli.newCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			args = arg
 			cs := []string{"-test.run=TestHelperProcess", "--", "ok"}
 			cs = append(cs, arg...)
 			return exec.CommandContext(ctx, os.Args[0], cs...)
 		}
-		defer func() { execCommand = exec.CommandContext }()
 		require.NoError(t, cli.ExportConfiguration(t.Context(), "/tmp", "site1"))
 		// No --commit: the runner commits the export, so Drush never runs git in the repository.
 		assert.Equal(t, []string{"config:export", "--yes"}, args[len(args)-2:])
@@ -135,12 +129,11 @@ func TestExportConfiguration(t *testing.T) {
 	t.Run("error", func(t *testing.T) {
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
 		t.Setenv("GO_HELPER_PROCESS_ERROR", "1")
-		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+		cli.newCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--"}
 			cs = append(cs, arg...)
 			return exec.CommandContext(ctx, os.Args[0], cs...)
 		}
-		defer func() { execCommand = exec.CommandContext }()
 		require.Error(t, cli.ExportConfiguration(t.Context(), "/tmp", "site1"))
 	})
 }
@@ -152,24 +145,22 @@ func TestUpdateSite(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
 		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
-		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+		cli.newCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", "ok"}
 			cs = append(cs, arg...)
 			return exec.CommandContext(ctx, os.Args[0], cs...)
 		}
-		defer func() { execCommand = exec.CommandContext }()
 		require.NoError(t, cli.UpdateSite(t.Context(), "/tmp", "site1"))
 	})
 
 	t.Run("error", func(t *testing.T) {
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
 		t.Setenv("GO_HELPER_PROCESS_ERROR", "1")
-		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+		cli.newCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--"}
 			cs = append(cs, arg...)
 			return exec.CommandContext(ctx, os.Args[0], cs...)
 		}
-		defer func() { execCommand = exec.CommandContext }()
 		require.Error(t, cli.UpdateSite(t.Context(), "/tmp", "site1"))
 	})
 }
@@ -181,24 +172,22 @@ func TestConfigResave(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
 		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
-		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+		cli.newCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", "ok"}
 			cs = append(cs, arg...)
 			return exec.CommandContext(ctx, os.Args[0], cs...)
 		}
-		defer func() { execCommand = exec.CommandContext }()
 		require.NoError(t, cli.ConfigResave(t.Context(), "/tmp", "site1"))
 	})
 
 	t.Run("error", func(t *testing.T) {
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
 		t.Setenv("GO_HELPER_PROCESS_ERROR", "1")
-		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+		cli.newCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--"}
 			cs = append(cs, arg...)
 			return exec.CommandContext(ctx, os.Args[0], cs...)
 		}
-		defer func() { execCommand = exec.CommandContext }()
 		require.Error(t, cli.ConfigResave(t.Context(), "/tmp", "site1"))
 	})
 }
@@ -210,24 +199,22 @@ func TestLocalizeTranslations(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
 		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
-		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+		cli.newCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--", "ok"}
 			cs = append(cs, arg...)
 			return exec.CommandContext(ctx, os.Args[0], cs...)
 		}
-		defer func() { execCommand = exec.CommandContext }()
 		require.NoError(t, cli.LocalizeTranslations(t.Context(), "/tmp", "site1"))
 	})
 
 	t.Run("error", func(t *testing.T) {
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
 		t.Setenv("GO_HELPER_PROCESS_ERROR", "1")
-		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+		cli.newCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			cs := []string{"-test.run=TestHelperProcess", "--"}
 			cs = append(cs, arg...)
 			return exec.CommandContext(ctx, os.Args[0], cs...)
 		}
-		defer func() { execCommand = exec.CommandContext }()
 		require.Error(t, cli.LocalizeTranslations(t.Context(), "/tmp", "site1"))
 	})
 }
@@ -281,24 +268,24 @@ func TestRelativeToFallsBack(t *testing.T) {
 	assert.Equal(t, "config/sync", RelativeTo("/project", "config/sync"), "a relative path is already relative")
 }
 
-// fakeDrush makes drush print stdout and records the arguments it was called with.
-func fakeDrush(t *testing.T, stdout string) *[]string {
+// fakeDrush makes cli's drush print stdout and records the arguments it was called with.
+func fakeDrush(t *testing.T, cli *CLI, stdout string) *[]string {
 	t.Helper()
 	t.Setenv("GO_WANT_HELPER_PROCESS", "1")
 	t.Setenv("GO_HELPER_PROCESS_RAW", "1")
 	t.Setenv("GOCOVERDIR", "/tmp")
 	args := new([]string)
-	execCommand = func(ctx context.Context, name string, arg ...string) *exec.Cmd {
+	cli.newCommand = func(ctx context.Context, name string, arg ...string) *exec.Cmd {
 		*args = append([]string{name}, arg...)
 		cs := append([]string{"-test.run=TestHelperProcess", "--", stdout}, arg...)
 		return exec.CommandContext(ctx, os.Args[0], cs...)
 	}
-	t.Cleanup(func() { execCommand = exec.CommandContext })
 	return args
 }
 
 func TestFactsDecodesTheIncludedCommandsOutput(t *testing.T) {
-	args := fakeDrush(t, `{
+	cli := NewCLI(zap.NewNop(), "/opt/include")
+	args := fakeDrush(t, cli, `{
 		"config_sync_directory": "/project/config/sync",
 		"translation_path": "/project/web/sites/default/files/translations",
 		"modules": ["locale_deploy", "system"],
@@ -307,7 +294,7 @@ func TestFactsDecodesTheIncludedCommandsOutput(t *testing.T) {
 		"unsupported_modules_error": ""
 	}`)
 
-	facts, err := NewCLI(zap.NewNop(), "/opt/include").Facts(t.Context(), "/tmp", "site1")
+	facts, err := cli.Facts(t.Context(), "/tmp", "site1")
 
 	require.NoError(t, err)
 	assert.Equal(t, []string{"composer", "exec", "--", "drush", "--include=/opt/include", "drupdater:facts"}, *args)
@@ -324,11 +311,23 @@ func TestFactsDecodesTheIncludedCommandsOutput(t *testing.T) {
 	assert.False(t, facts.ModuleEnabled("locale"))
 }
 
+func TestLocalFactsSkipsTheUpdateStatusRequest(t *testing.T) {
+	cli := NewCLI(zap.NewNop(), "/opt/include")
+	args := fakeDrush(t, cli, `{"config_sync_directory": "/project/config/sync"}`)
+
+	facts, err := cli.LocalFacts(t.Context(), "/tmp", "site1")
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"composer", "exec", "--", "drush", "--include=/opt/include", "drupdater:facts", "--skip-update-status"}, *args)
+	assert.Equal(t, "/project/config/sync", facts.ConfigSyncDirectory)
+}
+
 func TestFactsKeepsStderrOutOfThePayload(t *testing.T) {
-	fakeDrush(t, `{"modules": ["system"]}`)
+	cli := NewCLI(zap.NewNop(), "/opt/include")
+	fakeDrush(t, cli, `{"modules": ["system"]}`)
 	t.Setenv("GO_HELPER_PROCESS_STDERR_NOISE", "1")
 
-	facts, err := NewCLI(zap.NewNop(), "/opt/include").Facts(t.Context(), "/tmp", "site1")
+	facts, err := cli.Facts(t.Context(), "/tmp", "site1")
 
 	require.NoError(t, err)
 	assert.Equal(t, []string{"system"}, facts.Modules)
@@ -336,19 +335,21 @@ func TestFactsKeepsStderrOutOfThePayload(t *testing.T) {
 
 func TestFactsFailures(t *testing.T) {
 	t.Run("drush fails", func(t *testing.T) {
-		fakeDrush(t, "")
+		cli := NewCLI(zap.NewNop(), "/opt/include")
+		fakeDrush(t, cli, "")
 		t.Setenv("GO_HELPER_PROCESS_ERROR", "1")
 
-		_, err := NewCLI(zap.NewNop(), "/opt/include").Facts(t.Context(), "/tmp", "site1")
+		_, err := cli.Facts(t.Context(), "/tmp", "site1")
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "site1")
 	})
 
 	t.Run("output is not JSON", func(t *testing.T) {
-		fakeDrush(t, "Bootstrap failed.")
+		cli := NewCLI(zap.NewNop(), "/opt/include")
+		fakeDrush(t, cli, "Bootstrap failed.")
 
-		_, err := NewCLI(zap.NewNop(), "/opt/include").Facts(t.Context(), "/tmp", "site1")
+		_, err := cli.Facts(t.Context(), "/tmp", "site1")
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to decode the JSON output")
@@ -374,9 +375,10 @@ func TestFactsCloneSharesNothing(t *testing.T) {
 
 func TestGetConfigSyncDir(t *testing.T) {
 	t.Run("relative to the Drupal root", func(t *testing.T) {
-		args := fakeDrush(t, `{"config-sync": "../config/sync", "root": "/project/web"}`)
+		cli := NewCLI(zap.NewNop(), "/opt/include")
+		args := fakeDrush(t, cli, `{"config-sync": "../config/sync", "root": "/project/web"}`)
 
-		dir, err := NewCLI(zap.NewNop(), "/opt/include").GetConfigSyncDir(t.Context(), "/tmp", "site1")
+		dir, err := cli.GetConfigSyncDir(t.Context(), "/tmp", "site1")
 
 		require.NoError(t, err)
 		assert.Equal(t, "/project/config/sync", dir)
@@ -384,28 +386,31 @@ func TestGetConfigSyncDir(t *testing.T) {
 	})
 
 	t.Run("absolute", func(t *testing.T) {
-		fakeDrush(t, `{"config-sync": "/config/sync", "root": "/project/web"}`)
+		cli := NewCLI(zap.NewNop(), "/opt/include")
+		fakeDrush(t, cli, `{"config-sync": "/config/sync", "root": "/project/web"}`)
 
-		dir, err := NewCLI(zap.NewNop(), "/opt/include").GetConfigSyncDir(t.Context(), "/tmp", "site1")
+		dir, err := cli.GetConfigSyncDir(t.Context(), "/tmp", "site1")
 
 		require.NoError(t, err)
 		assert.Equal(t, "/config/sync", dir)
 	})
 
 	t.Run("not configured", func(t *testing.T) {
-		fakeDrush(t, `{"config-sync": null, "root": "/project/web"}`)
+		cli := NewCLI(zap.NewNop(), "/opt/include")
+		fakeDrush(t, cli, `{"config-sync": null, "root": "/project/web"}`)
 
-		_, err := NewCLI(zap.NewNop(), "/opt/include").GetConfigSyncDir(t.Context(), "/tmp", "site1")
+		_, err := cli.GetConfigSyncDir(t.Context(), "/tmp", "site1")
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "site site1 has no config sync directory")
 	})
 
 	t.Run("drush fails", func(t *testing.T) {
-		fakeDrush(t, "")
+		cli := NewCLI(zap.NewNop(), "/opt/include")
+		fakeDrush(t, cli, "")
 		t.Setenv("GO_HELPER_PROCESS_ERROR", "1")
 
-		_, err := NewCLI(zap.NewNop(), "/opt/include").GetConfigSyncDir(t.Context(), "/tmp", "site1")
+		_, err := cli.GetConfigSyncDir(t.Context(), "/tmp", "site1")
 
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "site1")
@@ -413,9 +418,10 @@ func TestGetConfigSyncDir(t *testing.T) {
 }
 
 func TestConfigResaveRunsTheIncludedCommand(t *testing.T) {
-	args := fakeDrush(t, "ok")
+	cli := NewCLI(zap.NewNop(), "/opt/include")
+	args := fakeDrush(t, cli, "ok")
 
-	require.NoError(t, NewCLI(zap.NewNop(), "/opt/include").ConfigResave(t.Context(), "/tmp", "site1"))
+	require.NoError(t, cli.ConfigResave(t.Context(), "/tmp", "site1"))
 
 	assert.Equal(t, []string{"composer", "exec", "--", "drush", "--include=/opt/include", "drupdater:config-resave"}, *args)
 }

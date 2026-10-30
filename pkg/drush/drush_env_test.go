@@ -24,13 +24,12 @@ func TestComposerEnvironment(t *testing.T) {
 		t.Setenv("GOCOVERDIR", "/tmp")
 
 		cmd := new(*exec.Cmd)
-		execCommand = func(ctx context.Context, name string, arg ...string) *exec.Cmd {
+		executor.newCommand = func(ctx context.Context, name string, arg ...string) *exec.Cmd {
 			cs := append([]string{"-test.run=TestHelperProcess", "--", name}, arg...)
 			c := exec.CommandContext(ctx, os.Args[0], cs...) //nolint:gosec // test helper process
 			*cmd = c
 			return c
 		}
-		t.Cleanup(func() { execCommand = exec.CommandContext })
 		return cmd
 	}
 

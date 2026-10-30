@@ -105,6 +105,7 @@ func (h *reportHarness) expectFullRun(t *testing.T) {
 	h.worktree.EXPECT().Add("config/sync").Return(plumbing.ZeroHash, nil).Maybe()
 	expectUpdateBranch(h.repository)
 	h.drush.EXPECT().ConfigResave(anyCtx, testCheckout, "site1").Return(nil).Maybe()
+	h.drush.EXPECT().LocalFacts(anyCtx, testCheckout, "site1").Return(syncFacts(testCheckout+"/config/sync"), nil).Maybe()
 
 	h.repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound).Maybe()
 	h.repoSvc.EXPECT().BranchExists(h.repository, mock.Anything, mock.Anything).Return(false, nil).Maybe()

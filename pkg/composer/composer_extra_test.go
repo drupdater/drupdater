@@ -2,6 +2,7 @@ package composer
 
 import (
 	"context"
+	"github.com/drupdater/drupdater/pkg/php"
 	"os"
 	"os/exec"
 	"testing"
@@ -12,31 +13,26 @@ import (
 	"go.uber.org/zap"
 )
 
-// stubComposerOutput makes the next composer invocations print out on stdout and exit 0. It
-// restores the real exec.CommandContext when the test ends.
-func stubComposerOutput(t *testing.T, out string) {
-	t.Helper()
-	execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+// composerPrinting is a composer that prints out on stdout and exits 0.
+func composerPrinting(out string) php.CommandFactory {
+	return func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 		cs := []string{"-test.run=TestHelperProcess", "--", out}
 		cs = append(cs, arg...)
 		cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 		cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
 		return cmd
 	}
-	t.Cleanup(func() { execCommand = exec.CommandContext })
 }
 
-// stubComposerFailure makes the next composer invocations exit non-zero.
-func stubComposerFailure(t *testing.T) {
-	t.Helper()
-	execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+// composerFailing is a composer that exits non-zero.
+func composerFailing() php.CommandFactory {
+	return func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 		cs := []string{"-test.run=TestHelperProcess", "--"}
 		cs = append(cs, arg...)
 		cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 		cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
 		return cmd
 	}
-	t.Cleanup(func() { execCommand = exec.CommandContext })
 }
 
 func TestNewCLI(t *testing.T) {
@@ -113,20 +109,18 @@ func TestAllowPluginsDecides(t *testing.T) {
 
 func TestUnsetConfig(t *testing.T) {
 	var args []string
-	execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+	newCommand := func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 		args = arg
 		cs := append([]string{"-test.run=TestHelperProcess", "--", ""}, arg...)
 		cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 		cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
 		return cmd
 	}
-	t.Cleanup(func() { execCommand = exec.CommandContext })
 
-	require.NoError(t, (&CLI{logger: zap.NewNop()}).UnsetConfig(t.Context(), "/tmp", "allow-plugins.*"))
+	require.NoError(t, (&CLI{newCommand: newCommand, logger: zap.NewNop()}).UnsetConfig(t.Context(), "/tmp", "allow-plugins.*"))
 	assert.Equal(t, []string{"config", "--unset", "allow-plugins.*"}, args)
 
-	stubComposerFailure(t)
-	require.Error(t, (&CLI{logger: zap.NewNop()}).UnsetConfig(t.Context(), "/tmp", "allow-plugins.*"))
+	require.Error(t, (&CLI{newCommand: composerFailing(), logger: zap.NewNop()}).UnsetConfig(t.Context(), "/tmp", "allow-plugins.*"))
 }
 
 func TestCleanup(t *testing.T) {
@@ -220,9 +214,7 @@ func TestCleanupResetsInitOnceForReinitialization(t *testing.T) {
 }
 
 func TestInstallReturnsNilOnSuccess(t *testing.T) {
-	stubComposerOutput(t, "Nothing to install")
-
-	service := &CLI{logger: zap.NewNop()}
+	service := &CLI{newCommand: composerPrinting("Nothing to install"), logger: zap.NewNop()}
 	require.NoError(t, service.Install(t.Context(), "/tmp"))
 }
 
@@ -245,22 +237,19 @@ func TestGetLockHashErrors(t *testing.T) {
 
 func TestGetInstalledPackageVersionErrors(t *testing.T) {
 	t.Run("composer failure", func(t *testing.T) {
-		stubComposerFailure(t)
-		service := &CLI{logger: zap.NewNop()}
+		service := &CLI{newCommand: composerFailing(), logger: zap.NewNop()}
 		_, err := service.GetInstalledPackageVersion(t.Context(), "/tmp", "drupal/core")
 		require.Error(t, err)
 	})
 
 	t.Run("malformed JSON", func(t *testing.T) {
-		stubComposerOutput(t, "not-json")
-		service := &CLI{logger: zap.NewNop()}
+		service := &CLI{newCommand: composerPrinting("not-json"), logger: zap.NewNop()}
 		_, err := service.GetInstalledPackageVersion(t.Context(), "/tmp", "drupal/core")
 		require.Error(t, err)
 	})
 
 	t.Run("no versions reported", func(t *testing.T) {
-		stubComposerOutput(t, `{"versions":[]}`)
-		service := &CLI{logger: zap.NewNop()}
+		service := &CLI{newCommand: composerPrinting(`{"versions":[]}`), logger: zap.NewNop()}
 		_, err := service.GetInstalledPackageVersion(t.Context(), "/tmp", "drupal/core")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no versions found")
@@ -268,26 +257,20 @@ func TestGetInstalledPackageVersionErrors(t *testing.T) {
 }
 
 func TestDiffFailure(t *testing.T) {
-	stubComposerFailure(t)
-
-	service := &CLI{logger: zap.NewNop()}
+	service := &CLI{newCommand: composerFailing(), logger: zap.NewNop()}
 	entries, err := service.Diff(t.Context(), "/tmp")
 	require.Error(t, err)
 	assert.Nil(t, entries)
 }
 
 func TestGetInstalledPluginsFailure(t *testing.T) {
-	stubComposerFailure(t)
-
-	service := &CLI{logger: zap.NewNop()}
+	service := &CLI{newCommand: composerFailing(), logger: zap.NewNop()}
 	_, err := service.GetInstalledPlugins(t.Context(), "/tmp")
 	require.Error(t, err)
 }
 
 func TestAuditMalformedOutput(t *testing.T) {
-	stubComposerOutput(t, "not-json")
-
-	service := &CLI{logger: zap.NewNop()}
+	service := &CLI{newCommand: composerPrinting("not-json"), logger: zap.NewNop()}
 	_, err := service.Audit(t.Context(), "/tmp")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse composer audit output")

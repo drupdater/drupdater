@@ -3,6 +3,7 @@ package composer
 import (
 	"context"
 	"fmt"
+	"github.com/drupdater/drupdater/pkg/php"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -37,9 +38,9 @@ type fakeUpdate struct {
 	baseLocks []string
 }
 
-func (f *fakeUpdate) install(t *testing.T) {
+func (f *fakeUpdate) command(t *testing.T) php.CommandFactory {
 	t.Helper()
-	execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+	return func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 		f.mu.Lock()
 		f.calls = append(f.calls, arg)
 		// Read now, while Update still holds the base lock on disk for the subprocess.
@@ -62,7 +63,6 @@ func (f *fakeUpdate) install(t *testing.T) {
 		}
 		return cmd
 	}
-	t.Cleanup(func() { execCommand = exec.CommandContext })
 }
 
 func (f *fakeUpdate) call(t *testing.T, subcommand string) []string {
@@ -113,8 +113,8 @@ func readFile(t *testing.T, dir, name string) string {
 	return string(content)
 }
 
-func newUpdateCLI() *CLI {
-	return &CLI{logger: zap.NewNop(), fs: afero.NewOsFs()}
+func newUpdateCLI(newCommand php.CommandFactory) *CLI {
+	return &CLI{logger: zap.NewNop(), fs: afero.NewOsFs(), newCommand: newCommand}
 }
 
 // Shaped like composer-diff's real output, dev-branch commit and all.
@@ -136,9 +136,8 @@ const diffWithEveryOperation = `{
 func TestUpdateReadsChangesFromTheLockDiff(t *testing.T) {
 	dir := newUpdateProject(t)
 	fake := &fakeUpdate{diffOut: diffWithEveryOperation}
-	fake.install(t)
 
-	changes, err := newUpdateCLI().Update(t.Context(), dir, nil, nil, false, false)
+	changes, err := newUpdateCLI(fake.command(t)).Update(t.Context(), dir, nil, nil, false, false)
 	require.NoError(t, err)
 
 	assert.Equal(t, []PackageChange{
@@ -156,9 +155,8 @@ func TestUpdateReadsChangesFromTheLockDiff(t *testing.T) {
 func TestUpdateDiffsAgainstTheLockAsItWasBeforeTheUpdate(t *testing.T) {
 	dir := newUpdateProject(t)
 	fake := &fakeUpdate{diffOut: `{"packages": [], "packages-dev": []}`}
-	fake.install(t)
 
-	_, err := newUpdateCLI().Update(t.Context(), dir, nil, nil, false, false)
+	_, err := newUpdateCLI(fake.command(t)).Update(t.Context(), dir, nil, nil, false, false)
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{baseLock}, fake.baseLocks)
@@ -173,9 +171,8 @@ func TestUpdateDiffsAgainstTheLockAsItWasBeforeTheUpdate(t *testing.T) {
 func TestUpdateKeepsTheUpdatedFiles(t *testing.T) {
 	dir := newUpdateProject(t)
 	fake := &fakeUpdate{diffOut: diffWithEveryOperation}
-	fake.install(t)
 
-	_, err := newUpdateCLI().Update(t.Context(), dir, []string{"drupal/core"}, nil, false, false)
+	_, err := newUpdateCLI(fake.command(t)).Update(t.Context(), dir, []string{"drupal/core"}, nil, false, false)
 	require.NoError(t, err)
 
 	assert.JSONEq(t, newJSON, readFile(t, dir, "composer.json"))
@@ -193,9 +190,8 @@ func TestUpdateKeepsTheUpdatedFiles(t *testing.T) {
 func TestUpdateDryRunPutsComposerFilesBack(t *testing.T) {
 	dir := newUpdateProject(t)
 	fake := &fakeUpdate{diffOut: diffWithEveryOperation}
-	fake.install(t)
 
-	changes, err := newUpdateCLI().Update(t.Context(), dir, nil, []string{"drupal/foo:1.2.3"}, true, true)
+	changes, err := newUpdateCLI(fake.command(t)).Update(t.Context(), dir, nil, []string{"drupal/foo:1.2.3"}, true, true)
 	require.NoError(t, err)
 	assert.Len(t, changes, 8, "a dry run still reports what the update would change")
 
@@ -215,9 +211,8 @@ func TestUpdateDryRunPutsComposerFilesBack(t *testing.T) {
 func TestUpdateDryRunPutsComposerFilesBackWhenComposerFails(t *testing.T) {
 	dir := newUpdateProject(t)
 	fake := &fakeUpdate{diffFails: true}
-	fake.install(t)
 
-	_, err := newUpdateCLI().Update(t.Context(), dir, nil, nil, false, true)
+	_, err := newUpdateCLI(fake.command(t)).Update(t.Context(), dir, nil, nil, false, true)
 	require.Error(t, err)
 
 	assert.JSONEq(t, baseJSON, readFile(t, dir, "composer.json"))
@@ -227,9 +222,8 @@ func TestUpdateDryRunPutsComposerFilesBackWhenComposerFails(t *testing.T) {
 func TestUpdatePropagatesFailure(t *testing.T) {
 	dir := newUpdateProject(t)
 	fake := &fakeUpdate{updateFails: true}
-	fake.install(t)
 
-	changes, err := newUpdateCLI().Update(t.Context(), dir, nil, nil, false, false)
+	changes, err := newUpdateCLI(fake.command(t)).Update(t.Context(), dir, nil, nil, false, false)
 	var exitErr *exec.ExitError
 	require.ErrorAs(t, err, &exitErr)
 	assert.Empty(t, changes)
@@ -240,9 +234,8 @@ func TestUpdatePropagatesFailure(t *testing.T) {
 func TestUpdatePropagatesDiffFailure(t *testing.T) {
 	dir := newUpdateProject(t)
 	fake := &fakeUpdate{diffFails: true}
-	fake.install(t)
 
-	_, err := newUpdateCLI().Update(t.Context(), dir, nil, nil, false, false)
+	_, err := newUpdateCLI(fake.command(t)).Update(t.Context(), dir, nil, nil, false, false)
 	var exitErr *exec.ExitError
 	require.ErrorAs(t, err, &exitErr)
 	assert.Contains(t, err.Error(), "failed to diff composer.lock")
@@ -251,18 +244,16 @@ func TestUpdatePropagatesDiffFailure(t *testing.T) {
 func TestUpdateRejectsMalformedDiffOutput(t *testing.T) {
 	dir := newUpdateProject(t)
 	fake := &fakeUpdate{diffOut: "not json"}
-	fake.install(t)
 
-	_, err := newUpdateCLI().Update(t.Context(), dir, nil, nil, false, false)
+	_, err := newUpdateCLI(fake.command(t)).Update(t.Context(), dir, nil, nil, false, false)
 	require.Error(t, err)
 }
 
 func TestUpdateRejectsAnUnknownDiffOperation(t *testing.T) {
 	dir := newUpdateProject(t)
 	fake := &fakeUpdate{diffOut: `{"packages": {"a/b": {"name": "a/b", "operation": "teleport", "version_base": "1.0.0", "version_target": "2.0.0"}}}`}
-	fake.install(t)
 
-	_, err := newUpdateCLI().Update(t.Context(), dir, nil, nil, false, false)
+	_, err := newUpdateCLI(fake.command(t)).Update(t.Context(), dir, nil, nil, false, false)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), `unknown composer-diff operation "teleport" for a/b`)
 }
@@ -270,18 +261,16 @@ func TestUpdateRejectsAnUnknownDiffOperation(t *testing.T) {
 func TestUpdateReportsNoChangesAsNil(t *testing.T) {
 	dir := newUpdateProject(t)
 	fake := &fakeUpdate{diffOut: `{"packages": [], "packages-dev": []}`}
-	fake.install(t)
 
-	changes, err := newUpdateCLI().Update(t.Context(), dir, nil, nil, false, false)
+	changes, err := newUpdateCLI(fake.command(t)).Update(t.Context(), dir, nil, nil, false, false)
 	require.NoError(t, err)
 	assert.Nil(t, changes)
 }
 
 func TestUpdateWithoutALockFileNeverRunsComposer(t *testing.T) {
 	fake := &fakeUpdate{}
-	fake.install(t)
 
-	_, err := newUpdateCLI().Update(t.Context(), t.TempDir(), nil, nil, false, false)
+	_, err := newUpdateCLI(fake.command(t)).Update(t.Context(), t.TempDir(), nil, nil, false, false)
 	require.ErrorIs(t, err, os.ErrNotExist)
 	assert.Contains(t, err.Error(), "failed to read composer.lock")
 	assert.Empty(t, fake.calls)
@@ -291,9 +280,8 @@ func TestUpdateDryRunWithoutComposerJSONNeverRunsComposer(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "composer.lock"), []byte(baseLock), 0o600))
 	fake := &fakeUpdate{}
-	fake.install(t)
 
-	_, err := newUpdateCLI().Update(t.Context(), dir, nil, nil, false, true)
+	_, err := newUpdateCLI(fake.command(t)).Update(t.Context(), dir, nil, nil, false, true)
 	require.ErrorIs(t, err, os.ErrNotExist)
 	assert.Contains(t, err.Error(), "failed to read composer.json")
 	assert.Empty(t, fake.calls)
@@ -302,9 +290,8 @@ func TestUpdateDryRunWithoutComposerJSONNeverRunsComposer(t *testing.T) {
 func TestUpdatePinsADevPackageByCommit(t *testing.T) {
 	dir := newUpdateProject(t)
 	fake := &fakeUpdate{diffOut: `{"packages": []}`}
-	fake.install(t)
 
-	_, err := newUpdateCLI().Update(t.Context(), dir, nil, []string{"symfony/polyfill-ctype:1.x-dev 0424dff"}, false, true)
+	_, err := newUpdateCLI(fake.command(t)).Update(t.Context(), dir, nil, []string{"symfony/polyfill-ctype:1.x-dev 0424dff"}, false, true)
 	require.NoError(t, err)
 
 	assert.Contains(t, fake.call(t, "update"), "--with=symfony/polyfill-ctype:1.x-dev#0424dff")
@@ -319,9 +306,8 @@ func TestConstraint(t *testing.T) {
 
 func TestRequireIntoScratchPinsADevPackageByCommit(t *testing.T) {
 	fake := &fakeUpdate{}
-	fake.install(t)
 
-	service := &CLI{logger: zap.NewNop(), tempDir: t.TempDir()}
+	service := &CLI{newCommand: fake.command(t), logger: zap.NewNop(), tempDir: t.TempDir()}
 	ok, err := service.requireIntoScratch(t.Context(), "drupal/foo", "1.x-dev 0424dff")
 	require.NoError(t, err)
 	assert.True(t, ok)
@@ -332,7 +318,6 @@ func TestRequireIntoScratchPinsADevPackageByCommit(t *testing.T) {
 func TestUpdateDryRunReportsAFailedRestore(t *testing.T) {
 	dir := newUpdateProject(t)
 	fake := &fakeUpdate{diffOut: `{"packages": []}`}
-	fake.install(t)
 
 	fs := &faultFs{Fs: afero.NewOsFs(), openErr: func(name string, flag int) error {
 		if flag&os.O_WRONLY != 0 && strings.HasPrefix(filepath.Base(name), "composer.") {
@@ -340,7 +325,7 @@ func TestUpdateDryRunReportsAFailedRestore(t *testing.T) {
 		}
 		return nil
 	}}
-	_, err := (&CLI{logger: zap.NewNop(), fs: fs}).Update(t.Context(), dir, nil, nil, false, true)
+	_, err := (&CLI{newCommand: fake.command(t), logger: zap.NewNop(), fs: fs}).Update(t.Context(), dir, nil, nil, false, true)
 	require.ErrorIs(t, err, os.ErrPermission)
 	assert.Contains(t, err.Error(), "failed to restore composer.")
 }
@@ -348,7 +333,6 @@ func TestUpdateDryRunReportsAFailedRestore(t *testing.T) {
 func TestUpdateFailsWhenTheBaseLockCannotBeCreated(t *testing.T) {
 	dir := newUpdateProject(t)
 	fake := &fakeUpdate{diffOut: `{"packages": []}`}
-	fake.install(t)
 
 	fs := &faultFs{Fs: afero.NewOsFs(), openErr: func(name string, _ int) error {
 		if strings.HasPrefix(filepath.Base(name), "drupdater-base-") {
@@ -356,7 +340,7 @@ func TestUpdateFailsWhenTheBaseLockCannotBeCreated(t *testing.T) {
 		}
 		return nil
 	}}
-	_, err := (&CLI{logger: zap.NewNop(), fs: fs}).Update(t.Context(), dir, nil, nil, false, false)
+	_, err := (&CLI{newCommand: fake.command(t), logger: zap.NewNop(), fs: fs}).Update(t.Context(), dir, nil, nil, false, false)
 	require.ErrorIs(t, err, os.ErrPermission)
 	assert.Contains(t, err.Error(), "failed to create the base lock file")
 	assert.Len(t, fake.calls, 1, "composer diff never runs without a base")
@@ -365,10 +349,9 @@ func TestUpdateFailsWhenTheBaseLockCannotBeCreated(t *testing.T) {
 func TestUpdateFailsWhenTheBaseLockCannotBeWritten(t *testing.T) {
 	dir := newUpdateProject(t)
 	fake := &fakeUpdate{diffOut: `{"packages": []}`}
-	fake.install(t)
 
 	fs := &faultFs{Fs: afero.NewOsFs(), writeErr: os.ErrClosed}
-	_, err := (&CLI{logger: zap.NewNop(), fs: fs}).Update(t.Context(), dir, nil, nil, false, false)
+	_, err := (&CLI{newCommand: fake.command(t), logger: zap.NewNop(), fs: fs}).Update(t.Context(), dir, nil, nil, false, false)
 	require.ErrorIs(t, err, os.ErrClosed)
 	assert.Contains(t, err.Error(), "failed to write the base lock file")
 	assert.Len(t, fake.calls, 1, "composer diff never runs against a partial base")
@@ -386,11 +369,10 @@ func TestUpdateWarnsOnlyWhenTheBaseLockCannotBeRemoved(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := newUpdateProject(t)
 			fake := &fakeUpdate{diffOut: `{"packages": []}`}
-			fake.install(t)
 
 			core, logs := observer.New(zap.WarnLevel)
 			fs := &faultFs{Fs: afero.NewOsFs(), removeErr: tc.removeErr}
-			_, err := (&CLI{logger: zap.New(core), fs: fs}).Update(t.Context(), dir, nil, nil, false, false)
+			_, err := (&CLI{newCommand: fake.command(t), logger: zap.New(core), fs: fs}).Update(t.Context(), dir, nil, nil, false, false)
 			require.NoError(t, err, "a leftover temporary file does not fail the update")
 			assert.Equal(t, tc.warnings, logs.FilterMessage("failed to remove the base lock file").Len())
 		})
