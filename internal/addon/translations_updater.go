@@ -1,6 +1,7 @@
 package addon
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/drupdater/drupdater/internal/workflow"
@@ -8,14 +9,21 @@ import (
 	"go.uber.org/zap"
 )
 
+// TranslationsDrush imports a site's translations and finds where they are stored.
+type TranslationsDrush interface {
+	GetTranslationPath(ctx context.Context, dir string, site string, relative bool) (string, error)
+	IsModuleEnabled(ctx context.Context, dir string, site string, module string) (bool, error)
+	LocalizeTranslations(ctx context.Context, dir string, site string) error
+}
+
 type TranslationsUpdater struct {
 	logger *zap.Logger
-	drush  Drush
+	drush  TranslationsDrush
 
 	results workflow.PerSite[TranslationResult]
 }
 
-func NewTranslationsUpdater(logger *zap.Logger, drush Drush) *TranslationsUpdater {
+func NewTranslationsUpdater(logger *zap.Logger, drush TranslationsDrush) *TranslationsUpdater {
 	return &TranslationsUpdater{
 		logger: logger,
 		drush:  drush,

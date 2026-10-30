@@ -11,11 +11,22 @@ import (
 	"go.uber.org/zap"
 )
 
+// DeprecationsComposer finds custom code and whether the project ships its own Rector.
+type DeprecationsComposer interface {
+	GetCustomCodeDirectories(ctx context.Context, dir string) ([]string, error)
+	IsPackageInstalled(ctx context.Context, dir string, packageToCheck string) (bool, error)
+}
+
+// Rector runs rector over custom code.
+type Rector interface {
+	Run(ctx context.Context, dir string, customCodeDirectories []string) (rector.ReturnOutput, error)
+}
+
 type DeprecationsRemover struct {
 	logger        *zap.Logger
 	projectRector Rector
 	bundledRector Rector
-	composer      Composer
+	composer      DeprecationsComposer
 
 	// For the report. Written once from the single post-code-update event, read after the run.
 	fixes []DeprecationFix
@@ -23,7 +34,7 @@ type DeprecationsRemover struct {
 
 // NewDeprecationsRemover runs projectRector when the project has drupal-rector, bundledRector
 // when it has no Rector at all.
-func NewDeprecationsRemover(logger *zap.Logger, projectRector Rector, bundledRector Rector, composer Composer) *DeprecationsRemover {
+func NewDeprecationsRemover(logger *zap.Logger, projectRector Rector, bundledRector Rector, composer DeprecationsComposer) *DeprecationsRemover {
 	return &DeprecationsRemover{
 		logger:        logger,
 		projectRector: projectRector,

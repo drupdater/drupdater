@@ -18,7 +18,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 	logger := zap.NewNop()
 
 	t.Run("Returns error when os.Create fails", func(t *testing.T) {
-		composer := NewMockComposer(t)
+		composer := NewMockBeautifierComposer(t)
 		committer := &fakeCommitter{}
 
 		// Use a path that cannot be written to (root-owned directory)
@@ -34,7 +34,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 	})
 
 	t.Run("Returns error when committing phpcs.xml fails", func(t *testing.T) {
-		composer := NewMockComposer(t)
+		composer := NewMockBeautifierComposer(t)
 		committer := &fakeCommitter{err: assert.AnError}
 		tmpDir := t.TempDir()
 
@@ -50,7 +50,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 	})
 
 	t.Run("Returns false and no error when no custom code directories found", func(t *testing.T) {
-		composer := NewMockComposer(t)
+		composer := NewMockBeautifierComposer(t)
 		committer := &fakeCommitter{}
 
 		tmpDir := t.TempDir()
@@ -71,7 +71,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 	})
 
 	t.Run("Leaves no phpcs.xml behind when GetCustomCodeDirectories fails", func(t *testing.T) {
-		composer := NewMockComposer(t)
+		composer := NewMockBeautifierComposer(t)
 		committer := &fakeCommitter{}
 
 		tmpDir := t.TempDir()
@@ -87,7 +87,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 	})
 
 	t.Run("Creates phpcs.xml and commits when custom code directories found", func(t *testing.T) {
-		composer := NewMockComposer(t)
+		composer := NewMockBeautifierComposer(t)
 		committer := &fakeCommitter{}
 
 		tmpDir := t.TempDir()
@@ -104,7 +104,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 	})
 
 	t.Run("Returns error when template parsing fails", func(t *testing.T) {
-		composer := NewMockComposer(t)
+		composer := NewMockBeautifierComposer(t)
 		committer := &fakeCommitter{}
 
 		tmpDir := t.TempDir()
@@ -121,7 +121,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 	})
 
 	t.Run("Returns error when template execution fails", func(t *testing.T) {
-		composer := NewMockComposer(t)
+		composer := NewMockBeautifierComposer(t)
 		committer := &fakeCommitter{}
 
 		tmpDir := t.TempDir()
@@ -148,7 +148,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 			t.Skip("/dev/full not available")
 		}
 
-		composer := NewMockComposer(t)
+		composer := NewMockBeautifierComposer(t)
 		committer := &fakeCommitter{}
 
 		tmpDir := t.TempDir()
@@ -169,7 +169,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 	})
 
 	t.Run("Returns error when GetCustomCodeDirectories fails", func(t *testing.T) {
-		composer := NewMockComposer(t)
+		composer := NewMockBeautifierComposer(t)
 		committer := &fakeCommitter{}
 
 		tmpDir := t.TempDir()
@@ -289,7 +289,7 @@ func TestCodingStyles(t *testing.T) {
 		defer func() { hasPHPCSPathDefinitions = oldFn }()
 
 		runner := NewMockPHPCS(t)
-		composer := NewMockComposer(t)
+		composer := NewMockBeautifierComposer(t)
 
 		committer := &fakeCommitter{}
 		updateCodingStyles := NewCodeBeautifier(logger, runner, NewMockPHPCS(t), composer)
@@ -313,7 +313,7 @@ func TestCodingStyles(t *testing.T) {
 		defer func() { hasPHPCSPathDefinitions = oldFn }()
 
 		runner := NewMockPHPCS(t)
-		composer := NewMockComposer(t)
+		composer := NewMockBeautifierComposer(t)
 
 		committer := &fakeCommitter{}
 		updateCodingStyles := NewCodeBeautifier(logger, runner, NewMockPHPCS(t), composer)
@@ -340,7 +340,7 @@ func TestCodingStyles(t *testing.T) {
 			Files: map[string]phpcs.ReturnOutputFile{},
 		}, nil)
 
-		composer := NewMockComposer(t)
+		composer := NewMockBeautifierComposer(t)
 		composer.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/coder").Return(true, nil)
 		composer.EXPECT().GetCustomCodeDirectories(anyCtx, "/tmp").Return([]string{"web/modules/custom", "web/themes/custom"}, nil)
 		composer.EXPECT().GetInstalledPackageVersion(anyCtx, "/tmp", "drupal/core").Return("9.2.1", nil)
@@ -374,7 +374,7 @@ func TestCodingStyles(t *testing.T) {
 		}, nil)
 		bundled.EXPECT().RunCBF(anyCtx, "/tmp").Return(nil)
 
-		composer := NewMockComposer(t)
+		composer := NewMockBeautifierComposer(t)
 		composer.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/coder").Return(false, nil)
 
 		committer := &fakeCommitter{}
@@ -398,7 +398,7 @@ func TestCodingStyles(t *testing.T) {
 			Files:  map[string]phpcs.ReturnOutputFile{},
 		}, nil)
 
-		composer := NewMockComposer(t)
+		composer := NewMockBeautifierComposer(t)
 		composer.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/coder").Return(true, nil)
 
 		committer := &fakeCommitter{}
@@ -425,7 +425,7 @@ func TestCodingStyles(t *testing.T) {
 			},
 			Files: map[string]phpcs.ReturnOutputFile{},
 		}, nil)
-		composer := NewMockComposer(t)
+		composer := NewMockBeautifierComposer(t)
 		composer.EXPECT().IsPackageInstalled(anyCtx, "/path/to/repo", "drupal/coder").Return(true, nil)
 
 		committer := &fakeCommitter{}
@@ -473,7 +473,7 @@ func TestCodingStyles(t *testing.T) {
 		}, nil)
 		runner.EXPECT().RunCBF(anyCtx, "/path/to/repo").Return(nil)
 
-		composer := NewMockComposer(t)
+		composer := NewMockBeautifierComposer(t)
 		composer.EXPECT().IsPackageInstalled(anyCtx, "/path/to/repo", "drupal/coder").Return(true, nil)
 
 		committer := &fakeCommitter{}
@@ -503,7 +503,7 @@ func TestCodingStyles(t *testing.T) {
 		}, nil)
 		runner.EXPECT().RunCBF(anyCtx, "/path/to/repo").Return(nil)
 
-		composer := NewMockComposer(t)
+		composer := NewMockBeautifierComposer(t)
 		composer.EXPECT().IsPackageInstalled(anyCtx, "/path/to/repo", "drupal/coder").Return(true, nil)
 
 		committer := &fakeCommitter{unchanged: true}
@@ -552,7 +552,7 @@ func TestCodingStyles(t *testing.T) {
 			},
 		}, assert.AnError)
 
-		composer := NewMockComposer(t)
+		composer := NewMockBeautifierComposer(t)
 		composer.EXPECT().IsPackageInstalled(anyCtx, "/path/to/repo", "drupal/coder").Return(true, nil)
 
 		committer := &fakeCommitter{}
@@ -581,7 +581,7 @@ func TestCodingStyleCommitFailureFailsTheHandler(t *testing.T) {
 		},
 	}, nil)
 	runner.EXPECT().RunCBF(anyCtx, "/path/to/repo").Return(nil)
-	composer := NewMockComposer(t)
+	composer := NewMockBeautifierComposer(t)
 	composer.EXPECT().IsPackageInstalled(anyCtx, "/path/to/repo", "drupal/coder").Return(true, nil)
 
 	cb := NewCodeBeautifier(zap.NewNop(), runner, NewMockPHPCS(t), composer)

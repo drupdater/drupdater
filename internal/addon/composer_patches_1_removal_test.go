@@ -63,7 +63,7 @@ func TestUpdatePatchesRemovesRemotePatchForFixedIssue(t *testing.T) {
 	// dropping the patch from composer.json unreported.
 	const patchURL = "https://www.drupal.org/files/issues/123456-1.patch"
 
-	composerService := NewMockComposer(t)
+	composerService := NewMockPatchesComposer(t)
 	composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
 	composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/core").Return(true, nil)
 
@@ -99,7 +99,7 @@ func TestUpdatePatchesKeepsPatchWhenRemovalFails(t *testing.T) {
 	// would change composer.json without any trace in the merge request description.
 	const patchPath = "patches/drupal/123456.patch"
 
-	composerService := NewMockComposer(t)
+	composerService := NewMockPatchesComposer(t)
 	composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
 	composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/core").Return(true, nil)
 
@@ -151,7 +151,7 @@ func TestDropPatchFile(t *testing.T) {
 func TestValidateCombinedPatchesResolvesAbsoluteLocalPaths(t *testing.T) {
 	// url.ParseRequestURI accepts an absolute local path, which once passed through unprefixed
 	// and pinned the package on a conflict that did not exist.
-	composerService := NewMockComposer(t)
+	composerService := NewMockPatchesComposer(t)
 	composerService.EXPECT().
 		CheckIfPatchesApply(mock.Anything, mock.Anything, "drupal/core", "8.8.0", mock.Anything).
 		RunAndReturn(func(_ context.Context, _ string, _ string, _ string, paths []string) (bool, error) {
@@ -198,7 +198,7 @@ func TestUpdatePatchesRecognisesEveryFixedIssueStatus(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			const patchURL = "https://www.drupal.org/files/issues/123456-1.patch"
 
-			composerService := NewMockComposer(t)
+			composerService := NewMockPatchesComposer(t)
 			composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
 			composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/core").Return(true, nil)
 			if !tt.wantRemoved {
@@ -243,7 +243,7 @@ func TestUpdatePatchesKeepsPatchWithoutGitlabClient(t *testing.T) {
 	// the issue status alone would remove patches whose fix is not in the target version yet.
 	const patchURL = "https://www.drupal.org/files/issues/123456-1.patch"
 
-	composerService := NewMockComposer(t)
+	composerService := NewMockPatchesComposer(t)
 	composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
 	composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/core").Return(true, nil)
 	composerService.EXPECT().CheckIfPatchApplies(anyCtx, "/tmp", "drupal/core", "8.8.0", patchURL).Return(true, nil).Maybe()

@@ -29,7 +29,7 @@ func TestUpdatePatchesLeavesUnverifiablePatchesUnpinned(t *testing.T) {
 	t.Run("the declared patch cannot be checked", func(t *testing.T) {
 		path := t.TempDir()
 
-		composerService := NewMockComposer(t)
+		composerService := NewMockPatchesComposer(t)
 		composerService.EXPECT().GetDependencyPatches(anyCtx, path).Return(nil, nil).Maybe()
 		composerService.EXPECT().IsPackageInstalled(anyCtx, path, "drupal/core").Return(true, nil)
 		composerService.EXPECT().
@@ -54,7 +54,7 @@ func TestUpdatePatchesLeavesUnverifiablePatchesUnpinned(t *testing.T) {
 	t.Run("the replacement patch from the issue fork cannot be checked", func(t *testing.T) {
 		path := t.TempDir()
 
-		composerService := NewMockComposer(t)
+		composerService := NewMockPatchesComposer(t)
 		composerService.EXPECT().GetDependencyPatches(anyCtx, path).Return(nil, nil).Maybe()
 		composerService.EXPECT().IsPackageInstalled(anyCtx, path, "drupal/core").Return(true, nil)
 		// The declared patch is genuinely rejected, so a replacement is fetched from the issue

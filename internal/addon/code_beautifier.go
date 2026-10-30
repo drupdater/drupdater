@@ -12,15 +12,29 @@ import (
 	"text/template"
 
 	"github.com/drupdater/drupdater/internal/workflow"
+	"github.com/drupdater/drupdater/pkg/phpcs"
 
 	"go.uber.org/zap"
 )
+
+// BeautifierComposer finds custom code and which coding standards the project installs.
+type BeautifierComposer interface {
+	GetCustomCodeDirectories(ctx context.Context, dir string) ([]string, error)
+	GetInstalledPackageVersion(ctx context.Context, dir string, packageName string) (string, error)
+	IsPackageInstalled(ctx context.Context, dir string, packageToCheck string) (bool, error)
+}
+
+// PHPCS runs phpcs and phpcbf.
+type PHPCS interface {
+	Run(ctx context.Context, path string) (phpcs.ReturnOutput, error)
+	RunCBF(ctx context.Context, path string) error
+}
 
 type CodeBeautifier struct {
 	logger       *zap.Logger
 	projectPHPCS PHPCS
 	bundledPHPCS PHPCS
-	composer     Composer
+	composer     BeautifierComposer
 
 	// For the report. Written once from the single post-code-update event, read after the run.
 	fixedFiles []string
@@ -28,7 +42,7 @@ type CodeBeautifier struct {
 }
 
 // NewCodeBeautifier runs projectPHPCS when the project has drupal/coder, bundledPHPCS otherwise.
-func NewCodeBeautifier(logger *zap.Logger, projectPHPCS PHPCS, bundledPHPCS PHPCS, composer Composer) *CodeBeautifier {
+func NewCodeBeautifier(logger *zap.Logger, projectPHPCS PHPCS, bundledPHPCS PHPCS, composer BeautifierComposer) *CodeBeautifier {
 	return &CodeBeautifier{
 		logger:       logger,
 		projectPHPCS: projectPHPCS,

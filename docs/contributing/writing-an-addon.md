@@ -26,18 +26,25 @@ description section:
 package addon
 
 import (
+	"context"
+
 	"go.uber.org/zap"
 
 	"github.com/drupdater/drupdater/internal/workflow"
 )
 
-type YourAddon struct {
-	logger *zap.Logger
-	// injected dependencies — a Composer or Drush wrapper, etc.
+// YourAddonComposer is the part of composer YourAddon uses.
+type YourAddonComposer interface {
+	IsPackageInstalled(ctx context.Context, dir string, packageToCheck string) (bool, error)
 }
 
-func NewYourAddon(logger *zap.Logger) *YourAddon {
-	return &YourAddon{logger: logger}
+type YourAddon struct {
+	logger   *zap.Logger
+	composer YourAddonComposer
+}
+
+func NewYourAddon(logger *zap.Logger, composer YourAddonComposer) *YourAddon {
+	return &YourAddon{logger: logger, composer: composer}
 }
 
 func (a *YourAddon) Hooks() workflow.Hooks {
@@ -57,6 +64,12 @@ The `workflow.Addon` interface is the whole contract. An addon renders nothing i
 it found reaches the pull request through its [report section](#4-report). An addon that changes files commits
 them by naming them to the event, never through git itself — see [Committing
 changes](../explanation/addon-architecture.md#committing-changes).
+
+Declare the interface for each tool your addon calls in its own file, listing only the methods
+it calls, as above. Its constructor then shows what the addon can do to the project, and its
+tests mock exactly that. Then add the interface to `addonComposer` or `addonDrush` in
+`cmd/root.go`: those are the sum of every addon's own interface, and what `*composer.CLI` and
+`*drush.CLI` have to satisfy. Run `make mock` to generate the mock.
 
 ### Choosing an event and stage
 
@@ -188,6 +201,7 @@ Template output is easy to get subtly wrong, and `--dry-run` still renders it.
 ## Checklist
 
 - [ ] Implements the addon interface, each hook at a justified stage, listed in `TestAddonHookStages`
+- [ ] Its own interface per tool, with only the methods it calls, added to `addonComposer` or `addonDrush`
 - [ ] Registered in `builtinAddons()` under the name users will write
 - [ ] Mandatory or configurable decided, and defaults updated if needed
 - [ ] `ReportKey`/`ReportData` in `internal/addon/report.go`, returning `nil` when empty

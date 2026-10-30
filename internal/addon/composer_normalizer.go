@@ -1,18 +1,25 @@
 package addon
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/drupdater/drupdater/internal/workflow"
 	"go.uber.org/zap"
 )
 
-type ComposerNormalizer struct {
-	logger   *zap.Logger
-	composer Composer
+// NormalizerComposer runs composer normalize where the plugin is installed.
+type NormalizerComposer interface {
+	IsPackageInstalled(ctx context.Context, dir string, packageToCheck string) (bool, error)
+	Normalize(ctx context.Context, dir string) (string, error)
 }
 
-func NewComposerNormalizer(logger *zap.Logger, composer Composer) *ComposerNormalizer {
+type ComposerNormalizer struct {
+	logger   *zap.Logger
+	composer NormalizerComposer
+}
+
+func NewComposerNormalizer(logger *zap.Logger, composer NormalizerComposer) *ComposerNormalizer {
 	return &ComposerNormalizer{
 		logger:   logger,
 		composer: composer,

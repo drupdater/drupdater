@@ -11,7 +11,7 @@ import (
 
 func TestDefaultComposerNormalize_PostComposerUpdateHandler_PackageInstalled(t *testing.T) {
 	logger := zap.NewNop()
-	composer := NewMockComposer(t)
+	composer := NewMockNormalizerComposer(t)
 
 	ctx := context.Background()
 	testPath := "/test/path"
@@ -31,7 +31,7 @@ func TestDefaultComposerNormalize_PostComposerUpdateHandler_PackageInstalled(t *
 
 func TestDefaultComposerNormalize_PostComposerUpdateHandler_PackageNotInstalled(t *testing.T) {
 	logger := zap.NewNop()
-	composer := NewMockComposer(t)
+	composer := NewMockNormalizerComposer(t)
 
 	ctx := context.Background()
 	testPath := "/test/path"

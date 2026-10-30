@@ -46,7 +46,7 @@ func runPerSite(t *testing.T, sites []string, fn func(site string) error) {
 }
 
 func TestUpdateHooksRecordsEverySiteUnderConcurrency(t *testing.T) {
-	mockDrush := NewMockDrush(t)
+	mockDrush := NewMockUpdateHooksDrush(t)
 	updateHooks := NewUpdateHooks(zap.NewNop(), mockDrush)
 
 	ctx := context.Background()
@@ -70,7 +70,7 @@ func TestUpdateHooksRecordsEverySiteUnderConcurrency(t *testing.T) {
 }
 
 func TestUnsupportedModulesRecordsEverySiteUnderConcurrency(t *testing.T) {
-	mockDrush := NewMockDrush(t)
+	mockDrush := NewMockUnsupportedModulesDrush(t)
 	um := NewUnsupportedModules(zap.NewNop(), mockDrush)
 
 	ctx := context.Background()
@@ -102,7 +102,7 @@ func TestUnsupportedModulesRecordsEverySiteUnderConcurrency(t *testing.T) {
 }
 
 func TestTranslationsUpdaterRecordsEverySiteUnderConcurrency(t *testing.T) {
-	mockDrush := NewMockDrush(t)
+	mockDrush := NewMockTranslationsDrush(t)
 	tu := NewTranslationsUpdater(zap.NewNop(), mockDrush)
 
 	ctx := context.Background()

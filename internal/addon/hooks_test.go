@@ -103,3 +103,19 @@ func TestPerSiteHooksShareStateOnlyThroughPerSite(t *testing.T) {
 		})
 	}
 }
+
+func TestNoTwoAddonsShareAToolInterface(t *testing.T) {
+	owner := map[reflect.Type]string{}
+	for name, tt := range everyAddon {
+		for field := range reflect.TypeOf(tt.addon).Elem().Fields() {
+			if field.Type.Kind() != reflect.Interface || field.Type.PkgPath() != reflect.TypeFor[CodeBeautifier]().PkgPath() {
+				continue
+			}
+			if other, ok := owner[field.Type]; ok && other != name {
+				t.Errorf("%s and %s both depend on %s: give each addon its own interface", other, name, field.Type.Name())
+			}
+			owner[field.Type] = name
+		}
+	}
+	assert.NotEmpty(t, owner, "no addon has a tool interface, so the check above checked nothing")
+}

@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/drupdater/drupdater/internal"
-	"github.com/drupdater/drupdater/internal/addon"
 	"github.com/drupdater/drupdater/internal/logging"
 	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/drupdater/drupdater/pkg/composer"
@@ -319,7 +318,7 @@ func TestComposerOptions(t *testing.T) {
 }
 
 // cleanAudit is a composer whose audit finds nothing. Only Audit is implemented.
-type cleanAudit struct{ addon.Composer }
+type cleanAudit struct{ addonComposer }
 
 func (cleanAudit) Audit(context.Context, string) (composer.Audit, error) {
 	return composer.Audit{}, nil

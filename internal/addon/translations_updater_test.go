@@ -13,7 +13,7 @@ import (
 
 func TestUpdateTranslationsEventHandlerWithoutLocaleDeploy(t *testing.T) {
 	// Setup - Create mocks and system under test
-	mockDrush := NewMockDrush(t)
+	mockDrush := NewMockTranslationsDrush(t)
 	logger := zap.NewNop()
 	handler := NewTranslationsUpdater(logger, mockDrush)
 
@@ -38,7 +38,7 @@ func TestUpdateTranslationsEventHandlerWithoutLocaleDeploy(t *testing.T) {
 
 func TestUpdateTranslationsEventHandlerWithLocaleDeploy(t *testing.T) {
 	// Setup - Create mocks and system under test
-	mockDrush := NewMockDrush(t)
+	mockDrush := NewMockTranslationsDrush(t)
 	logger := zap.NewNop()
 	handler := NewTranslationsUpdater(logger, mockDrush)
 
@@ -64,7 +64,7 @@ func TestUpdateTranslationsEventHandlerWithLocaleDeploy(t *testing.T) {
 func TestUpdateTranslationsEventHandlerSkipsWhenTranslationPathUnavailable(t *testing.T) {
 	// A soft skip, not a fatal error — and nothing committed: an empty path would commit the
 	// entire working tree.
-	mockDrush := NewMockDrush(t)
+	mockDrush := NewMockTranslationsDrush(t)
 	logger := zap.NewNop()
 	handler := NewTranslationsUpdater(logger, mockDrush)
 
@@ -93,7 +93,7 @@ func TestUpdateTranslationsEventHandlerSkipsWhenTranslationPathUnavailable(t *te
 
 func TestUpdateTranslationsEventHandlerRecordsNothingToCommit(t *testing.T) {
 	// Localized but unchanged: the site still appears in the report, explicitly not updated.
-	mockDrush := NewMockDrush(t)
+	mockDrush := NewMockTranslationsDrush(t)
 	handler := NewTranslationsUpdater(zap.NewNop(), mockDrush)
 
 	committer := &fakeCommitter{unchanged: true}

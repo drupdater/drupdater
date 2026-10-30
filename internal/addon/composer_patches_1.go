@@ -65,9 +65,32 @@ type ConflictPatch struct {
 	NewVersion       string `json:"new_version"`
 }
 
+// PatchesComposer reads, rewrites and test-applies composer-patches 1.x patches.
+type PatchesComposer interface {
+	CheckIfPatchApplies(ctx context.Context, dir string, packageName string, packageVersion string, patchPath string) (bool, error)
+	CheckIfPatchesApply(ctx context.Context, dir string, packageName string, packageVersion string, patchPaths []string) (bool, error)
+	GetConfig(ctx context.Context, dir string, key string) (string, error)
+	GetDependencyPatches(ctx context.Context, dir string) (map[string]map[string]bool, error)
+	IsPackageInstalled(ctx context.Context, dir string, packageToCheck string) (bool, error)
+	SetConfig(ctx context.Context, dir string, key string, value string) error
+	Update(ctx context.Context, dir string, packagesToUpdate []string, packagesToKeep []string, minimalChanges bool, dryRun bool) ([]composer.PackageChange, error)
+	UpdateLockHash(ctx context.Context, dir string) error
+}
+
+// DrupalOrg looks up the drupal.org issue a patch belongs to.
+type DrupalOrg interface {
+	GetIssue(ctx context.Context, issueID string) (*drupalorg.Issue, error)
+	FindIssueNumber(text string) (string, bool)
+}
+
+// HTTPClient downloads remote patches.
+type HTTPClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
 type ComposerPatches1 struct {
 	logger       *zap.Logger
-	composer     Composer
+	composer     PatchesComposer
 	drupalOrg    DrupalOrg
 	gitlab       *gitlab.Client
 	httpClient   HTTPClient
@@ -75,7 +98,7 @@ type ComposerPatches1 struct {
 	removeFile   func(name string) error
 }
 
-func NewComposerPatches1(logger *zap.Logger, composer Composer, drupalOrg DrupalOrg, httpClient HTTPClient) *ComposerPatches1 {
+func NewComposerPatches1(logger *zap.Logger, composer PatchesComposer, drupalOrg DrupalOrg, httpClient HTTPClient) *ComposerPatches1 {
 	token := os.Getenv("DRUPALCODE_ACCESS_TOKEN")
 	var drupalOrgGitlab *gitlab.Client
 	if token != "" {

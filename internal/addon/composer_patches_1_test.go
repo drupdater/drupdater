@@ -64,7 +64,7 @@ func TestUpdatePatches(t *testing.T) {
 
 	t.Run("Local patch still applies", func(t *testing.T) {
 
-		composerService := NewMockComposer(t)
+		composerService := NewMockPatchesComposer(t)
 		composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
 		drupalOrgService := NewMockDrupalOrg(t)
 
@@ -108,7 +108,7 @@ func TestUpdatePatches(t *testing.T) {
 	t.Run("Local patch is not deduplicated against dependencies", func(t *testing.T) {
 		// A local (relative) path that happens to match a dependency string must NOT be
 		// removed: local paths are package-relative, so they are not the same file.
-		composerService := NewMockComposer(t)
+		composerService := NewMockPatchesComposer(t)
 		drupalOrgService := NewMockDrupalOrg(t)
 		var removed []string
 
@@ -131,7 +131,7 @@ func TestUpdatePatches(t *testing.T) {
 	})
 
 	t.Run("GetDependencyPatches error is non-fatal", func(t *testing.T) {
-		composerService := NewMockComposer(t)
+		composerService := NewMockPatchesComposer(t)
 		drupalOrgService := NewMockDrupalOrg(t)
 		var removed []string
 
@@ -152,7 +152,7 @@ func TestUpdatePatches(t *testing.T) {
 	})
 
 	t.Run("Multiple patches apply together", func(t *testing.T) {
-		composerService := NewMockComposer(t)
+		composerService := NewMockPatchesComposer(t)
 		drupalOrgService := NewMockDrupalOrg(t)
 		var removed []string
 
@@ -174,7 +174,7 @@ func TestUpdatePatches(t *testing.T) {
 	})
 
 	t.Run("Combined patch check error is non-fatal", func(t *testing.T) {
-		composerService := NewMockComposer(t)
+		composerService := NewMockPatchesComposer(t)
 		drupalOrgService := NewMockDrupalOrg(t)
 		var removed []string
 
@@ -196,7 +196,7 @@ func TestUpdatePatches(t *testing.T) {
 	})
 
 	t.Run("Patch already provided by a dependency is removed", func(t *testing.T) {
-		composerService := NewMockComposer(t)
+		composerService := NewMockPatchesComposer(t)
 		drupalOrgService := NewMockDrupalOrg(t)
 		var removed []string
 
@@ -242,7 +242,7 @@ func TestUpdatePatches(t *testing.T) {
 
 	t.Run("Local patch not applies", func(t *testing.T) {
 
-		composerService := NewMockComposer(t)
+		composerService := NewMockPatchesComposer(t)
 		composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
 		drupalOrgService := NewMockDrupalOrg(t)
 
@@ -300,7 +300,7 @@ func TestUpdatePatches(t *testing.T) {
 
 	t.Run("Remote patch still applies", func(t *testing.T) {
 
-		composerService := NewMockComposer(t)
+		composerService := NewMockPatchesComposer(t)
 		composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
 		drupalOrgService := NewMockDrupalOrg(t)
 
@@ -354,7 +354,7 @@ func TestUpdatePatches(t *testing.T) {
 
 	t.Run("Current patch fails, remote patch still applies", func(t *testing.T) {
 
-		composerService := NewMockComposer(t)
+		composerService := NewMockPatchesComposer(t)
 		composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
 		drupalOrgService := NewMockDrupalOrg(t)
 
@@ -454,7 +454,7 @@ func TestUpdatePatches(t *testing.T) {
 
 	t.Run("Current patch fails, remote patch also fails", func(t *testing.T) {
 
-		composerService := NewMockComposer(t)
+		composerService := NewMockPatchesComposer(t)
 		composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
 		drupalOrgService := NewMockDrupalOrg(t)
 
@@ -566,7 +566,7 @@ func TestUpdatePatches(t *testing.T) {
 	t.Run("Current patch fails and no gitlab client records a conflict", func(t *testing.T) {
 		// When DRUPALCODE_ACCESS_TOKEN is unset the gitlab client is nil; the fork lookup
 		// must be skipped instead of panicking, and the package kept at its current version.
-		composerService := NewMockComposer(t)
+		composerService := NewMockPatchesComposer(t)
 		composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
 		drupalOrgService := NewMockDrupalOrg(t)
 		var removed []string
@@ -614,7 +614,7 @@ func TestUpdatePatches(t *testing.T) {
 
 	t.Run("Remote patch was committed and released", func(t *testing.T) {
 
-		composerService := NewMockComposer(t)
+		composerService := NewMockPatchesComposer(t)
 		composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
 		drupalOrgService := NewMockDrupalOrg(t)
 
@@ -688,7 +688,7 @@ func TestUpdatePatches(t *testing.T) {
 
 	t.Run("Remote patch was committed, but not yet releases", func(t *testing.T) {
 
-		composerService := NewMockComposer(t)
+		composerService := NewMockPatchesComposer(t)
 		composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
 		drupalOrgService := NewMockDrupalOrg(t)
 
@@ -765,7 +765,7 @@ func TestUpdatePatches(t *testing.T) {
 
 	t.Run("Module will be removed", func(t *testing.T) {
 
-		composerService := NewMockComposer(t)
+		composerService := NewMockPatchesComposer(t)
 		composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
 		drupalOrgService := NewMockDrupalOrg(t)
 
@@ -815,7 +815,7 @@ func TestUpdatePatches(t *testing.T) {
 	})
 
 	t.Run("Multiple patches conflict when applied together", func(t *testing.T) {
-		composerService := NewMockComposer(t)
+		composerService := NewMockPatchesComposer(t)
 		composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
 		drupalOrgService := NewMockDrupalOrg(t)
 		var removed []string
@@ -864,7 +864,7 @@ func TestUpdatePatches(t *testing.T) {
 	})
 
 	t.Run("Module not installed", func(t *testing.T) {
-		composerService := NewMockComposer(t)
+		composerService := NewMockPatchesComposer(t)
 		composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
 		drupalOrgService := NewMockDrupalOrg(t)
 

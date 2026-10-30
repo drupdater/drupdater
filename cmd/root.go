@@ -410,11 +410,29 @@ func ensureGitSafeDirectory(ctx context.Context, logger *zap.Logger, dir string)
 	}
 }
 
+// addonComposer is every builtin addon's composer interface at once; each addon sees only its own.
+type addonComposer interface {
+	addon.AllowPluginsComposer
+	addon.AuditComposer
+	addon.BeautifierComposer
+	addon.DeprecationsComposer
+	addon.DiffComposer
+	addon.NormalizerComposer
+	addon.PatchesComposer
+}
+
+// addonDrush is every builtin addon's drush interface at once.
+type addonDrush interface {
+	addon.TranslationsDrush
+	addon.UnsupportedModulesDrush
+	addon.UpdateHooksDrush
+}
+
 // addonDeps carries everything the addon constructors need.
 type addonDeps struct {
 	logger    *zap.Logger
-	drush     addon.Drush
-	composer  addon.Composer
+	drush     addonDrush
+	composer  addonComposer
 	drupalOrg addon.DrupalOrg
 	// security marks a --security run. Only composer_audit reads it.
 	security bool
@@ -469,8 +487,8 @@ func builtinAddons() addonCatalog {
 func (c addonCatalog) create(
 	logger *zap.Logger,
 	config internal.Config,
-	drush addon.Drush,
-	composer addon.Composer,
+	drush addonDrush,
+	composer addonComposer,
 	drupalOrg addon.DrupalOrg,
 ) ([]workflow.Addon, error) {
 	deps := addonDeps{logger: logger, drush: drush, composer: composer, drupalOrg: drupalOrg, security: config.Security}
