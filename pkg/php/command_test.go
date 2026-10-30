@@ -1,4 +1,4 @@
-package composer
+package php
 
 import (
 	"context"
@@ -171,4 +171,110 @@ func TestCommandSplit(t *testing.T) {
 		assert.Equal(t, "o", stdout)
 		assert.Equal(t, "e", stderr)
 	})
+}
+
+func TestJSON(t *testing.T) {
+	t.Run("decodes stdout and ignores the notices on stderr", func(t *testing.T) {
+		var seen []string
+		c := Command{New: shellCommand(`echo "Deprecated: notice" >&2; echo '{"name": "drupal/core"}'`, &seen), Logger: zap.NewNop()}
+
+		value, err := JSON[struct {
+			Name string `json:"name"`
+		}](t.Context(), c, "show", "--format=json")
+
+		require.NoError(t, err)
+		assert.Equal(t, "drupal/core", value.Name)
+		assert.Equal(t, []string{"composer", "show", "--format=json"}, seen)
+	})
+
+	t.Run("a failed command carries its stderr", func(t *testing.T) {
+		var seen []string
+		c := Command{New: shellCommand(`echo '{}'; echo "Bootstrap failed" >&2; exit 1`, &seen), Logger: zap.NewNop()}
+
+		_, err := JSON[map[string]any](t.Context(), c)
+
+		var exitErr *exec.ExitError
+		require.ErrorAs(t, err, &exitErr)
+		assert.Contains(t, err.Error(), "output: Bootstrap failed")
+	})
+
+	t.Run("output that is not JSON", func(t *testing.T) {
+		var seen []string
+		c := Command{New: shellCommand(`echo "No database updates required."`, &seen), Logger: zap.NewNop()}
+
+		_, err := JSON[map[string]any](t.Context(), c)
+
+		require.ErrorContains(t, err, "failed to decode the JSON output")
+	})
+}
+
+func TestComposerEnv(t *testing.T) {
+	t.Run("forces the settings drupdater depends on when they are absent", func(t *testing.T) {
+		got := Env([]string{"PATH=/usr/bin"})
+
+		assert.Contains(t, got, "PATH=/usr/bin", "unrelated entries must survive")
+		assert.Contains(t, got, "COMPOSER_PROCESS_TIMEOUT=0")
+		assert.Contains(t, got, "COMPOSER_NO_AUDIT=1")
+	})
+
+	t.Run("overrides an inherited value, leaving exactly one entry per variable", func(t *testing.T) {
+		got := Env([]string{
+			"COMPOSER_PROCESS_TIMEOUT=300",
+			"COMPOSER_NO_AUDIT=0",
+			"COMPOSER_AUTH={}",
+		})
+
+		// Not merely "the forced value is present": an inherited entry left in place would make
+		// the result depend on os/exec's de-duplication order rather than on this function.
+		assert.Equal(t, 1, countKey(got, "COMPOSER_PROCESS_TIMEOUT"))
+		assert.Equal(t, 1, countKey(got, "COMPOSER_NO_AUDIT"))
+		assert.Contains(t, got, "COMPOSER_PROCESS_TIMEOUT=0")
+		assert.Contains(t, got, "COMPOSER_NO_AUDIT=1")
+		assert.NotContains(t, got, "COMPOSER_PROCESS_TIMEOUT=300")
+		assert.NotContains(t, got, "COMPOSER_NO_AUDIT=0")
+		assert.Contains(t, got, "COMPOSER_AUTH={}", "COMPOSER_AUTH must be passed through untouched")
+	})
+
+	t.Run("leaves the image's policy variables to the environment", func(t *testing.T) {
+		// These are deployment policy, not correctness: forcing them would override a developer
+		// running the binary outside the image with a composer home of their own choosing.
+		got := Env([]string{
+			"COMPOSER_HOME=/home/dev/.composer",
+			"COMPOSER_CACHE_DIR=/home/dev/.cache/composer",
+			"COMPOSER_ALLOW_SUPERUSER=0",
+			"COMPOSER_FUND=1",
+		})
+
+		assert.Contains(t, got, "COMPOSER_HOME=/home/dev/.composer")
+		assert.Contains(t, got, "COMPOSER_CACHE_DIR=/home/dev/.cache/composer")
+		assert.Contains(t, got, "COMPOSER_ALLOW_SUPERUSER=0")
+		assert.Contains(t, got, "COMPOSER_FUND=1")
+	})
+
+	t.Run("keeps entries that are not KEY=VALUE", func(t *testing.T) {
+		// Including a bare variable name: os.Environ() does not promise every entry has "=",
+		// and a name alone assigns — and so overrides — nothing.
+		got := Env([]string{"NOT_AN_ASSIGNMENT", "COMPOSER_PROCESS_TIMEOUT"})
+
+		assert.Contains(t, got, "NOT_AN_ASSIGNMENT")
+		assert.Contains(t, got, "COMPOSER_PROCESS_TIMEOUT")
+	})
+
+	t.Run("preserves the order of the entries it keeps", func(t *testing.T) {
+		got := Env([]string{"A=1", "COMPOSER_NO_AUDIT=0", "B=2", "C=3"})
+
+		assert.Equal(t, []string{"A=1", "B=2", "C=3"}, withoutRequired(got),
+			"removing a forced entry must not reorder the rest")
+	})
+}
+
+// countKey returns how many entries of env assign key.
+func countKey(env []string, key string) int {
+	count := 0
+	for _, entry := range env {
+		if len(entry) > len(key) && entry[:len(key)+1] == key+"=" {
+			count++
+		}
+	}
+	return count
 }

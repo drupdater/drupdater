@@ -86,11 +86,12 @@ func TestRunWithConcurrentSites(t *testing.T) {
 		installer.EXPECT().Install(anyCtx, testCheckout, site).RunAndReturn(baseline.probe)
 		installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, site).Return(nil)
 		installer.EXPECT().RestoreSettings(anyCtx, testCheckout, site).Return(nil)
+		drush.EXPECT().Facts(anyCtx, testCheckout, site).Return(syncFacts(testCheckout+"/config/"+site), nil)
 		drush.EXPECT().UpdateSite(anyCtx, testCheckout, site).Return(nil)
 		drush.EXPECT().ExportConfiguration(anyCtx, testCheckout, site).RunAndReturn(commitTail.probe)
-		drush.EXPECT().GetConfigSyncDir(anyCtx, testCheckout, site, true).Return("config/"+site, nil)
 		worktree.EXPECT().Add("config/"+site).Return(plumbing.ZeroHash, nil)
 		drush.EXPECT().ConfigResave(anyCtx, testCheckout, site).Return(nil)
+		drush.EXPECT().LocalFacts(anyCtx, testCheckout, site).Return(syncFacts(testCheckout+"/config/"+site), nil)
 	}
 
 	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
@@ -139,17 +140,18 @@ func turnsRunner(t *testing.T, sites []string, concurrency int, stub func(site s
 	for _, site := range sites {
 		installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, site).Return(nil)
 		installer.EXPECT().RestoreSettings(anyCtx, testCheckout, site).Return(nil).Once()
+		drush.EXPECT().Facts(anyCtx, testCheckout, site).Return(syncFacts(testCheckout+"/config/"+site), nil)
 		drush.EXPECT().UpdateSite(anyCtx, testCheckout, site).RunAndReturn(func(context.Context, string, string) error {
 			return stub(site)
 		})
 		drush.EXPECT().ConfigResave(anyCtx, testCheckout, site).Return(nil).Maybe()
+		drush.EXPECT().LocalFacts(anyCtx, testCheckout, site).Return(syncFacts(testCheckout+"/config/"+site), nil).Maybe()
 		drush.EXPECT().ExportConfiguration(anyCtx, testCheckout, site).RunAndReturn(func(context.Context, string, string) error {
 			mu.Lock()
 			defer mu.Unlock()
 			exported = append(exported, site)
 			return nil
 		}).Maybe()
-		drush.EXPECT().GetConfigSyncDir(anyCtx, testCheckout, site, true).Return("config/"+site, nil).Maybe()
 	}
 
 	committer := &fakeCommitter{result: true}

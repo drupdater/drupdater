@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/drupdater/drupdater/pkg/php"
 	"os"
 	"os/exec"
 	"regexp"
-	"slices"
 	"strings"
 	"sync"
 
@@ -15,11 +15,10 @@ import (
 	"go.uber.org/zap"
 )
 
-var execCommand = exec.CommandContext
-
 type CLI struct {
-	fs     afero.Fs
-	logger *zap.Logger
+	fs         afero.Fs
+	logger     *zap.Logger
+	newCommand php.CommandFactory
 	// extraEnv is added to every invocation; see WithoutBlocking.
 	extraEnv []string
 
@@ -30,8 +29,9 @@ type CLI struct {
 
 func NewCLI(logger *zap.Logger, opts ...Option) *CLI {
 	s := &CLI{
-		fs:     afero.NewOsFs(),
-		logger: logger,
+		fs:         afero.NewOsFs(),
+		logger:     logger,
+		newCommand: exec.CommandContext,
 	}
 	for _, opt := range opts {
 		opt(s)
@@ -51,39 +51,8 @@ func WithoutBlocking() Option {
 	}
 }
 
-// requiredComposerEnv is forced on every invocation (see Env), not left to the Dockerfile, which
-// only covers the published image. The 300s default timeout kills a large install mid-phase, and
-// the implicit audit is noise in every update's log. Deployment policy is not forced here.
-var requiredComposerEnv = []string{
-	"COMPOSER_PROCESS_TIMEOUT=0",
-	"COMPOSER_NO_AUDIT=1",
-}
-
-// Env applies requiredComposerEnv to env, passing everything else through in order — notably
-// COMPOSER_AUTH. Inherited assignments to a required variable are dropped rather than shadowed,
-// so the outcome does not depend on how os/exec resolves duplicate keys.
-//
-// Exported because drush, phpcs and rector run through `composer exec`; each should set
-// command.Env = composer.Env(command.Environ()).
-func Env(env []string) []string {
-	result := make([]string, 0, len(env)+len(requiredComposerEnv))
-	for _, entry := range env {
-		key, _, isAssignment := strings.Cut(entry, "=")
-		// A non-assignment entry cannot override anything, so it is carried over.
-		if isAssignment && slices.ContainsFunc(requiredComposerEnv, func(required string) bool {
-			requiredKey, _, _ := strings.Cut(required, "=")
-			return requiredKey == key
-		}) {
-			continue
-		}
-		result = append(result, entry)
-	}
-	return append(result, requiredComposerEnv...)
-}
-
-// command is built per call so a test swapping execCommand later still diverts the subprocess.
-func (s *CLI) command(dir string) Command {
-	return Command{New: execCommand, Logger: s.logger, Dir: dir, ExtraEnv: s.extraEnv}
+func (s *CLI) command(dir string) php.Command {
+	return php.Command{New: s.newCommand, Logger: s.logger, Dir: dir, ExtraEnv: s.extraEnv}
 }
 
 func (s *CLI) execComposer(ctx context.Context, dir string, args ...string) (string, error) {
@@ -142,16 +111,10 @@ func (s *CLI) Normalize(ctx context.Context, dir string) (string, error) {
 }
 
 func (s *CLI) GetInstalledPackageVersion(ctx context.Context, dir string, packageName string) (string, error) {
-	out, err := s.execComposerJSON(ctx, dir, "show", packageName, "--locked", "--no-ansi", "--format=json")
-	if err != nil {
-		return "", err
-	}
-
-	var composerShow struct {
+	composerShow, err := php.JSON[struct {
 		Versions []string `json:"versions"`
-	}
-
-	if err := json.Unmarshal([]byte(out), &composerShow); err != nil {
+	}](ctx, s.command(dir), "show", packageName, "--locked", "--no-ansi", "--format=json")
+	if err != nil {
 		return "", err
 	}
 
@@ -161,9 +124,31 @@ func (s *CLI) GetInstalledPackageVersion(ctx context.Context, dir string, packag
 	return composerShow.Versions[0], nil
 }
 
-func (s *CLI) GetConfig(ctx context.Context, dir string, key string) (string, error) {
-	// stdout only: composer's stderr warnings would corrupt the value.
-	return s.execComposerJSON(ctx, dir, "config", "--json", key)
+// GetConfig reads a dotted key from composer.json as `composer config --json` prints it: a string
+// as is, anything else as JSON. It reads the file as written, so it suits extra.*, not config.*.
+func (s *CLI) GetConfig(_ context.Context, dir string, key string) (string, error) {
+	content, err := afero.ReadFile(s.fs, dir+"/composer.json")
+	if err != nil {
+		return "", err
+	}
+	var value any
+	if err := json.Unmarshal(content, &value); err != nil {
+		return "", fmt.Errorf("failed to decode composer.json: %w", err)
+	}
+	for part := range strings.SplitSeq(key, ".") {
+		object, ok := value.(map[string]any)
+		if !ok {
+			return "", fmt.Errorf("%s is not defined", key)
+		}
+		if value, ok = object[part]; !ok {
+			return "", fmt.Errorf("%s is not defined", key)
+		}
+	}
+	if text, ok := value.(string); ok {
+		return text, nil
+	}
+	encoded, err := json.Marshal(value)
+	return string(encoded), err
 }
 
 func (s *CLI) SetConfig(ctx context.Context, dir string, key string, value string) error {

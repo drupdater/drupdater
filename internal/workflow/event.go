@@ -1,6 +1,10 @@
 package workflow
 
-import "context"
+import (
+	"context"
+
+	"github.com/drupdater/drupdater/pkg/drush"
+)
 
 type AbortError struct {
 	Msg string
@@ -88,17 +92,19 @@ func NewPostCodeUpdateEvent(ctx context.Context, path string, committer Committe
 
 type PreSiteUpdateEvent struct {
 	BasicAddonEvent
-	site string
+	site  string
+	facts drush.Facts
 }
 
 func (*PreSiteUpdateEvent) name() string { return "pre-site-update" }
 
 func (*PreSiteUpdateEvent) hook(h Hooks) *Hook[*PreSiteUpdateEvent] { return h.PreSiteUpdate }
 
-func NewPreSiteUpdateEvent(ctx context.Context, path string, committer Committer, site string) *PreSiteUpdateEvent {
+func NewPreSiteUpdateEvent(ctx context.Context, path string, committer Committer, site string, facts drush.Facts) *PreSiteUpdateEvent {
 	return &PreSiteUpdateEvent{
 		BasicAddonEvent: newBasicAddonEvent(ctx, path, committer),
 		site:            site,
+		facts:           facts,
 	}
 }
 
@@ -106,22 +112,34 @@ func (e *PreSiteUpdateEvent) Site() string {
 	return e.site
 }
 
+// Facts is what the site reported before its update hooks ran.
+func (e *PreSiteUpdateEvent) Facts() drush.Facts {
+	return e.facts.Clone()
+}
+
 type PostSiteUpdateEvent struct {
 	BasicAddonEvent
-	site string
+	site  string
+	facts drush.Facts
 }
 
 func (*PostSiteUpdateEvent) name() string { return "post-site-update" }
 
 func (*PostSiteUpdateEvent) hook(h Hooks) *Hook[*PostSiteUpdateEvent] { return h.PostSiteUpdate }
 
-func NewPostSiteUpdateEvent(ctx context.Context, path string, committer Committer, site string) *PostSiteUpdateEvent {
+func NewPostSiteUpdateEvent(ctx context.Context, path string, committer Committer, site string, facts drush.Facts) *PostSiteUpdateEvent {
 	return &PostSiteUpdateEvent{
 		BasicAddonEvent: newBasicAddonEvent(ctx, path, committer),
 		site:            site,
+		facts:           facts,
 	}
 }
 
 func (e *PostSiteUpdateEvent) Site() string {
 	return e.site
+}
+
+// Facts is what the site reported after its update hooks ran, without UnsupportedModules.
+func (e *PostSiteUpdateEvent) Facts() drush.Facts {
+	return e.facts.Clone()
 }

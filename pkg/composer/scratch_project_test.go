@@ -3,6 +3,7 @@ package composer
 import (
 	"context"
 	"encoding/json"
+	"github.com/drupdater/drupdater/pkg/php"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,11 +15,10 @@ import (
 	"go.uber.org/zap"
 )
 
-// stubComposerFailureWithOutput makes the next composer invocations print out and exit non-zero,
-// which is what composer does when it cannot resolve a package or cannot apply a patch.
-func stubComposerFailureWithOutput(t *testing.T, out string) {
-	t.Helper()
-	execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+// composerFailingWith is a composer that prints out and exits non-zero, as composer does when it
+// cannot resolve a package or cannot apply a patch.
+func composerFailingWith(out string) php.CommandFactory {
+	return func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 		cs := append([]string{"-test.run=TestHelperProcess", "--"}, arg...)
 		cmd := exec.CommandContext(ctx, os.Args[0], cs...)
 		cmd.Env = []string{
@@ -29,7 +29,6 @@ func stubComposerFailureWithOutput(t *testing.T, out string) {
 		}
 		return cmd
 	}
-	t.Cleanup(func() { execCommand = exec.CommandContext })
 }
 
 // newScratchCLI returns a CLI on the real filesystem, not a MemMapFs: the scratch project's temp
@@ -40,7 +39,7 @@ func newScratchCLI(t *testing.T, projectComposerJSON string) (*CLI, string) {
 	if projectComposerJSON != "" {
 		require.NoError(t, os.WriteFile(filepath.Join(projectDir, "composer.json"), []byte(projectComposerJSON), 0600))
 	}
-	service := &CLI{logger: zap.NewNop(), fs: afero.NewOsFs()}
+	service := &CLI{logger: zap.NewNop(), fs: afero.NewOsFs(), newCommand: exec.CommandContext}
 	t.Cleanup(service.Cleanup)
 	return service, projectDir
 }
@@ -285,8 +284,8 @@ func TestCheckIfPatchAppliesClassifiesFailures(t *testing.T) {
 	t.Run("a package composer cannot obtain is an error, not a patch conflict", func(t *testing.T) {
 		// Read as "the patch does not apply", this pinned the package and blamed a conflict on
 		// every run. Callers leave the package alone on an error instead.
-		stubComposerFailureWithOutput(t, "Could not find package acme/private-module in any version")
 		service, projectDir := newScratchCLI(t, `{"repositories": []}`)
+		service.newCommand = composerFailingWith("Could not find package acme/private-module in any version")
 
 		applies, err := service.CheckIfPatchApplies(t.Context(), projectDir, "acme/private-module", "1.2.0", filepath.Join(projectDir, "patches/a.diff"))
 
@@ -297,8 +296,8 @@ func TestCheckIfPatchAppliesClassifiesFailures(t *testing.T) {
 	})
 
 	t.Run("a rejected patch is still a plain false", func(t *testing.T) {
-		stubComposerFailureWithOutput(t, "  - Applying patches for drupal/core\nCould not apply patch! Skipping.")
 		service, projectDir := newScratchCLI(t, `{"repositories": []}`)
+		service.newCommand = composerFailingWith("  - Applying patches for drupal/core\nCould not apply patch! Skipping.")
 
 		applies, err := service.CheckIfPatchApplies(t.Context(), projectDir, "drupal/core", "10.2.0", filepath.Join(projectDir, "patches/a.diff"))
 
@@ -307,8 +306,8 @@ func TestCheckIfPatchAppliesClassifiesFailures(t *testing.T) {
 	})
 
 	t.Run("the project's repositories reach the scratch project", func(t *testing.T) {
-		stubComposerOutput(t, "ok")
 		service, projectDir := newScratchCLI(t, `{"repositories": [{"type": "composer", "url": "https://repo.packagist.com/acme/"}]}`)
+		service.newCommand = composerPrinting("ok")
 
 		applies, err := service.CheckIfPatchApplies(t.Context(), projectDir, "acme/private-module", "1.2.0", filepath.Join(projectDir, "patches/a.diff"))
 		require.NoError(t, err)
@@ -322,8 +321,8 @@ func TestCheckIfPatchAppliesClassifiesFailures(t *testing.T) {
 
 func TestCheckIfPatchesApplyClassifiesFailures(t *testing.T) {
 	t.Run("a package composer cannot obtain is an error", func(t *testing.T) {
-		stubComposerFailureWithOutput(t, "Could not find package acme/private-module in any version")
 		service, projectDir := newScratchCLI(t, `{"repositories": []}`)
+		service.newCommand = composerFailingWith("Could not find package acme/private-module in any version")
 		patches := []string{filepath.Join(projectDir, "patches/a.diff"), filepath.Join(projectDir, "patches/b.diff")}
 
 		applies, err := service.CheckIfPatchesApply(t.Context(), projectDir, "acme/private-module", "1.2.0", patches)
@@ -333,8 +332,8 @@ func TestCheckIfPatchesApplyClassifiesFailures(t *testing.T) {
 	})
 
 	t.Run("patches that do not apply together are a plain false", func(t *testing.T) {
-		stubComposerFailureWithOutput(t, "Could not apply patch! Skipping.")
 		service, projectDir := newScratchCLI(t, `{"repositories": []}`)
+		service.newCommand = composerFailingWith("Could not apply patch! Skipping.")
 		patches := []string{filepath.Join(projectDir, "patches/a.diff"), filepath.Join(projectDir, "patches/b.diff")}
 
 		applies, err := service.CheckIfPatchesApply(t.Context(), projectDir, "drupal/core", "10.2.0", patches)

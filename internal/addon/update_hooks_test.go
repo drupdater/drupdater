@@ -2,7 +2,6 @@ package addon
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/drupdater/drupdater/internal/workflow"
@@ -14,80 +13,31 @@ import (
 
 func TestNewUpdateHooks(t *testing.T) {
 	logger := zap.NewNop()
-	mockDrush := NewMockUpdateHooksDrush(t)
 
-	updateHooks := NewUpdateHooks(logger, mockDrush)
+	updateHooks := NewUpdateHooks(logger)
 
 	assert.NotNil(t, updateHooks)
 	assert.Equal(t, logger, updateHooks.logger)
-	assert.Equal(t, mockDrush, updateHooks.drush)
 	assert.Empty(t, updateHooks.hooks.All())
 }
 
-func TestUpdateHooks_PreSiteUpdateHandler_Success(t *testing.T) {
-	logger := zap.NewNop()
-	mockDrush := NewMockUpdateHooksDrush(t)
-	updateHooks := NewUpdateHooks(logger, mockDrush)
-
-	ctx := context.Background()
-	testPath := "/test/path"
-	testSite := "default"
-	mockHooks := map[string]drush.UpdateHook{
-		"module1_update_8001": {
-			Module:      "module1",
-			Description: "Update description",
-		},
+func TestUpdateHooksRecordsTheSitesPendingHooks(t *testing.T) {
+	updateHooks := NewUpdateHooks(zap.NewNop())
+	pending := map[string]drush.UpdateHook{
+		"module1_update_8001": {Module: "module1", Description: "Update description"},
 	}
 
-	committer := &fakeCommitter{}
-	mockEvent := workflow.NewPreSiteUpdateEvent(ctx, testPath, committer, testSite)
+	evt := workflow.NewPreSiteUpdateEvent(context.Background(), "/test/path", &fakeCommitter{}, "default", drush.Facts{UpdateHooks: pending})
 
-	mockDrush.EXPECT().GetUpdateHooks(ctx, testPath, testSite).Return(mockHooks, nil)
-
-	err := updateHooks.preSiteUpdateHandler(mockEvent)
-
-	require.NoError(t, err)
-	assert.Equal(t, map[string]map[string]drush.UpdateHook{testSite: mockHooks}, updateHooks.hooks.All())
+	require.NoError(t, updateHooks.preSiteUpdateHandler(evt))
+	assert.Equal(t, map[string]map[string]drush.UpdateHook{"default": pending}, updateHooks.hooks.All())
 }
 
-func TestUpdateHooks_PreSiteUpdateHandler_NoHooks(t *testing.T) {
-	logger := zap.NewNop()
-	mockDrush := NewMockUpdateHooksDrush(t)
-	updateHooks := NewUpdateHooks(logger, mockDrush)
+func TestUpdateHooksRecordsNothingWithoutPendingHooks(t *testing.T) {
+	updateHooks := NewUpdateHooks(zap.NewNop())
 
-	ctx := context.Background()
-	testPath := "/test/path"
-	testSite := "default"
-	emptyHooks := map[string]drush.UpdateHook{}
+	evt := workflow.NewPreSiteUpdateEvent(context.Background(), "/test/path", &fakeCommitter{}, "default", drush.Facts{UpdateHooks: map[string]drush.UpdateHook{}})
 
-	committer := &fakeCommitter{}
-	mockEvent := workflow.NewPreSiteUpdateEvent(ctx, testPath, committer, testSite)
-
-	mockDrush.EXPECT().GetUpdateHooks(ctx, testPath, testSite).Return(emptyHooks, nil)
-
-	err := updateHooks.preSiteUpdateHandler(mockEvent)
-
-	require.NoError(t, err)
-	assert.NotContains(t, updateHooks.hooks.All(), testSite)
-}
-
-func TestUpdateHooks_PreSiteUpdateHandler_Error(t *testing.T) {
-	logger := zap.NewNop()
-	mockDrush := NewMockUpdateHooksDrush(t)
-	updateHooks := NewUpdateHooks(logger, mockDrush)
-
-	ctx := context.Background()
-	testPath := "/test/path"
-	testSite := "default"
-	expectedError := errors.New("drush error")
-
-	committer := &fakeCommitter{}
-	mockEvent := workflow.NewPreSiteUpdateEvent(ctx, testPath, committer, testSite)
-
-	mockDrush.EXPECT().GetUpdateHooks(ctx, testPath, testSite).Return(nil, expectedError)
-
-	err := updateHooks.preSiteUpdateHandler(mockEvent)
-
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to get update hooks")
+	require.NoError(t, updateHooks.preSiteUpdateHandler(evt))
+	assert.NotContains(t, updateHooks.hooks.All(), "default")
 }

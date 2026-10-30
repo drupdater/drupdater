@@ -2,40 +2,42 @@ package rector
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"github.com/drupdater/drupdater/pkg/php"
 	"os/exec"
 	"path/filepath"
 
 	"github.com/spf13/afero"
 	"go.uber.org/zap"
-
-	"github.com/drupdater/drupdater/pkg/composer"
 )
 
-var execCommand = exec.CommandContext
-
 type CLI struct {
-	logger *zap.Logger
-	fs     afero.Fs
+	logger     *zap.Logger
+	fs         afero.Fs
+	newCommand php.CommandFactory
 	// binDir holds drupdater's own rector; empty runs the project's through composer.
 	binDir string
+	config string
 }
 
-// NewCLI runs the project's own rector.
-func NewCLI(logger *zap.Logger) *CLI {
+// NewCLI runs the project's own rector with drupdater's config.
+func NewCLI(logger *zap.Logger, config string) *CLI {
 	return &CLI{
-		logger: logger,
-		fs:     afero.NewOsFs(),
+		logger:     logger,
+		fs:         afero.NewOsFs(),
+		newCommand: exec.CommandContext,
+		config:     config,
 	}
 }
 
 // NewBundledCLI runs the rector in binDir, which needs nothing installed in the project.
-func NewBundledCLI(logger *zap.Logger, binDir string) *CLI {
+func NewBundledCLI(logger *zap.Logger, binDir string, config string) *CLI {
 	return &CLI{
-		logger: logger,
-		fs:     afero.NewOsFs(),
-		binDir: binDir,
+		logger:     logger,
+		fs:         afero.NewOsFs(),
+		newCommand: exec.CommandContext,
+		binDir:     binDir,
+		config:     config,
 	}
 }
 
@@ -71,7 +73,7 @@ func (s *CLI) Run(ctx context.Context, dir string, customCodeDirectories []strin
 		}, nil
 	}
 
-	command := composer.Command{New: execCommand, Logger: s.logger, Dir: dir}
+	command := php.Command{New: s.newCommand, Logger: s.logger, Dir: dir}
 	args := []string{"exec", "--", "rector", "process"}
 	if s.binDir != "" {
 		autoloader, err := projectAutoloader(ctx, command)
@@ -82,19 +84,12 @@ func (s *CLI) Run(ctx context.Context, dir string, customCodeDirectories []strin
 		args = []string{"process", "--autoload-file", autoloader}
 	}
 	// No --no-diffs: rector's JSON lists each file's applied rules only alongside its diff.
-	args = append(args, "--config=/opt/drupdater/rector.php", "--no-progress-bar", "--debug", "--output-format=json")
+	args = append(args, "--config="+s.config, "--no-progress-bar", "--debug", "--output-format=json")
 	args = append(args, customCodeDirectories...)
 
-	// Split: rector's --debug output and PHP notices would corrupt the JSON report.
-	out, _, err := command.Split(ctx, args...)
-
+	deprecationRemovalResult, err := php.JSON[ReturnOutput](ctx, command, args...)
 	if err != nil {
 		return ReturnOutput{}, fmt.Errorf("failed to run rector: %w", err)
-	}
-
-	var deprecationRemovalResult ReturnOutput
-	if err := json.Unmarshal([]byte(out), &deprecationRemovalResult); err != nil {
-		return ReturnOutput{}, fmt.Errorf("failed to unmarshal JSON: %w", err)
 	}
 
 	for _, diff := range deprecationRemovalResult.FileDiffs {
@@ -129,7 +124,7 @@ func (s *CLI) restoreFileDocBlock(dir string, file string) error {
 }
 
 // projectAutoloader honours vendor-dir, where Rector would only ever look under vendor/.
-func projectAutoloader(ctx context.Context, composerInDir composer.Command) (string, error) {
+func projectAutoloader(ctx context.Context, composerInDir php.Command) (string, error) {
 	vendorDir, _, err := composerInDir.Split(ctx, "config", "--absolute", "vendor-dir")
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve the project's vendor directory: %w", err)

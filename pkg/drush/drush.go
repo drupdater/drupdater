@@ -2,37 +2,37 @@ package drush
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"github.com/drupdater/drupdater/pkg/php"
+	"maps"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 
-	"github.com/maypok86/otter"
 	"go.uber.org/zap"
-
-	"github.com/drupdater/drupdater/pkg/composer"
 )
 
-var execCommand = exec.CommandContext
-
 type CLI struct {
-	logger *zap.Logger
-	cache  otter.Cache[string, string]
+	logger     *zap.Logger
+	newCommand php.CommandFactory
+	// include holds drupdater's own drush commands, passed to drush --include.
+	include string
 }
 
-func NewCLI(logger *zap.Logger, cache otter.Cache[string, string]) *CLI {
+func NewCLI(logger *zap.Logger, include string) *CLI {
 	return &CLI{
-		logger: logger,
-		cache:  cache,
+		logger:     logger,
+		newCommand: exec.CommandContext,
+		include:    include,
 	}
 }
 
 // command runs drush through `composer exec`, inheriting its process timeout. SITE_NAME comes
 // after that environment so it wins over any value the parent process set.
-func (e *CLI) command(dir string, site string) composer.Command {
-	return composer.Command{
-		New:      execCommand,
+func (e *CLI) command(dir string, site string) php.Command {
+	return php.Command{
+		New:      e.newCommand,
 		Logger:   e.logger,
 		Dir:      dir,
 		ExtraEnv: []string{"SITE_NAME=" + site},
@@ -47,11 +47,6 @@ func (e *CLI) execDrush(ctx context.Context, dir string, site string, args ...st
 	return e.command(dir, site).Combined(ctx, drushArgs(args)...)
 }
 
-// execDrushStreams keeps the streams apart, so a stderr notice cannot corrupt a JSON payload.
-func (e *CLI) execDrushStreams(ctx context.Context, dir string, site string, args ...string) (stdout string, stderr string, err error) {
-	return e.command(dir, site).Split(ctx, drushArgs(args)...)
-}
-
 func (e *CLI) InstallSite(ctx context.Context, dir string, site string) error {
 	out, err := e.execDrush(ctx, dir, site, "--existing-config", "--yes", "site:install", "--sites-subdir="+site, "--verbose")
 	if err != nil {
@@ -60,34 +55,41 @@ func (e *CLI) InstallSite(ctx context.Context, dir string, site string) error {
 	return nil
 }
 
-// relativeTo makes PHP's realpath() result relative to dir. dir is resolved too: realpath follows
-// symlinks, such as macOS's /tmp, and a prefix compared unresolved would never match.
-func relativeTo(dir string, path string) string {
-	root, err := filepath.EvalSymlinks(dir)
-	if err != nil {
-		root = dir
+// RelativeTo makes an absolute path from drush relative to dir, which is tried as given and
+// resolved: drush reports the resolved Drupal root, settings.php whatever it was written as.
+func RelativeTo(dir string, path string) string {
+	if !filepath.IsAbs(path) {
+		return path
 	}
-	if rel, err := filepath.Rel(root, path); err == nil && filepath.IsAbs(path) {
-		return rel
+	roots := []string{dir}
+	if resolved, err := filepath.EvalSymlinks(dir); err == nil {
+		roots = append(roots, resolved)
+	}
+	for _, root := range roots {
+		if rel, err := filepath.Rel(root, path); err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			return rel
+		}
 	}
 	return path
 }
 
-func (e *CLI) GetConfigSyncDir(ctx context.Context, dir string, site string, relative bool) (string, error) {
-	cacheKey := fmt.Sprintf("config-sync-dir_%s_%s_%t", dir, site, relative)
-	value, ok := e.cache.Get(cacheKey)
-	if ok {
-		return value, nil
-	}
-	configSyncDir, err := e.execDrush(ctx, dir, site, "ev", "print realpath(\\Drupal\\Core\\Site\\Settings::get('config_sync_directory'))")
+// GetConfigSyncDir returns the site's absolute config sync directory. Unlike Facts it needs no
+// database, so it works before the site is installed.
+func (e *CLI) GetConfigSyncDir(ctx context.Context, dir string, site string) (string, error) {
+	status, err := php.JSON[struct {
+		ConfigSync string `json:"config-sync"`
+		Root       string `json:"root"`
+	}](ctx, e.command(dir, site), drushArgs([]string{"status", "--fields=config-sync,root", "--format=json"})...)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to read the config sync directory of site %s: %w", site, err)
 	}
-	if relative {
-		configSyncDir = relativeTo(dir, configSyncDir)
+	if status.ConfigSync == "" {
+		return "", fmt.Errorf("site %s has no config sync directory", site)
 	}
-	e.cache.Set(cacheKey, configSyncDir)
-	return configSyncDir, nil
+	if filepath.IsAbs(status.ConfigSync) {
+		return status.ConfigSync, nil
+	}
+	return filepath.Join(status.Root, status.ConfigSync), nil
 }
 
 func (e *CLI) ExportConfiguration(ctx context.Context, dir string, site string) error {
@@ -101,46 +103,13 @@ func (e *CLI) UpdateSite(ctx context.Context, dir string, site string) error {
 }
 
 func (e *CLI) ConfigResave(ctx context.Context, dir string, site string) error {
-	_, err := e.execDrush(ctx, dir, site, "php:script", "/opt/drupdater/config-resave.php")
+	_, err := e.execDrush(ctx, dir, site, "--include="+e.include, "drupdater:config-resave")
 	return err
-}
-
-// IsModuleEnabled splits the streams: a merged notice would report an enabled module as disabled.
-func (e *CLI) IsModuleEnabled(ctx context.Context, dir string, site string, module string) (bool, error) {
-	stdout, stderr, err := e.execDrushStreams(ctx, dir, site, "pm:list", "--status=enabled", "--field=name", "--filter="+module)
-	if err != nil {
-		return false, fmt.Errorf("failed to check if module %s is enabled: %w, output: %s", module, err, stderr)
-	}
-	return strings.TrimSpace(stdout) == module, nil
 }
 
 func (e *CLI) LocalizeTranslations(ctx context.Context, dir string, site string) error {
 	_, err := e.execDrush(ctx, dir, site, "locale-deploy:localize-translations")
 	return err
-}
-
-func (e *CLI) GetTranslationPath(ctx context.Context, dir string, site string, relative bool) (string, error) {
-	cacheKey := fmt.Sprintf("translation-path_%s_%s_%t", dir, site, relative)
-	value, ok := e.cache.Get(cacheKey)
-	if ok {
-		return value, nil
-	}
-	translationPath, err := e.execDrush(ctx, dir, site, "ev", "print realpath(\\Drupal::config('locale.settings')->get('translation.path'))")
-	if err != nil {
-		return "", err
-	}
-	// An empty path must never reach git: Worktree.Add would stage the entire working tree.
-	// realpath() prints nothing when the directory was never created.
-	if strings.TrimSpace(translationPath) == "" {
-		return "", fmt.Errorf("translation path for site %s does not resolve to an existing directory", site)
-	}
-
-	if relative {
-		translationPath = strings.TrimLeft(strings.TrimPrefix(translationPath, dir), "/")
-	}
-
-	e.cache.Set(cacheKey, translationPath)
-	return translationPath, nil
 }
 
 type UpdateHook struct {
@@ -157,43 +126,46 @@ type UnsupportedModule struct {
 	RecommendedVersion string `json:"recommended_version"`
 }
 
-// GetUnsupportedModules runs the bundled unsupported-modules.php, which yields nothing when
-// Drupal's update module is off.
-func (e *CLI) GetUnsupportedModules(ctx context.Context, dir string, site string) ([]UnsupportedModule, error) {
-	stdout, stderr, err := e.execDrushStreams(ctx, dir, site, "php:script", "/opt/drupdater/unsupported-modules.php")
-	if err != nil {
-		return nil, fmt.Errorf("failed to check for unsupported modules: %w, output: %s", err, stderr)
-	}
-
-	if strings.TrimSpace(stdout) == "" {
-		return nil, nil
-	}
-
-	var modules []UnsupportedModule
-	if err := json.Unmarshal([]byte(stdout), &modules); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal unsupported modules: %w", err)
-	}
-
-	return modules, nil
+// Facts is what drupdater reads from a site, in one bootstrap. Paths are absolute and may not
+// exist yet.
+type Facts struct {
+	ConfigSyncDirectory string                `json:"config_sync_directory"`
+	TranslationPath     string                `json:"translation_path"`
+	Modules             []string              `json:"modules"`
+	UpdateHooks         map[string]UpdateHook `json:"update_hooks"`
+	UnsupportedModules  []UnsupportedModule   `json:"unsupported_modules"`
+	// UnsupportedModulesError is why the update status service could not be asked, if it could not.
+	UnsupportedModulesError string `json:"unsupported_modules_error"`
 }
 
-func (e *CLI) GetUpdateHooks(ctx context.Context, dir string, site string) (map[string]UpdateHook, error) {
-	stdout, stderr, err := e.execDrushStreams(ctx, dir, site, "updatedb-status", "--format=json")
+func (f Facts) ModuleEnabled(module string) bool {
+	return slices.Contains(f.Modules, module)
+}
+
+// Facts runs drupdater:facts, which reads the site under drush's update kernel: the code is
+// already updated, the schema is not.
+func (e *CLI) Facts(ctx context.Context, dir string, site string) (Facts, error) {
+	return e.facts(ctx, dir, site)
+}
+
+// LocalFacts is Facts without the drupal.org request, so UnsupportedModules stays empty.
+func (e *CLI) LocalFacts(ctx context.Context, dir string, site string) (Facts, error) {
+	return e.facts(ctx, dir, site, "--skip-update-status")
+}
+
+func (e *CLI) facts(ctx context.Context, dir string, site string, options ...string) (Facts, error) {
+	args := append([]string{"--include=" + e.include, "drupdater:facts"}, options...)
+	facts, err := php.JSON[Facts](ctx, e.command(dir, site), drushArgs(args)...)
 	if err != nil {
-		return nil, err
+		return Facts{}, fmt.Errorf("failed to read the facts of site %s: %w", site, err)
 	}
+	return facts, nil
+}
 
-	// "No database updates required" lands on either stream, depending on the drush version.
-	if strings.Contains(stdout, "No database updates required") ||
-		strings.Contains(stderr, "No database updates required") ||
-		strings.TrimSpace(stdout) == "" {
-		return map[string]UpdateHook{}, nil
-	}
-
-	var updates map[string]UpdateHook
-	if err := json.Unmarshal([]byte(stdout), &updates); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal update hooks: %w", err)
-	}
-
-	return updates, nil
+// Clone copies the slices and the map, so no holder can change another's facts.
+func (f Facts) Clone() Facts {
+	f.Modules = slices.Clone(f.Modules)
+	f.UpdateHooks = maps.Clone(f.UpdateHooks)
+	f.UnsupportedModules = slices.Clone(f.UnsupportedModules)
+	return f
 }

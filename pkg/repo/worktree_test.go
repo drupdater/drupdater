@@ -167,6 +167,34 @@ func TestAddWorktreeErrors(t *testing.T) {
 			assert.NotContains(t, gitOutput(t, dir, "worktree", "list"), m)
 		}
 	})
+
+	t.Run("git reports success but leaves no worktree", func(t *testing.T) {
+		source, _ := initRepoWithCommit(t)
+		var calls [][]string
+		silent := &GitRepositoryService{logger: zap.NewNop(), newCommand: func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+			calls = append(calls, arg)
+			return exec.CommandContext(ctx, "true")
+		}}
+		t.Setenv("TMPDIR", t.TempDir())
+
+		_, err := silent.AddWorktree(t.Context(), source, "", "")
+
+		require.ErrorIs(t, err, git.ErrRepositoryNotExists)
+		require.Len(t, calls, 2)
+		assert.Contains(t, calls[1], "remove", "the half-made worktree must be removed again")
+		matches, globErr := filepath.Glob(filepath.Join(os.TempDir(), "drupdater-worktree-*"))
+		require.NoError(t, globErr)
+		assert.Empty(t, matches)
+	})
+
+	t.Run("no temporary directory", func(t *testing.T) {
+		source, _ := initRepoWithCommit(t)
+		t.Setenv("TMPDIR", filepath.Join(t.TempDir(), "missing"))
+
+		_, err := service.AddWorktree(t.Context(), source, "", "")
+
+		require.ErrorContains(t, err, "failed to create temporary directory")
+	})
 }
 
 // The platform's user, else the identity git config supplies, else drupdater's own — and in every
@@ -224,13 +252,12 @@ func TestSignatureIsTheIdentityNow(t *testing.T) {
 
 func TestGitCommandsTrustTheRepository(t *testing.T) {
 	var args []string
-	execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+	rs := &GitRepositoryService{newCommand: func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 		args = arg
 		return exec.CommandContext(ctx, "true")
-	}
-	t.Cleanup(func() { execCommand = exec.CommandContext })
+	}}
 
-	_, err := runGit(t.Context(), t.TempDir(), "worktree", "prune")
+	_, err := rs.runGit(t.Context(), t.TempDir(), "worktree", "prune")
 
 	require.NoError(t, err)
 	assert.Equal(t, []string{"-c", "safe.directory=*", "worktree", "prune"}, args)

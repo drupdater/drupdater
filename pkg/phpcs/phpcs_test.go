@@ -26,13 +26,13 @@ func newTestCLI(t *testing.T) (*CLI, *observer.ObservedLogs) {
 	return NewCLI(zap.New(core)), logs
 }
 
-// stubExec replaces execCommand with the helper-process pattern and records what the
+// stubExec gives cli the helper-process pattern for its subprocesses and records what the
 // production code asked for. The returned pointers are populated by the time the call returns.
-func stubExec(t *testing.T, stdout string, wantErr bool) (name *string, args *[]string, cmd **exec.Cmd) {
+func stubExec(t *testing.T, cli *CLI, stdout string, wantErr bool) (name *string, args *[]string, cmd **exec.Cmd) {
 	t.Helper()
 	name, args, cmd = new(string), new([]string), new(*exec.Cmd)
 
-	execCommand = func(ctx context.Context, n string, arg ...string) *exec.Cmd {
+	cli.newCommand = func(ctx context.Context, n string, arg ...string) *exec.Cmd {
 		*name = n
 		*args = append([]string(nil), arg...)
 
@@ -46,7 +46,6 @@ func stubExec(t *testing.T, stdout string, wantErr bool) (name *string, args *[]
 		*cmd = c
 		return c
 	}
-	t.Cleanup(func() { execCommand = exec.CommandContext })
 
 	return name, args, cmd
 }
@@ -56,7 +55,7 @@ func TestPhpcsRun(t *testing.T) {
 		cli, logs := newTestCLI(t)
 
 		data := `{"files":{"web/modules/custom/a.php":{"errors":2,"warnings":0,"messages":[{"message":"Missing docblock","source":"Drupal.Commenting","severity":5,"fixable":true,"type":"ERROR","line":7,"column":3}]}},"totals":{"errors":2,"warnings":0,"fixable":1}}`
-		name, args, cmd := stubExec(t, data, false)
+		name, args, cmd := stubExec(t, cli, data, false)
 
 		// A real directory, because the command actually chdir's into it.
 		workDir := t.TempDir()
@@ -105,7 +104,7 @@ func TestPhpcsRun(t *testing.T) {
 
 	t.Run("invalid JSON", func(t *testing.T) {
 		cli, _ := newTestCLI(t)
-		stubExec(t, "not-json", false)
+		stubExec(t, cli, "not-json", false)
 
 		_, err := cli.Run(t.Context(), t.TempDir())
 		require.Error(t, err)
@@ -116,7 +115,7 @@ func TestPhpcsRun(t *testing.T) {
 
 	t.Run("exec error", func(t *testing.T) {
 		cli, _ := newTestCLI(t)
-		stubExec(t, "", true)
+		stubExec(t, cli, "", true)
 
 		result, err := cli.Run(t.Context(), t.TempDir())
 		require.Error(t, err)
@@ -133,7 +132,7 @@ func TestPhpcsRun(t *testing.T) {
 func TestPhpcsRunCBF(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		cli, logs := newTestCLI(t)
-		name, args, cmd := stubExec(t, "ok", false)
+		name, args, cmd := stubExec(t, cli, "ok", false)
 
 		workDir := t.TempDir()
 		require.NoError(t, cli.RunCBF(t.Context(), workDir))
@@ -152,7 +151,7 @@ func TestPhpcsRunCBF(t *testing.T) {
 
 	t.Run("error", func(t *testing.T) {
 		cli, _ := newTestCLI(t)
-		stubExec(t, "", true)
+		stubExec(t, cli, "", true)
 
 		err := cli.RunCBF(t.Context(), t.TempDir())
 		require.Error(t, err)
@@ -168,7 +167,7 @@ func TestBundledCLIRunsItsOwnBinaries(t *testing.T) {
 
 	t.Run("phpcs", func(t *testing.T) {
 		data := `{"files":{},"totals":{"errors":0,"warnings":0,"fixable":0}}`
-		name, args, cmd := stubExec(t, data, false)
+		name, args, cmd := stubExec(t, cli, data, false)
 		workDir := t.TempDir()
 
 		_, err := cli.Run(t.Context(), workDir)
@@ -184,7 +183,7 @@ func TestBundledCLIRunsItsOwnBinaries(t *testing.T) {
 	})
 
 	t.Run("phpcbf", func(t *testing.T) {
-		name, args, cmd := stubExec(t, "", false)
+		name, args, cmd := stubExec(t, cli, "", false)
 		workDir := t.TempDir()
 
 		require.NoError(t, cli.RunCBF(t.Context(), workDir))

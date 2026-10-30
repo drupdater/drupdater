@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/spf13/afero"
+	"golang.org/x/mod/semver"
 	"go.uber.org/zap"
 )
 
@@ -134,6 +135,7 @@ func packageChanges(entries []DiffEntry) ([]PackageChange, error) {
 		}
 		changes = append(changes, PackageChange{Action: action, Package: entry.Package, From: entry.From, To: entry.To})
 	}
+	changes = joinMoves(changes)
 	slices.SortFunc(changes, func(a, b PackageChange) int {
 		return cmp.Or(
 			cmp.Compare(slices.Index(actionOrder, a.Action), slices.Index(actionOrder, b.Action)),
@@ -141,6 +143,45 @@ func packageChanges(entries []DiffEntry) ([]PackageChange, error) {
 		)
 	})
 	return changes, nil
+}
+
+// joinMoves turns the remove and install composer-diff reports for a package that moved between
+// require and require-dev into the one change the lock made, or none if its version stayed.
+func joinMoves(changes []PackageChange) []PackageChange {
+	removed := map[string]string{}
+	installed := map[string]string{}
+	for _, c := range changes {
+		switch c.Action {
+		case "Remove":
+			removed[c.Package] = c.From
+		case "Install":
+			installed[c.Package] = c.To
+		}
+	}
+
+	var joined []PackageChange
+	for _, c := range changes {
+		from, wasRemoved := removed[c.Package]
+		to, wasInstalled := installed[c.Package]
+		if !wasRemoved || !wasInstalled {
+			joined = append(joined, c)
+			continue
+		}
+		if c.Action == "Remove" && from != to {
+			joined = append(joined, PackageChange{Action: direction(from, to), Package: c.Package, From: from, To: to})
+		}
+	}
+	return joined
+}
+
+// direction compares as semver where both versions are one; like composer-diff's "change", a
+// dev branch has no order and counts as an upgrade.
+func direction(from string, to string) string {
+	v, w := "v"+strings.TrimPrefix(from, "v"), "v"+strings.TrimPrefix(to, "v")
+	if semver.IsValid(v) && semver.IsValid(w) && semver.Compare(v, w) > 0 {
+		return "Downgrade"
+	}
+	return "Upgrade"
 }
 
 // constraint turns a version as composer prints it into one composer accepts back: a dev

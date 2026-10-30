@@ -2,7 +2,6 @@ package addon
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/drupdater/drupdater/internal/workflow"
@@ -10,101 +9,63 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 )
+
+func unsupportedEvent(site string, facts drush.Facts) *workflow.PreSiteUpdateEvent {
+	return workflow.NewPreSiteUpdateEvent(context.Background(), "/test/path", &fakeCommitter{}, site, facts)
+}
 
 func TestNewUnsupportedModules(t *testing.T) {
 	logger := zap.NewNop()
-	mockDrush := NewMockUnsupportedModulesDrush(t)
 
-	um := NewUnsupportedModules(logger, mockDrush)
+	um := NewUnsupportedModules(logger)
 
 	assert.NotNil(t, um)
 	assert.Equal(t, logger, um.logger)
-	assert.Equal(t, mockDrush, um.drush)
 	assert.Empty(t, um.modules.All())
 }
 
-func TestUnsupportedModules_PreSiteUpdateHandler_Success(t *testing.T) {
-	logger := zap.NewNop()
-	mockDrush := NewMockUnsupportedModulesDrush(t)
-	um := NewUnsupportedModules(logger, mockDrush)
+func TestUnsupportedModulesRecordsTheSitesModules(t *testing.T) {
+	um := NewUnsupportedModules(zap.NewNop())
+	modules := []drush.UnsupportedModule{{Name: "module_a", InstalledVersion: "1.0.0", RecommendedVersion: "None"}}
 
-	ctx := context.Background()
-	testPath := "/test/path"
-	testSite := "default"
-	mockModules := []drush.UnsupportedModule{
-		{Name: "module_a", InstalledVersion: "1.0.0", RecommendedVersion: "None"},
-	}
+	require.NoError(t, um.preSiteUpdateHandler(unsupportedEvent("default", drush.Facts{UnsupportedModules: modules})))
 
-	committer := &fakeCommitter{}
-	mockEvent := workflow.NewPreSiteUpdateEvent(ctx, testPath, committer, testSite)
-
-	mockDrush.EXPECT().GetUnsupportedModules(ctx, testPath, testSite).Return(mockModules, nil)
-
-	err := um.preSiteUpdateHandler(mockEvent)
-
-	require.NoError(t, err)
-	assert.Equal(t, map[string][]drush.UnsupportedModule{testSite: mockModules}, um.modules.All())
+	assert.Equal(t, map[string][]drush.UnsupportedModule{"default": modules}, um.modules.All())
 }
 
-func TestUnsupportedModules_PreSiteUpdateHandler_Dedupe(t *testing.T) {
-	logger := zap.NewNop()
-	mockDrush := NewMockUnsupportedModulesDrush(t)
-	um := NewUnsupportedModules(logger, mockDrush)
-
-	ctx := context.Background()
-	committer := &fakeCommitter{}
-
+func TestUnsupportedModulesReportsAModuleTwoSitesShareOnce(t *testing.T) {
+	um := NewUnsupportedModules(zap.NewNop())
 	shared := drush.UnsupportedModule{Name: "module_a", InstalledVersion: "1.0.0", RecommendedVersion: "None"}
 
-	mockDrush.EXPECT().GetUnsupportedModules(ctx, "/test/path", "site1").Return([]drush.UnsupportedModule{shared}, nil)
-	mockDrush.EXPECT().GetUnsupportedModules(ctx, "/test/path", "site2").Return([]drush.UnsupportedModule{shared}, nil)
+	require.NoError(t, um.preSiteUpdateHandler(unsupportedEvent("site1", drush.Facts{UnsupportedModules: []drush.UnsupportedModule{shared}})))
+	require.NoError(t, um.preSiteUpdateHandler(unsupportedEvent("site2", drush.Facts{UnsupportedModules: []drush.UnsupportedModule{shared}})))
 
-	require.NoError(t, um.preSiteUpdateHandler(workflow.NewPreSiteUpdateEvent(ctx, "/test/path", committer, "site1")))
-	require.NoError(t, um.preSiteUpdateHandler(workflow.NewPreSiteUpdateEvent(ctx, "/test/path", committer, "site2")))
-
-	assert.Equal(t, []drush.UnsupportedModule{shared}, um.ReportData(), "a module two sites share is one finding")
+	assert.Equal(t, []drush.UnsupportedModule{shared}, um.ReportData())
 }
 
-func TestUnsupportedModules_PreSiteUpdateHandler_NoModules(t *testing.T) {
-	logger := zap.NewNop()
-	mockDrush := NewMockUnsupportedModulesDrush(t)
-	um := NewUnsupportedModules(logger, mockDrush)
+func TestUnsupportedModulesRecordsNothingWithoutModules(t *testing.T) {
+	um := NewUnsupportedModules(zap.NewNop())
 
-	ctx := context.Background()
-	testPath := "/test/path"
-	testSite := "default"
+	require.NoError(t, um.preSiteUpdateHandler(unsupportedEvent("default", drush.Facts{})))
 
-	committer := &fakeCommitter{}
-	mockEvent := workflow.NewPreSiteUpdateEvent(ctx, testPath, committer, testSite)
-
-	mockDrush.EXPECT().GetUnsupportedModules(ctx, testPath, testSite).Return(nil, nil)
-
-	err := um.preSiteUpdateHandler(mockEvent)
-
-	require.NoError(t, err)
 	assert.Empty(t, um.modules.All())
 }
 
-func TestUnsupportedModules_PreSiteUpdateHandler_Error(t *testing.T) {
-	logger := zap.NewNop()
-	mockDrush := NewMockUnsupportedModulesDrush(t)
-	um := NewUnsupportedModules(logger, mockDrush)
+// Best-effort: an unreachable update status service must not abort the run.
+func TestUnsupportedModulesOnlyWarnsWhenTheStatusServiceFailed(t *testing.T) {
+	core, logs := observer.New(zapcore.WarnLevel)
+	um := NewUnsupportedModules(zap.New(core))
+	facts := drush.Facts{
+		UnsupportedModulesError: "updates.drupal.org unreachable",
+		UnsupportedModules:      []drush.UnsupportedModule{{Name: "ignored"}},
+	}
 
-	ctx := context.Background()
-	testPath := "/test/path"
-	testSite := "default"
-	expectedError := errors.New("drush error")
+	require.NoError(t, um.preSiteUpdateHandler(unsupportedEvent("default", facts)))
 
-	committer := &fakeCommitter{}
-	mockEvent := workflow.NewPreSiteUpdateEvent(ctx, testPath, committer, testSite)
-
-	mockDrush.EXPECT().GetUnsupportedModules(ctx, testPath, testSite).Return(nil, expectedError)
-
-	// Execute - errors are swallowed (logged, not returned): this is a best-effort,
-	// informational check that must not abort the run.
-	err := um.preSiteUpdateHandler(mockEvent)
-
-	require.NoError(t, err)
 	assert.Empty(t, um.modules.All())
+	require.Equal(t, 1, logs.Len())
+	assert.Equal(t, "updates.drupal.org unreachable", logs.All()[0].ContextMap()["error"])
 }

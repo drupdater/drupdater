@@ -14,8 +14,8 @@ release, and packages their maintainers have abandoned — as one list.
 
 ### Unsupported modules
 
-Queries Drupal's own update status for each site, via a helper script shipped in the
-Docker image, and collects modules whose status is `NOT_SUPPORTED`.
+Queries Drupal's own update status for each site, through drupdater's `drupdater:facts` Drush
+command, and collects modules whose status is `NOT_SUPPORTED`.
 
 Results are deduplicated by module name across sites, so a multi-site project does not
 list the same module several times.

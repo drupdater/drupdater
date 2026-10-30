@@ -51,7 +51,7 @@ profile: thunder
 			duringInstall, err = afero.ReadFile(fs, settingsPath)
 			return err
 		})
-		drush.EXPECT().GetConfigSyncDir(t.Context(), "/tmp", "site1", false).Return(configSyncDir, nil)
+		drush.EXPECT().GetConfigSyncDir(t.Context(), "/tmp", "site1").Return(configSyncDir, nil)
 
 		composer := NewMockComposer(t)
 		composer.EXPECT().GetConfig(t.Context(), "/tmp", "extra.drupal-scaffold.locations.web-root").Return("web", nil)
@@ -100,7 +100,7 @@ $settings['hash_salt'] = 'changeme';
 		// Setup mocks
 		drush := NewMockDrush(t)
 		drush.EXPECT().InstallSite(t.Context(), "/tmp", "site1").Return(errors.New("failed to install site"))
-		drush.EXPECT().GetConfigSyncDir(t.Context(), "/tmp", "site1", false).Return(configSyncDir, nil)
+		drush.EXPECT().GetConfigSyncDir(t.Context(), "/tmp", "site1").Return(configSyncDir, nil)
 
 		composer := NewMockComposer(t)
 		composer.EXPECT().GetConfig(t.Context(), "/tmp", "extra.drupal-scaffold.locations.web-root").Return("web", nil)
@@ -130,7 +130,6 @@ $settings['hash_salt'] = 'changeme';
 
 func TestAddSqliteModule(t *testing.T) {
 	logger := zap.NewNop()
-	drush := NewMockDrush(t)
 	fs := afero.NewMemMapFs()
 
 	// Create a temporary file to act as the core.extension.yml
@@ -161,15 +160,12 @@ profile: thunder
 		t.Fatalf("Failed to close temp file: %v", err)
 	}
 
-	drush.EXPECT().GetConfigSyncDir(t.Context(), "/tmp", "default", false).Return("/tmp", nil)
-
 	installer := &Installer{
 		logger: logger,
-		drush:  drush,
 		fs:     fs,
 	}
 
-	if err := installer.addSqliteModule(t.Context(), "/tmp", "default"); err != nil {
+	if err := installer.addSqliteModule("/tmp/core.extension.yml"); err != nil {
 		t.Fatalf("Failed to add SQLite module: %v", err)
 	}
 
@@ -201,7 +197,6 @@ profile: thunder
 
 func TestRemoveProfile(t *testing.T) {
 	logger := zap.NewNop()
-	drush := NewMockDrush(t)
 	fs := afero.NewMemMapFs()
 
 	// Create a temporary file to act as the core.extension.yml
@@ -232,15 +227,12 @@ profile: standard
 		t.Fatalf("Failed to close temp file: %v", err)
 	}
 
-	drush.EXPECT().GetConfigSyncDir(t.Context(), "/tmp", "default", false).Return("/tmp", nil)
-
 	installer := &Installer{
 		logger: logger,
-		drush:  drush,
 		fs:     fs,
 	}
 
-	if err := installer.RemoveProfile(t.Context(), "/tmp", "default"); err != nil {
+	if err := installer.removeProfile("/tmp/core.extension.yml"); err != nil {
 		t.Fatalf("Failed to remove profile: %v", err)
 	}
 

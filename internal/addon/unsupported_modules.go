@@ -1,32 +1,25 @@
 package addon
 
 import (
-	"context"
+	"errors"
 
 	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/drupdater/drupdater/pkg/drush"
 	"go.uber.org/zap"
 )
 
-// UnsupportedModulesDrush lists a site's modules without a supported release.
-type UnsupportedModulesDrush interface {
-	GetUnsupportedModules(ctx context.Context, dir string, site string) ([]drush.UnsupportedModule, error)
-}
-
 // UnsupportedModules detects modules Drupal's update status service reports as NOT_SUPPORTED. The
 // merge request lists them together with composer_audit's abandoned packages.
 type UnsupportedModules struct {
 	logger *zap.Logger
-	drush  UnsupportedModulesDrush
 
 	modules workflow.PerSite[[]drush.UnsupportedModule]
 }
 
 // NewUnsupportedModules creates an unsupported modules detector.
-func NewUnsupportedModules(logger *zap.Logger, drushClient UnsupportedModulesDrush) *UnsupportedModules {
+func NewUnsupportedModules(logger *zap.Logger) *UnsupportedModules {
 	return &UnsupportedModules{
 		logger: logger,
-		drush:  drushClient,
 	}
 }
 
@@ -39,11 +32,12 @@ func (um *UnsupportedModules) Hooks() workflow.Hooks {
 // preSiteUpdateHandler checks a site. Best-effort: an unreachable status service is not an error.
 func (um *UnsupportedModules) preSiteUpdateHandler(evt *workflow.PreSiteUpdateEvent) error {
 
-	modules, err := um.drush.GetUnsupportedModules(evt.Context(), evt.Path(), evt.Site())
-	if err != nil {
-		um.logger.Warn("failed to check for unsupported modules", zap.String("site", evt.Site()), zap.Error(err))
+	facts := evt.Facts()
+	if facts.UnsupportedModulesError != "" {
+		um.logger.Warn("failed to check for unsupported modules", zap.String("site", evt.Site()), zap.Error(errors.New(facts.UnsupportedModulesError)))
 		return nil
 	}
+	modules := facts.UnsupportedModules
 	if len(modules) == 0 {
 		return nil
 	}

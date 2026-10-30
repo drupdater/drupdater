@@ -57,7 +57,6 @@ COPY tools/composer.json tools/composer.lock /opt/drupdater/tools/
 RUN composer install --working-dir=/opt/drupdater/tools --no-dev --no-interaction --no-progress \
     && composer clear-cache
 
-COPY scripts/ /opt/drupdater/
 COPY --from=build /build/drupdater /opt/drupdater/bin
 
 CMD [""]

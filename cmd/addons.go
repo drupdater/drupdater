@@ -31,8 +31,6 @@ type addonComposer interface {
 // addonDrush is every builtin addon's drush interface at once.
 type addonDrush interface {
 	addon.TranslationsDrush
-	addon.UnsupportedModulesDrush
-	addon.UpdateHooksDrush
 }
 
 // addonDeps carries everything the addon constructors need.
@@ -45,11 +43,13 @@ type addonDeps struct {
 	drupalCode addon.DrupalCode
 	// security marks a --security run. Only composer_audit reads it.
 	security bool
+	// rectorConfig is drupdater's Rector config, extracted from the binary.
+	rectorConfig string
 }
 
 // newAddonDeps adds the drupalcode client only when DRUPALCODE_ACCESS_TOKEN is set.
-func newAddonDeps(logger *zap.Logger, drush addonDrush, composer addonComposer, drupalOrg addon.DrupalOrg) addonDeps {
-	deps := addonDeps{logger: logger, drush: drush, composer: composer, drupalOrg: drupalOrg}
+func newAddonDeps(logger *zap.Logger, drush addonDrush, composer addonComposer, drupalOrg addon.DrupalOrg, rectorConfig string) addonDeps {
+	deps := addonDeps{logger: logger, drush: drush, composer: composer, drupalOrg: drupalOrg, rectorConfig: rectorConfig}
 	if token := os.Getenv("DRUPALCODE_ACCESS_TOKEN"); token != "" {
 		deps.drupalCode = drupalorg.NewDrupalCode(token)
 	}
@@ -76,7 +76,7 @@ func builtinAddons() addonCatalog {
 				return addon.NewCodeBeautifier(d.logger, phpcs.NewCLI(d.logger), phpcs.NewBundledCLI(d.logger, bundledToolsBin), d.composer)
 			},
 			"deprecations_remover": func(d addonDeps) workflow.Addon {
-				return addon.NewDeprecationsRemover(d.logger, rector.NewCLI(d.logger), rector.NewBundledCLI(d.logger, bundledToolsBin), d.composer)
+				return addon.NewDeprecationsRemover(d.logger, rector.NewCLI(d.logger, d.rectorConfig), rector.NewBundledCLI(d.logger, bundledToolsBin, d.rectorConfig), d.composer)
 			},
 			"translations_updater":   func(d addonDeps) workflow.Addon { return addon.NewTranslationsUpdater(d.logger, d.drush) },
 			"composer_allow_plugins": func(d addonDeps) workflow.Addon { return addon.NewComposerAllowPlugins(d.logger, d.composer) },
@@ -85,8 +85,8 @@ func builtinAddons() addonCatalog {
 				return addon.NewComposerPatches1(d.logger, d.composer, d.drupalOrg, d.drupalCode, http.DefaultClient)
 			},
 			"composer_diff":       func(d addonDeps) workflow.Addon { return addon.NewComposerDiff(d.logger, d.composer) },
-			"update_hooks":        func(d addonDeps) workflow.Addon { return addon.NewUpdateHooks(d.logger, d.drush) },
-			"unsupported_modules": func(d addonDeps) workflow.Addon { return addon.NewUnsupportedModules(d.logger, d.drush) },
+			"update_hooks":        func(d addonDeps) workflow.Addon { return addon.NewUpdateHooks(d.logger) },
+			"unsupported_modules": func(d addonDeps) workflow.Addon { return addon.NewUnsupportedModules(d.logger) },
 		},
 		// The description joins composer_audit's and unsupported_modules' findings into one
 		// end-of-life list, so both always run.

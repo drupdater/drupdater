@@ -19,6 +19,7 @@ import (
 	"github.com/drupdater/drupdater/pkg/drupal"
 	"github.com/drupdater/drupdater/pkg/drush"
 	"github.com/drupdater/drupdater/pkg/repo"
+	"github.com/drupdater/drupdater/scripts"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -223,7 +224,7 @@ type siteInstaller interface {
 type fullCheckDeps struct {
 	clone        func(repositoryURL string, branch string, token string) (string, error)
 	newComposer  func() fullCheckComposer
-	newInstaller func(c fullCheckComposer, dataDir string) (siteInstaller, error)
+	newInstaller func(c fullCheckComposer, dataDir string, drushInclude string) (siteInstaller, error)
 }
 
 // realFullCheckDeps builds the dependencies that really clone and install.
@@ -235,12 +236,8 @@ func realFullCheckDeps(logger *zap.Logger) fullCheckDeps {
 			return checkout.Path, err
 		},
 		newComposer: func() fullCheckComposer { return composer.NewCLI(logger) },
-		newInstaller: func(c fullCheckComposer, dataDir string) (siteInstaller, error) {
-			cache, err := NewCache()
-			if err != nil {
-				return nil, err
-			}
-			return drupal.NewInstaller(logger, drush.NewCLI(logger, cache), c, dataDir), nil
+		newInstaller: func(c fullCheckComposer, dataDir string, drushInclude string) (siteInstaller, error) {
+			return drupal.NewInstaller(logger, drush.NewCLI(logger, drushInclude), c, dataDir), nil
 		},
 	}
 }
@@ -279,7 +276,13 @@ func (a app) runFullChecks(ctx context.Context, logger *zap.Logger, cfg config.C
 	}
 	defer os.RemoveAll(siteData)
 
-	installer, err := deps.newInstaller(composerCLI, siteData)
+	scriptsDir, err := scripts.Extract()
+	if err != nil {
+		return append(results, workflow.CheckFailed("drush site-install --existing-config", err.Error()))
+	}
+	defer os.RemoveAll(scriptsDir)
+
+	installer, err := deps.newInstaller(composerCLI, siteData, scripts.DrushInclude(scriptsDir))
 	if err != nil {
 		return append(results, workflow.CheckFailed("drush site-install --existing-config", err.Error()))
 	}

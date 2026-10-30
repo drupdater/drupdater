@@ -20,8 +20,8 @@ import (
 
 type Drush interface {
 	InstallSite(ctx context.Context, path string, site string) error
-	// GetConfigSyncDir returns the site's config sync directory, relative to path or absolute.
-	GetConfigSyncDir(ctx context.Context, path string, site string, relative bool) (string, error)
+	// GetConfigSyncDir returns the site's absolute config sync directory, before it is installed too.
+	GetConfigSyncDir(ctx context.Context, path string, site string) (string, error)
 }
 
 type Composer interface {
@@ -58,7 +58,11 @@ func (is *Installer) Install(ctx context.Context, path string, site string) (err
 
 	is.logger.Info("installing site", zap.String("site", site))
 
-	settingsPath, err := is.configureDatabase(ctx, path, site)
+	coreExtension, err := is.coreExtensionPath(ctx, path, site)
+	if err != nil {
+		return err
+	}
+	settingsPath, err := is.configureDatabase(ctx, path, site, coreExtension)
 	if err != nil {
 		return err
 	}
@@ -68,7 +72,7 @@ func (is *Installer) Install(ctx context.Context, path string, site string) (err
 		}
 	}()
 
-	if err := is.RemoveProfile(ctx, path, site); err != nil {
+	if err := is.removeProfile(coreExtension); err != nil {
 		return err
 	}
 
@@ -94,11 +98,15 @@ func (is *Installer) settingsPath(ctx context.Context, dir string, site string) 
 // ConfigureDatabase points the site at a throwaway SQLite database. Pair it with RestoreSettings:
 // settings.php is tracked, and nothing may stage it while the block is in place.
 func (is *Installer) ConfigureDatabase(ctx context.Context, dir string, site string) error {
-	_, err := is.configureDatabase(ctx, dir, site)
+	coreExtension, err := is.coreExtensionPath(ctx, dir, site)
+	if err != nil {
+		return err
+	}
+	_, err = is.configureDatabase(ctx, dir, site, coreExtension)
 	return err
 }
 
-func (is *Installer) configureDatabase(ctx context.Context, dir string, site string) (string, error) {
+func (is *Installer) configureDatabase(ctx context.Context, dir string, site string, coreExtension string) (string, error) {
 
 	siteLogger := is.logger.With(zap.String("site", site))
 	siteLogger.Debug("configuring database", zap.String("dir", dir))
@@ -111,10 +119,10 @@ func (is *Installer) configureDatabase(ctx context.Context, dir string, site str
 	// Checked on every call: core.extension.yml comes back from git without the sqlite entry
 	// whenever a run is restored, and Drupal refuses to install without it ("SQLite is
 	// providing the database driver").
-	isSqliteEnabled, _ := is.isSqliteModuleEnabled(ctx, dir, site)
+	isSqliteEnabled, _ := is.isSqliteModuleEnabled(coreExtension)
 	if !isSqliteEnabled {
-		siteLogger.Debug("enabling sqlite module")
-		if err := is.addSqliteModule(ctx, dir, site); err != nil {
+		siteLogger.Debug("enabling sqlite module", zap.String("path", coreExtension))
+		if err := is.addSqliteModule(coreExtension); err != nil {
 			return "", fmt.Errorf("failed to enable sqlite module: %w", err)
 		}
 	}
@@ -233,62 +241,44 @@ func (is *Installer) writeSettings(path string, content []byte) error {
 	return f.Close()
 }
 
-// coreExtensionPath returns the site's core.extension.yml.
 func (is *Installer) coreExtensionPath(ctx context.Context, dir string, site string) (string, error) {
-	configSyncDir, err := is.drush.GetConfigSyncDir(ctx, dir, site, false)
+	configSyncDir, err := is.drush.GetConfigSyncDir(ctx, dir, site)
 	if err != nil {
 		return "", err
 	}
-	return configSyncDir + "/core.extension.yml", nil
+	return filepath.Join(configSyncDir, "core.extension.yml"), nil
 }
 
 // readCoreExtension decodes core.extension.yml. A document with no module section is an error:
 // every caller here needs one.
-func (is *Installer) readCoreExtension(ctx context.Context, dir string, site string) (path string, config map[string]any, modules map[string]any, err error) {
-	path, err = is.coreExtensionPath(ctx, dir, site)
-	if err != nil {
-		return "", nil, nil, err
-	}
-
+func (is *Installer) readCoreExtension(path string) (config map[string]any, modules map[string]any, err error) {
 	file, err := afero.ReadFile(is.fs, path)
 	if err != nil {
-		return path, nil, nil, fmt.Errorf("failed to read core extension file: %w", err)
+		return nil, nil, fmt.Errorf("failed to read core extension file: %w", err)
 	}
 
 	if err := yaml.Unmarshal(file, &config); err != nil {
-		return path, nil, nil, fmt.Errorf("failed to unmarshal core extension file: %w", err)
+		return nil, nil, fmt.Errorf("failed to unmarshal core extension file: %w", err)
 	}
 
 	modules, ok := config["module"].(map[string]any)
 	if !ok {
-		return path, config, nil, fmt.Errorf("core extension file %s has no module section", path)
+		return config, nil, fmt.Errorf("core extension file %s has no module section", path)
 	}
-	return path, config, modules, nil
+	return config, modules, nil
 }
 
-func (is *Installer) isSqliteModuleEnabled(ctx context.Context, dir string, site string) (bool, error) {
-	siteLogger := is.logger.With(zap.String("site", site))
-
-	coreExtensionPath, _, modules, err := is.readCoreExtension(ctx, dir, site)
+func (is *Installer) isSqliteModuleEnabled(path string) (bool, error) {
+	_, modules, err := is.readCoreExtension(path)
 	if err != nil {
 		return false, err
 	}
-	siteLogger.Debug("checking if sqlite module is enabled", zap.String("path", coreExtensionPath))
-
-	if enabled, exists := modules["sqlite"]; exists && enabled == 0 {
-		siteLogger.Debug("sqlite module is enabled")
-		return true, nil
-	}
-
-	siteLogger.Debug("sqlite module is not enabled")
-	return false, nil
+	enabled, exists := modules["sqlite"]
+	return exists && enabled == 0, nil
 }
 
-func (is *Installer) addSqliteModule(ctx context.Context, dir string, site string) error {
-
-	siteLogger := is.logger.With(zap.String("site", site))
-
-	coreExtensionPath, config, modules, err := is.readCoreExtension(ctx, dir, site)
+func (is *Installer) addSqliteModule(path string) error {
+	config, modules, err := is.readCoreExtension(path)
 	if err != nil {
 		return err
 	}
@@ -299,25 +289,15 @@ func (is *Installer) addSqliteModule(ctx context.Context, dir string, site strin
 		return fmt.Errorf("failed to marshal updated config: %w", err)
 	}
 
-	if err := afero.WriteFile(is.fs, coreExtensionPath, updatedConfig, 0644); err != nil {
+	if err := afero.WriteFile(is.fs, path, updatedConfig, 0644); err != nil {
 		return fmt.Errorf("failed to write updated core extension file: %w", err)
 	}
-	siteLogger.Debug("sqlite module added to core extension file")
-
 	return nil
 }
 
-func (is *Installer) RemoveProfile(ctx context.Context, dir string, site string) error {
-	siteLogger := is.logger.With(zap.String("site", site))
-
-	coreExtensionPath, err := is.coreExtensionPath(ctx, dir, site)
-	if err != nil {
-		return err
-	}
-
+func (is *Installer) removeProfile(coreExtensionPath string) error {
 	fileToRead, err := is.fs.Open(coreExtensionPath)
 	if err != nil {
-		siteLogger.Error("failed to open file", zap.Error(err))
 		return err
 	}
 	defer fileToRead.Close()

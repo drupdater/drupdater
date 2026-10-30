@@ -81,6 +81,12 @@ tests mock exactly that. Then add the interface to `addonComposer` or `addonDrus
 | `pre-site-update` | Inspecting a site before its update hooks run |
 | `post-site-update` | Per-site work after hooks, before configuration export |
 
+Both site events carry `evt.Facts()`: on `pre-site-update` what the site reported before its
+update hooks ran, on `post-site-update` what it reported after them, without
+`UnsupportedModules`. Read
+a site's modules, paths or pending hooks from there instead of adding a Drush query; a new fact
+belongs in `drupdater:facts` (`scripts/drush/Commands/DrupdaterCommands.php`) and `drush.Facts`.
+
 Pick the stage from what the hook does: `Prepare` if later hooks on the event read what it
 writes, `Change` if it edits the project, `Format` if it restyles what `Change` wrote, and
 `Inspect` if it only observes, so it records the settled state. Read
