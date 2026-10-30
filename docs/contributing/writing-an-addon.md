@@ -89,7 +89,7 @@ An addon with a per-site hook may not have a map, slice or mutex field at all:
 
 ## 2. Register it
 
-In `cmd/root.go`, add it to `addonRegistry`:
+In `cmd/root.go`, add it to the `factories` of `builtinAddons()`:
 
 ```go
 "your_addon": func(d addonDeps) workflow.Addon { return addon.NewYourAddon(d.logger) },
@@ -100,7 +100,7 @@ a run, so a mismatch here is a user-visible bug.
 
 ## 3. Decide mandatory or configurable
 
-**Mandatory** — add the name to `mandatoryAddons`. Reserve this for addons that are
+**Mandatory** — add the name to the `mandatory` list of `builtinAddons()`. Reserve this for addons that are
 required for the update to succeed at all, or that produce the changelog a reviewer needs.
 It is a high bar: a mandatory addon cannot be turned off by any project.
 
@@ -188,7 +188,7 @@ Template output is easy to get subtly wrong, and `--dry-run` still renders it.
 ## Checklist
 
 - [ ] Implements the addon interface, each hook at a justified stage, listed in `TestAddonHookStages`
-- [ ] Registered in `addonRegistry` under the name users will write
+- [ ] Registered in `builtinAddons()` under the name users will write
 - [ ] Mandatory or configurable decided, and defaults updated if needed
 - [ ] `ReportKey`/`ReportData` in `internal/addon/report.go`, returning `nil` when empty
 - [ ] Output sorted for deterministic reports

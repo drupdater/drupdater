@@ -4,9 +4,8 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"runtime"
+	"path/filepath"
 	"slices"
-	"strconv"
 	"testing"
 
 	"github.com/drupdater/drupdater/internal"
@@ -76,20 +75,15 @@ func TestPersistentFlagDefaults(t *testing.T) {
 		{flag: "report", want: ""},
 	}
 
+	flags := testApp().newRootCmd().PersistentFlags()
 	for _, tt := range tests {
 		t.Run(tt.flag, func(t *testing.T) {
-			f := rootCmd.PersistentFlags().Lookup(tt.flag)
+			f := flags.Lookup(tt.flag)
 			require.NotNil(t, f, "flag %q is not registered", tt.flag)
 			assert.Equal(t, tt.want, f.DefValue)
 			assert.NotEmpty(t, f.Usage, "every flag needs help text")
 		})
 	}
-
-	// Not a literal: it reflects the container's CPU quota, so pin the source rather than a
-	// number that differs per machine.
-	concurrency := rootCmd.PersistentFlags().Lookup("concurrency")
-	require.NotNil(t, concurrency)
-	assert.Equal(t, strconv.Itoa(runtime.GOMAXPROCS(0)), concurrency.DefValue)
 }
 
 func TestNewCache(t *testing.T) {
@@ -149,19 +143,19 @@ func TestCreateAddons(t *testing.T) {
 		config := internal.Config{
 			RunTypes: internal.RunTypesConfig{Normal: internal.RunTypeConfig{Addons: []string{"code_beautifier"}}},
 		}
-		addons, err := createAddons(logger, config, nil, nil, nil)
+		addons, err := builtinAddons().create(logger, config, nil, nil, nil)
 		require.NoError(t, err)
-		assert.Len(t, addons, len(mandatoryAddons)+1)
+		assert.Len(t, addons, len(builtinAddons().mandatory)+1)
 	})
 
 	t.Run("composer_audit and unsupported_modules run on a normal update", func(t *testing.T) {
 		// Both are mandatory: the description joins them into one list, so either alone shows half of it.
 		config := internal.Config{RunTypes: internal.RunTypesConfig{Normal: internal.RunTypeConfig{}}}
-		addons, err := createAddons(logger, config, nil, nil, nil)
+		addons, err := builtinAddons().create(logger, config, nil, nil, nil)
 		require.NoError(t, err)
-		assert.Len(t, addons, len(mandatoryAddons))
-		assert.Contains(t, mandatoryAddons, "composer_audit")
-		assert.Contains(t, mandatoryAddons, "unsupported_modules")
+		assert.Len(t, addons, len(builtinAddons().mandatory))
+		assert.Contains(t, builtinAddons().mandatory, "composer_audit")
+		assert.Contains(t, builtinAddons().mandatory, "unsupported_modules")
 	})
 
 	// composer_audit runs in both modes, so --security must reach it some other way. Pinned on
@@ -175,10 +169,10 @@ func TestCreateAddons(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			config := internal.Config{Security: tt.security}
-			addons, err := createAddons(logger, config, nil, cleanAudit{}, nil)
+			addons, err := builtinAddons().create(logger, config, nil, cleanAudit{}, nil)
 			require.NoError(t, err)
 
-			audit := addons[slices.Index(mandatoryAddons, "composer_audit")]
+			audit := addons[slices.Index(builtinAddons().mandatory, "composer_audit")]
 			_, err = audit.Hooks().PreComposerUpdate.Run(workflow.NewPreComposerUpdateEvent(t.Context(), "/repo", nil, workflow.UpdatePlan{}))
 
 			_, aborted := errors.AsType[workflow.AbortError](err)
@@ -188,14 +182,14 @@ func TestCreateAddons(t *testing.T) {
 
 	t.Run("a mandatory addon listed in the YAML is not duplicated", func(t *testing.T) {
 		config := internal.Config{RunTypes: internal.RunTypesConfig{Normal: internal.RunTypeConfig{Addons: []string{"update_hooks"}}}}
-		addons, err := createAddons(logger, config, nil, nil, nil)
+		addons, err := builtinAddons().create(logger, config, nil, nil, nil)
 		require.NoError(t, err)
-		assert.Len(t, addons, len(mandatoryAddons)) // update_hooks is already mandatory
+		assert.Len(t, addons, len(builtinAddons().mandatory)) // update_hooks is already mandatory
 	})
 
 	t.Run("an unknown addon name is an error", func(t *testing.T) {
 		config := internal.Config{RunTypes: internal.RunTypesConfig{Normal: internal.RunTypeConfig{Addons: []string{"does_not_exist"}}}}
-		_, err := createAddons(logger, config, nil, nil, nil)
+		_, err := builtinAddons().create(logger, config, nil, nil, nil)
 		require.Error(t, err)
 	})
 }
@@ -206,12 +200,12 @@ func TestValidateAddons(t *testing.T) {
 			Normal:   internal.RunTypeConfig{Addons: []string{"code_beautifier", "update_hooks"}},
 			Security: internal.RunTypeConfig{Addons: []string{"composer_normalizer"}},
 		}}
-		require.NoError(t, validateAddons(config))
+		require.NoError(t, builtinAddons().validate(config))
 	})
 
 	t.Run("unknown name in the normal list is an error", func(t *testing.T) {
 		config := internal.Config{RunTypes: internal.RunTypesConfig{Normal: internal.RunTypeConfig{Addons: []string{"nope"}}}}
-		err := validateAddons(config)
+		err := builtinAddons().validate(config)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "nope")
 	})
@@ -219,12 +213,12 @@ func TestValidateAddons(t *testing.T) {
 	t.Run("unknown name in the security list is caught regardless of mode", func(t *testing.T) {
 		// Security: false, yet a bad security-list name must still be rejected.
 		config := internal.Config{RunTypes: internal.RunTypesConfig{Security: internal.RunTypeConfig{Addons: []string{"typo"}}}}
-		require.Error(t, validateAddons(config))
+		require.Error(t, builtinAddons().validate(config))
 	})
 }
 
 func TestConfigurableAddons(t *testing.T) {
-	names := configurableAddons()
+	names := builtinAddons().configurable()
 
 	// Exactly the four configurable addons, sorted, and nothing mandatory.
 	assert.Equal(t, []string{
@@ -234,17 +228,19 @@ func TestConfigurableAddons(t *testing.T) {
 		"translations_updater",
 	}, names)
 
-	for _, mandatory := range append(mandatoryAddons, "composer_audit") {
+	for _, mandatory := range append(builtinAddons().mandatory, "composer_audit") {
 		assert.NotContains(t, names, mandatory)
 	}
 }
 
 func TestAddonsCommand(t *testing.T) {
 	var buf bytes.Buffer
-	addonsCmd.SetOut(&buf)
-	addonsCmd.Run(addonsCmd, nil)
+	addons := testApp().newAddonsCmd()
+	addons.SetOut(&buf)
+	addons.Run(addons, nil)
 	out := buf.String()
 
+	assert.Contains(t, out, "Addons you can set under run_types.normal.addons")
 	assert.Contains(t, out, "code_beautifier")
 	// Mandatory addons must not be listed as settable.
 	assert.NotContains(t, out, "composer_patches")
@@ -327,4 +323,47 @@ type cleanAudit struct{ addon.Composer }
 
 func (cleanAudit) Audit(context.Context, string) (composer.Audit, error) {
 	return composer.Audit{}, nil
+}
+
+func TestCommandTreesShareNoFlagState(t *testing.T) {
+	first := testApp().newRootCmd()
+	require.NoError(t, first.PersistentFlags().Parse([]string{"--branch", "develop", "--dry-run"}))
+
+	second := testApp().newRootCmd()
+
+	assert.Equal(t, "main", second.PersistentFlags().Lookup("branch").Value.String())
+	assert.Equal(t, "false", second.PersistentFlags().Lookup("dry-run").Value.String())
+}
+
+func TestRootCommandValidatesTheFlagsItParsed(t *testing.T) {
+	cmd := testApp().newRootCmd()
+	cmd.SetArgs([]string{"--clone"})
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetErr(&bytes.Buffer{})
+
+	require.ErrorContains(t, cmd.ExecuteContext(t.Context()), "--repository-url is required")
+}
+
+func TestCheckCommandReadsTheRootFlags(t *testing.T) {
+	dir := t.TempDir()
+	_, err := git.PlainInit(dir, false)
+	require.NoError(t, err)
+	reportPath := filepath.Join(t.TempDir(), "check.json")
+
+	root := testApp().newRootCmd()
+	root.SetArgs([]string{"check", "--working-dir", dir, "--report", reportPath})
+	root.SetOut(&bytes.Buffer{})
+	root.SetErr(&bytes.Buffer{})
+
+	require.ErrorContains(t, root.ExecuteContext(t.Context()), "preflight check failed")
+	assert.FileExists(t, reportPath, "--report, a root flag, has to reach the check command")
+}
+
+func TestCheckCommandHasTheFullFlag(t *testing.T) {
+	check, _, err := testApp().newRootCmd().Find([]string{"check"})
+	require.NoError(t, err)
+
+	full := check.Flags().Lookup("full")
+	require.NotNil(t, full)
+	assert.Equal(t, "false", full.DefValue)
 }

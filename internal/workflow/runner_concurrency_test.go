@@ -53,7 +53,7 @@ func (o *occupancyProbe) peak() int32 { return o.high.Load() }
 // independent phase overlaps, the committing one does not.
 func TestRunWithConcurrentSites(t *testing.T) {
 	installer := NewMockInstaller(t)
-	repositoryService := NewMockRepository(t)
+	repositoryService := NewMockGitService(t)
 	vcsProvider := NewMockPlatform(t)
 	repository := NewMockGitRepository(t)
 	expectUpdateBranch(repository)
@@ -129,7 +129,7 @@ func TestRunWithConcurrentSites(t *testing.T) {
 
 // turnsRunner is a Runner whose sites each export to config/<site>, and which records the order
 // the exports happen in. stub sets what each site's update hooks do.
-func turnsRunner(t *testing.T, sites []string, concurrency int, stub func(site string) error) (*Runner, *fakeCommitter, func() []string) {
+func turnsRunner(t *testing.T, sites []string, concurrency int, stub func(site string) error) (*run, *fakeCommitter, func() []string) {
 	t.Helper()
 	installer := NewMockInstaller(t)
 	drush := NewMockDrush(t)
@@ -153,14 +153,13 @@ func turnsRunner(t *testing.T, sites []string, concurrency int, stub func(site s
 	}
 
 	committer := &fakeCommitter{result: true}
-	r := &Runner{
+	r := testRun(services{
 		logger:    zap.NewNop(),
 		config:    internal.Config{Sites: sites, Concurrency: concurrency},
 		installer: installer,
 		drush:     drush,
-		hooks:     NewPipeline(nil),
-		committer: committer,
-	}
+	}, repo.Checkout{Path: testCheckout})
+	r.committer = committer
 	return r, committer, func() []string {
 		mu.Lock()
 		defer mu.Unlock()
@@ -206,7 +205,7 @@ func TestUpdateSitesCommitsInSiteOrderHoweverTheSitesFinish(t *testing.T) {
 		return nil
 	})
 
-	require.NoError(t, withinDeadline(t, func() error { return r.updateSites(t.Context(), testCheckout) }))
+	require.NoError(t, withinDeadline(t, func() error { return r.updateSites(t.Context()) }))
 
 	assert.Equal(t, sites, exported())
 	assert.Equal(t, []string{"Update configuration site1", "Update configuration site2", "Update configuration site3"}, commitMessages(committer))
@@ -216,7 +215,7 @@ func TestUpdateSitesRunsInOrderWithOneSiteAtATime(t *testing.T) {
 	sites := []string{"site1", "site2", "site3"}
 	r, committer, exported := turnsRunner(t, sites, 1, func(string) error { return nil })
 
-	require.NoError(t, withinDeadline(t, func() error { return r.updateSites(t.Context(), testCheckout) }))
+	require.NoError(t, withinDeadline(t, func() error { return r.updateSites(t.Context()) }))
 
 	assert.Equal(t, sites, exported())
 	assert.Len(t, committer.commits, len(sites))
@@ -237,7 +236,7 @@ func TestUpdateSitesGivesNoLaterSiteATurnAfterAnEarlierOneFails(t *testing.T) {
 		return assert.AnError
 	})
 
-	err := withinDeadline(t, func() error { return r.updateSites(t.Context(), testCheckout) })
+	err := withinDeadline(t, func() error { return r.updateSites(t.Context()) })
 
 	require.ErrorIs(t, err, assert.AnError)
 	assert.Empty(t, exported(), "a site after the failed one exported anyway")
@@ -249,7 +248,7 @@ func TestUpdateSiteReportsACancelledWaitForItsTurn(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
-	err := r.updateSite(ctx, testCheckout, "site2", make(chan struct{}), make(chan struct{}))
+	err := r.updateSite(ctx, "site2", make(chan struct{}), make(chan struct{}))
 
 	require.ErrorIs(t, err, context.Canceled, "a site that never got its turn must not read as done")
 	assert.Empty(t, exported())
