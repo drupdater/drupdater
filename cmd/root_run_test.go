@@ -229,14 +229,12 @@ func TestCreateAddonsPassesEveryDependency(t *testing.T) {
 	logger := zap.NewNop()
 	composerSvc := composer.NewCLI(logger)
 	t.Cleanup(composerSvc.Cleanup)
-	drupalCode, err := drupalorg.NewDrupalCode("token")
-	require.NoError(t, err)
 	deps := addonDeps{
 		logger:     logger,
 		drush:      drush.NewCLI(logger, cache),
 		composer:   composerSvc,
 		drupalOrg:  drupalorg.NewHTTPClient(logger),
-		drupalCode: drupalCode,
+		drupalCode: drupalorg.NewDrupalCode("token"),
 	}
 
 	_, err = catalog.create(internal.Config{Security: true}, deps)
@@ -254,14 +252,12 @@ func TestNewAddonDepsBuildsADrupalCodeClientOnlyWithAToken(t *testing.T) {
 	drupalOrgSvc := drupalorg.NewHTTPClient(logger)
 
 	t.Setenv("DRUPALCODE_ACCESS_TOKEN", "")
-	deps, err := newAddonDeps(logger, drushSvc, composerSvc, drupalOrgSvc)
-	require.NoError(t, err)
+	deps := newAddonDeps(logger, drushSvc, composerSvc, drupalOrgSvc)
 	assert.Equal(t, addonDeps{logger: logger, drush: drushSvc, composer: composerSvc, drupalOrg: drupalOrgSvc}, deps)
 	assert.Nil(t, deps.drupalCode, "composer_patches tells a missing client by nil, so no typed nil may slip in")
 
 	t.Setenv("DRUPALCODE_ACCESS_TOKEN", "secret")
-	deps, err = newAddonDeps(logger, drushSvc, composerSvc, drupalOrgSvc)
-	require.NoError(t, err)
+	deps = newAddonDeps(logger, drushSvc, composerSvc, drupalOrgSvc)
 	assert.IsType(t, &drupalorg.DrupalCode{}, deps.drupalCode)
 	deps.drupalCode = nil
 	assert.Equal(t, addonDeps{logger: logger, drush: drushSvc, composer: composerSvc, drupalOrg: drupalOrgSvc}, deps)

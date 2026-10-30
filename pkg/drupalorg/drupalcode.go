@@ -22,8 +22,13 @@ type ForkMergeRequest struct {
 }
 
 // NewDrupalCode authenticates with token; drupalcode answers no API call anonymously.
-func NewDrupalCode(token string) (*DrupalCode, error) {
-	return newDrupalCode(token, drupalCodeAPI)
+func NewDrupalCode(token string) *DrupalCode {
+	d, err := newDrupalCode(token, drupalCodeAPI)
+	if err != nil {
+		// Only an unparseable base URL fails, and drupalCodeAPI is a constant.
+		panic(err)
+	}
+	return d
 }
 
 func newDrupalCode(token string, baseURL string) (*DrupalCode, error) {

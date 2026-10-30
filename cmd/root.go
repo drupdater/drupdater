@@ -206,12 +206,7 @@ func (a app) runUpdate(cmd *cobra.Command, args []string, opts options) error {
 		}
 	}
 
-	deps, err := newAddonDeps(logger, drush, composer, drupalOrg)
-	if err != nil {
-		logger.Error("failed to create the drupalcode client", zap.Error(err))
-		return err
-	}
-	addons, err := a.addons.create(config, deps)
+	addons, err := a.addons.create(config, newAddonDeps(logger, drush, composer, drupalOrg))
 	if err != nil {
 		return err
 	}
@@ -446,18 +441,12 @@ type addonDeps struct {
 }
 
 // newAddonDeps adds the drupalcode client only when DRUPALCODE_ACCESS_TOKEN is set.
-func newAddonDeps(logger *zap.Logger, drush addonDrush, composer addonComposer, drupalOrg addon.DrupalOrg) (addonDeps, error) {
+func newAddonDeps(logger *zap.Logger, drush addonDrush, composer addonComposer, drupalOrg addon.DrupalOrg) addonDeps {
 	deps := addonDeps{logger: logger, drush: drush, composer: composer, drupalOrg: drupalOrg}
-	token := os.Getenv("DRUPALCODE_ACCESS_TOKEN")
-	if token == "" {
-		return deps, nil
+	if token := os.Getenv("DRUPALCODE_ACCESS_TOKEN"); token != "" {
+		deps.drupalCode = drupalorg.NewDrupalCode(token)
 	}
-	drupalCode, err := drupalorg.NewDrupalCode(token)
-	if err != nil {
-		return addonDeps{}, err
-	}
-	deps.drupalCode = drupalCode
-	return deps, nil
+	return deps
 }
 
 // bundledToolsBin is where the image installs tools/, so addons install nothing into the project.

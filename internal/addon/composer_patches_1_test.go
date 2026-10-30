@@ -14,6 +14,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 func TestIsRemotePatch(t *testing.T) {
@@ -552,6 +554,49 @@ func TestUpdatePatches(t *testing.T) {
 
 		composerService.AssertExpectations(t)
 		drupalOrgService.AssertExpectations(t)
+	})
+
+	t.Run("a failed fork lookup is logged and changes nothing", func(t *testing.T) {
+		composerService := NewMockPatchesComposer(t)
+		composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
+		composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/core").Return(true, nil)
+		composerService.EXPECT().CheckIfPatchApplies(anyCtx, mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/remote/0001-remote.patch").Return(false, nil)
+
+		drupalOrgService := NewMockDrupalOrg(t)
+		drupalOrgService.EXPECT().FindIssueNumber("Issue #123456 \"With problems\"").Return("123456", true)
+		drupalOrgService.EXPECT().GetIssue(anyCtx, "123456").Return(&drupalorg.Issue{
+			ID: "123456", Title: "Alot of problems", Status: "1", URL: "https://www.drupal.org/node/123456",
+			Project: struct {
+				MaschineName string `json:"machine_name"`
+			}{MaschineName: "drupal"},
+		}, nil)
+
+		drupalCode := NewMockDrupalCode(t)
+		drupalCode.EXPECT().IssueForkMergeRequests(anyCtx, "drupal", "123456").Return(nil, assert.AnError)
+
+		core, logs := observer.New(zapcore.ErrorLevel)
+		var removed []string
+		updater := &ComposerPatches1{
+			logger:     zap.New(core),
+			composer:   composerService,
+			drupalOrg:  drupalOrgService,
+			drupalCode: drupalCode,
+			removeFile: recordRemovals(&removed),
+		}
+		patches := map[string]map[string]string{
+			"drupal/core": {"Issue #123456 \"With problems\"": "patches/remote/0001-remote.patch"},
+		}
+
+		report, newPatches := updater.updatePatches(t.Context(), "/tmp", []composer.PackageChange{
+			{Action: "Upgrade", Package: "drupal/core", From: "8.7.0", To: "8.8.0"},
+		}, patches)
+
+		assert.Empty(t, removed)
+		assert.Equal(t, PatchUpdates{}, report)
+		assert.Equal(t, map[string]map[string]string{
+			"drupal/core": {"Issue #123456: [Alot of problems](https://www.drupal.org/node/123456)": "patches/remote/0001-remote.patch"},
+		}, newPatches)
+		require.Equal(t, 1, logs.FilterMessage("failed to find the issue fork's merge requests").Len())
 	})
 
 	t.Run("Remote patch was committed and released", func(t *testing.T) {

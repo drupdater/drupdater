@@ -4,7 +4,10 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
+
+	gitlab "gitlab.com/gitlab-org/api/client-go"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -32,9 +35,14 @@ func drupalCodeServer(t *testing.T, routes map[string]any) (*DrupalCode, *[]*htt
 }
 
 func TestNewDrupalCodeTalksToDrupalCode(t *testing.T) {
-	d, err := NewDrupalCode("secret")
-	require.NoError(t, err)
-	assert.Equal(t, "https://git.drupalcode.org/api/v4/", d.client.BaseURL().String())
+	assert.Equal(t, "https://git.drupalcode.org/api/v4/", NewDrupalCode("secret").client.BaseURL().String())
+}
+
+func TestNewDrupalCodeRejectsAnUnparseableBaseURL(t *testing.T) {
+	_, err := newDrupalCode("secret", "http://[::1")
+	require.ErrorContains(t, err, "failed to create the drupalcode client")
+	var parseErr *url.Error
+	require.ErrorAs(t, err, &parseErr, "the cause must survive the wrapper")
 }
 
 func TestIsFixedIn(t *testing.T) {
@@ -68,6 +76,7 @@ func TestIsFixedIn(t *testing.T) {
 
 		_, err := d.IsFixedIn(t.Context(), "drupal", "123456", "11.1.0")
 		require.ErrorContains(t, err, "failed to search drupal for issue 123456")
+		require.ErrorIs(t, err, gitlab.ErrNotFound, "the cause must survive the wrapper")
 	})
 }
 
@@ -103,6 +112,7 @@ func TestIssueForkMergeRequests(t *testing.T) {
 
 		_, err := d.IssueForkMergeRequests(t.Context(), "drupal", "123456")
 		require.ErrorContains(t, err, "failed to get the fork of issue 123456")
+		require.ErrorIs(t, err, gitlab.ErrNotFound, "the cause must survive the wrapper")
 		assert.Len(t, *requests, 1, "no merge request query without a fork to filter on")
 	})
 
@@ -111,6 +121,17 @@ func TestIssueForkMergeRequests(t *testing.T) {
 
 		_, err := d.IssueForkMergeRequests(t.Context(), "drupal", "123456")
 		require.ErrorContains(t, err, "failed to list the merge requests from the fork of issue 123456")
+		require.ErrorIs(t, err, gitlab.ErrNotFound, "the cause must survive the wrapper")
+	})
+
+	t.Run("a project name that is no URL path is an error", func(t *testing.T) {
+		d, requests := drupalCodeServer(t, map[string]any{"/api/v4/projects/issue/%zz-123456": map[string]any{"id": 5678}})
+
+		_, err := d.IssueForkMergeRequests(t.Context(), "%zz", "123456")
+		require.ErrorContains(t, err, "failed to build the merge request query")
+		var escapeErr url.EscapeError
+		require.ErrorAs(t, err, &escapeErr, "the cause must survive the wrapper")
+		assert.Len(t, *requests, 1, "the fork was found; only the query could not be built")
 	})
 
 	t.Run("a fork with no merge requests yields none", func(t *testing.T) {
