@@ -184,9 +184,10 @@ Changed packages need **≥ 90% coverage**. Existing addon tests show the patter
 the addon with mocks, call its hook with an event, assert on both the side effects and
 `ReportData()`.
 
-When your addon depends on another one's hook running first, test the two through
-`workflow.NewPipeline` rather than calling the hooks yourself — that runs them in the order a
-real run would, so the test fails if a stage changes.
+When your addon depends on another one's hook running first, test the two through a
+`workflow.NewPipeline` rather than calling the hooks yourself: `workflow.Fire(p, event)` (or
+`workflow.Settle` for pre-composer-update) runs them in the order a real run would, so the test
+fails if a stage changes.
 
 Then verify end to end against a real project:
 
