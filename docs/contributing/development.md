@@ -431,7 +431,7 @@ Four, on the code that parses input drupdater does not control:
 | Target | Covers |
 |---|---|
 | `FuzzParseGitURL` | The repository URL, in both the HTTP and the SCP shape, straight from a CI variable |
-| `FuzzLoadConfigFile` | `.drupdater.yaml`, including that a rejected file leaves the `Config` untouched |
+| `FuzzLoadFile` | `.drupdater.yaml`, including that a rejected file leaves the `Config` untouched |
 | `FuzzAuditUnmarshalJSON` | `composer audit` output, across the two shapes composer emits |
 | `FuzzRedact` | That a registered secret never survives redaction, on bytes no generator would write |
 

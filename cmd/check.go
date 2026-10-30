@@ -9,8 +9,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/internal/buildinfo"
 	"github.com/drupdater/drupdater/internal/codehosting"
+	"github.com/drupdater/drupdater/internal/config"
 	"github.com/drupdater/drupdater/internal/logging"
 	"github.com/drupdater/drupdater/internal/report"
 	"github.com/drupdater/drupdater/internal/workflow"
@@ -105,7 +106,7 @@ func (a app) runCheapChecks(
 	ctx context.Context,
 	logger *zap.Logger,
 	cfgFilePath string,
-	cfg *internal.Config,
+	cfg *config.Config,
 	repository workflow.ShallowCloneChecker,
 	composerSvc cheapChecksComposer,
 	fs afero.Fs,
@@ -129,7 +130,7 @@ func writeCheckReport(logger *zap.Logger, redactor *logging.Redactor, path strin
 		return
 	}
 
-	check := report.NewCheck(internal.Version, tools, toReportCheckResults(results))
+	check := report.NewCheck(buildinfo.Version, tools, toReportCheckResults(results))
 	if err := report.WriteCheck(afero.NewOsFs(), path, check, redactor.Redact); err != nil {
 		logger.Warn("failed to write check report", zap.String("path", path), zap.Error(err))
 		return
@@ -156,8 +157,8 @@ func checkToken(args []string) string {
 }
 
 // checkConfigAndAddons validates .drupdater.yaml and its addon names, and fills cfg for the rest.
-func checkConfigAndAddons(catalog addonCatalog, path string, cfg *internal.Config) []workflow.CheckResult {
-	if _, err := internal.LoadConfigFile(path, cfg); err != nil {
+func checkConfigAndAddons(catalog addonCatalog, path string, cfg *config.Config) []workflow.CheckResult {
+	if _, err := config.LoadFile(path, cfg); err != nil {
 		return []workflow.CheckResult{workflow.CheckFailed(".drupdater.yaml valid", err.Error())}
 	}
 
@@ -245,7 +246,7 @@ func realFullCheckDeps(logger *zap.Logger) fullCheckDeps {
 }
 
 // runFullChecks clones to a scratch directory, never the live working copy, and installs each site.
-func (a app) runFullChecks(ctx context.Context, logger *zap.Logger, cfg internal.Config, token string) []workflow.CheckResult {
+func (a app) runFullChecks(ctx context.Context, logger *zap.Logger, cfg config.Config, token string) []workflow.CheckResult {
 	if cfg.RepositoryURL == "" {
 		return []workflow.CheckResult{workflow.CheckFailed("sites install from configuration",
 			"no repository URL to clone (pass --repository-url or run inside a checkout "+

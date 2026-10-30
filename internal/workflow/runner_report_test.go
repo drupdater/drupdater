@@ -3,12 +3,14 @@ package workflow
 import (
 	"context"
 	"errors"
-	"github.com/drupdater/drupdater/pkg/repo"
 	"testing"
 	"time"
 
-	"github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/pkg/repo"
+
+	"github.com/drupdater/drupdater/internal/buildinfo"
 	"github.com/drupdater/drupdater/internal/codehosting"
+	"github.com/drupdater/drupdater/internal/config"
 	"github.com/drupdater/drupdater/internal/report"
 	"github.com/drupdater/drupdater/pkg/composer"
 	git "github.com/go-git/go-git/v5"
@@ -22,7 +24,7 @@ import (
 // reportHarness wires up the mocks a Run run needs, with a report sink attached. Each
 // test then overrides only the expectations relevant to the outcome it exercises.
 type reportHarness struct {
-	config      internal.Config
+	config      config.Config
 	installer   *MockInstaller
 	repoSvc     *MockGitService
 	vcsProvider *MockPlatform
@@ -52,7 +54,7 @@ func newReportHarness(t *testing.T, dryRun bool) *reportHarness {
 	repoURL := "https://user:" + testToken + "@example.com/repo.git"
 
 	h := &reportHarness{
-		config: internal.Config{
+		config: config.Config{
 			RepositoryURL: repoURL,
 			Branch:        "main",
 			Token:         testToken,
@@ -154,7 +156,7 @@ func TestReportWrittenOnSuccessfulRun(t *testing.T) {
 	// The publish phase only exists on a run that actually publishes.
 	assert.Contains(t, phaseNames(h.got.Phases), "publish")
 	assert.Equal(t, report.ModeNormal, h.got.Mode)
-	assert.Equal(t, internal.Version, h.got.DrupdaterVersion)
+	assert.Equal(t, buildinfo.Version, h.got.DrupdaterVersion)
 }
 
 // Composer decides what a run does, so the report has to name the version that produced it.

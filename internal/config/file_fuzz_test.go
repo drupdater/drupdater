@@ -1,4 +1,4 @@
-package internal
+package config
 
 import (
 	"os"
@@ -13,7 +13,7 @@ import (
 // .drupdater.yaml is committed by the project and read before anything else happens, so a broken
 // one has to be rejected whole. The invariant worth fuzzing is not that the parser accepts the
 // right files but that a rejected file leaves the Config the run proceeds with untouched.
-func FuzzLoadConfigFile(f *testing.F) {
+func FuzzLoadFile(f *testing.F) {
 	for _, seed := range []string{
 		"sites: [default]\ntimeout: 30m\n",
 		"timeout: 0\n",
@@ -40,7 +40,7 @@ func FuzzLoadConfigFile(f *testing.F) {
 
 		before := Config{Sites: []string{"sentinel"}, Timeout: time.Hour}
 		c := before
-		found, err := LoadConfigFile(path, &c)
+		found, err := LoadFile(path, &c)
 
 		assert.True(t, found, "the file exists, so it was found whatever it contains")
 		if err != nil {

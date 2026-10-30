@@ -9,8 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/internal/buildinfo"
 	"github.com/drupdater/drupdater/internal/codehosting"
+	"github.com/drupdater/drupdater/internal/config"
 	"github.com/drupdater/drupdater/internal/golden"
 	"github.com/drupdater/drupdater/internal/report"
 	"github.com/drupdater/drupdater/pkg/composer"
@@ -36,7 +37,7 @@ func TestRun(t *testing.T) {
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
-	config := internal.Config{
+	config := config.Config{
 		RepositoryURL: "https://example.com/repo.git",
 		Branch:        "main",
 		Token:         "token",
@@ -117,7 +118,7 @@ func TestRunPublishUsesLiveContext(t *testing.T) {
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
-	config := internal.Config{
+	config := config.Config{
 		RepositoryURL: "https://example.com/repo.git",
 		Branch:        "main",
 		Token:         "token",
@@ -188,7 +189,7 @@ func TestRunSiteFailureDoesNotPublish(t *testing.T) {
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
-	config := internal.Config{
+	config := config.Config{
 		RepositoryURL: "https://example.com/repo.git",
 		Branch:        "main",
 		Token:         "token",
@@ -251,7 +252,7 @@ func TestRunTimeout(t *testing.T) {
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
-	config := internal.Config{
+	config := config.Config{
 		RepositoryURL: "https://example.com/repo.git",
 		Branch:        "main",
 		Token:         "token",
@@ -299,7 +300,7 @@ func TestRunPlatformReqsFail(t *testing.T) {
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
-	config := internal.Config{
+	config := config.Config{
 		RepositoryURL: "https://example.com/repo.git",
 		Branch:        "main",
 		Token:         "token",
@@ -341,7 +342,7 @@ func TestRunNoChanges(t *testing.T) {
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
-	config := internal.Config{
+	config := config.Config{
 		RepositoryURL: "https://example.com/repo.git",
 		Branch:        "main",
 		Token:         "token",
@@ -386,7 +387,7 @@ func TestRunAbortedByAnAddonInstallsNoSite(t *testing.T) {
 	mockComposer := NewMockComposer(t)
 	expectVersionLookup(mockComposer)
 
-	config := internal.Config{RepositoryURL: "https://example.com/repo.git", Branch: "main", Token: "token", Clone: true, Sites: []string{"site1"}}
+	config := config.Config{RepositoryURL: "https://example.com/repo.git", Branch: "main", Token: "token", Clone: true, Sites: []string{"site1"}}
 
 	worktree := NewMockWorktree(t)
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
@@ -416,7 +417,7 @@ func TestRunUpdatesAsTheAddonsPlanned(t *testing.T) {
 	mockComposer := NewMockComposer(t)
 	expectVersionLookup(mockComposer)
 
-	config := internal.Config{RepositoryURL: "https://example.com/repo.git", Branch: "main", Token: "token", Clone: true, Sites: []string{"site1"}}
+	config := config.Config{RepositoryURL: "https://example.com/repo.git", Branch: "main", Token: "token", Clone: true, Sites: []string{"site1"}}
 
 	worktree := NewMockWorktree(t)
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
@@ -452,7 +453,7 @@ func TestRunInstallsSitesAtTheOldCode(t *testing.T) {
 	expectVersionLookup(mockComposer)
 	drush := NewMockDrush(t)
 
-	config := internal.Config{RepositoryURL: "https://example.com/repo.git", Branch: "main", Token: "token", Clone: true, Sites: []string{"site1"}, DryRun: true}
+	config := config.Config{RepositoryURL: "https://example.com/repo.git", Branch: "main", Token: "token", Clone: true, Sites: []string{"site1"}, DryRun: true}
 
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Add("config/sync").Return(plumbing.ZeroHash, nil).Maybe()
@@ -634,7 +635,7 @@ func TestRunCreatesTheUpdateBranchAfterTheLastCommit(t *testing.T) {
 	mockComposer := NewMockComposer(t)
 	expectVersionLookup(mockComposer)
 	drush := NewMockDrush(t)
-	config := internal.Config{RepositoryURL: "https://example.com/repo.git", Branch: "main", Clone: true, Sites: []string{"site1"}, DryRun: true}
+	config := config.Config{RepositoryURL: "https://example.com/repo.git", Branch: "main", Clone: true, Sites: []string{"site1"}, DryRun: true}
 
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
@@ -689,7 +690,7 @@ func TestRunBranchAlreadyExists(t *testing.T) {
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
-	config := internal.Config{
+	config := config.Config{
 		RepositoryURL: "https://example.com/repo.git",
 		Branch:        "main",
 		Token:         "token",
@@ -743,7 +744,7 @@ func TestRunLocalBranchAlreadyExists(t *testing.T) {
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
-	config := internal.Config{
+	config := config.Config{
 		RepositoryURL: "https://example.com/repo.git",
 		Branch:        "main",
 		Token:         "token",
@@ -791,7 +792,7 @@ func TestRunLocalBranchLookupError(t *testing.T) {
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
-	config := internal.Config{
+	config := config.Config{
 		RepositoryURL: "https://example.com/repo.git",
 		Branch:        "main",
 		Token:         "token",
@@ -836,7 +837,7 @@ func TestRunWithDryRun(t *testing.T) {
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
-	config := internal.Config{
+	config := config.Config{
 		RepositoryURL: "https://example.com/repo.git",
 		Branch:        "main",
 		Token:         "token",
@@ -964,7 +965,7 @@ func TestRunCheckoutDryRunWithoutPlatform(t *testing.T) {
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
-	config := internal.Config{
+	config := config.Config{
 		WorkingDir: "/checkout",
 		Branch:     "main",
 		Sites:      []string{"site1"},
@@ -1034,7 +1035,7 @@ func TestPublishWorkDeletesBranchOnMRFailure(t *testing.T) {
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
-	config := internal.Config{
+	config := config.Config{
 		RepositoryURL: "https://example.com/repo.git",
 		Branch:        "main",
 		Token:         "token",
@@ -1099,7 +1100,7 @@ func TestPublishWorkLogsWarningWhenDeleteBranchFails(t *testing.T) {
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
-	config := internal.Config{
+	config := config.Config{
 		RepositoryURL: "https://example.com/repo.git",
 		Branch:        "main",
 		Token:         "token",
@@ -1166,7 +1167,7 @@ func TestPublishWorkPushFails(t *testing.T) {
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
-	config := internal.Config{
+	config := config.Config{
 		RepositoryURL: "https://example.com/repo.git",
 		Branch:        "main",
 		Token:         "token",
@@ -1226,7 +1227,7 @@ func TestRunGetLockHashError(t *testing.T) {
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
-	config := internal.Config{
+	config := config.Config{
 		RepositoryURL: "https://example.com/repo.git",
 		Branch:        "main",
 		Token:         "token",
@@ -1269,7 +1270,7 @@ func TestRunBranchExistsError(t *testing.T) {
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
-	config := internal.Config{
+	config := config.Config{
 		RepositoryURL: "https://example.com/repo.git",
 		Branch:        "main",
 		Token:         "token",
@@ -1315,7 +1316,7 @@ func TestRunConfigResaveError(t *testing.T) {
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
-	config := internal.Config{
+	config := config.Config{
 		RepositoryURL: "https://example.com/repo.git",
 		Branch:        "main",
 		Token:         "token",
@@ -1369,7 +1370,7 @@ func TestRunExportConfigurationError(t *testing.T) {
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
-	config := internal.Config{
+	config := config.Config{
 		RepositoryURL: "https://example.com/repo.git",
 		Branch:        "main",
 		Token:         "token",
@@ -1425,14 +1426,14 @@ func TestRunWithAutoMerge(t *testing.T) {
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
-	config := internal.Config{
+	config := config.Config{
 		RepositoryURL: "https://example.com/repo.git",
 		Branch:        "main",
 		Token:         "token",
 		Clone:         true,
 		Sites:         []string{"site1"},
 		DryRun:        false,
-		RunTypes:      internal.RunTypesConfig{Normal: internal.RunTypeConfig{AutoMerge: true}},
+		RunTypes:      config.RunTypesConfig{Normal: config.RunTypeConfig{AutoMerge: true}},
 	}
 
 	worktree := NewMockWorktree(t)
@@ -1493,14 +1494,14 @@ func TestRunAutoMergeError(t *testing.T) {
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
-	config := internal.Config{
+	config := config.Config{
 		RepositoryURL: "https://example.com/repo.git",
 		Branch:        "main",
 		Token:         "token",
 		Clone:         true,
 		Sites:         []string{"site1"},
 		DryRun:        false,
-		RunTypes:      internal.RunTypesConfig{Normal: internal.RunTypeConfig{AutoMerge: true}},
+		RunTypes:      config.RunTypesConfig{Normal: config.RunTypeConfig{AutoMerge: true}},
 	}
 
 	worktree := NewMockWorktree(t)
@@ -1560,14 +1561,14 @@ func TestRunAutoMergeSkippedWhenDisabled(t *testing.T) {
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
-	config := internal.Config{
+	config := config.Config{
 		RepositoryURL: "https://example.com/repo.git",
 		Branch:        "main",
 		Token:         "token",
 		Clone:         true,
 		Sites:         []string{"site1"},
 		DryRun:        false,
-		RunTypes:      internal.RunTypesConfig{},
+		RunTypes:      config.RunTypesConfig{},
 	}
 
 	worktree := NewMockWorktree(t)
@@ -1623,7 +1624,7 @@ func TestRunFireEventError(t *testing.T) {
 	drush := NewMockDrush(t)
 	ctx := context.Background()
 
-	config := internal.Config{
+	config := config.Config{
 		RepositoryURL: "https://example.com/repo.git",
 		Branch:        "main",
 		Token:         "token",
@@ -1678,7 +1679,7 @@ func checkoutModeRun(t *testing.T, source, worktreePath string) (*Runner, *MockG
 	expectVersionLookup(mockComposer)
 	drush := NewMockDrush(t)
 
-	config := internal.Config{Branch: "main", Token: "token", WorkingDir: source, Sites: []string{"site1"}}
+	config := config.Config{Branch: "main", Token: "token", WorkingDir: source, Sites: []string{"site1"}}
 
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
@@ -1759,7 +1760,7 @@ func TestRunRemovesItsWorktreeEvenWhenCancelled(t *testing.T) {
 	})
 	repositoryService.EXPECT().RemoveWorktree(mock.MatchedBy(func(ctx context.Context) bool { return ctx.Err() == nil }), source, testCheckout).Return(nil)
 
-	config := internal.Config{Branch: "main", WorkingDir: source, Sites: []string{"site1"}, DryRun: true}
+	config := config.Config{Branch: "main", WorkingDir: source, Sites: []string{"site1"}, DryRun: true}
 	err := New(zap.NewNop(), config, NewMockDrush(t), nil, repositoryService, installer, mockComposer).Run(ctx, nil)
 
 	require.Error(t, err)
@@ -1788,7 +1789,7 @@ func TestForEachSite(t *testing.T) {
 	sites := []string{"site1", "site2", "site3", "site4"}
 
 	t.Run("bounds concurrency to config.Concurrency", func(t *testing.T) {
-		ws := services{logger: logger, config: internal.Config{Sites: sites, Concurrency: 1}}
+		ws := services{logger: logger, config: config.Config{Sites: sites, Concurrency: 1}}
 
 		var current, peak atomic.Int32
 		err := ws.forEachSite(context.Background(), func(_ context.Context, _ int, _ string) error {
@@ -1809,7 +1810,7 @@ func TestForEachSite(t *testing.T) {
 	})
 
 	t.Run("falls back to GOMAXPROCS(0) when Concurrency is unset", func(t *testing.T) {
-		ws := services{logger: logger, config: internal.Config{Sites: sites}}
+		ws := services{logger: logger, config: config.Config{Sites: sites}}
 
 		var calls atomic.Int32
 		err := ws.forEachSite(context.Background(), func(_ context.Context, _ int, _ string) error {
@@ -1822,7 +1823,7 @@ func TestForEachSite(t *testing.T) {
 	})
 
 	t.Run("propagates the first error and cancels the rest", func(t *testing.T) {
-		ws := services{logger: logger, config: internal.Config{Sites: sites, Concurrency: 2}}
+		ws := services{logger: logger, config: config.Config{Sites: sites, Concurrency: 2}}
 		boom := errors.New("boom")
 
 		err := ws.forEachSite(context.Background(), func(_ context.Context, _ int, site string) error {
@@ -1849,7 +1850,7 @@ func TestCleanup(t *testing.T) {
 		require.NoError(t, os.MkdirAll(clone, 0o755))
 		require.NoError(t, os.MkdirAll(sibling, 0o755))
 
-		ws := services{logger: logger, config: internal.Config{Clone: true}}
+		ws := services{logger: logger, config: config.Config{Clone: true}}
 		ws.cleanup(t.Context(), clone)
 
 		assert.NoDirExists(t, clone)
@@ -1861,7 +1862,7 @@ func TestCleanup(t *testing.T) {
 		// os.TempDir() is pointed at a sandbox: a broken guard must not wipe the real one.
 		t.Setenv("TMPDIR", t.TempDir())
 
-		ws := services{logger: logger, config: internal.Config{Clone: true}}
+		ws := services{logger: logger, config: config.Config{Clone: true}}
 		ws.cleanup(t.Context(), os.TempDir())
 		assert.DirExists(t, os.TempDir())
 	})
@@ -1873,7 +1874,7 @@ func TestCleanup(t *testing.T) {
 		repositoryService := NewMockGitService(t)
 		repositoryService.EXPECT().RemoveWorktree(anyCtx, "/source", work).Return(nil)
 
-		ws := services{logger: logger, git: repositoryService, config: internal.Config{WorkingDir: "/source", Sites: []string{"site1"}}}
+		ws := services{logger: logger, git: repositoryService, config: config.Config{WorkingDir: "/source", Sites: []string{"site1"}}}
 		ws.cleanup(t.Context(), work)
 
 		assert.DirExists(t, work, "removing is the repository service's job, through git")
@@ -2022,7 +2023,7 @@ func TestEnsureUpdateBranchAvailable(t *testing.T) {
 		// A --dry-run never pushes, so the remote is never reached. BranchExists is left
 		// unstubbed, so the mock fails the test if it is called.
 		repository := NewMockGitService(t)
-		ws := testRun(services{logger: zap.NewNop(), git: repository, config: internal.Config{DryRun: true}}, repo.Checkout{Repository: newCheckout(t), Path: testCheckout})
+		ws := testRun(services{logger: zap.NewNop(), git: repository, config: config.Config{DryRun: true}}, repo.Checkout{Repository: newCheckout(t), Path: testCheckout})
 
 		require.NoError(t, ws.ensureUpdateBranchAvailable(branch))
 	})
@@ -2031,7 +2032,7 @@ func TestEnsureUpdateBranchAvailable(t *testing.T) {
 		checkout := newCheckout(t)
 		repository := NewMockGitService(t)
 		repository.EXPECT().BranchExists(checkout, branch, "tok").Return(true, nil)
-		ws := testRun(services{logger: zap.NewNop(), git: repository, config: internal.Config{DryRun: false, Token: "tok"}}, repo.Checkout{Repository: checkout, Path: testCheckout})
+		ws := testRun(services{logger: zap.NewNop(), git: repository, config: config.Config{DryRun: false, Token: "tok"}}, repo.Checkout{Repository: checkout, Path: testCheckout})
 
 		err := ws.ensureUpdateBranchAvailable(branch)
 		var abort AbortError
@@ -2042,7 +2043,7 @@ func TestEnsureUpdateBranchAvailable(t *testing.T) {
 		checkout := newCheckout(t)
 		repository := NewMockGitService(t)
 		repository.EXPECT().BranchExists(checkout, branch, "tok").Return(false, nil)
-		ws := testRun(services{logger: zap.NewNop(), git: repository, config: internal.Config{DryRun: false, Token: "tok"}}, repo.Checkout{Repository: checkout, Path: testCheckout})
+		ws := testRun(services{logger: zap.NewNop(), git: repository, config: config.Config{DryRun: false, Token: "tok"}}, repo.Checkout{Repository: checkout, Path: testCheckout})
 
 		require.NoError(t, ws.ensureUpdateBranchAvailable(branch))
 	})
@@ -2051,7 +2052,7 @@ func TestEnsureUpdateBranchAvailable(t *testing.T) {
 		checkout := newCheckout(t)
 		repository := NewMockGitService(t)
 		repository.EXPECT().BranchExists(checkout, branch, "").Return(false, assert.AnError)
-		ws := testRun(services{logger: zap.NewNop(), git: repository, config: internal.Config{DryRun: false}}, repo.Checkout{Repository: checkout, Path: testCheckout})
+		ws := testRun(services{logger: zap.NewNop(), git: repository, config: config.Config{DryRun: false}}, repo.Checkout{Repository: checkout, Path: testCheckout})
 
 		err := ws.ensureUpdateBranchAvailable(branch)
 		require.ErrorContains(t, err, "failed to check if branch exists")
@@ -2063,7 +2064,7 @@ const testCheckout = "/drupdater-test/checkout"
 
 // testRun is a run over checkout with s, built by newRun as Run builds one.
 func testRun(s services, checkout repo.Checkout, addons ...Addon) *run {
-	rec := report.NewRecorder(internal.Version, report.ModeNormal, false, "", "", nil)
+	rec := report.NewRecorder(buildinfo.Version, report.ModeNormal, false, "", "", nil)
 	return newRun(s, checkout, addons, rec)
 }
 
@@ -2119,7 +2120,7 @@ func TestStageScaffoldChanges(t *testing.T) {
 
 		ws := testRun(services{
 			logger:   logger,
-			config:   internal.Config{Sites: []string{"default"}},
+			config:   config.Config{Sites: []string{"default"}},
 			composer: newComposer("web/"),
 		}, repo.Checkout{Worktree: worktree, Path: "/project"})
 
@@ -2149,7 +2150,7 @@ func TestStageScaffoldChanges(t *testing.T) {
 
 		ws := testRun(services{
 			logger:   logger,
-			config:   internal.Config{Sites: []string{"default"}},
+			config:   config.Config{Sites: []string{"default"}},
 			composer: newComposer("web/"),
 		}, repo.Checkout{Worktree: worktree, Path: "/project"})
 
@@ -2211,7 +2212,7 @@ func TestRunFailsWhenScaffoldChangesCannotBeStaged(t *testing.T) {
 	expectVersionLookup(mockComposer)
 	drush := NewMockDrush(t)
 
-	config := internal.Config{
+	config := config.Config{
 		RepositoryURL: "https://example.com/repo.git",
 		Branch:        "main",
 		Token:         "token",
@@ -2257,7 +2258,7 @@ func TestRunHandsAddonsTheRunsContextAndCommitter(t *testing.T) {
 	expectVersionLookup(mockComposer)
 	drush := NewMockDrush(t)
 
-	config := internal.Config{RepositoryURL: "https://example.com/repo.git", Branch: "main", Token: "token", Clone: true, Sites: []string{"site1"}, DryRun: true}
+	config := config.Config{RepositoryURL: "https://example.com/repo.git", Branch: "main", Token: "token", Clone: true, Sites: []string{"site1"}, DryRun: true}
 
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Add("config/sync").Return(plumbing.ZeroHash, nil).Maybe()

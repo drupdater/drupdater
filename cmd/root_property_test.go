@@ -5,7 +5,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/internal/config"
 	"github.com/drupdater/drupdater/internal/logging"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -155,9 +155,9 @@ func TestPropertyConfigurableAddonsMatchesTheRegistry(t *testing.T) {
 		// Round-trip: every name it offers is a name validateAddons accepts, under either run
 		// type, since a typo in one block aborts a run in the other too.
 		split := rapid.IntRange(0, len(names)).Draw(t, "split")
-		assert.NoError(t, builtinAddons().validate(internal.Config{RunTypes: internal.RunTypesConfig{
-			Normal:   internal.RunTypeConfig{Addons: names[:split]},
-			Security: internal.RunTypeConfig{Addons: names[split:]},
+		assert.NoError(t, builtinAddons().validate(config.Config{RunTypes: config.RunTypesConfig{
+			Normal:   config.RunTypeConfig{Addons: names[:split]},
+			Security: config.RunTypeConfig{Addons: names[split:]},
 		}}))
 	})
 }
@@ -170,9 +170,9 @@ func TestPropertyValidateAddonsRejectsUnknownNamesInEitherRunType(t *testing.T) 
 		known := rapid.SliceOfNDistinct(rapid.SampledFrom(builtinAddons().configurable()), 0, 3, rapid.ID).Draw(t, "known")
 		inSecurity := rapid.Bool().Draw(t, "inSecurity")
 
-		config := internal.Config{RunTypes: internal.RunTypesConfig{
-			Normal:   internal.RunTypeConfig{Addons: known},
-			Security: internal.RunTypeConfig{Addons: known},
+		config := config.Config{RunTypes: config.RunTypesConfig{
+			Normal:   config.RunTypeConfig{Addons: known},
+			Security: config.RunTypeConfig{Addons: known},
 		}}
 		if inSecurity {
 			config.RunTypes.Security.Addons = append(slices.Clone(known), unknown)

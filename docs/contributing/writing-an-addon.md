@@ -68,7 +68,7 @@ changes](../explanation/addon-architecture.md#committing-changes).
 Declare the interface for each tool your addon calls in its own file, listing only the methods
 it calls, as above. Its constructor then shows what the addon can do to the project, and its
 tests mock exactly that. Then add the interface to `addonComposer` or `addonDrush` in
-`cmd/root.go`: those are the sum of every addon's own interface, and what `*composer.CLI` and
+`cmd/addons.go`: those are the sum of every addon's own interface, and what `*composer.CLI` and
 `*drush.CLI` have to satisfy. Run `make mock` to generate the mock.
 
 ### Choosing an event and stage
@@ -102,7 +102,7 @@ An addon with a per-site hook may not have a map, slice or mutex field at all:
 
 ## 2. Register it
 
-In `cmd/root.go`, add it to the `factories` of `builtinAddons()`:
+In `cmd/addons.go`, add it to the `factories` of `builtinAddons()`:
 
 ```go
 "your_addon": func(d addonDeps) workflow.Addon { return addon.NewYourAddon(d.logger) },
@@ -118,7 +118,7 @@ required for the update to succeed at all, or that produce the changelog a revie
 It is a high bar: a mandatory addon cannot be turned off by any project.
 
 **Configurable** — the default. If it should run in a normal update by default, add it to
-`defaultNormalAddons` in `internal/configfile.go`.
+`defaultNormalAddons` in `internal/config/file.go`.
 
 Think carefully before adding anything to the **security** defaults. That list is empty on
 purpose: a security update should be a minimal, focused fix.
