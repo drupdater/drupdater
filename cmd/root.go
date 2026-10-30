@@ -206,7 +206,12 @@ func (a app) runUpdate(cmd *cobra.Command, args []string, opts options) error {
 		}
 	}
 
-	addons, err := a.addons.create(logger, config, drush, composer, drupalOrg)
+	deps, err := newAddonDeps(logger, drush, composer, drupalOrg)
+	if err != nil {
+		logger.Error("failed to create the drupalcode client", zap.Error(err))
+		return err
+	}
+	addons, err := a.addons.create(config, deps)
 	if err != nil {
 		return err
 	}
@@ -434,8 +439,25 @@ type addonDeps struct {
 	drush     addonDrush
 	composer  addonComposer
 	drupalOrg addon.DrupalOrg
+	// drupalCode is nil without DRUPALCODE_ACCESS_TOKEN.
+	drupalCode addon.DrupalCode
 	// security marks a --security run. Only composer_audit reads it.
 	security bool
+}
+
+// newAddonDeps adds the drupalcode client only when DRUPALCODE_ACCESS_TOKEN is set.
+func newAddonDeps(logger *zap.Logger, drush addonDrush, composer addonComposer, drupalOrg addon.DrupalOrg) (addonDeps, error) {
+	deps := addonDeps{logger: logger, drush: drush, composer: composer, drupalOrg: drupalOrg}
+	token := os.Getenv("DRUPALCODE_ACCESS_TOKEN")
+	if token == "" {
+		return deps, nil
+	}
+	drupalCode, err := drupalorg.NewDrupalCode(token)
+	if err != nil {
+		return addonDeps{}, err
+	}
+	deps.drupalCode = drupalCode
+	return deps, nil
 }
 
 // bundledToolsBin is where the image installs tools/, so addons install nothing into the project.
@@ -464,7 +486,7 @@ func builtinAddons() addonCatalog {
 			"composer_allow_plugins": func(d addonDeps) workflow.Addon { return addon.NewComposerAllowPlugins(d.logger, d.composer) },
 			"composer_normalizer":    func(d addonDeps) workflow.Addon { return addon.NewComposerNormalizer(d.logger, d.composer) },
 			"composer_patches": func(d addonDeps) workflow.Addon {
-				return addon.NewComposerPatches1(d.logger, d.composer, d.drupalOrg, http.DefaultClient)
+				return addon.NewComposerPatches1(d.logger, d.composer, d.drupalOrg, d.drupalCode, http.DefaultClient)
 			},
 			"composer_diff":       func(d addonDeps) workflow.Addon { return addon.NewComposerDiff(d.logger, d.composer) },
 			"update_hooks":        func(d addonDeps) workflow.Addon { return addon.NewUpdateHooks(d.logger, d.drush) },
@@ -484,14 +506,8 @@ func builtinAddons() addonCatalog {
 }
 
 // create builds the mandatory addons plus the ones the active run type lists.
-func (c addonCatalog) create(
-	logger *zap.Logger,
-	config internal.Config,
-	drush addonDrush,
-	composer addonComposer,
-	drupalOrg addon.DrupalOrg,
-) ([]workflow.Addon, error) {
-	deps := addonDeps{logger: logger, drush: drush, composer: composer, drupalOrg: drupalOrg, security: config.Security}
+func (c addonCatalog) create(config internal.Config, deps addonDeps) ([]workflow.Addon, error) {
+	deps.security = config.Security
 
 	var addons []workflow.Addon
 	added := map[string]bool{}

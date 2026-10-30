@@ -20,20 +20,10 @@ import (
 )
 
 func TestNewComposerPatches1(t *testing.T) {
-	t.Run("no token leaves the gitlab client unset", func(t *testing.T) {
-		t.Setenv("DRUPALCODE_ACCESS_TOKEN", "")
-
-		h := NewComposerPatches1(zap.NewNop(), NewMockPatchesComposer(t), NewMockDrupalOrg(t), nil)
-		require.NotNil(t, h)
-		assert.Nil(t, h.gitlab, "without a token there is no drupalcode client to look up issue forks with")
-	})
-
-	t.Run("a token configures the drupalcode gitlab client", func(t *testing.T) {
-		t.Setenv("DRUPALCODE_ACCESS_TOKEN", "secret")
-
-		h := NewComposerPatches1(zap.NewNop(), NewMockPatchesComposer(t), NewMockDrupalOrg(t), nil)
-		require.NotNil(t, h)
-		assert.NotNil(t, h.gitlab)
+	t.Run("keeps the drupalcode client it is given", func(t *testing.T) {
+		drupalCode := NewMockDrupalCode(t)
+		h := NewComposerPatches1(zap.NewNop(), NewMockPatchesComposer(t), NewMockDrupalOrg(t), drupalCode, nil)
+		assert.Same(t, drupalCode, h.drupalCode)
 	})
 
 	t.Run("drops patch files from the real filesystem", func(t *testing.T) {
@@ -41,7 +31,7 @@ func TestNewComposerPatches1(t *testing.T) {
 		require.NoError(t, os.MkdirAll(filepath.Join(dir, "patches"), 0o750))
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "patches", "a.patch"), []byte("x"), 0o600))
 
-		h := NewComposerPatches1(zap.NewNop(), NewMockPatchesComposer(t), NewMockDrupalOrg(t), nil)
+		h := NewComposerPatches1(zap.NewNop(), NewMockPatchesComposer(t), NewMockDrupalOrg(t), nil, nil)
 		require.NoError(t, h.dropPatchFile(dir, "patches/a.patch"))
 		assert.NoFileExists(t, filepath.Join(dir, "patches", "a.patch"))
 	})

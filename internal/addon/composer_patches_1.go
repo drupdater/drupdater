@@ -16,7 +16,6 @@ import (
 	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/drupalorg"
-	gitlab "gitlab.com/gitlab-org/api/client-go"
 	"go.uber.org/zap"
 )
 
@@ -83,6 +82,12 @@ type DrupalOrg interface {
 	FindIssueNumber(text string) (string, bool)
 }
 
+// DrupalCode confirms an issue's fix and finds the merge requests from its fork.
+type DrupalCode interface {
+	IsFixedIn(ctx context.Context, project string, issueID string, ref string) (bool, error)
+	IssueForkMergeRequests(ctx context.Context, project string, issueID string) ([]drupalorg.ForkMergeRequest, error)
+}
+
 // HTTPClient downloads remote patches.
 type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
@@ -92,28 +97,20 @@ type ComposerPatches1 struct {
 	logger       *zap.Logger
 	composer     PatchesComposer
 	drupalOrg    DrupalOrg
-	gitlab       *gitlab.Client
+	drupalCode   DrupalCode
 	httpClient   HTTPClient
 	patchUpdates PatchUpdates
 	removeFile   func(name string) error
 }
 
-func NewComposerPatches1(logger *zap.Logger, composer PatchesComposer, drupalOrg DrupalOrg, httpClient HTTPClient) *ComposerPatches1 {
-	token := os.Getenv("DRUPALCODE_ACCESS_TOKEN")
-	var drupalOrgGitlab *gitlab.Client
-	if token != "" {
-		var err error
-		drupalOrgGitlab, err = gitlab.NewClient(token, gitlab.WithBaseURL("https://git.drupalcode.org/api/v4"))
-		if err != nil {
-			logger.Error("failed to create gitlab client", zap.Error(err))
-		}
-	}
-
+// NewComposerPatches1 takes a nil drupalCode without DRUPALCODE_ACCESS_TOKEN: a fix then stays
+// unconfirmed and no newer patch is looked for.
+func NewComposerPatches1(logger *zap.Logger, composer PatchesComposer, drupalOrg DrupalOrg, drupalCode DrupalCode, httpClient HTTPClient) *ComposerPatches1 {
 	return &ComposerPatches1{
 		logger:     logger,
 		composer:   composer,
 		drupalOrg:  drupalOrg,
-		gitlab:     drupalOrgGitlab,
+		drupalCode: drupalCode,
 		httpClient: httpClient,
 		removeFile: os.Remove,
 	}
@@ -343,12 +340,11 @@ func (h *ComposerPatches1) processSinglePatch(ctx context.Context, path string, 
 		delete(patches[op.Package], description)
 
 		// 2 = Fixed, 7 = Closed (fixed), 15 = Patch (to be ported)
-		if h.gitlab != nil && (issue.Status == "2" || issue.Status == "7" || issue.Status == "15") {
-			commits, _, err := h.gitlab.Search.CommitsByProject("project/"+issue.Project.MaschineName, issue.ID,
-				&gitlab.SearchOptions{Ref: &op.To})
+		if h.drupalCode != nil && (issue.Status == "2" || issue.Status == "7" || issue.Status == "15") {
+			fixed, err := h.drupalCode.IsFixedIn(ctx, issue.Project.MaschineName, issue.ID, op.To)
 			if err != nil {
 				h.logger.Error("failed to search commit history", zap.Error(err))
-			} else if len(commits) != 0 {
+			} else if fixed {
 				h.logger.Debug("issue is fixed", zap.String("issue", issue.ID))
 				if err := h.dropPatchFile(path, patchPath); err != nil {
 					// Restore the entry deleted above: a patch whose file survived must stay
@@ -392,21 +388,15 @@ func (h *ComposerPatches1) processSinglePatch(ctx context.Context, path string, 
 	}
 
 	// Finding a newer patch needs the drupalcode client, configured only with DRUPALCODE_ACCESS_TOKEN.
-	if h.gitlab == nil {
+	if h.drupalCode == nil {
 		h.logger.Info("patch does not apply and no drupalcode client is configured, keeping current package version", zap.String("package", op.Package), zap.String("version", op.From), zap.String("patch", patchPath))
 		updates.Conflicts = append(updates.Conflicts, conflict(op, patchPath, description))
 		return
 	}
 
-	forkProject, _, err := h.gitlab.Projects.GetProject("issue/"+issue.Project.MaschineName+"-"+issue.ID, &gitlab.GetProjectOptions{})
+	mergeRequests, err := h.drupalCode.IssueForkMergeRequests(ctx, issue.Project.MaschineName, issue.ID)
 	if err != nil {
-		h.logger.Error("failed to get fork project", zap.Error(err))
-		return
-	}
-	h.logger.Debug("fetched fork project", zap.Any("project", forkProject))
-
-	mergeRequests, err := h.fetchForkMergeRequests(issue.Project.MaschineName, forkProject.ID)
-	if err != nil {
+		h.logger.Error("failed to find the issue fork's merge requests", zap.Error(err))
 		return
 	}
 
@@ -465,29 +455,6 @@ func (h *ComposerPatches1) validateCombinedPatches(ctx context.Context, path str
 		h.logger.Debug("patches apply together", zap.String("package", op.Package), zap.String("version", op.To), zap.Any("patch", patchPaths))
 
 	}
-}
-
-// fetchForkMergeRequests returns open MRs in projectMachineName originating from forkProjectID.
-// Raw request: gitlab.ListMergeRequests cannot filter on source_project_id.
-func (h *ComposerPatches1) fetchForkMergeRequests(projectMachineName string, forkProjectID int64) ([]*gitlab.BasicMergeRequest, error) {
-	opt := struct {
-		gitlab.ListProjectMergeRequestsOptions
-		SourceProjectID int64 `url:"source_project_id"`
-	}{
-		SourceProjectID: forkProjectID,
-	}
-
-	u := "projects/project%2F" + projectMachineName + "/merge_requests"
-	req, err := h.gitlab.NewRequest(http.MethodGet, u, opt, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var mergeRequests []*gitlab.BasicMergeRequest
-	if _, err = h.gitlab.Do(req, &mergeRequests); err != nil {
-		return nil, err
-	}
-	return mergeRequests, nil
 }
 
 var unsafeFileNameChars = regexp.MustCompile(`[^a-zA-Z0-9\-_.]`)

@@ -1,7 +1,6 @@
 package addon
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -9,7 +8,6 @@ import (
 
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/drupdater/drupdater/pkg/drupalorg"
-	gitlab "gitlab.com/gitlab-org/api/client-go"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -78,39 +76,21 @@ func TestUpdatePatchesLeavesUnverifiablePatchesUnpinned(t *testing.T) {
 			}{MaschineName: "drupal"},
 		}, nil)
 
-		var serverURL string
 		mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.URL.Path == "/project/drupal/-/merge_requests/1.diff" {
-				w.Header().Set("Content-Type", "text/plain")
-				_, _ = w.Write([]byte("patch content"))
-				return
-			}
-
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-
-			var jsonString []byte
-			switch r.URL.Path {
-			case "/api/v4/projects/issue/drupal-123456":
-				jsonString, _ = json.Marshal(&gitlab.Project{ID: 5678})
-			case "/api/v4/projects/project/drupal/merge_requests":
-				jsonString, _ = json.Marshal([]gitlab.MergeRequest{{
-					ID: 1234, IID: 5678, Title: "Remote patch", SHA: "111111",
-					WebURL: serverURL + "/project/drupal/-/merge_requests/1",
-				}})
-			}
-			_, err := w.Write(jsonString)
-			assert.NoError(t, err)
+			assert.Equal(t, "/project/drupal/-/merge_requests/1.diff", r.URL.Path)
+			_, _ = w.Write([]byte("patch content"))
 		}))
-		serverURL = mockServer.URL
 		defer mockServer.Close()
 
-		gitClient, _ := gitlab.NewClient("", gitlab.WithBaseURL(mockServer.URL))
+		drupalCode := NewMockDrupalCode(t)
+		drupalCode.EXPECT().IssueForkMergeRequests(anyCtx, "drupal", "123456").Return([]drupalorg.ForkMergeRequest{
+			{SHA: "111111", WebURL: mockServer.URL + "/project/drupal/-/merge_requests/1"},
+		}, nil)
 		updater := &ComposerPatches1{
 			logger:     logger,
 			composer:   composerService,
 			drupalOrg:  drupalOrgService,
-			gitlab:     gitClient,
+			drupalCode: drupalCode,
 			httpClient: mockServer.Client(),
 		}
 		patches := map[string]map[string]string{

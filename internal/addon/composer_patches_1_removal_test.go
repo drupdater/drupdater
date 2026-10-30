@@ -2,9 +2,6 @@ package addon
 
 import (
 	"context"
-	"encoding/json"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/drupdater/drupdater/pkg/composer"
@@ -12,30 +9,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	gitlab "gitlab.com/gitlab-org/api/client-go"
 	"go.uber.org/zap"
 )
 
-// fixedIssueGitlab returns a gitlab client whose commit search reports the issue as fixed in
-// the target version.
-func fixedIssueGitlab(t *testing.T) *gitlab.Client {
+// fixedInTarget is a drupalcode whose history has issue 123456 fixed in drupal/core 8.8.0.
+func fixedInTarget(t *testing.T) *MockDrupalCode {
 	t.Helper()
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-
-		var body []byte
-		if r.URL.Path == "/api/v4/projects/project/drupal/-/search" {
-			body, _ = json.Marshal([]gitlab.Commit{{ID: "5678"}})
-		}
-		_, err := w.Write(body)
-		assert.NoError(t, err)
-	}))
-	t.Cleanup(server.Close)
-
-	client, err := gitlab.NewClient("", gitlab.WithBaseURL(server.URL))
-	require.NoError(t, err)
-	return client
+	drupalCode := NewMockDrupalCode(t)
+	drupalCode.EXPECT().IsFixedIn(anyCtx, "drupal", "123456", "8.8.0").Return(true, nil)
+	return drupalCode
 }
 
 func fixedIssue() *drupalorg.Issue {
@@ -76,7 +58,7 @@ func TestUpdatePatchesRemovesRemotePatchForFixedIssue(t *testing.T) {
 		logger:     zap.NewNop(),
 		composer:   composerService,
 		drupalOrg:  drupalOrgService,
-		gitlab:     fixedIssueGitlab(t),
+		drupalCode: fixedInTarget(t),
 		removeFile: recordRemovals(&removed),
 	}
 
@@ -111,7 +93,7 @@ func TestUpdatePatchesKeepsPatchWhenRemovalFails(t *testing.T) {
 		logger:     zap.NewNop(),
 		composer:   composerService,
 		drupalOrg:  drupalOrgService,
-		gitlab:     fixedIssueGitlab(t),
+		drupalCode: fixedInTarget(t),
 		removeFile: func(string) error { return assert.AnError },
 	}
 
@@ -216,11 +198,16 @@ func TestUpdatePatchesRecognisesEveryFixedIssueStatus(t *testing.T) {
 			drupalOrgService.EXPECT().FindIssueNumber("Issue #123456").Return("123456", true)
 			drupalOrgService.EXPECT().GetIssue(anyCtx, "123456").Return(issue, nil)
 
+			// An open issue's fix is never looked up: only a fixed status asks drupalcode.
+			drupalCode := NewMockDrupalCode(t)
+			if tt.wantRemoved {
+				drupalCode.EXPECT().IsFixedIn(anyCtx, "drupal", "123456", "8.8.0").Return(true, nil)
+			}
 			updater := &ComposerPatches1{
-				logger:    zap.NewNop(),
-				composer:  composerService,
-				drupalOrg: drupalOrgService,
-				gitlab:    fixedIssueGitlab(t),
+				logger:     zap.NewNop(),
+				composer:   composerService,
+				drupalOrg:  drupalOrgService,
+				drupalCode: drupalCode,
 			}
 
 			patches := map[string]map[string]string{"drupal/core": {"Issue #123456": patchURL}}
@@ -238,8 +225,8 @@ func TestUpdatePatchesRecognisesEveryFixedIssueStatus(t *testing.T) {
 	}
 }
 
-func TestUpdatePatchesKeepsPatchWithoutGitlabClient(t *testing.T) {
-	// Without a gitlab client the fix cannot be confirmed, so the patch stays. Dropping it on
+func TestUpdatePatchesKeepsPatchWithoutDrupalCode(t *testing.T) {
+	// Without drupalcode the fix cannot be confirmed, so the patch stays. Dropping it on
 	// the issue status alone would remove patches whose fix is not in the target version yet.
 	const patchURL = "https://www.drupal.org/files/issues/123456-1.patch"
 
@@ -254,10 +241,10 @@ func TestUpdatePatchesKeepsPatchWithoutGitlabClient(t *testing.T) {
 	drupalOrgService.EXPECT().GetIssue(anyCtx, "123456").Return(fixedIssue(), nil)
 
 	updater := &ComposerPatches1{
-		logger:    zap.NewNop(),
-		composer:  composerService,
-		drupalOrg: drupalOrgService,
-		gitlab:    nil,
+		logger:     zap.NewNop(),
+		composer:   composerService,
+		drupalOrg:  drupalOrgService,
+		drupalCode: nil,
 	}
 
 	patches := map[string]map[string]string{"drupal/core": {"Issue #123456": patchURL}}

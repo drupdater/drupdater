@@ -565,7 +565,8 @@ package it mocks. Do not edit those files by hand.
 | `scripts/` | PHP helper scripts copied into the Docker image |
 
 `pkg/` wraps one external tool per directory: `composer`, `drush`, `repo` (go-git),
-`phpcs`, `rector`, `drupal` (site installer) and `drupalorg` (Drupal.org HTTP client).
+`phpcs`, `rector`, `drupal` (site installer) and `drupalorg` (Drupal.org issues, and the
+git.drupalcode.org GitLab).
 
 For how these fit together, read [Explanation](../explanation/index.md) — in particular
 [How a run works](../explanation/how-a-run-works.md) and [The addon

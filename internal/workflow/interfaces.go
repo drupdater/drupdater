@@ -15,13 +15,14 @@ type Addon interface {
 	Hooks() Hooks
 }
 
+// Composer is what the phases call, plus what they hand to the preflight checks and the report.
 type Composer interface {
 	Install(ctx context.Context, dir string) error
 	Update(ctx context.Context, dir string, packagesToUpdate []string, packagesToKeep []string, minimalChanges bool, dryRun bool) ([]composer.PackageChange, error)
 	GetLockHash(dir string) (string, error)
-	CheckPlatformReqs(ctx context.Context, dir string) (string, error)
-	GetConfig(ctx context.Context, dir string, key string) (string, error)
-	Version(ctx context.Context) (composer.Versions, error)
+	PlatformReqsChecker
+	ComposerConfigGetter
+	ComposerVersionReporter
 }
 
 type Drush interface {
@@ -37,9 +38,7 @@ type GitService interface {
 	CloneRepository(repository string, branch string, token string, username string, email string) (repo.Checkout, error)
 	AddWorktree(ctx context.Context, source string, username string, email string) (repo.Checkout, error)
 	RemoveWorktree(ctx context.Context, source string, path string) error
-	GetRemoteURL(path string) (string, error)
-	GetCurrentBranch(path string) (string, error)
-	IsShallowClone(path string) (bool, error)
+	ShallowCloneChecker
 }
 
 // GitRepository is an alias for repo.Repository to avoid duplication.
