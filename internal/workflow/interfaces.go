@@ -5,6 +5,7 @@ import (
 
 	"github.com/drupdater/drupdater/internal/codehosting"
 	"github.com/drupdater/drupdater/pkg/composer"
+	"github.com/drupdater/drupdater/pkg/drush"
 	"github.com/drupdater/drupdater/pkg/repo"
 )
 
@@ -26,9 +27,9 @@ type Composer interface {
 }
 
 type Drush interface {
+	Facts(ctx context.Context, dir string, site string) (drush.Facts, error)
 	UpdateSite(ctx context.Context, dir string, site string) error
 	ExportConfiguration(ctx context.Context, dir string, site string) error
-	GetConfigSyncDir(ctx context.Context, dir string, site string, relative bool) (string, error)
 	ConfigResave(ctx context.Context, dir string, site string) error
 }
 

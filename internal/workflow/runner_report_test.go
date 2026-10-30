@@ -101,7 +101,7 @@ func (h *reportHarness) expectFullRun(t *testing.T) {
 	h.installer.EXPECT().RestoreSettings(anyCtx, testCheckout, "site1").Return(nil).Maybe()
 	h.drush.EXPECT().UpdateSite(anyCtx, testCheckout, "site1").Return(nil).Maybe()
 	h.drush.EXPECT().ExportConfiguration(anyCtx, testCheckout, "site1").Return(nil).Maybe()
-	h.drush.EXPECT().GetConfigSyncDir(anyCtx, testCheckout, "site1", true).Return("config/sync", nil).Maybe()
+	h.drush.EXPECT().Facts(anyCtx, testCheckout, "site1").Return(syncFacts(testCheckout+"/config/sync"), nil).Maybe()
 	h.worktree.EXPECT().Add("config/sync").Return(plumbing.ZeroHash, nil).Maybe()
 	expectUpdateBranch(h.repository)
 	h.drush.EXPECT().ConfigResave(anyCtx, testCheckout, "site1").Return(nil).Maybe()

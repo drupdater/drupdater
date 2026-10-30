@@ -111,7 +111,7 @@ func TestConfigureDatabaseIOFailures(t *testing.T) {
 	t.Run("settings.php cannot be written", func(t *testing.T) {
 		installer, drush, composer := newFailingInstaller(t, &failingFs{failWrite: true}, coreExtensionWithSqlite)
 		composer.EXPECT().GetConfig(t.Context(), "/project", "extra.drupal-scaffold.locations.web-root").Return("web", nil)
-		drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1", false).Return("/config/sync", nil)
+		drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1").Return("/config/sync", nil)
 
 		err := installer.ConfigureDatabase(t.Context(), "/project", "site1")
 		require.Error(t, err)
@@ -124,7 +124,7 @@ func TestConfigureDatabaseIOFailures(t *testing.T) {
 		// otherwise look like a successful configuration.
 		installer, drush, composer := newFailingInstaller(t, &failingFs{failClose: true}, coreExtensionWithSqlite)
 		composer.EXPECT().GetConfig(t.Context(), "/project", "extra.drupal-scaffold.locations.web-root").Return("web", nil)
-		drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1", false).Return("/config/sync", nil)
+		drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1").Return("/config/sync", nil)
 
 		err := installer.ConfigureDatabase(t.Context(), "/project", "site1")
 		require.Error(t, err)
@@ -136,7 +136,7 @@ func TestConfigureDatabaseIOFailures(t *testing.T) {
 		installer, drush, composer := newFailingInstaller(t, &failingFs{}, coreExtensionWithSqlite)
 		require.NoError(t, installer.fs.Remove("/project/web/sites/site1/settings.php"))
 		composer.EXPECT().GetConfig(t.Context(), "/project", "extra.drupal-scaffold.locations.web-root").Return("web", nil)
-		drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1", false).Return("/config/sync", nil)
+		drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1").Return("/config/sync", nil)
 
 		err := installer.ConfigureDatabase(t.Context(), "/project", "site1")
 		require.Error(t, err)
@@ -147,7 +147,7 @@ func TestConfigureDatabaseIOFailures(t *testing.T) {
 
 func TestAddSqliteModuleWriteFailure(t *testing.T) {
 	installer, drush, _ := newFailingInstaller(t, &failingFs{failWrite: true}, coreExtensionWithoutSqlite)
-	drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1", false).Return("/config/sync", nil)
+	drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1").Return("/config/sync", nil)
 
 	err := installer.addSqliteModule(t.Context(), "/project", "site1")
 	require.Error(t, err)
@@ -160,7 +160,7 @@ func TestRemoveProfileIOFailures(t *testing.T) {
 		// A short read must abort the rewrite: continuing would write back a truncated
 		// core.extension.yml, silently dropping the project's module list.
 		installer, drush, _ := newFailingInstaller(t, &failingFs{failRead: true}, coreExtensionWithSqlite)
-		drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1", false).Return("/config/sync", nil)
+		drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1").Return("/config/sync", nil)
 
 		err := installer.RemoveProfile(t.Context(), "/project", "site1")
 		require.Error(t, err)
@@ -170,7 +170,7 @@ func TestRemoveProfileIOFailures(t *testing.T) {
 
 	t.Run("the rewritten file cannot be created", func(t *testing.T) {
 		installer, drush, _ := newFailingInstaller(t, &failingFs{failCreate: true}, coreExtensionWithSqlite)
-		drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1", false).Return("/config/sync", nil)
+		drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1").Return("/config/sync", nil)
 
 		err := installer.RemoveProfile(t.Context(), "/project", "site1")
 		require.Error(t, err)
@@ -180,7 +180,7 @@ func TestRemoveProfileIOFailures(t *testing.T) {
 
 	t.Run("the rewritten file cannot be flushed", func(t *testing.T) {
 		installer, drush, _ := newFailingInstaller(t, &failingFs{failWrite: true}, coreExtensionWithSqlite)
-		drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1", false).Return("/config/sync", nil)
+		drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1").Return("/config/sync", nil)
 
 		err := installer.RemoveProfile(t.Context(), "/project", "site1")
 		require.Error(t, err)
@@ -193,7 +193,7 @@ func TestRemoveProfileIOFailures(t *testing.T) {
 		// buffer is what reaches the WriteString branch rather than the Flush one.
 		big := "module:\n" + strings.Repeat("  filler_module_with_a_long_name: 0\n", 200) + "profile: standard\n"
 		installer, drush, _ := newFailingInstaller(t, &failingFs{failWrite: true}, big)
-		drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1", false).Return("/config/sync", nil)
+		drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1").Return("/config/sync", nil)
 
 		err := installer.RemoveProfile(t.Context(), "/project", "site1")
 		require.Error(t, err)
@@ -237,7 +237,7 @@ func TestInstallReportsAFailedRestoreAlongsideTheInstallError(t *testing.T) {
 	fs := &failingFs{}
 	installer, drush, composer := newFailingInstaller(t, fs, coreExtensionWithSqlite)
 	composer.EXPECT().GetConfig(t.Context(), "/project", "extra.drupal-scaffold.locations.web-root").Return("web", nil)
-	drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1", false).Return("/config/sync", nil)
+	drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1").Return("/config/sync", nil)
 	installErr := errors.New("site install failed")
 	drush.EXPECT().InstallSite(t.Context(), "/project", "site1").RunAndReturn(func(context.Context, string, string) error {
 		fs.failClose = true

@@ -2,7 +2,6 @@ package addon
 
 import (
 	"context"
-	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -125,76 +124,26 @@ func TestDeprecationsRemoverErrors(t *testing.T) {
 }
 
 func TestTranslationsUpdaterErrors(t *testing.T) {
-	newEvent := func(committer workflow.Committer) *workflow.PostSiteUpdateEvent {
-		return workflow.NewPostSiteUpdateEvent(t.Context(), "/tmp", committer, "site1")
-	}
-
-	t.Run("module check fails", func(t *testing.T) {
-		drushService := NewMockTranslationsDrush(t)
-		drushService.EXPECT().IsModuleEnabled(anyCtx, "/tmp", "site1", "locale_deploy").Return(false, assert.AnError)
-
-		tu := NewTranslationsUpdater(zap.NewNop(), drushService)
-		require.Error(t, tu.postSiteUpdateHandler(newEvent(&fakeCommitter{})))
-	})
-
 	t.Run("localizing translations fails", func(t *testing.T) {
 		drushService := NewMockTranslationsDrush(t)
-		drushService.EXPECT().IsModuleEnabled(anyCtx, "/tmp", "site1", "locale_deploy").Return(true, nil)
 		drushService.EXPECT().LocalizeTranslations(anyCtx, "/tmp", "site1").Return(assert.AnError)
 
 		tu := NewTranslationsUpdater(zap.NewNop(), drushService)
-		require.Error(t, tu.postSiteUpdateHandler(newEvent(&fakeCommitter{})))
-	})
-
-	t.Run("an unresolvable translation path is skipped, not fatal", func(t *testing.T) {
-		// GetTranslationPath refuses to return an empty path, because committing that would
-		// commit the entire working tree.
-		drushService := NewMockTranslationsDrush(t)
-		drushService.EXPECT().IsModuleEnabled(anyCtx, "/tmp", "site1", "locale_deploy").Return(true, nil)
-		drushService.EXPECT().LocalizeTranslations(anyCtx, "/tmp", "site1").Return(nil)
-		drushService.EXPECT().GetTranslationPath(anyCtx, "/tmp", "site1", true).Return("", errors.New("does not resolve"))
-
-		tu := NewTranslationsUpdater(zap.NewNop(), drushService)
-		require.NoError(t, tu.postSiteUpdateHandler(newEvent(&fakeCommitter{})))
+		evt := workflow.NewPostSiteUpdateEvent(t.Context(), "/tmp", &fakeCommitter{}, "site1", drush.Facts{Modules: []string{"locale_deploy"}})
+		require.ErrorIs(t, tu.postSiteUpdateHandler(evt), assert.AnError)
 	})
 
 	t.Run("committing the translations fails", func(t *testing.T) {
+		project, facts := translationsSite(t)
 		drushService := NewMockTranslationsDrush(t)
-		drushService.EXPECT().IsModuleEnabled(anyCtx, "/tmp", "site1", "locale_deploy").Return(true, nil)
-		drushService.EXPECT().LocalizeTranslations(anyCtx, "/tmp", "site1").Return(nil)
-		drushService.EXPECT().GetTranslationPath(anyCtx, "/tmp", "site1", true).Return("translations", nil)
+		drushService.EXPECT().LocalizeTranslations(anyCtx, project, "site1").Return(nil)
 
 		tu := NewTranslationsUpdater(zap.NewNop(), drushService)
-		err := tu.postSiteUpdateHandler(newEvent(&fakeCommitter{err: assert.AnError}))
+		err := tu.postSiteUpdateHandler(workflow.NewPostSiteUpdateEvent(t.Context(), project, &fakeCommitter{err: assert.AnError}, "site1", facts))
 		require.ErrorIs(t, err, assert.AnError)
 		assert.Contains(t, err.Error(), "failed to commit translation path")
 		assert.Empty(t, tu.results.All(), "a site whose commit failed has no outcome to report")
 	})
-}
-
-func TestUpdateHooksHandlerError(t *testing.T) {
-	drushService := NewMockUpdateHooksDrush(t)
-	drushService.EXPECT().GetUpdateHooks(anyCtx, "/tmp", "site1").Return(nil, assert.AnError)
-
-	uh := NewUpdateHooks(zap.NewNop(), drushService)
-	err := uh.preSiteUpdateHandler(workflow.NewPreSiteUpdateEvent(t.Context(), "/tmp", nil, "site1"))
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to get update hooks")
-}
-
-func TestUnsupportedModulesDeduplicatesAcrossSites(t *testing.T) {
-	// Multisite runs check every site; the same end-of-life module must be reported once.
-	module := drush.UnsupportedModule{Name: "old_module", InstalledVersion: "1.0", RecommendedVersion: "None"}
-
-	drushService := NewMockUnsupportedModulesDrush(t)
-	drushService.EXPECT().GetUnsupportedModules(anyCtx, "/tmp", "site1").Return([]drush.UnsupportedModule{module}, nil)
-	drushService.EXPECT().GetUnsupportedModules(anyCtx, "/tmp", "site2").Return([]drush.UnsupportedModule{module}, nil)
-
-	um := NewUnsupportedModules(zap.NewNop(), drushService)
-	require.NoError(t, um.preSiteUpdateHandler(workflow.NewPreSiteUpdateEvent(t.Context(), "/tmp", nil, "site1")))
-	require.NoError(t, um.preSiteUpdateHandler(workflow.NewPreSiteUpdateEvent(t.Context(), "/tmp", nil, "site2")))
-
-	assert.Equal(t, []drush.UnsupportedModule{module}, um.ReportData())
 }
 
 // anyCtx matches any non-nil context.Context in a mock expectation. mock.Anything would let a

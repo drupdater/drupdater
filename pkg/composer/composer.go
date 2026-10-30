@@ -142,16 +142,10 @@ func (s *CLI) Normalize(ctx context.Context, dir string) (string, error) {
 }
 
 func (s *CLI) GetInstalledPackageVersion(ctx context.Context, dir string, packageName string) (string, error) {
-	out, err := s.execComposerJSON(ctx, dir, "show", packageName, "--locked", "--no-ansi", "--format=json")
-	if err != nil {
-		return "", err
-	}
-
-	var composerShow struct {
+	composerShow, err := JSON[struct {
 		Versions []string `json:"versions"`
-	}
-
-	if err := json.Unmarshal([]byte(out), &composerShow); err != nil {
+	}](ctx, s.command(dir), "show", packageName, "--locked", "--no-ansi", "--format=json")
+	if err != nil {
 		return "", err
 	}
 
@@ -161,9 +155,31 @@ func (s *CLI) GetInstalledPackageVersion(ctx context.Context, dir string, packag
 	return composerShow.Versions[0], nil
 }
 
-func (s *CLI) GetConfig(ctx context.Context, dir string, key string) (string, error) {
-	// stdout only: composer's stderr warnings would corrupt the value.
-	return s.execComposerJSON(ctx, dir, "config", "--json", key)
+// GetConfig reads a dotted key from composer.json as `composer config --json` prints it: a string
+// as is, anything else as JSON. It reads the file as written, so it suits extra.*, not config.*.
+func (s *CLI) GetConfig(_ context.Context, dir string, key string) (string, error) {
+	content, err := afero.ReadFile(s.fs, dir+"/composer.json")
+	if err != nil {
+		return "", err
+	}
+	var value any
+	if err := json.Unmarshal(content, &value); err != nil {
+		return "", fmt.Errorf("failed to decode composer.json: %w", err)
+	}
+	for part := range strings.SplitSeq(key, ".") {
+		object, ok := value.(map[string]any)
+		if !ok {
+			return "", fmt.Errorf("%s is not defined", key)
+		}
+		if value, ok = object[part]; !ok {
+			return "", fmt.Errorf("%s is not defined", key)
+		}
+	}
+	if text, ok := value.(string); ok {
+		return text, nil
+	}
+	encoded, err := json.Marshal(value)
+	return string(encoded), err
 }
 
 func (s *CLI) SetConfig(ctx context.Context, dir string, key string, value string) error {

@@ -2,17 +2,18 @@ package addon
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"os"
 
 	"github.com/drupdater/drupdater/internal/workflow"
+	"github.com/drupdater/drupdater/pkg/drush"
 
 	"go.uber.org/zap"
 )
 
-// TranslationsDrush imports a site's translations and finds where they are stored.
+// TranslationsDrush imports a site's translations.
 type TranslationsDrush interface {
-	GetTranslationPath(ctx context.Context, dir string, site string, relative bool) (string, error)
-	IsModuleEnabled(ctx context.Context, dir string, site string, module string) (bool, error)
 	LocalizeTranslations(ctx context.Context, dir string, site string) error
 }
 
@@ -38,11 +39,8 @@ func (tu *TranslationsUpdater) Hooks() workflow.Hooks {
 
 func (tu *TranslationsUpdater) postSiteUpdateHandler(evt *workflow.PostSiteUpdateEvent) error {
 
-	enabled, err := tu.drush.IsModuleEnabled(evt.Context(), evt.Path(), evt.Site(), "locale_deploy")
-	if err != nil {
-		return err
-	}
-	if !enabled {
+	facts := evt.Facts()
+	if !facts.ModuleEnabled("locale_deploy") {
 		tu.logger.Info("locale_deploy not enabled, skipping translations update", zap.String("site", evt.Site()))
 		tu.record(evt.Site(), TranslationResult{Skipped: "locale_deploy not enabled"})
 		return nil
@@ -54,12 +52,13 @@ func (tu *TranslationsUpdater) postSiteUpdateHandler(evt *workflow.PostSiteUpdat
 		return err
 	}
 
-	translationPath, err := tu.drush.GetTranslationPath(evt.Context(), evt.Path(), evt.Site(), true)
+	translationPath, err := existingDir(facts.TranslationPath)
 	if err != nil {
 		tu.logger.Info("translation path not available, skipping translations update", zap.String("site", evt.Site()), zap.Error(err))
 		tu.record(evt.Site(), TranslationResult{Skipped: "translation path not available: " + err.Error()})
 		return nil
 	}
+	translationPath = drush.RelativeTo(evt.Path(), translationPath)
 
 	committed, err := evt.Commit("Update translations", translationPath)
 	if err != nil {
@@ -73,6 +72,17 @@ func (tu *TranslationsUpdater) postSiteUpdateHandler(evt *workflow.PostSiteUpdat
 
 	tu.record(evt.Site(), TranslationResult{Path: translationPath, Updated: true})
 	return nil
+}
+
+// existingDir refuses an empty path, which would reach git as the whole working tree.
+func existingDir(path string) (string, error) {
+	if path == "" {
+		return "", errors.New("no translation path is configured")
+	}
+	if info, err := os.Stat(path); err != nil || !info.IsDir() {
+		return "", fmt.Errorf("%s is not an existing directory", path)
+	}
+	return path, nil
 }
 
 // record stores a site's outcome for the report.

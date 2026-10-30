@@ -224,20 +224,19 @@ func TestCreateAddonsPassesEveryDependency(t *testing.T) {
 		mandatory: []string{"probe", "probe_other"},
 	}
 
-	cache, err := NewCache()
-	require.NoError(t, err)
 	logger := zap.NewNop()
 	composerSvc := composer.NewCLI(logger)
 	t.Cleanup(composerSvc.Cleanup)
 	deps := addonDeps{
-		logger:     logger,
-		drush:      drush.NewCLI(logger, cache),
-		composer:   composerSvc,
-		drupalOrg:  drupalorg.NewHTTPClient(logger),
-		drupalCode: drupalorg.NewDrupalCode("token"),
+		logger:       logger,
+		drush:        drush.NewCLI(logger, "/scripts/drush"),
+		composer:     composerSvc,
+		drupalOrg:    drupalorg.NewHTTPClient(logger),
+		drupalCode:   drupalorg.NewDrupalCode("token"),
+		rectorConfig: "/scripts/rector.php",
 	}
 
-	_, err = catalog.create(config.Config{Security: true}, deps)
+	_, err := catalog.create(config.Config{Security: true}, deps)
 	require.NoError(t, err)
 
 	want := deps
@@ -252,15 +251,15 @@ func TestNewAddonDepsBuildsADrupalCodeClientOnlyWithAToken(t *testing.T) {
 	drupalOrgSvc := drupalorg.NewHTTPClient(logger)
 
 	t.Setenv("DRUPALCODE_ACCESS_TOKEN", "")
-	deps := newAddonDeps(logger, drushSvc, composerSvc, drupalOrgSvc)
-	assert.Equal(t, addonDeps{logger: logger, drush: drushSvc, composer: composerSvc, drupalOrg: drupalOrgSvc}, deps)
+	deps := newAddonDeps(logger, drushSvc, composerSvc, drupalOrgSvc, "/scripts/rector.php")
+	assert.Equal(t, addonDeps{logger: logger, drush: drushSvc, composer: composerSvc, drupalOrg: drupalOrgSvc, rectorConfig: "/scripts/rector.php"}, deps)
 	assert.Nil(t, deps.drupalCode, "composer_patches tells a missing client by nil, so no typed nil may slip in")
 
 	t.Setenv("DRUPALCODE_ACCESS_TOKEN", "secret")
-	deps = newAddonDeps(logger, drushSvc, composerSvc, drupalOrgSvc)
+	deps = newAddonDeps(logger, drushSvc, composerSvc, drupalOrgSvc, "/scripts/rector.php")
 	assert.IsType(t, &drupalorg.DrupalCode{}, deps.drupalCode)
 	deps.drupalCode = nil
-	assert.Equal(t, addonDeps{logger: logger, drush: drushSvc, composer: composerSvc, drupalOrg: drupalOrgSvc}, deps)
+	assert.Equal(t, addonDeps{logger: logger, drush: drushSvc, composer: composerSvc, drupalOrg: drupalOrgSvc, rectorConfig: "/scripts/rector.php"}, deps)
 }
 
 func TestNewRunnerBuildsTheWorkflowRunner(t *testing.T) {

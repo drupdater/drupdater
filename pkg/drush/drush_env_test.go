@@ -6,7 +6,6 @@ import (
 	"os/exec"
 	"testing"
 
-	"github.com/maypok86/otter"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -15,8 +14,7 @@ import (
 // drush runs as a subprocess of composer, so composer's 300s default timeout applies — and
 // `site:install` and `updatedb` on a real site exceed it comfortably.
 func TestComposerEnvironment(t *testing.T) {
-	cache, _ := otter.MustBuilder[string, string](100).Build()
-	executor := NewCLI(zap.NewNop(), cache)
+	executor := NewCLI(zap.NewNop(), "/opt/include")
 
 	// captureCmd returns the command that actually ran, so the assertions are about the
 	// environment the subprocess was given.
@@ -52,11 +50,11 @@ func TestComposerEnvironment(t *testing.T) {
 		assertComposerEnvironment(t, (*cmd).Env)
 	})
 
-	t.Run("execDrushStreams", func(t *testing.T) {
+	t.Run("Facts", func(t *testing.T) {
 		cmd := captureCmd(t)
 
-		_, _, err := executor.execDrushStreams(t.Context(), "/tmp", "example_site", "updatedb-status", "--format=json")
-		require.NoError(t, err)
+		// The helper prints no JSON; only the environment it was given matters here.
+		_, _ = executor.Facts(t.Context(), "/tmp", "example_site")
 
 		assertComposerEnvironment(t, (*cmd).Env)
 	})

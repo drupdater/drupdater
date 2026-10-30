@@ -236,11 +236,8 @@ func realFullCheckDeps(logger *zap.Logger) fullCheckDeps {
 		},
 		newComposer: func() fullCheckComposer { return composer.NewCLI(logger) },
 		newInstaller: func(c fullCheckComposer, dataDir string) (siteInstaller, error) {
-			cache, err := NewCache()
-			if err != nil {
-				return nil, err
-			}
-			return drupal.NewInstaller(logger, drush.NewCLI(logger, cache), c, dataDir), nil
+			// No --include: installing a site runs none of drupdater's drush commands.
+			return drupal.NewInstaller(logger, drush.NewCLI(logger, ""), c, dataDir), nil
 		},
 	}
 }

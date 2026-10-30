@@ -736,21 +736,40 @@ func TestDiffRejectsMalformedOutput(t *testing.T) {
 	}
 }
 
-func TestGetConfig(t *testing.T) {
-	service := &CLI{logger: zap.NewNop()}
+func TestGetConfigReadsComposerJSONAsComposerConfigPrintsIt(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	require.NoError(t, afero.WriteFile(fs, "/project/composer.json", []byte(`{
+		"extra": {
+			"drupal-scaffold": {"locations": {"web-root": "web/"}},
+			"patches": {"drupal/core": {"Fix": "patches/core.patch"}}
+		}
+	}`), 0o644))
+	service := &CLI{logger: zap.NewNop(), fs: fs}
 
-	execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
-		cs := []string{"-test.run=TestHelperProcess", "--", `"8.3"`}
-		cs = append(cs, arg...)
-		cmd := exec.CommandContext(ctx, os.Args[0], cs...)
-		cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
-		return cmd
-	}
-	defer func() { execCommand = exec.CommandContext }()
-
-	val, err := service.GetConfig(t.Context(), "/tmp", "platform.php")
+	webRoot, err := service.GetConfig(t.Context(), "/project", "extra.drupal-scaffold.locations.web-root")
 	require.NoError(t, err)
-	assert.Equal(t, `"8.3"`, val)
+	assert.Equal(t, "web/", webRoot, "a string comes back unquoted")
+
+	patches, err := service.GetConfig(t.Context(), "/project", "extra.patches")
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"drupal/core": {"Fix": "patches/core.patch"}}`, patches)
+
+	for _, key := range []string{"extra.missing", "extra.drupal-scaffold.locations.web-root.deeper"} {
+		_, err := service.GetConfig(t.Context(), "/project", key)
+		require.EqualError(t, err, key+" is not defined")
+	}
+}
+
+func TestGetConfigFailsWithoutAReadableComposerJSON(t *testing.T) {
+	fs := afero.NewMemMapFs()
+	service := &CLI{logger: zap.NewNop(), fs: fs}
+
+	_, err := service.GetConfig(t.Context(), "/project", "extra.patches")
+	require.ErrorIs(t, err, os.ErrNotExist)
+
+	require.NoError(t, afero.WriteFile(fs, "/project/composer.json", []byte("{"), 0o644))
+	_, err = service.GetConfig(t.Context(), "/project", "extra.patches")
+	require.ErrorContains(t, err, "failed to decode composer.json")
 }
 
 func TestSetConfig(t *testing.T) {
@@ -846,16 +865,9 @@ func TestGetCustomCodeDirectories(t *testing.T) {
 		fs := afero.NewMemMapFs()
 		_ = fs.MkdirAll("/tmp/web/modules/custom", 0755)
 		_ = fs.MkdirAll("/tmp/web/themes/custom", 0755)
+		require.NoError(t, afero.WriteFile(fs, "/tmp/composer.json", []byte(`{"extra": {"drupal-scaffold": {"locations": {"web-root": "web/"}}}}`), 0o644))
 
 		service := &CLI{logger: zap.NewNop(), fs: fs}
-		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
-			cs := []string{"-test.run=TestHelperProcess", "--", "web/"}
-			cs = append(cs, arg...)
-			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
-			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
-			return cmd
-		}
-		defer func() { execCommand = exec.CommandContext }()
 
 		dirs, err := service.GetCustomCodeDirectories(t.Context(), "/tmp")
 		require.NoError(t, err)
@@ -864,14 +876,6 @@ func TestGetCustomCodeDirectories(t *testing.T) {
 
 	t.Run("GetConfig error", func(t *testing.T) {
 		service := &CLI{logger: zap.NewNop(), fs: afero.NewMemMapFs()}
-		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
-			cs := []string{"-test.run=TestHelperProcess", "--"}
-			cs = append(cs, arg...)
-			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
-			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
-			return cmd
-		}
-		defer func() { execCommand = exec.CommandContext }()
 
 		_, err := service.GetCustomCodeDirectories(t.Context(), "/project")
 		require.Error(t, err)

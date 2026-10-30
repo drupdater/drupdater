@@ -3,6 +3,8 @@ package composer
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
 	"os/exec"
 	"strings"
 
@@ -67,4 +69,18 @@ func (c Command) Split(ctx context.Context, args ...string) (stdout string, stde
 	c.Logger.Debug(command.String() + "\nstdout: " + stdout + "\nstderr: " + stderr)
 
 	return stdout, stderr, err
+}
+
+// JSON decodes the command's stdout into T. stderr only reaches the error: PHP notices and
+// progress output land there and would corrupt the payload.
+func JSON[T any](ctx context.Context, c Command, args ...string) (T, error) {
+	var value T
+	stdout, stderr, err := c.Split(ctx, args...)
+	if err != nil {
+		return value, fmt.Errorf("%w, output: %s", err, stderr)
+	}
+	if err := json.Unmarshal([]byte(stdout), &value); err != nil {
+		return value, fmt.Errorf("failed to decode the JSON output: %w", err)
+	}
+	return value, nil
 }

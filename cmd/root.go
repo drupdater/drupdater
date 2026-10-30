@@ -20,7 +20,7 @@ import (
 	"github.com/drupdater/drupdater/pkg/drupalorg"
 	"github.com/drupdater/drupdater/pkg/drush"
 	"github.com/drupdater/drupdater/pkg/repo"
-	"github.com/maypok86/otter"
+	"github.com/drupdater/drupdater/scripts"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -154,13 +154,18 @@ func (a app) runUpdate(cmd *cobra.Command, args []string, opts options) error {
 		return err
 	}
 
-	cache, err := NewCache()
+	scriptsDir, err := os.MkdirTemp("", "drupdater-scripts-")
 	if err != nil {
-		logger.Error("failed to create cache", zap.Error(err))
+		logger.Error("failed to create the scripts directory", zap.Error(err))
+		return err
+	}
+	defer os.RemoveAll(scriptsDir)
+	if err := scripts.Extract(scriptsDir); err != nil {
+		logger.Error("failed to extract the bundled scripts", zap.Error(err))
 		return err
 	}
 
-	drush := drush.NewCLI(logger, cache)
+	drush := drush.NewCLI(logger, scripts.DrushInclude(scriptsDir))
 	composer := composer.NewCLI(logger, composerOptions(cfg)...)
 	// Patch checks leave a scratch project with a full vendor tree behind otherwise.
 	defer composer.Cleanup()
@@ -196,7 +201,7 @@ func (a app) runUpdate(cmd *cobra.Command, args []string, opts options) error {
 		}
 	}
 
-	addons, err := a.addons.create(cfg, newAddonDeps(logger, drush, composer, drupalOrg))
+	addons, err := a.addons.create(cfg, newAddonDeps(logger, drush, composer, drupalOrg, scripts.RectorConfig(scriptsDir)))
 	if err != nil {
 		return err
 	}
@@ -306,10 +311,6 @@ func execute(ctx context.Context, cmd *cobra.Command) int {
 		return 1
 	}
 	return 0
-}
-
-func NewCache() (otter.Cache[string, string], error) {
-	return otter.MustBuilder[string, string](100).Build()
 }
 
 func NewLogger(cfg config.Config, redactor *logging.Redactor) (*zap.Logger, error) {

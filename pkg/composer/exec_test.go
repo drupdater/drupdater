@@ -172,3 +172,38 @@ func TestCommandSplit(t *testing.T) {
 		assert.Equal(t, "e", stderr)
 	})
 }
+
+func TestJSON(t *testing.T) {
+	t.Run("decodes stdout and ignores the notices on stderr", func(t *testing.T) {
+		var seen []string
+		c := Command{New: shellCommand(`echo "Deprecated: notice" >&2; echo '{"name": "drupal/core"}'`, &seen), Logger: zap.NewNop()}
+
+		value, err := JSON[struct {
+			Name string `json:"name"`
+		}](t.Context(), c, "show", "--format=json")
+
+		require.NoError(t, err)
+		assert.Equal(t, "drupal/core", value.Name)
+		assert.Equal(t, []string{"composer", "show", "--format=json"}, seen)
+	})
+
+	t.Run("a failed command carries its stderr", func(t *testing.T) {
+		var seen []string
+		c := Command{New: shellCommand(`echo '{}'; echo "Bootstrap failed" >&2; exit 1`, &seen), Logger: zap.NewNop()}
+
+		_, err := JSON[map[string]any](t.Context(), c)
+
+		var exitErr *exec.ExitError
+		require.ErrorAs(t, err, &exitErr)
+		assert.Contains(t, err.Error(), "output: Bootstrap failed")
+	})
+
+	t.Run("output that is not JSON", func(t *testing.T) {
+		var seen []string
+		c := Command{New: shellCommand(`echo "No database updates required."`, &seen), Logger: zap.NewNop()}
+
+		_, err := JSON[map[string]any](t.Context(), c)
+
+		require.ErrorContains(t, err, "failed to decode the JSON output")
+	})
+}

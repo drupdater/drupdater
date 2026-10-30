@@ -51,7 +51,7 @@ profile: thunder
 			duringInstall, err = afero.ReadFile(fs, settingsPath)
 			return err
 		})
-		drush.EXPECT().GetConfigSyncDir(t.Context(), "/tmp", "site1", false).Return(configSyncDir, nil)
+		drush.EXPECT().GetConfigSyncDir(t.Context(), "/tmp", "site1").Return(configSyncDir, nil)
 
 		composer := NewMockComposer(t)
 		composer.EXPECT().GetConfig(t.Context(), "/tmp", "extra.drupal-scaffold.locations.web-root").Return("web", nil)
@@ -100,7 +100,7 @@ $settings['hash_salt'] = 'changeme';
 		// Setup mocks
 		drush := NewMockDrush(t)
 		drush.EXPECT().InstallSite(t.Context(), "/tmp", "site1").Return(errors.New("failed to install site"))
-		drush.EXPECT().GetConfigSyncDir(t.Context(), "/tmp", "site1", false).Return(configSyncDir, nil)
+		drush.EXPECT().GetConfigSyncDir(t.Context(), "/tmp", "site1").Return(configSyncDir, nil)
 
 		composer := NewMockComposer(t)
 		composer.EXPECT().GetConfig(t.Context(), "/tmp", "extra.drupal-scaffold.locations.web-root").Return("web", nil)
@@ -161,7 +161,7 @@ profile: thunder
 		t.Fatalf("Failed to close temp file: %v", err)
 	}
 
-	drush.EXPECT().GetConfigSyncDir(t.Context(), "/tmp", "default", false).Return("/tmp", nil)
+	drush.EXPECT().GetConfigSyncDir(t.Context(), "/tmp", "default").Return("/tmp", nil)
 
 	installer := &Installer{
 		logger: logger,
@@ -232,7 +232,7 @@ profile: standard
 		t.Fatalf("Failed to close temp file: %v", err)
 	}
 
-	drush.EXPECT().GetConfigSyncDir(t.Context(), "/tmp", "default", false).Return("/tmp", nil)
+	drush.EXPECT().GetConfigSyncDir(t.Context(), "/tmp", "default").Return("/tmp", nil)
 
 	installer := &Installer{
 		logger: logger,

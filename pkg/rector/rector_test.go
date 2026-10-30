@@ -20,7 +20,7 @@ import (
 func newTestCLI(t *testing.T) (*CLI, *observer.ObservedLogs) {
 	t.Helper()
 	core, logs := observer.New(zapcore.DebugLevel)
-	return NewCLI(zap.New(core)), logs
+	return NewCLI(zap.New(core), "/opt/drupdater/rector.php"), logs
 }
 
 // stubExec replaces execCommand with the helper-process pattern and records what the
@@ -145,7 +145,7 @@ func TestRectorRun(t *testing.T) {
 
 		_, err := cli.Run(t.Context(), "/tmp", []string{"web/modules/custom"})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to unmarshal JSON")
+		assert.Contains(t, err.Error(), "failed to decode the JSON output")
 
 		var syntaxErr *json.SyntaxError
 		require.ErrorAs(t, err, &syntaxErr)
@@ -182,7 +182,9 @@ func stubExecEach(t *testing.T, outputs ...string) *[]call {
 }
 
 func TestBundledRectorRun(t *testing.T) {
-	newBundledCLI := func() *CLI { return NewBundledCLI(zap.NewNop(), "/opt/drupdater/tools/vendor/bin") }
+	newBundledCLI := func() *CLI {
+		return NewBundledCLI(zap.NewNop(), "/opt/drupdater/tools/vendor/bin", "/opt/drupdater/rector.php")
+	}
 
 	t.Run("loads the project's autoloader from its vendor-dir", func(t *testing.T) {
 		calls := stubExecEach(t,

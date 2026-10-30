@@ -2,7 +2,6 @@ package rector
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os/exec"
 	"path/filepath"
@@ -20,22 +19,25 @@ type CLI struct {
 	fs     afero.Fs
 	// binDir holds drupdater's own rector; empty runs the project's through composer.
 	binDir string
+	config string
 }
 
-// NewCLI runs the project's own rector.
-func NewCLI(logger *zap.Logger) *CLI {
+// NewCLI runs the project's own rector with drupdater's config.
+func NewCLI(logger *zap.Logger, config string) *CLI {
 	return &CLI{
 		logger: logger,
 		fs:     afero.NewOsFs(),
+		config: config,
 	}
 }
 
 // NewBundledCLI runs the rector in binDir, which needs nothing installed in the project.
-func NewBundledCLI(logger *zap.Logger, binDir string) *CLI {
+func NewBundledCLI(logger *zap.Logger, binDir string, config string) *CLI {
 	return &CLI{
 		logger: logger,
 		fs:     afero.NewOsFs(),
 		binDir: binDir,
+		config: config,
 	}
 }
 
@@ -82,19 +84,12 @@ func (s *CLI) Run(ctx context.Context, dir string, customCodeDirectories []strin
 		args = []string{"process", "--autoload-file", autoloader}
 	}
 	// No --no-diffs: rector's JSON lists each file's applied rules only alongside its diff.
-	args = append(args, "--config=/opt/drupdater/rector.php", "--no-progress-bar", "--debug", "--output-format=json")
+	args = append(args, "--config="+s.config, "--no-progress-bar", "--debug", "--output-format=json")
 	args = append(args, customCodeDirectories...)
 
-	// Split: rector's --debug output and PHP notices would corrupt the JSON report.
-	out, _, err := command.Split(ctx, args...)
-
+	deprecationRemovalResult, err := composer.JSON[ReturnOutput](ctx, command, args...)
 	if err != nil {
 		return ReturnOutput{}, fmt.Errorf("failed to run rector: %w", err)
-	}
-
-	var deprecationRemovalResult ReturnOutput
-	if err := json.Unmarshal([]byte(out), &deprecationRemovalResult); err != nil {
-		return ReturnOutput{}, fmt.Errorf("failed to unmarshal JSON: %w", err)
 	}
 
 	for _, diff := range deprecationRemovalResult.FileDiffs {

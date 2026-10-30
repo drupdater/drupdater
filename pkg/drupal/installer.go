@@ -20,8 +20,8 @@ import (
 
 type Drush interface {
 	InstallSite(ctx context.Context, path string, site string) error
-	// GetConfigSyncDir returns the site's config sync directory, relative to path or absolute.
-	GetConfigSyncDir(ctx context.Context, path string, site string, relative bool) (string, error)
+	// GetConfigSyncDir returns the site's absolute config sync directory, before it is installed too.
+	GetConfigSyncDir(ctx context.Context, path string, site string) (string, error)
 }
 
 type Composer interface {
@@ -39,6 +39,8 @@ type Installer struct {
 	// reuses the first decision: by then core.extension.yml already carries our sqlite entry.
 	mu     sync.Mutex
 	blocks map[string]string
+	// syncDirs saves a drush bootstrap per lookup: settings.php fixes the directory for the run.
+	syncDirs map[string]string
 }
 
 // NewInstaller writes each site's SQLite database and private files under dataDir, which the
@@ -235,9 +237,21 @@ func (is *Installer) writeSettings(path string, content []byte) error {
 
 // coreExtensionPath returns the site's core.extension.yml.
 func (is *Installer) coreExtensionPath(ctx context.Context, dir string, site string) (string, error) {
-	configSyncDir, err := is.drush.GetConfigSyncDir(ctx, dir, site, false)
-	if err != nil {
-		return "", err
+	key := dir + "\x00" + site
+	is.mu.Lock()
+	configSyncDir, ok := is.syncDirs[key]
+	is.mu.Unlock()
+	if !ok {
+		var err error
+		if configSyncDir, err = is.drush.GetConfigSyncDir(ctx, dir, site); err != nil {
+			return "", err
+		}
+		is.mu.Lock()
+		if is.syncDirs == nil {
+			is.syncDirs = map[string]string{}
+		}
+		is.syncDirs[key] = configSyncDir
+		is.mu.Unlock()
 	}
 	return configSyncDir + "/core.extension.yml", nil
 }

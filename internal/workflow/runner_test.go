@@ -56,9 +56,9 @@ func TestRun(t *testing.T) {
 	installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil)
 	installer.EXPECT().RestoreSettings(anyCtx, testCheckout, "site1").Return(nil)
 
+	drush.EXPECT().Facts(anyCtx, testCheckout, "site1").Return(syncFacts(testCheckout+"/config/sync"), nil)
 	drush.EXPECT().UpdateSite(anyCtx, testCheckout, "site1").Return(nil)
 	drush.EXPECT().ExportConfiguration(anyCtx, testCheckout, "site1").Return(nil)
-	drush.EXPECT().GetConfigSyncDir(anyCtx, testCheckout, "site1", true).Return("config/sync", nil)
 	drush.EXPECT().ConfigResave(anyCtx, testCheckout, "site1").Return(nil)
 
 	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
@@ -137,9 +137,9 @@ func TestRunPublishUsesLiveContext(t *testing.T) {
 	installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil)
 	installer.EXPECT().RestoreSettings(anyCtx, testCheckout, "site1").Return(nil)
 
+	drush.EXPECT().Facts(anyCtx, testCheckout, "site1").Return(syncFacts(testCheckout+"/config/sync"), nil)
 	drush.EXPECT().UpdateSite(anyCtx, testCheckout, "site1").Return(nil)
 	drush.EXPECT().ExportConfiguration(anyCtx, testCheckout, "site1").Return(nil)
-	drush.EXPECT().GetConfigSyncDir(anyCtx, testCheckout, "site1", true).Return("config/sync", nil)
 	drush.EXPECT().ConfigResave(anyCtx, testCheckout, "site1").Return(nil)
 
 	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
@@ -225,6 +225,7 @@ func TestRunSiteFailureDoesNotPublish(t *testing.T) {
 	// The site update fails. ConfigResave/ExportConfiguration are left unexpected on
 	// purpose: if the failure didn't short-circuit, those calls would fail the test.
 	updateErr := errors.New("drush updatedb crashed")
+	drush.EXPECT().Facts(anyCtx, testCheckout, "site1").Return(syncFacts(testCheckout+"/config/sync"), nil)
 	drush.EXPECT().UpdateSite(anyCtx, testCheckout, "site1").Return(updateErr)
 
 	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
@@ -487,10 +488,10 @@ func TestRunInstallsSitesAtTheOldCode(t *testing.T) {
 		return nil
 	})
 	installer.EXPECT().RestoreSettings(anyCtx, testCheckout, "site1").Return(nil)
+	drush.EXPECT().Facts(anyCtx, testCheckout, "site1").Return(syncFacts(testCheckout+"/config/sync"), nil)
 	drush.EXPECT().UpdateSite(anyCtx, testCheckout, "site1").Return(nil)
 	drush.EXPECT().ConfigResave(anyCtx, testCheckout, "site1").Return(nil)
 	drush.EXPECT().ExportConfiguration(anyCtx, testCheckout, "site1").Return(nil)
-	drush.EXPECT().GetConfigSyncDir(anyCtx, testCheckout, "site1", true).Return("config/sync", nil)
 
 	core, logs := observer.New(zap.InfoLevel)
 	err := New(zap.New(core), config, drush, vcsProvider, repositoryService, installer, mockComposer).Run(t.Context(), nil)
@@ -665,10 +666,10 @@ func TestRunCreatesTheUpdateBranchAfterTheLastCommit(t *testing.T) {
 	installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil)
 	installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil)
 	installer.EXPECT().RestoreSettings(anyCtx, testCheckout, "site1").Return(nil)
+	drush.EXPECT().Facts(anyCtx, testCheckout, "site1").Return(syncFacts(testCheckout+"/config/sync"), nil)
 	drush.EXPECT().UpdateSite(anyCtx, testCheckout, "site1").Return(nil)
 	drush.EXPECT().ConfigResave(anyCtx, testCheckout, "site1").Return(nil)
 	drush.EXPECT().ExportConfiguration(anyCtx, testCheckout, "site1").Return(nil)
-	drush.EXPECT().GetConfigSyncDir(anyCtx, testCheckout, "site1", true).Return("config/sync", nil)
 
 	require.NoError(t, New(zap.NewNop(), config, drush, nil, repositoryService, installer, mockComposer).Run(context.Background(), nil))
 
@@ -856,9 +857,9 @@ func TestRunWithDryRun(t *testing.T) {
 	installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil)
 	installer.EXPECT().RestoreSettings(anyCtx, testCheckout, "site1").Return(nil)
 
+	drush.EXPECT().Facts(anyCtx, testCheckout, "site1").Return(syncFacts(testCheckout+"/config/sync"), nil)
 	drush.EXPECT().UpdateSite(anyCtx, testCheckout, "site1").Return(nil)
 	drush.EXPECT().ExportConfiguration(anyCtx, testCheckout, "site1").Return(nil)
-	drush.EXPECT().GetConfigSyncDir(anyCtx, testCheckout, "site1", true).Return("config/sync", nil)
 	drush.EXPECT().ConfigResave(anyCtx, testCheckout, "site1").Return(nil)
 
 	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
@@ -982,9 +983,9 @@ func TestRunCheckoutDryRunWithoutPlatform(t *testing.T) {
 	installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil)
 	installer.EXPECT().RestoreSettings(anyCtx, testCheckout, "site1").Return(nil)
 
+	drush.EXPECT().Facts(anyCtx, testCheckout, "site1").Return(syncFacts(testCheckout+"/config/sync"), nil)
 	drush.EXPECT().UpdateSite(anyCtx, testCheckout, "site1").Return(nil)
 	drush.EXPECT().ExportConfiguration(anyCtx, testCheckout, "site1").Return(nil)
-	drush.EXPECT().GetConfigSyncDir(anyCtx, testCheckout, "site1", true).Return("config/sync", nil)
 	drush.EXPECT().ConfigResave(anyCtx, testCheckout, "site1").Return(nil)
 
 	repositoryService.EXPECT().AddWorktree(anyCtx, config.WorkingDir, "", "").Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
@@ -1054,9 +1055,9 @@ func TestPublishWorkDeletesBranchOnMRFailure(t *testing.T) {
 	installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil)
 	installer.EXPECT().RestoreSettings(anyCtx, testCheckout, "site1").Return(nil)
 
+	drush.EXPECT().Facts(anyCtx, testCheckout, "site1").Return(syncFacts(testCheckout+"/config/sync"), nil)
 	drush.EXPECT().UpdateSite(anyCtx, testCheckout, "site1").Return(nil)
 	drush.EXPECT().ExportConfiguration(anyCtx, testCheckout, "site1").Return(nil)
-	drush.EXPECT().GetConfigSyncDir(anyCtx, testCheckout, "site1", true).Return("config/sync", nil)
 	drush.EXPECT().ConfigResave(anyCtx, testCheckout, "site1").Return(nil)
 
 	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
@@ -1119,9 +1120,9 @@ func TestPublishWorkLogsWarningWhenDeleteBranchFails(t *testing.T) {
 	installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil)
 	installer.EXPECT().RestoreSettings(anyCtx, testCheckout, "site1").Return(nil)
 
+	drush.EXPECT().Facts(anyCtx, testCheckout, "site1").Return(syncFacts(testCheckout+"/config/sync"), nil)
 	drush.EXPECT().UpdateSite(anyCtx, testCheckout, "site1").Return(nil)
 	drush.EXPECT().ExportConfiguration(anyCtx, testCheckout, "site1").Return(nil)
-	drush.EXPECT().GetConfigSyncDir(anyCtx, testCheckout, "site1", true).Return("config/sync", nil)
 	drush.EXPECT().ConfigResave(anyCtx, testCheckout, "site1").Return(nil)
 
 	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
@@ -1186,9 +1187,9 @@ func TestPublishWorkPushFails(t *testing.T) {
 	installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil)
 	installer.EXPECT().RestoreSettings(anyCtx, testCheckout, "site1").Return(nil)
 
+	drush.EXPECT().Facts(anyCtx, testCheckout, "site1").Return(syncFacts(testCheckout+"/config/sync"), nil)
 	drush.EXPECT().UpdateSite(anyCtx, testCheckout, "site1").Return(nil)
 	drush.EXPECT().ExportConfiguration(anyCtx, testCheckout, "site1").Return(nil)
-	drush.EXPECT().GetConfigSyncDir(anyCtx, testCheckout, "site1", true).Return("config/sync", nil)
 	drush.EXPECT().ConfigResave(anyCtx, testCheckout, "site1").Return(nil)
 
 	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
@@ -1334,6 +1335,7 @@ func TestRunConfigResaveError(t *testing.T) {
 	installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil)
 	installer.EXPECT().RestoreSettings(anyCtx, testCheckout, "site1").Return(nil)
 
+	drush.EXPECT().Facts(anyCtx, testCheckout, "site1").Return(syncFacts(testCheckout+"/config/sync"), nil)
 	drush.EXPECT().UpdateSite(anyCtx, testCheckout, "site1").Return(nil)
 	resaveErr := errors.New("drush config:resave failed")
 	drush.EXPECT().ConfigResave(anyCtx, testCheckout, "site1").Return(resaveErr)
@@ -1389,6 +1391,7 @@ func TestRunExportConfigurationError(t *testing.T) {
 	installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil)
 	installer.EXPECT().RestoreSettings(anyCtx, testCheckout, "site1").Return(nil)
 
+	drush.EXPECT().Facts(anyCtx, testCheckout, "site1").Return(syncFacts(testCheckout+"/config/sync"), nil)
 	drush.EXPECT().UpdateSite(anyCtx, testCheckout, "site1").Return(nil)
 	drush.EXPECT().ConfigResave(anyCtx, testCheckout, "site1").Return(nil)
 	exportErr := errors.New("drush config:export failed")
@@ -1446,9 +1449,9 @@ func TestRunWithAutoMerge(t *testing.T) {
 	installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil)
 	installer.EXPECT().RestoreSettings(anyCtx, testCheckout, "site1").Return(nil)
 
+	drush.EXPECT().Facts(anyCtx, testCheckout, "site1").Return(syncFacts(testCheckout+"/config/sync"), nil)
 	drush.EXPECT().UpdateSite(anyCtx, testCheckout, "site1").Return(nil)
 	drush.EXPECT().ExportConfiguration(anyCtx, testCheckout, "site1").Return(nil)
-	drush.EXPECT().GetConfigSyncDir(anyCtx, testCheckout, "site1", true).Return("config/sync", nil)
 	drush.EXPECT().ConfigResave(anyCtx, testCheckout, "site1").Return(nil)
 
 	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
@@ -1514,9 +1517,9 @@ func TestRunAutoMergeError(t *testing.T) {
 	installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil)
 	installer.EXPECT().RestoreSettings(anyCtx, testCheckout, "site1").Return(nil)
 
+	drush.EXPECT().Facts(anyCtx, testCheckout, "site1").Return(syncFacts(testCheckout+"/config/sync"), nil)
 	drush.EXPECT().UpdateSite(anyCtx, testCheckout, "site1").Return(nil)
 	drush.EXPECT().ExportConfiguration(anyCtx, testCheckout, "site1").Return(nil)
-	drush.EXPECT().GetConfigSyncDir(anyCtx, testCheckout, "site1", true).Return("config/sync", nil)
 	drush.EXPECT().ConfigResave(anyCtx, testCheckout, "site1").Return(nil)
 
 	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
@@ -1581,9 +1584,9 @@ func TestRunAutoMergeSkippedWhenDisabled(t *testing.T) {
 	installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil)
 	installer.EXPECT().RestoreSettings(anyCtx, testCheckout, "site1").Return(nil)
 
+	drush.EXPECT().Facts(anyCtx, testCheckout, "site1").Return(syncFacts(testCheckout+"/config/sync"), nil)
 	drush.EXPECT().UpdateSite(anyCtx, testCheckout, "site1").Return(nil)
 	drush.EXPECT().ExportConfiguration(anyCtx, testCheckout, "site1").Return(nil)
-	drush.EXPECT().GetConfigSyncDir(anyCtx, testCheckout, "site1", true).Return("config/sync", nil)
 	drush.EXPECT().ConfigResave(anyCtx, testCheckout, "site1").Return(nil)
 
 	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
@@ -1655,6 +1658,7 @@ func TestRunFireEventError(t *testing.T) {
 	installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil).Maybe()
 	installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil).Maybe()
 	installer.EXPECT().RestoreSettings(anyCtx, testCheckout, "site1").Return(nil).Maybe()
+	drush.EXPECT().Facts(anyCtx, testCheckout, "site1").Return(syncFacts(testCheckout+"/config/sync"), nil).Maybe()
 	drush.EXPECT().UpdateSite(anyCtx, testCheckout, "site1").Return(nil).Maybe()
 	drush.EXPECT().ExportConfiguration(anyCtx, testCheckout, "site1").Return(nil).Maybe()
 	drush.EXPECT().ConfigResave(anyCtx, testCheckout, "site1").Return(nil).Maybe()
@@ -1690,9 +1694,9 @@ func checkoutModeRun(t *testing.T, source, worktreePath string) (*Runner, *MockG
 	installer.EXPECT().Install(anyCtx, worktreePath, "site1").Return(nil)
 	installer.EXPECT().ConfigureDatabase(anyCtx, worktreePath, "site1").Return(nil)
 	installer.EXPECT().RestoreSettings(anyCtx, worktreePath, "site1").Return(nil)
+	drush.EXPECT().Facts(anyCtx, worktreePath, "site1").Return(syncFacts(worktreePath+"/config/sync"), nil)
 	drush.EXPECT().UpdateSite(anyCtx, worktreePath, "site1").Return(nil)
 	drush.EXPECT().ExportConfiguration(anyCtx, worktreePath, "site1").Return(nil)
-	drush.EXPECT().GetConfigSyncDir(anyCtx, worktreePath, "site1", true).Return("config/sync", nil)
 	drush.EXPECT().ConfigResave(anyCtx, worktreePath, "site1").Return(nil)
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
@@ -1890,8 +1894,9 @@ func TestUpdateSiteRestoresSettings(t *testing.T) {
 	}
 
 	t.Run("after a failed pre-site-update hook, which stops the update", func(t *testing.T) {
-		ws, installer, _ := newRunner(t, hookAddon{Hooks{PreSiteUpdate: On(Inspect, failing[*PreSiteUpdateEvent])}})
+		ws, installer, drush := newRunner(t, hookAddon{Hooks{PreSiteUpdate: On(Inspect, failing[*PreSiteUpdateEvent])}})
 		installer.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(nil)
+		drush.EXPECT().Facts(anyCtx, "/project", "site1").Return(syncFacts("/project/config/sync"), nil)
 		installer.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(nil).Once()
 
 		err := ws.updateSite(t.Context(), "site1", yourTurn(), make(chan struct{}))
@@ -1899,9 +1904,21 @@ func TestUpdateSiteRestoresSettings(t *testing.T) {
 		assert.Contains(t, err.Error(), "pre-site-update hook failed")
 	})
 
+	t.Run("after its facts cannot be read, which stops the update before any hook", func(t *testing.T) {
+		ws, installer, drush := newRunner(t, hookAddon{Hooks{PreSiteUpdate: On(Inspect, failing[*PreSiteUpdateEvent])}})
+		installer.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(nil)
+		drush.EXPECT().Facts(anyCtx, "/project", "site1").Return(syncFacts(""), assert.AnError)
+		installer.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(nil).Once()
+
+		err := ws.updateSite(t.Context(), "site1", yourTurn(), make(chan struct{}))
+		require.ErrorIs(t, err, assert.AnError)
+		assert.NotContains(t, err.Error(), "pre-site-update")
+	})
+
 	t.Run("after a failed post-site-update hook, which stops the export", func(t *testing.T) {
 		ws, installer, drush := newRunner(t, hookAddon{Hooks{PostSiteUpdate: On(Change, failing[*PostSiteUpdateEvent])}})
 		installer.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(nil)
+		drush.EXPECT().Facts(anyCtx, "/project", "site1").Return(syncFacts("/project/config/sync"), nil)
 		drush.EXPECT().UpdateSite(anyCtx, "/project", "site1").Return(nil)
 		drush.EXPECT().ConfigResave(anyCtx, "/project", "site1").Return(nil)
 		installer.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(nil).Once()
@@ -1914,6 +1931,7 @@ func TestUpdateSiteRestoresSettings(t *testing.T) {
 	t.Run("after a failed update hook", func(t *testing.T) {
 		ws, installer, drush := newRunner(t)
 		installer.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(nil)
+		drush.EXPECT().Facts(anyCtx, "/project", "site1").Return(syncFacts("/project/config/sync"), nil)
 		drush.EXPECT().UpdateSite(anyCtx, "/project", "site1").Return(assert.AnError)
 		installer.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(nil).Once()
 
@@ -1926,6 +1944,7 @@ func TestUpdateSiteRestoresSettings(t *testing.T) {
 		ws, installer, drush := newRunner(t)
 		ctx, cancel := context.WithCancel(t.Context())
 		installer.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(nil)
+		drush.EXPECT().Facts(anyCtx, "/project", "site1").Return(syncFacts("/project/config/sync"), nil)
 		drush.EXPECT().UpdateSite(anyCtx, "/project", "site1").RunAndReturn(func(context.Context, string, string) error {
 			cancel()
 			return context.Canceled
@@ -1938,10 +1957,10 @@ func TestUpdateSiteRestoresSettings(t *testing.T) {
 	t.Run("a failed restore fails the site", func(t *testing.T) {
 		ws, installer, drush := newRunner(t)
 		installer.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(nil)
+		drush.EXPECT().Facts(anyCtx, "/project", "site1").Return(syncFacts("/project/config/sync"), nil)
 		drush.EXPECT().UpdateSite(anyCtx, "/project", "site1").Return(nil)
 		drush.EXPECT().ConfigResave(anyCtx, "/project", "site1").Return(nil)
 		drush.EXPECT().ExportConfiguration(anyCtx, "/project", "site1").Return(nil)
-		drush.EXPECT().GetConfigSyncDir(anyCtx, "/project", "site1", true).Return("config/sync", nil)
 		committer := NewMockCommitter(t)
 		committer.EXPECT().Commit("Update configuration site1", []string{"config/sync"}).Return(true, nil)
 		ws.committer = committer
@@ -1963,47 +1982,35 @@ func TestUpdateSiteRestoresSettings(t *testing.T) {
 // Drupdater commits the exported configuration itself, as it does an addon's changes: Drush's own
 // --commit would run git, its hooks and its identity, in the user's repository.
 func TestCommitSiteChangesCommitsTheExportedConfiguration(t *testing.T) {
-	newRunner := func(t *testing.T) (*run, *MockDrush, *MockCommitter) {
+	newRunner := func(t *testing.T) (*run, *MockCommitter) {
 		t.Helper()
 		drush := NewMockDrush(t)
 		committer := NewMockCommitter(t)
 		drush.EXPECT().ExportConfiguration(anyCtx, "/project", "site1").Return(nil)
 		r := testRun(services{logger: zap.NewNop(), drush: drush}, repo.Checkout{Path: "/project"})
 		r.committer = committer
-		return r, drush, committer
+		return r, committer
 	}
 
 	t.Run("the site's sync directory, under its own message", func(t *testing.T) {
-		ws, drush, committer := newRunner(t)
-		drush.EXPECT().GetConfigSyncDir(anyCtx, "/project", "site1", true).Return("config/site1", nil)
+		ws, committer := newRunner(t)
 		committer.EXPECT().Commit("Update configuration site1", []string{"config/site1"}).Return(true, nil)
 
-		require.NoError(t, ws.commitSiteChanges(t.Context(), "site1"))
-	})
-
-	t.Run("an unknown sync directory", func(t *testing.T) {
-		ws, drush, _ := newRunner(t)
-		drush.EXPECT().GetConfigSyncDir(anyCtx, "/project", "site1", true).Return("", assert.AnError)
-
-		err := ws.commitSiteChanges(t.Context(), "site1")
-		require.ErrorIs(t, err, assert.AnError)
-		require.ErrorContains(t, err, "failed to locate the exported configuration")
+		require.NoError(t, ws.commitSiteChanges(t.Context(), "site1", syncFacts("/project/config/site1")))
 	})
 
 	t.Run("no sync directory at all", func(t *testing.T) {
-		ws, drush, _ := newRunner(t)
-		drush.EXPECT().GetConfigSyncDir(anyCtx, "/project", "site1", true).Return("", nil)
+		ws, _ := newRunner(t)
 
-		err := ws.commitSiteChanges(t.Context(), "site1")
+		err := ws.commitSiteChanges(t.Context(), "site1", syncFacts(""))
 		require.ErrorContains(t, err, "site site1 has no config sync directory")
 	})
 
 	t.Run("a refused commit", func(t *testing.T) {
-		ws, drush, committer := newRunner(t)
-		drush.EXPECT().GetConfigSyncDir(anyCtx, "/project", "site1", true).Return("config/site1", nil)
+		ws, committer := newRunner(t)
 		committer.EXPECT().Commit("Update configuration site1", []string{"config/site1"}).Return(false, assert.AnError)
 
-		err := ws.commitSiteChanges(t.Context(), "site1")
+		err := ws.commitSiteChanges(t.Context(), "site1", syncFacts("/project/config/site1"))
 		require.ErrorIs(t, err, assert.AnError)
 		require.ErrorContains(t, err, "failed to commit the exported configuration")
 	})
@@ -2283,10 +2290,10 @@ func TestRunHandsAddonsTheRunsContextAndCommitter(t *testing.T) {
 	installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil)
 	installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil)
 	installer.EXPECT().RestoreSettings(anyCtx, testCheckout, "site1").Return(nil)
+	drush.EXPECT().Facts(anyCtx, testCheckout, "site1").Return(syncFacts(testCheckout+"/config/sync"), nil)
 	drush.EXPECT().UpdateSite(anyCtx, testCheckout, "site1").Return(nil)
 	drush.EXPECT().ConfigResave(anyCtx, testCheckout, "site1").Return(nil)
 	drush.EXPECT().ExportConfiguration(anyCtx, testCheckout, "site1").Return(nil)
-	drush.EXPECT().GetConfigSyncDir(anyCtx, testCheckout, "site1", true).Return("config/sync", nil)
 
 	ctx := context.WithValue(t.Context(), runKey{}, "this run")
 	seen := map[string]bool{}

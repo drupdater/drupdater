@@ -6,6 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/drupdater/drupdater/pkg/drush"
 )
 
 type recordedCommit struct {
@@ -90,21 +92,31 @@ func TestNewPostCodeUpdateEvent(t *testing.T) {
 func TestNewPreSiteUpdateEvent(t *testing.T) {
 	ctx := context.Background()
 	committer := &fakeCommitter{result: true, err: assert.AnError}
-	evt := NewPreSiteUpdateEvent(ctx, "/repo", committer, "default")
+	evt := NewPreSiteUpdateEvent(ctx, "/repo", committer, "default", drush.Facts{Modules: []string{"system"}})
 
 	assert.Equal(t, ctx, evt.Context())
 	assert.Equal(t, "/repo", evt.Path())
 	assertCommitsThrough(t, evt, committer)
 	assert.Equal(t, "default", evt.Site())
+	assert.Equal(t, drush.Facts{Modules: []string{"system"}}, evt.Facts())
 }
 
 func TestNewPostSiteUpdateEvent(t *testing.T) {
 	ctx := context.Background()
 	committer := &fakeCommitter{result: true, err: assert.AnError}
-	evt := NewPostSiteUpdateEvent(ctx, "/repo", committer, "production")
+	evt := NewPostSiteUpdateEvent(ctx, "/repo", committer, "production", drush.Facts{Modules: []string{"system"}})
 
 	assert.Equal(t, ctx, evt.Context())
 	assert.Equal(t, "/repo", evt.Path())
 	assertCommitsThrough(t, evt, committer)
 	assert.Equal(t, "production", evt.Site())
+	assert.Equal(t, drush.Facts{Modules: []string{"system"}}, evt.Facts())
+}
+
+func TestSiteEventFactsAreCopies(t *testing.T) {
+	evt := NewPreSiteUpdateEvent(context.Background(), "/repo", &fakeCommitter{}, "default", drush.Facts{Modules: []string{"system"}})
+
+	evt.Facts().Modules[0] = "changed"
+
+	assert.Equal(t, []string{"system"}, evt.Facts().Modules, "a hook must not change what the next hook reads")
 }

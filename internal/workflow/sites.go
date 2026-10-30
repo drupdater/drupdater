@@ -8,6 +8,8 @@ import (
 
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/drupdater/drupdater/pkg/drush"
 )
 
 // forEachSite runs fn per site concurrently, bounded by config.Concurrency, cancelling the rest
@@ -56,7 +58,12 @@ func (r *run) updateSite(ctx context.Context, site string, turn <-chan struct{},
 		}
 	}()
 
-	preSiteUpdateEvent := NewPreSiteUpdateEvent(ctx, r.path, r.committer, site)
+	facts, err := r.drush.Facts(ctx, r.path, site)
+	if err != nil {
+		return err
+	}
+
+	preSiteUpdateEvent := NewPreSiteUpdateEvent(ctx, r.path, r.committer, site, facts)
 	if err := Fire(r.hooks, preSiteUpdateEvent); err != nil {
 		return err
 	}
@@ -76,15 +83,15 @@ func (r *run) updateSite(ctx context.Context, site string, turn <-chan struct{},
 	case <-ctx.Done():
 		return ctx.Err()
 	}
-	if err := r.commitSiteChanges(ctx, site); err != nil {
+	if err := r.commitSiteChanges(ctx, site, facts); err != nil {
 		return err
 	}
 	close(next)
 	return nil
 }
 
-func (r *run) commitSiteChanges(ctx context.Context, site string) error {
-	postSiteUpdateEvent := NewPostSiteUpdateEvent(ctx, r.path, r.committer, site)
+func (r *run) commitSiteChanges(ctx context.Context, site string, facts drush.Facts) error {
+	postSiteUpdateEvent := NewPostSiteUpdateEvent(ctx, r.path, r.committer, site, facts)
 	if err := Fire(r.hooks, postSiteUpdateEvent); err != nil {
 		return err
 	}
@@ -93,15 +100,11 @@ func (r *run) commitSiteChanges(ctx context.Context, site string) error {
 	if err := r.drush.ExportConfiguration(ctx, r.path, site); err != nil {
 		return fmt.Errorf("failed to export configuration: %w", err)
 	}
-	configDir, err := r.drush.GetConfigSyncDir(ctx, r.path, site, true)
-	if err != nil {
-		return fmt.Errorf("failed to locate the exported configuration: %w", err)
-	}
 	// The committer reads an empty path as the whole tree, which would sweep in unrelated changes.
-	if configDir == "" {
+	if facts.ConfigSyncDirectory == "" {
 		return fmt.Errorf("failed to locate the exported configuration: site %s has no config sync directory", site)
 	}
-	if _, err := r.committer.Commit("Update configuration "+site, configDir); err != nil {
+	if _, err := r.committer.Commit("Update configuration "+site, drush.RelativeTo(r.path, facts.ConfigSyncDirectory)); err != nil {
 		return fmt.Errorf("failed to commit the exported configuration: %w", err)
 	}
 

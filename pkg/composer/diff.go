@@ -31,16 +31,11 @@ func (s *CLI) Diff(ctx context.Context, dir string) ([]DiffEntry, error) {
 }
 
 func (s *CLI) diff(ctx context.Context, dir string, args ...string) ([]DiffEntry, error) {
-	out, err := s.execComposerJSON(ctx, dir, append([]string{"diff", "--format=json"}, args...)...)
-	if err != nil {
-		return nil, err
-	}
-
-	var raw struct {
+	raw, err := JSON[struct {
 		Packages    json.RawMessage `json:"packages"`
 		PackagesDev json.RawMessage `json:"packages-dev"`
-	}
-	if err := json.Unmarshal([]byte(out), &raw); err != nil {
+	}](ctx, s.command(dir), append([]string{"diff", "--format=json"}, args...)...)
+	if err != nil {
 		return nil, fmt.Errorf("failed to parse composer diff output: %w", err)
 	}
 

@@ -117,11 +117,19 @@ The centre of the run:
 
 Each site's work has two halves:
 
-1. **Concurrently, across sites:** configure the database, fire **`pre-site-update`**, run
-   the update hooks and resave configuration. This half touches only the site's database.
+1. **Concurrently, across sites:** configure the database, read the site's facts, fire
+   **`pre-site-update`**, run the update hooks and resave configuration. This half touches
+   only the site's database.
 2. **One site at a time, in `--sites` order:** fire **`post-site-update`**, export
    configuration, and commit the site's config sync directory as `Update configuration
    <site>`.
+
+The facts are everything drupdater reads from a site, gathered by one call to its own
+`drupdater:facts` Drush command, which ships inside the binary and is loaded with `drush
+--include`: the config sync directory, the translation path, the enabled modules, the pending
+update hooks and the unsupported modules. One Drupal bootstrap per site answers all of them,
+under Drush's update kernel, because the code is already updated and the schema is not. Both
+site events carry them, and the config export is committed from the directory they name.
 
 The second half writes into the working tree. Sites share that working tree and its git
 index, and two sites can name the same config or translation directory. A site starts its

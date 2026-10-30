@@ -4,11 +4,10 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 	"os/exec"
+	"path/filepath"
 	"testing"
 
-	"github.com/maypok86/otter"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -17,8 +16,7 @@ import (
 
 func TestExecDrush(t *testing.T) {
 	logger := zaptest.NewLogger(t)
-	cache, _ := otter.MustBuilder[string, string](100).Build()
-	executor := NewCLI(logger, cache)
+	executor := NewCLI(logger, "/opt/include")
 
 	t.Run("successful execution", func(t *testing.T) {
 		// execDrush builds cmd.Env from os.Environ(), so control vars must be
@@ -82,236 +80,9 @@ func TestExecDrush(t *testing.T) {
 	})
 }
 
-func TestGetUpdateHooks(t *testing.T) {
-
-	logger := zap.NewNop()
-
-	t.Run("JSON of updates", func(t *testing.T) {
-		data := `{
-					"ad_entity_update_8007": {
-						"module": "ad_entity",
-						"update_id": 8007,
-						"description": "8007 - Fix ad_entity.settings due to module uninstalls of sub-modules.",
-						"type": "hook_update_n"
-					},
-					"entity_reference_display_update_8001": {
-						"module": "entity_reference_display",
-						"update_id": "8001",
-						"description": "8001 - Updates the \"negate\" field settings option from integer to boolean.",
-						"type": "hook_update_n"
-					},
-					"menu_link_attributes_update_8002": {
-						"module": "menu_link_attributes",
-						"update_id": 8002,
-						"description": "8002 - Add labels and description to default menu item attributes for clarification.",
-						"type": "hook_update_n"
-					},
-					"migrate_tools_update_10000": {
-						"module": "migrate_tools",
-						"update_id": "10000",
-						"description": "10000 - Adds a table in the database dedicated to SyncSourceIds entries.",
-						"type": "hook_update_n"
-					}
-				}`
-
-		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
-		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
-		t.Setenv("GOCOVERDIR", "/tmp")
-		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
-			cs := []string{"-test.run=TestHelperProcess", "--", data}
-			cs = append(cs, arg...)
-			return exec.CommandContext(ctx, os.Args[0], cs...)
-		}
-		defer func() { execCommand = exec.CommandContext }()
-
-		drush := CLI{
-			logger: logger,
-		}
-
-		updates, err := drush.GetUpdateHooks(t.Context(), "/tmp", "site1")
-
-		require.NoError(t, err)
-
-		if len(updates) != 4 {
-			t.Errorf("Expected 4 updates, got %d", len(updates))
-		}
-
-		assert.Equal(t, map[string]UpdateHook{
-			"ad_entity_update_8007": {
-				Module:      "ad_entity",
-				UpdateID:    float64(8007),
-				Description: "8007 - Fix ad_entity.settings due to module uninstalls of sub-modules.",
-				Type:        "hook_update_n",
-			},
-			"entity_reference_display_update_8001": {
-				Module:      "entity_reference_display",
-				UpdateID:    "8001",
-				Description: "8001 - Updates the \"negate\" field settings option from integer to boolean.",
-				Type:        "hook_update_n",
-			},
-			"menu_link_attributes_update_8002": {
-				Module:      "menu_link_attributes",
-				UpdateID:    float64(8002),
-				Description: "8002 - Add labels and description to default menu item attributes for clarification.",
-				Type:        "hook_update_n",
-			},
-			"migrate_tools_update_10000": {
-				Module:      "migrate_tools",
-				UpdateID:    "10000",
-				Description: "10000 - Adds a table in the database dedicated to SyncSourceIds entries.",
-				Type:        "hook_update_n",
-			},
-		}, updates)
-	})
-
-	t.Run("No updates", func(t *testing.T) {
-		data := ` [success] No database updates required.`
-
-		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
-		t.Setenv("GOCOVERDIR", "/tmp")
-		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
-			cs := []string{"-test.run=TestHelperProcess", "--", data}
-			cs = append(cs, arg...)
-			return exec.CommandContext(ctx, os.Args[0], cs...)
-		}
-		defer func() { execCommand = exec.CommandContext }()
-
-		drush := CLI{
-			logger: logger,
-		}
-
-		updates, err := drush.GetUpdateHooks(t.Context(), "/tmp", "site1")
-
-		require.NoError(t, err)
-		assert.Empty(t, updates)
-	})
-
-}
-
-func TestGetUnsupportedModules(t *testing.T) {
-	logger := zap.NewNop()
-
-	t.Run("JSON of unsupported modules", func(t *testing.T) {
-		data := `[{"name":"module_a","installed_version":"1.0.0","recommended_version":"None"},{"name":"module_b","installed_version":"2.3.1","recommended_version":"3.0.0"}]`
-
-		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
-		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
-		t.Setenv("GOCOVERDIR", "/tmp")
-		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
-			cs := []string{"-test.run=TestHelperProcess", "--", data}
-			cs = append(cs, arg...)
-			return exec.CommandContext(ctx, os.Args[0], cs...)
-		}
-		defer func() { execCommand = exec.CommandContext }()
-
-		drush := CLI{
-			logger: logger,
-		}
-
-		modules, err := drush.GetUnsupportedModules(t.Context(), "/tmp", "site1")
-
-		require.NoError(t, err)
-		assert.Equal(t, []UnsupportedModule{
-			{Name: "module_a", InstalledVersion: "1.0.0", RecommendedVersion: "None"},
-			{Name: "module_b", InstalledVersion: "2.3.1", RecommendedVersion: "3.0.0"},
-		}, modules)
-	})
-
-	t.Run("no unsupported modules", func(t *testing.T) {
-		data := `[]`
-
-		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
-		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
-		t.Setenv("GOCOVERDIR", "/tmp")
-		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
-			cs := []string{"-test.run=TestHelperProcess", "--", data}
-			cs = append(cs, arg...)
-			return exec.CommandContext(ctx, os.Args[0], cs...)
-		}
-		defer func() { execCommand = exec.CommandContext }()
-
-		drush := CLI{
-			logger: logger,
-		}
-
-		modules, err := drush.GetUnsupportedModules(t.Context(), "/tmp", "site1")
-
-		require.NoError(t, err)
-		assert.Empty(t, modules)
-	})
-
-	t.Run("empty output", func(t *testing.T) {
-		data := ``
-
-		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
-		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
-		t.Setenv("GOCOVERDIR", "/tmp")
-		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
-			cs := []string{"-test.run=TestHelperProcess", "--", data}
-			cs = append(cs, arg...)
-			return exec.CommandContext(ctx, os.Args[0], cs...)
-		}
-		defer func() { execCommand = exec.CommandContext }()
-
-		drush := CLI{
-			logger: logger,
-		}
-
-		modules, err := drush.GetUnsupportedModules(t.Context(), "/tmp", "site1")
-
-		require.NoError(t, err)
-		assert.Nil(t, modules)
-	})
-
-	t.Run("execution failure", func(t *testing.T) {
-		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
-		t.Setenv("GO_HELPER_PROCESS_ERROR", "1")
-		t.Setenv("GOCOVERDIR", "/tmp")
-		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
-			cs := []string{"-test.run=TestHelperProcess", "--"}
-			cs = append(cs, arg...)
-			return exec.CommandContext(ctx, os.Args[0], cs...)
-		}
-		defer func() { execCommand = exec.CommandContext }()
-
-		drush := CLI{
-			logger: logger,
-		}
-
-		modules, err := drush.GetUnsupportedModules(t.Context(), "/tmp", "site1")
-
-		require.Error(t, err)
-		assert.Nil(t, modules)
-	})
-
-	t.Run("invalid JSON", func(t *testing.T) {
-		data := `not json`
-
-		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
-		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
-		t.Setenv("GOCOVERDIR", "/tmp")
-		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
-			cs := []string{"-test.run=TestHelperProcess", "--", data}
-			cs = append(cs, arg...)
-			return exec.CommandContext(ctx, os.Args[0], cs...)
-		}
-		defer func() { execCommand = exec.CommandContext }()
-
-		drush := CLI{
-			logger: logger,
-		}
-
-		modules, err := drush.GetUnsupportedModules(t.Context(), "/tmp", "site1")
-
-		require.Error(t, err)
-		assert.Nil(t, modules)
-	})
-}
-
 func TestInstallSite(t *testing.T) {
 	logger := zap.NewNop()
-	cache, _ := otter.MustBuilder[string, string](100).Build()
-	cli := NewCLI(logger, cache)
+	cli := NewCLI(logger, "/opt/include")
 
 	t.Run("success", func(t *testing.T) {
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
@@ -340,80 +111,9 @@ func TestInstallSite(t *testing.T) {
 	})
 }
 
-func TestGetConfigSyncDir(t *testing.T) {
-	logger := zap.NewNop()
-
-	t.Run("absolute path", func(t *testing.T) {
-		cache, _ := otter.MustBuilder[string, string](100).Build()
-		cli := NewCLI(logger, cache)
-		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
-		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
-		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
-			cs := []string{"-test.run=TestHelperProcess", "--", "/tmp/config/sync"}
-			cs = append(cs, arg...)
-			return exec.CommandContext(ctx, os.Args[0], cs...)
-		}
-		defer func() { execCommand = exec.CommandContext }()
-		dir, err := cli.GetConfigSyncDir(t.Context(), "/tmp", "site1", false)
-		require.NoError(t, err)
-		assert.Equal(t, "/tmp/config/sync", dir)
-	})
-
-	t.Run("relative path", func(t *testing.T) {
-		cache, _ := otter.MustBuilder[string, string](100).Build()
-		cli := NewCLI(logger, cache)
-		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
-		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
-		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
-			cs := []string{"-test.run=TestHelperProcess", "--", "/tmp/config/sync"}
-			cs = append(cs, arg...)
-			return exec.CommandContext(ctx, os.Args[0], cs...)
-		}
-		defer func() { execCommand = exec.CommandContext }()
-		dir, err := cli.GetConfigSyncDir(t.Context(), "/tmp", "site1", true)
-		require.NoError(t, err)
-		assert.Equal(t, "config/sync", dir)
-	})
-
-	t.Run("cache hit", func(t *testing.T) {
-		cache, _ := otter.MustBuilder[string, string](100).Build()
-		cli := NewCLI(logger, cache)
-		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
-		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
-		callCount := 0
-		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
-			callCount++
-			cs := []string{"-test.run=TestHelperProcess", "--", "/cached/path"}
-			cs = append(cs, arg...)
-			return exec.CommandContext(ctx, os.Args[0], cs...)
-		}
-		defer func() { execCommand = exec.CommandContext }()
-		v1, _ := cli.GetConfigSyncDir(t.Context(), "/tmp", "site1", false)
-		v2, _ := cli.GetConfigSyncDir(t.Context(), "/tmp", "site1", false)
-		assert.Equal(t, v1, v2)
-		assert.Equal(t, 1, callCount)
-	})
-
-	t.Run("error", func(t *testing.T) {
-		cache, _ := otter.MustBuilder[string, string](100).Build()
-		cli := NewCLI(logger, cache)
-		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
-		t.Setenv("GO_HELPER_PROCESS_ERROR", "1")
-		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
-			cs := []string{"-test.run=TestHelperProcess", "--"}
-			cs = append(cs, arg...)
-			return exec.CommandContext(ctx, os.Args[0], cs...)
-		}
-		defer func() { execCommand = exec.CommandContext }()
-		_, err := cli.GetConfigSyncDir(t.Context(), "/tmp", "site1", false)
-		require.Error(t, err)
-	})
-}
-
 func TestExportConfiguration(t *testing.T) {
 	logger := zap.NewNop()
-	cache, _ := otter.MustBuilder[string, string](100).Build()
-	cli := NewCLI(logger, cache)
+	cli := NewCLI(logger, "/opt/include")
 
 	t.Run("success", func(t *testing.T) {
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
@@ -447,8 +147,7 @@ func TestExportConfiguration(t *testing.T) {
 
 func TestUpdateSite(t *testing.T) {
 	logger := zap.NewNop()
-	cache, _ := otter.MustBuilder[string, string](100).Build()
-	cli := NewCLI(logger, cache)
+	cli := NewCLI(logger, "/opt/include")
 
 	t.Run("success", func(t *testing.T) {
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
@@ -477,8 +176,7 @@ func TestUpdateSite(t *testing.T) {
 
 func TestConfigResave(t *testing.T) {
 	logger := zap.NewNop()
-	cache, _ := otter.MustBuilder[string, string](100).Build()
-	cli := NewCLI(logger, cache)
+	cli := NewCLI(logger, "/opt/include")
 
 	t.Run("success", func(t *testing.T) {
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
@@ -505,61 +203,9 @@ func TestConfigResave(t *testing.T) {
 	})
 }
 
-func TestIsModuleEnabled(t *testing.T) {
-	logger := zap.NewNop()
-	cache, _ := otter.MustBuilder[string, string](100).Build()
-	cli := NewCLI(logger, cache)
-
-	t.Run("enabled", func(t *testing.T) {
-		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
-		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
-		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
-			cs := []string{"-test.run=TestHelperProcess", "--", "mymodule"}
-			cs = append(cs, arg...)
-			return exec.CommandContext(ctx, os.Args[0], cs...)
-		}
-		defer func() { execCommand = exec.CommandContext }()
-		enabled, err := cli.IsModuleEnabled(t.Context(), "/tmp", "site1", "mymodule")
-		require.NoError(t, err)
-		assert.True(t, enabled)
-	})
-
-	t.Run("not enabled", func(t *testing.T) {
-		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
-		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
-		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
-			cs := []string{"-test.run=TestHelperProcess", "--", ""}
-			cs = append(cs, arg...)
-			return exec.CommandContext(ctx, os.Args[0], cs...)
-		}
-		defer func() { execCommand = exec.CommandContext }()
-		enabled, err := cli.IsModuleEnabled(t.Context(), "/tmp", "site1", "mymodule")
-		require.NoError(t, err)
-		assert.False(t, enabled)
-	})
-
-	t.Run("enabled despite a stderr notice from drush", func(t *testing.T) {
-		// A notice drush writes to stderr (a contrib module deprecation warning, for example)
-		// must not affect the result: it would if this read combined stdout+stderr output.
-		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
-		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
-		t.Setenv("GO_HELPER_PROCESS_STDERR_NOISE", "1")
-		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
-			cs := []string{"-test.run=TestHelperProcess", "--", "mymodule"}
-			cs = append(cs, arg...)
-			return exec.CommandContext(ctx, os.Args[0], cs...)
-		}
-		defer func() { execCommand = exec.CommandContext }()
-		enabled, err := cli.IsModuleEnabled(t.Context(), "/tmp", "site1", "mymodule")
-		require.NoError(t, err)
-		assert.True(t, enabled)
-	})
-}
-
 func TestLocalizeTranslations(t *testing.T) {
 	logger := zap.NewNop()
-	cache, _ := otter.MustBuilder[string, string](100).Build()
-	cli := NewCLI(logger, cache)
+	cli := NewCLI(logger, "/opt/include")
 
 	t.Run("success", func(t *testing.T) {
 		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
@@ -586,79 +232,6 @@ func TestLocalizeTranslations(t *testing.T) {
 	})
 }
 
-func TestGetTranslationPath(t *testing.T) {
-	logger := zap.NewNop()
-
-	t.Run("absolute path", func(t *testing.T) {
-		cache, _ := otter.MustBuilder[string, string](100).Build()
-		cli := NewCLI(logger, cache)
-		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
-		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
-		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
-			cs := []string{"-test.run=TestHelperProcess", "--", "/tmp/translations"}
-			cs = append(cs, arg...)
-			return exec.CommandContext(ctx, os.Args[0], cs...)
-		}
-		defer func() { execCommand = exec.CommandContext }()
-		path, err := cli.GetTranslationPath(t.Context(), "/tmp", "site1", false)
-		require.NoError(t, err)
-		assert.Equal(t, "/tmp/translations", path)
-	})
-
-	t.Run("relative path", func(t *testing.T) {
-		cache, _ := otter.MustBuilder[string, string](100).Build()
-		cli := NewCLI(logger, cache)
-		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
-		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
-		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
-			cs := []string{"-test.run=TestHelperProcess", "--", "/tmp/translations"}
-			cs = append(cs, arg...)
-			return exec.CommandContext(ctx, os.Args[0], cs...)
-		}
-		defer func() { execCommand = exec.CommandContext }()
-		path, err := cli.GetTranslationPath(t.Context(), "/tmp", "site1", true)
-		require.NoError(t, err)
-		assert.Equal(t, "translations", path)
-	})
-
-	t.Run("cache hit", func(t *testing.T) {
-		cache, _ := otter.MustBuilder[string, string](100).Build()
-		cli := NewCLI(logger, cache)
-		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
-		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
-		callCount := 0
-		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
-			callCount++
-			cs := []string{"-test.run=TestHelperProcess", "--", "/cached/translations"}
-			cs = append(cs, arg...)
-			return exec.CommandContext(ctx, os.Args[0], cs...)
-		}
-		defer func() { execCommand = exec.CommandContext }()
-		v1, _ := cli.GetTranslationPath(t.Context(), "/tmp", "site1", false)
-		v2, _ := cli.GetTranslationPath(t.Context(), "/tmp", "site1", false)
-		assert.Equal(t, v1, v2)
-		assert.Equal(t, 1, callCount)
-	})
-
-	t.Run("unconfigured translation path errors instead of returning empty", func(t *testing.T) {
-		// An unset translation path makes realpath('') print an empty line, and an empty path
-		// handed to Worktree.Add stages the entire working tree.
-		cache, _ := otter.MustBuilder[string, string](100).Build()
-		cli := NewCLI(logger, cache)
-		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
-		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
-		execCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
-			cs := []string{"-test.run=TestHelperProcess", "--", ""}
-			cs = append(cs, arg...)
-			return exec.CommandContext(ctx, os.Args[0], cs...)
-		}
-		defer func() { execCommand = exec.CommandContext }()
-		path, err := cli.GetTranslationPath(t.Context(), "/tmp", "site1", false)
-		require.Error(t, err)
-		assert.Empty(t, path)
-	})
-}
-
 func TestHelperProcess(*testing.T) {
 	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
 		return
@@ -680,17 +253,169 @@ func TestHelperProcess(*testing.T) {
 // PHP's realpath() resolves symlinks, so the project directory has to be resolved before the
 // prefix can match — on macOS every temporary directory sits behind the /tmp symlink.
 func TestRelativeToResolvesTheProjectDirectory(t *testing.T) {
-	resolved := t.TempDir()
+	resolved, err := filepath.EvalSymlinks(t.TempDir())
+	require.NoError(t, err)
 	link := filepath.Join(t.TempDir(), "project")
 	require.NoError(t, os.Symlink(resolved, link))
 
-	assert.Equal(t, filepath.Join("config", "sync"), relativeTo(link, filepath.Join(resolved, "config", "sync")))
-	assert.Equal(t, filepath.Join("config", "sync"), relativeTo(resolved, filepath.Join(resolved, "config", "sync")))
+	assert.Equal(t, filepath.Join("config", "sync"), RelativeTo(link, filepath.Join(resolved, "config", "sync")))
+	assert.Equal(t, filepath.Join("config", "sync"), RelativeTo(resolved, filepath.Join(resolved, "config", "sync")))
+}
+
+func TestRelativeToTakesAnUnresolvedPathUnderASymlinkedDirectory(t *testing.T) {
+	link := filepath.Join(t.TempDir(), "project")
+	require.NoError(t, os.Symlink(t.TempDir(), link))
+
+	assert.Equal(t, filepath.Join("config", "sync"), RelativeTo(link, filepath.Join(link, "config", "sync")))
+}
+
+func TestRelativeToLeavesAPathOutsideTheDirectoryAbsolute(t *testing.T) {
+	assert.Equal(t, "/elsewhere/config", RelativeTo("/project", "/elsewhere/config"))
+	assert.Equal(t, "/", RelativeTo("/project", "/"))
 }
 
 func TestRelativeToFallsBack(t *testing.T) {
-	assert.Equal(t, "config/sync", relativeTo("/does/not/exist", "/does/not/exist/config/sync"),
+	assert.Equal(t, "config/sync", RelativeTo("/does/not/exist", "/does/not/exist/config/sync"),
 		"an unresolvable directory is compared as given")
-	assert.Empty(t, relativeTo("/project", ""), "realpath() of a missing directory stays empty")
-	assert.Equal(t, "config/sync", relativeTo("/project", "config/sync"), "a relative path is already relative")
+	assert.Empty(t, RelativeTo("/project", ""), "realpath() of a missing directory stays empty")
+	assert.Equal(t, "config/sync", RelativeTo("/project", "config/sync"), "a relative path is already relative")
+}
+
+// fakeDrush makes drush print stdout and records the arguments it was called with.
+func fakeDrush(t *testing.T, stdout string) *[]string {
+	t.Helper()
+	t.Setenv("GO_WANT_HELPER_PROCESS", "1")
+	t.Setenv("GO_HELPER_PROCESS_RAW", "1")
+	t.Setenv("GOCOVERDIR", "/tmp")
+	args := new([]string)
+	execCommand = func(ctx context.Context, name string, arg ...string) *exec.Cmd {
+		*args = append([]string{name}, arg...)
+		cs := append([]string{"-test.run=TestHelperProcess", "--", stdout}, arg...)
+		return exec.CommandContext(ctx, os.Args[0], cs...)
+	}
+	t.Cleanup(func() { execCommand = exec.CommandContext })
+	return args
+}
+
+func TestFactsDecodesTheIncludedCommandsOutput(t *testing.T) {
+	args := fakeDrush(t, `{
+		"config_sync_directory": "/project/config/sync",
+		"translation_path": "/project/web/sites/default/files/translations",
+		"modules": ["locale_deploy", "system"],
+		"update_hooks": {"system_update_10600": {"module": "system", "update_id": 10600, "description": "Equivalent update.", "type": "hook_update_n"}},
+		"unsupported_modules": [{"name": "old", "installed_version": "1.0.0", "recommended_version": "None"}],
+		"unsupported_modules_error": ""
+	}`)
+
+	facts, err := NewCLI(zap.NewNop(), "/opt/include").Facts(t.Context(), "/tmp", "site1")
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"composer", "exec", "--", "drush", "--include=/opt/include", "drupdater:facts"}, *args)
+	assert.Equal(t, Facts{
+		ConfigSyncDirectory: "/project/config/sync",
+		TranslationPath:     "/project/web/sites/default/files/translations",
+		Modules:             []string{"locale_deploy", "system"},
+		UpdateHooks: map[string]UpdateHook{
+			"system_update_10600": {Module: "system", UpdateID: float64(10600), Description: "Equivalent update.", Type: "hook_update_n"},
+		},
+		UnsupportedModules: []UnsupportedModule{{Name: "old", InstalledVersion: "1.0.0", RecommendedVersion: "None"}},
+	}, facts)
+	assert.True(t, facts.ModuleEnabled("locale_deploy"))
+	assert.False(t, facts.ModuleEnabled("locale"))
+}
+
+func TestFactsKeepsStderrOutOfThePayload(t *testing.T) {
+	fakeDrush(t, `{"modules": ["system"]}`)
+	t.Setenv("GO_HELPER_PROCESS_STDERR_NOISE", "1")
+
+	facts, err := NewCLI(zap.NewNop(), "/opt/include").Facts(t.Context(), "/tmp", "site1")
+
+	require.NoError(t, err)
+	assert.Equal(t, []string{"system"}, facts.Modules)
+}
+
+func TestFactsFailures(t *testing.T) {
+	t.Run("drush fails", func(t *testing.T) {
+		fakeDrush(t, "")
+		t.Setenv("GO_HELPER_PROCESS_ERROR", "1")
+
+		_, err := NewCLI(zap.NewNop(), "/opt/include").Facts(t.Context(), "/tmp", "site1")
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "site1")
+	})
+
+	t.Run("output is not JSON", func(t *testing.T) {
+		fakeDrush(t, "Bootstrap failed.")
+
+		_, err := NewCLI(zap.NewNop(), "/opt/include").Facts(t.Context(), "/tmp", "site1")
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to decode the JSON output")
+	})
+}
+
+func TestFactsCloneSharesNothing(t *testing.T) {
+	facts := Facts{
+		Modules:            []string{"system"},
+		UpdateHooks:        map[string]UpdateHook{"a": {Module: "a"}},
+		UnsupportedModules: []UnsupportedModule{{Name: "old"}},
+	}
+
+	clone := facts.Clone()
+	clone.Modules[0] = "changed"
+	clone.UpdateHooks["b"] = UpdateHook{}
+	clone.UnsupportedModules[0].Name = "changed"
+
+	assert.Equal(t, []string{"system"}, facts.Modules)
+	assert.Len(t, facts.UpdateHooks, 1)
+	assert.Equal(t, "old", facts.UnsupportedModules[0].Name)
+}
+
+func TestGetConfigSyncDir(t *testing.T) {
+	t.Run("relative to the Drupal root", func(t *testing.T) {
+		args := fakeDrush(t, `{"config-sync": "../config/sync", "root": "/project/web"}`)
+
+		dir, err := NewCLI(zap.NewNop(), "/opt/include").GetConfigSyncDir(t.Context(), "/tmp", "site1")
+
+		require.NoError(t, err)
+		assert.Equal(t, "/project/config/sync", dir)
+		assert.Equal(t, []string{"composer", "exec", "--", "drush", "status", "--fields=config-sync,root", "--format=json"}, *args)
+	})
+
+	t.Run("absolute", func(t *testing.T) {
+		fakeDrush(t, `{"config-sync": "/config/sync", "root": "/project/web"}`)
+
+		dir, err := NewCLI(zap.NewNop(), "/opt/include").GetConfigSyncDir(t.Context(), "/tmp", "site1")
+
+		require.NoError(t, err)
+		assert.Equal(t, "/config/sync", dir)
+	})
+
+	t.Run("not configured", func(t *testing.T) {
+		fakeDrush(t, `{"config-sync": null, "root": "/project/web"}`)
+
+		_, err := NewCLI(zap.NewNop(), "/opt/include").GetConfigSyncDir(t.Context(), "/tmp", "site1")
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "site site1 has no config sync directory")
+	})
+
+	t.Run("drush fails", func(t *testing.T) {
+		fakeDrush(t, "")
+		t.Setenv("GO_HELPER_PROCESS_ERROR", "1")
+
+		_, err := NewCLI(zap.NewNop(), "/opt/include").GetConfigSyncDir(t.Context(), "/tmp", "site1")
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "site1")
+	})
+}
+
+func TestConfigResaveRunsTheIncludedCommand(t *testing.T) {
+	args := fakeDrush(t, "ok")
+
+	require.NoError(t, NewCLI(zap.NewNop(), "/opt/include").ConfigResave(t.Context(), "/tmp", "site1"))
+
+	assert.Equal(t, []string{"composer", "exec", "--", "drush", "--include=/opt/include", "drupdater:config-resave"}, *args)
 }

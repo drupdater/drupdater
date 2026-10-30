@@ -12,9 +12,11 @@ reviewer knows what will run on deploy.
 
 ## What it does
 
-Runs immediately before each site's update hooks are executed, and asks Drush for the
-pending hook list. It runs at the **Inspect** stage on `pre-site-update`, so it observes the state after any
-addon that changes the site on that event has finished.
+Runs immediately before each site's update hooks are executed, and reads the pending hook
+list from the site's facts: what drupdater's `drupdater:facts` Drush command reported for the
+site just before `pre-site-update` fired. The command lists the same rows as `drush
+updatedb:status`, under Drush's update kernel, so it works on code that is already updated
+against a schema that is not yet.
 
 The hooks are kept per site: the same module can have different pending hooks on different
 sites.

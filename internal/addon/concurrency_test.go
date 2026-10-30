@@ -46,20 +46,15 @@ func runPerSite(t *testing.T, sites []string, fn func(site string) error) {
 }
 
 func TestUpdateHooksRecordsEverySiteUnderConcurrency(t *testing.T) {
-	mockDrush := NewMockUpdateHooksDrush(t)
-	updateHooks := NewUpdateHooks(zap.NewNop(), mockDrush)
+	updateHooks := NewUpdateHooks(zap.NewNop())
 
 	ctx := context.Background()
 	committer := &fakeCommitter{}
 	sites := concurrentSites(8)
 
-	for _, site := range sites {
-		mockDrush.EXPECT().GetUpdateHooks(ctx, "/project", site).
-			Return(map[string]drush.UpdateHook{site + "_update_8001": {Module: site}}, nil)
-	}
-
 	runPerSite(t, sites, func(site string) error {
-		return updateHooks.preSiteUpdateHandler(workflow.NewPreSiteUpdateEvent(ctx, "/project", committer, site))
+		facts := drush.Facts{UpdateHooks: map[string]drush.UpdateHook{site + "_update_8001": {Module: site}}}
+		return updateHooks.preSiteUpdateHandler(workflow.NewPreSiteUpdateEvent(ctx, "/project", committer, site, facts))
 	})
 
 	hooks := updateHooks.hooks.All()
@@ -70,8 +65,7 @@ func TestUpdateHooksRecordsEverySiteUnderConcurrency(t *testing.T) {
 }
 
 func TestUnsupportedModulesRecordsEverySiteUnderConcurrency(t *testing.T) {
-	mockDrush := NewMockUnsupportedModulesDrush(t)
-	um := NewUnsupportedModules(zap.NewNop(), mockDrush)
+	um := NewUnsupportedModules(zap.NewNop())
 
 	ctx := context.Background()
 	committer := &fakeCommitter{}
@@ -79,15 +73,12 @@ func TestUnsupportedModulesRecordsEverySiteUnderConcurrency(t *testing.T) {
 
 	// A module per site plus one they all report, so the run exercises both a fresh key and the
 	// deduplicating overwrite while the goroutines overlap.
-	for _, site := range sites {
-		mockDrush.EXPECT().GetUnsupportedModules(ctx, "/project", site).Return([]drush.UnsupportedModule{
+	runPerSite(t, sites, func(site string) error {
+		facts := drush.Facts{UnsupportedModules: []drush.UnsupportedModule{
 			{Name: "module_" + site, InstalledVersion: "1.0.0", RecommendedVersion: "2.0.0"},
 			{Name: "shared_module", InstalledVersion: "1.0.0", RecommendedVersion: "None"},
-		}, nil)
-	}
-
-	runPerSite(t, sites, func(site string) error {
-		return um.preSiteUpdateHandler(workflow.NewPreSiteUpdateEvent(ctx, "/project", committer, site))
+		}}
+		return um.preSiteUpdateHandler(workflow.NewPreSiteUpdateEvent(ctx, "/project", committer, site, facts))
 	})
 
 	var names []string
@@ -109,14 +100,9 @@ func TestTranslationsUpdaterRecordsEverySiteUnderConcurrency(t *testing.T) {
 	committer := &fakeCommitter{}
 	sites := concurrentSites(8)
 
-	// The skip path is the one that writes without committing anything, so the goroutines
-	// reach `record` with nothing else serialising them.
-	for _, site := range sites {
-		mockDrush.EXPECT().IsModuleEnabled(ctx, "/project", site, "locale_deploy").Return(false, nil)
-	}
-
+	// The skip path writes without committing anything, so nothing else serialises `record`.
 	runPerSite(t, sites, func(site string) error {
-		return tu.postSiteUpdateHandler(workflow.NewPostSiteUpdateEvent(ctx, "/project", committer, site))
+		return tu.postSiteUpdateHandler(workflow.NewPostSiteUpdateEvent(ctx, "/project", committer, site, drush.Facts{}))
 	})
 
 	results := tu.results.All()

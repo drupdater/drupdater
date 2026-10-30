@@ -85,22 +85,6 @@ func TestPersistentFlagDefaults(t *testing.T) {
 	}
 }
 
-func TestNewCache(t *testing.T) {
-	// Create cache
-	cache, err := NewCache()
-
-	// Verify cache is initialized
-	require.NoError(t, err)
-	assert.NotNil(t, cache)
-
-	// Test basic cache operations
-	cache.Set("test_key", "test_value")
-	value, found := cache.Get("test_key")
-
-	assert.True(t, found)
-	assert.Equal(t, "test_value", value)
-}
-
 func TestHandleWorkflowError(t *testing.T) {
 	t.Run("AbortError logs warning with message not nil", func(t *testing.T) {
 		core, logs := observer.New(zap.WarnLevel)
