@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/drupdater/drupdater/internal/drupal"
 	"github.com/drupdater/drupdater/internal/workflow"
-	"github.com/drupdater/drupdater/pkg/drush"
 
 	"go.uber.org/zap"
 )
@@ -58,7 +58,7 @@ func (tu *TranslationsUpdater) postSiteUpdateHandler(evt *workflow.PostSiteUpdat
 		tu.record(evt.Site(), TranslationResult{Skipped: "translation path not available: " + err.Error()})
 		return nil
 	}
-	translationPath = drush.RelativeTo(evt.Path(), translationPath)
+	translationPath = drupal.RelativeTo(evt.Path(), translationPath)
 
 	committed, err := evt.Commit("Update translations", translationPath)
 	if err != nil {

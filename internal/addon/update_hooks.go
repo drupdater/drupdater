@@ -1,8 +1,8 @@
 package addon
 
 import (
+	"github.com/drupdater/drupdater/internal/drush"
 	"github.com/drupdater/drupdater/internal/workflow"
-	"github.com/drupdater/drupdater/pkg/drush"
 	"go.uber.org/zap"
 )
 

@@ -109,8 +109,10 @@ Where things live. For *how they work*, read `docs/explanation/` rather than dup
 | `internal/report/` | The published JSON report schema and its atomic writer |
 | `internal/logging/redact.go` | Value-based secret redaction, wrapping the zap core |
 | `internal/golden/` | Golden-file comparison and the `-update` flag; imported only from tests |
-| `pkg/` | One directory per wrapped external tool: `composer`, `drush`, `repo` (go-git), `phpcs`, `rector`, `drupal` (installer), `drupalorg` (drupal.org issues, and its GitLab at git.drupalcode.org) |
-| `pkg/php/` | What the PHP wrappers share: running a command under Composer's environment, decoding JSON output, and the `CommandFactory` each wrapper holds as its test seam |
+| `internal/composer/`, `drush/`, `repo/`, `phpcs/`, `rector/`, `drupalorg/` | One directory per wrapped external tool: `repo` is go-git, `drupalorg` is drupal.org issues and its GitLab at git.drupalcode.org |
+| `internal/drupal/` | Where a Drupal project keeps things: web root, custom code directories, drush-reported paths |
+| `internal/siteinstall/` | Installs a throwaway SQLite site for the `check --full` tier |
+| `internal/php/` | What the PHP wrappers share: running a command under Composer's environment, decoding JSON output, and the `CommandFactory` each wrapper holds as its test seam |
 | `scripts/` | PHP embedded in the binary, extracted per run: `rector.php` and the `drupdater:*` Drush commands (`drush --include`) |
 | `tools/` | The PHPCS and Rector the image installs to `/opt/drupdater/tools`, so addons install nothing into the project |
 

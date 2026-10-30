@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/drupdater/drupdater/internal/mergerequest"
-	"github.com/drupdater/drupdater/pkg/repo"
+	"github.com/drupdater/drupdater/internal/repo"
 	git "github.com/go-git/go-git/v5"
 	gitConfig "github.com/go-git/go-git/v5/config"
 	"go.uber.org/zap"

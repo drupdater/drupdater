@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/drupdater/drupdater/pkg/rector"
+	"github.com/drupdater/drupdater/internal/rector"
 	"github.com/stretchr/testify/assert"
 	"pgregory.net/rapid"
 )

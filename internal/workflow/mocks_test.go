@@ -8,9 +8,9 @@ import (
 	"context"
 
 	"github.com/drupdater/drupdater/internal/codehosting"
-	"github.com/drupdater/drupdater/pkg/composer"
-	"github.com/drupdater/drupdater/pkg/drush"
-	"github.com/drupdater/drupdater/pkg/repo"
+	"github.com/drupdater/drupdater/internal/composer"
+	"github.com/drupdater/drupdater/internal/drush"
+	"github.com/drupdater/drupdater/internal/repo"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	mock "github.com/stretchr/testify/mock"
@@ -1269,8 +1269,8 @@ func (_m *MockGitService) EXPECT() *MockGitService_Expecter {
 }
 
 // AddWorktree provides a mock function for the type MockGitService
-func (_mock *MockGitService) AddWorktree(ctx context.Context, source string, username string, email string) (repo.Checkout, error) {
-	ret := _mock.Called(ctx, source, username, email)
+func (_mock *MockGitService) AddWorktree(ctx context.Context, source string, requested repo.Identity) (repo.Checkout, error) {
+	ret := _mock.Called(ctx, source, requested)
 
 	if len(ret) == 0 {
 		panic("no return value specified for AddWorktree")
@@ -1278,16 +1278,16 @@ func (_mock *MockGitService) AddWorktree(ctx context.Context, source string, use
 
 	var r0 repo.Checkout
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string) (repo.Checkout, error)); ok {
-		return returnFunc(ctx, source, username, email)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, repo.Identity) (repo.Checkout, error)); ok {
+		return returnFunc(ctx, source, requested)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, string) repo.Checkout); ok {
-		r0 = returnFunc(ctx, source, username, email)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, repo.Identity) repo.Checkout); ok {
+		r0 = returnFunc(ctx, source, requested)
 	} else {
 		r0 = ret.Get(0).(repo.Checkout)
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string, string) error); ok {
-		r1 = returnFunc(ctx, source, username, email)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, repo.Identity) error); ok {
+		r1 = returnFunc(ctx, source, requested)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -1302,13 +1302,12 @@ type MockGitService_AddWorktree_Call struct {
 // AddWorktree is a helper method to define mock.On call
 //   - ctx context.Context
 //   - source string
-//   - username string
-//   - email string
-func (_e *MockGitService_Expecter) AddWorktree(ctx any, source any, username any, email any) *MockGitService_AddWorktree_Call {
-	return &MockGitService_AddWorktree_Call{Call: _e.mock.On("AddWorktree", ctx, source, username, email)}
+//   - requested repo.Identity
+func (_e *MockGitService_Expecter) AddWorktree(ctx any, source any, requested any) *MockGitService_AddWorktree_Call {
+	return &MockGitService_AddWorktree_Call{Call: _e.mock.On("AddWorktree", ctx, source, requested)}
 }
 
-func (_c *MockGitService_AddWorktree_Call) Run(run func(ctx context.Context, source string, username string, email string)) *MockGitService_AddWorktree_Call {
+func (_c *MockGitService_AddWorktree_Call) Run(run func(ctx context.Context, source string, requested repo.Identity)) *MockGitService_AddWorktree_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -1318,19 +1317,14 @@ func (_c *MockGitService_AddWorktree_Call) Run(run func(ctx context.Context, sou
 		if args[1] != nil {
 			arg1 = args[1].(string)
 		}
-		var arg2 string
+		var arg2 repo.Identity
 		if args[2] != nil {
-			arg2 = args[2].(string)
-		}
-		var arg3 string
-		if args[3] != nil {
-			arg3 = args[3].(string)
+			arg2 = args[2].(repo.Identity)
 		}
 		run(
 			arg0,
 			arg1,
 			arg2,
-			arg3,
 		)
 	})
 	return _c
@@ -1341,7 +1335,7 @@ func (_c *MockGitService_AddWorktree_Call) Return(checkout repo.Checkout, err er
 	return _c
 }
 
-func (_c *MockGitService_AddWorktree_Call) RunAndReturn(run func(ctx context.Context, source string, username string, email string) (repo.Checkout, error)) *MockGitService_AddWorktree_Call {
+func (_c *MockGitService_AddWorktree_Call) RunAndReturn(run func(ctx context.Context, source string, requested repo.Identity) (repo.Checkout, error)) *MockGitService_AddWorktree_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1419,8 +1413,8 @@ func (_c *MockGitService_BranchExists_Call) RunAndReturn(run func(repository rep
 }
 
 // CloneRepository provides a mock function for the type MockGitService
-func (_mock *MockGitService) CloneRepository(repository string, branch string, token string, username string, email string) (repo.Checkout, error) {
-	ret := _mock.Called(repository, branch, token, username, email)
+func (_mock *MockGitService) CloneRepository(repository string, branch string, token string, requested repo.Identity) (repo.Checkout, error) {
+	ret := _mock.Called(repository, branch, token, requested)
 
 	if len(ret) == 0 {
 		panic("no return value specified for CloneRepository")
@@ -1428,16 +1422,16 @@ func (_mock *MockGitService) CloneRepository(repository string, branch string, t
 
 	var r0 repo.Checkout
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(string, string, string, string, string) (repo.Checkout, error)); ok {
-		return returnFunc(repository, branch, token, username, email)
+	if returnFunc, ok := ret.Get(0).(func(string, string, string, repo.Identity) (repo.Checkout, error)); ok {
+		return returnFunc(repository, branch, token, requested)
 	}
-	if returnFunc, ok := ret.Get(0).(func(string, string, string, string, string) repo.Checkout); ok {
-		r0 = returnFunc(repository, branch, token, username, email)
+	if returnFunc, ok := ret.Get(0).(func(string, string, string, repo.Identity) repo.Checkout); ok {
+		r0 = returnFunc(repository, branch, token, requested)
 	} else {
 		r0 = ret.Get(0).(repo.Checkout)
 	}
-	if returnFunc, ok := ret.Get(1).(func(string, string, string, string, string) error); ok {
-		r1 = returnFunc(repository, branch, token, username, email)
+	if returnFunc, ok := ret.Get(1).(func(string, string, string, repo.Identity) error); ok {
+		r1 = returnFunc(repository, branch, token, requested)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -1453,13 +1447,12 @@ type MockGitService_CloneRepository_Call struct {
 //   - repository string
 //   - branch string
 //   - token string
-//   - username string
-//   - email string
-func (_e *MockGitService_Expecter) CloneRepository(repository any, branch any, token any, username any, email any) *MockGitService_CloneRepository_Call {
-	return &MockGitService_CloneRepository_Call{Call: _e.mock.On("CloneRepository", repository, branch, token, username, email)}
+//   - requested repo.Identity
+func (_e *MockGitService_Expecter) CloneRepository(repository any, branch any, token any, requested any) *MockGitService_CloneRepository_Call {
+	return &MockGitService_CloneRepository_Call{Call: _e.mock.On("CloneRepository", repository, branch, token, requested)}
 }
 
-func (_c *MockGitService_CloneRepository_Call) Run(run func(repository string, branch string, token string, username string, email string)) *MockGitService_CloneRepository_Call {
+func (_c *MockGitService_CloneRepository_Call) Run(run func(repository string, branch string, token string, requested repo.Identity)) *MockGitService_CloneRepository_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 string
 		if args[0] != nil {
@@ -1473,20 +1466,15 @@ func (_c *MockGitService_CloneRepository_Call) Run(run func(repository string, b
 		if args[2] != nil {
 			arg2 = args[2].(string)
 		}
-		var arg3 string
+		var arg3 repo.Identity
 		if args[3] != nil {
-			arg3 = args[3].(string)
-		}
-		var arg4 string
-		if args[4] != nil {
-			arg4 = args[4].(string)
+			arg3 = args[3].(repo.Identity)
 		}
 		run(
 			arg0,
 			arg1,
 			arg2,
 			arg3,
-			arg4,
 		)
 	})
 	return _c
@@ -1497,7 +1485,7 @@ func (_c *MockGitService_CloneRepository_Call) Return(checkout repo.Checkout, er
 	return _c
 }
 
-func (_c *MockGitService_CloneRepository_Call) RunAndReturn(run func(repository string, branch string, token string, username string, email string) (repo.Checkout, error)) *MockGitService_CloneRepository_Call {
+func (_c *MockGitService_CloneRepository_Call) RunAndReturn(run func(repository string, branch string, token string, requested repo.Identity) (repo.Checkout, error)) *MockGitService_CloneRepository_Call {
 	_c.Call.Return(run)
 	return _c
 }

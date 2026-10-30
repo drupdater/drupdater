@@ -3,7 +3,7 @@ package phpcs
 import (
 	"context"
 	"encoding/json"
-	"github.com/drupdater/drupdater/pkg/php"
+	"github.com/drupdater/drupdater/internal/php"
 	"os/exec"
 	"path/filepath"
 

@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/drupdater/drupdater/pkg/composer"
-	"github.com/drupdater/drupdater/pkg/drupalorg"
-	"github.com/drupdater/drupdater/pkg/drush"
+	"github.com/drupdater/drupdater/internal/composer"
+	"github.com/drupdater/drupdater/internal/drupalorg"
+	"github.com/drupdater/drupdater/internal/drush"
 	"github.com/spf13/cobra"
 
 	"github.com/drupdater/drupdater/internal/config"

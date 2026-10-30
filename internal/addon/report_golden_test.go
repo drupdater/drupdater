@@ -5,11 +5,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/drupdater/drupdater/internal/composer"
+	"github.com/drupdater/drupdater/internal/drush"
 	"github.com/drupdater/drupdater/internal/golden"
 	"github.com/drupdater/drupdater/internal/report"
 	"github.com/drupdater/drupdater/internal/workflow"
-	"github.com/drupdater/drupdater/pkg/composer"
-	"github.com/drupdater/drupdater/pkg/drush"
 	"github.com/stretchr/testify/require"
 )
 

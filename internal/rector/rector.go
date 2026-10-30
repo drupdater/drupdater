@@ -3,7 +3,7 @@ package rector
 import (
 	"context"
 	"fmt"
-	"github.com/drupdater/drupdater/pkg/php"
+	"github.com/drupdater/drupdater/internal/php"
 	"os/exec"
 	"path/filepath"
 

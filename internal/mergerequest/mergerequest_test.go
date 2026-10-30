@@ -9,11 +9,11 @@ import (
 	"time"
 
 	"github.com/drupdater/drupdater/internal/addon"
+	"github.com/drupdater/drupdater/internal/composer"
+	"github.com/drupdater/drupdater/internal/drush"
 	"github.com/drupdater/drupdater/internal/golden"
 	"github.com/drupdater/drupdater/internal/mergerequest"
 	"github.com/drupdater/drupdater/internal/report"
-	"github.com/drupdater/drupdater/pkg/composer"
-	"github.com/drupdater/drupdater/pkg/drush"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

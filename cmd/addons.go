@@ -9,10 +9,10 @@ import (
 
 	"github.com/drupdater/drupdater/internal/addon"
 	"github.com/drupdater/drupdater/internal/config"
+	"github.com/drupdater/drupdater/internal/drupalorg"
+	"github.com/drupdater/drupdater/internal/phpcs"
+	"github.com/drupdater/drupdater/internal/rector"
 	"github.com/drupdater/drupdater/internal/workflow"
-	"github.com/drupdater/drupdater/pkg/drupalorg"
-	"github.com/drupdater/drupdater/pkg/phpcs"
-	"github.com/drupdater/drupdater/pkg/rector"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )

@@ -3,7 +3,7 @@ package addon
 import (
 	"testing"
 
-	"github.com/drupdater/drupdater/pkg/composer"
+	"github.com/drupdater/drupdater/internal/composer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"pgregory.net/rapid"

@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"path/filepath"
 
-	composerpkg "github.com/drupdater/drupdater/pkg/composer"
 	"github.com/spf13/afero"
+
+	"github.com/drupdater/drupdater/internal/drupal"
 )
 
 // CheckResult is one preflight outcome, from "drupdater check" or from a run's own guard.
@@ -73,7 +74,7 @@ type ComposerConfigGetter interface {
 func CheckSiteSettings(ctx context.Context, composer ComposerConfigGetter, fs afero.Fs, workingDir string, site string) CheckResult {
 	name := fmt.Sprintf("site %q: settings.php", site)
 
-	webroot, err := composerpkg.WebRoot(ctx, composer, workingDir)
+	webroot, err := drupal.WebRoot(ctx, composer, workingDir)
 	if err != nil {
 		return CheckFailed(name, fmt.Sprintf("could not determine web root: %s", err))
 	}

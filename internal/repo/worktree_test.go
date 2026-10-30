@@ -39,9 +39,9 @@ func gitOutput(t *testing.T, dir string, args ...string) string {
 func addWorktree(t *testing.T, username, email string) (string, Checkout) {
 	t.Helper()
 	source, _ := initRepoWithCommit(t)
-	service := NewGitRepositoryService(zap.NewNop())
+	service := New(zap.NewNop())
 
-	checkout, err := service.AddWorktree(t.Context(), source, username, email)
+	checkout, err := service.AddWorktree(t.Context(), source, Identity{Name: username, Email: email})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = service.RemoveWorktree(context.Background(), source, checkout.Path) })
 	return source, checkout
@@ -107,8 +107,8 @@ func TestSetAndRemoveBranchAreSeenByTheSourceCheckout(t *testing.T) {
 func TestRemoveWorktreeRemovesItsDirectoryAndRegistration(t *testing.T) {
 	isolateGitConfig(t)
 	source, _ := initRepoWithCommit(t)
-	service := NewGitRepositoryService(zap.NewNop())
-	checkout, err := service.AddWorktree(t.Context(), source, "", "")
+	service := New(zap.NewNop())
+	checkout, err := service.AddWorktree(t.Context(), source, Identity{})
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(filepath.Join(checkout.Path, "dirty.txt"), []byte("x"), 0o600))
 
@@ -122,8 +122,8 @@ func TestRemoveWorktreeRemovesItsDirectoryAndRegistration(t *testing.T) {
 func TestRemoveWorktreePrunesAWorktreeWhoseDirectoryIsGone(t *testing.T) {
 	isolateGitConfig(t)
 	source, _ := initRepoWithCommit(t)
-	service := NewGitRepositoryService(zap.NewNop())
-	checkout, err := service.AddWorktree(t.Context(), source, "", "")
+	service := New(zap.NewNop())
+	checkout, err := service.AddWorktree(t.Context(), source, Identity{})
 	require.NoError(t, err)
 	require.NoError(t, os.RemoveAll(filepath.Dir(checkout.Path)))
 
@@ -133,7 +133,7 @@ func TestRemoveWorktreePrunesAWorktreeWhoseDirectoryIsGone(t *testing.T) {
 }
 
 func TestRemoveWorktreeFailsWhenGitCannotRunAtAll(t *testing.T) {
-	service := NewGitRepositoryService(zap.NewNop())
+	service := New(zap.NewNop())
 	dir := t.TempDir()
 
 	err := service.RemoveWorktree(t.Context(), filepath.Join(dir, "missing"), filepath.Join(dir, "x", "checkout"))
@@ -143,10 +143,10 @@ func TestRemoveWorktreeFailsWhenGitCannotRunAtAll(t *testing.T) {
 
 func TestAddWorktreeErrors(t *testing.T) {
 	isolateGitConfig(t)
-	service := NewGitRepositoryService(zap.NewNop())
+	service := New(zap.NewNop())
 
 	t.Run("not a repository", func(t *testing.T) {
-		_, err := service.AddWorktree(t.Context(), t.TempDir(), "", "")
+		_, err := service.AddWorktree(t.Context(), t.TempDir(), Identity{})
 
 		require.ErrorIs(t, err, git.ErrRepositoryNotExists)
 		require.ErrorContains(t, err, "--working-dir must be the repository root")
@@ -158,7 +158,7 @@ func TestAddWorktreeErrors(t *testing.T) {
 		_, err := git.PlainInit(dir, false)
 		require.NoError(t, err)
 
-		_, err = service.AddWorktree(t.Context(), dir, "", "")
+		_, err = service.AddWorktree(t.Context(), dir, Identity{})
 
 		require.ErrorContains(t, err, "failed to add a worktree of "+dir)
 		matches, globErr := filepath.Glob(filepath.Join(os.TempDir(), "drupdater-worktree-*", "checkout"))
@@ -171,13 +171,13 @@ func TestAddWorktreeErrors(t *testing.T) {
 	t.Run("git reports success but leaves no worktree", func(t *testing.T) {
 		source, _ := initRepoWithCommit(t)
 		var calls [][]string
-		silent := &GitRepositoryService{logger: zap.NewNop(), newCommand: func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+		silent := &Git{logger: zap.NewNop(), newCommand: func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 			calls = append(calls, arg)
 			return exec.CommandContext(ctx, "true")
 		}}
 		t.Setenv("TMPDIR", t.TempDir())
 
-		_, err := silent.AddWorktree(t.Context(), source, "", "")
+		_, err := silent.AddWorktree(t.Context(), source, Identity{})
 
 		require.ErrorIs(t, err, git.ErrRepositoryNotExists)
 		require.Len(t, calls, 2)
@@ -191,7 +191,7 @@ func TestAddWorktreeErrors(t *testing.T) {
 		source, _ := initRepoWithCommit(t)
 		t.Setenv("TMPDIR", filepath.Join(t.TempDir(), "missing"))
 
-		_, err := service.AddWorktree(t.Context(), source, "", "")
+		_, err := service.AddWorktree(t.Context(), source, Identity{})
 
 		require.ErrorContains(t, err, "failed to create temporary directory")
 	})
@@ -252,7 +252,7 @@ func TestSignatureIsTheIdentityNow(t *testing.T) {
 
 func TestGitCommandsTrustTheRepository(t *testing.T) {
 	var args []string
-	rs := &GitRepositoryService{newCommand: func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+	rs := &Git{newCommand: func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
 		args = arg
 		return exec.CommandContext(ctx, "true")
 	}}
@@ -280,9 +280,9 @@ func TestAddWorktreeOfARepositoryOwnedByAnotherUser(t *testing.T) {
 		}
 		return root.Lchown(path, 65534, 65534)
 	}))
-	service := NewGitRepositoryService(zap.NewNop())
+	service := New(zap.NewNop())
 
-	checkout, err := service.AddWorktree(t.Context(), source, "", "")
+	checkout, err := service.AddWorktree(t.Context(), source, Identity{})
 	require.NoError(t, err)
 	require.NoError(t, service.RemoveWorktree(t.Context(), source, checkout.Path))
 }

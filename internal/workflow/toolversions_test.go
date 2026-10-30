@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/drupdater/drupdater/internal/composer"
 	"github.com/drupdater/drupdater/internal/report"
-	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"

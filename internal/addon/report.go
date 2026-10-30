@@ -5,8 +5,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/drupdater/drupdater/pkg/composer"
-	"github.com/drupdater/drupdater/pkg/drush"
+	"github.com/drupdater/drupdater/internal/composer"
+	"github.com/drupdater/drupdater/internal/drush"
 )
 
 // Every addon's contribution to the --report document, together in one file because these

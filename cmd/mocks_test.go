@@ -7,8 +7,8 @@ package cmd
 import (
 	"context"
 
+	"github.com/drupdater/drupdater/internal/composer"
 	"github.com/drupdater/drupdater/internal/workflow"
-	"github.com/drupdater/drupdater/pkg/composer"
 	mock "github.com/stretchr/testify/mock"
 )
 

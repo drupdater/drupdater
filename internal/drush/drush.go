@@ -3,12 +3,12 @@ package drush
 import (
 	"context"
 	"fmt"
-	"github.com/drupdater/drupdater/pkg/php"
 	"maps"
 	"os/exec"
 	"path/filepath"
 	"slices"
-	"strings"
+
+	"github.com/drupdater/drupdater/internal/php"
 
 	"go.uber.org/zap"
 )
@@ -53,24 +53,6 @@ func (e *CLI) InstallSite(ctx context.Context, dir string, site string) error {
 		return fmt.Errorf("failed to install %s: %w, output: %s", site, err, out)
 	}
 	return nil
-}
-
-// RelativeTo makes an absolute path from drush relative to dir, which is tried as given and
-// resolved: drush reports the resolved Drupal root, settings.php whatever it was written as.
-func RelativeTo(dir string, path string) string {
-	if !filepath.IsAbs(path) {
-		return path
-	}
-	roots := []string{dir}
-	if resolved, err := filepath.EvalSymlinks(dir); err == nil {
-		roots = append(roots, resolved)
-	}
-	for _, root := range roots {
-		if rel, err := filepath.Rel(root, path); err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-			return rel
-		}
-	}
-	return path
 }
 
 // GetConfigSyncDir returns the site's absolute config sync directory. Unlike Facts it needs no

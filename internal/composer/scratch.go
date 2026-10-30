@@ -2,57 +2,45 @@ package composer
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"slices"
-	"strings"
 	"sync"
 
 	"github.com/spf13/afero"
 	"go.uber.org/zap"
 )
 
-// GetDependencyPatches returns targetPackage -> patch files declared by installed dependencies,
-// which apply on top of the root composer.json patches.
-func (s *CLI) GetDependencyPatches(_ context.Context, dir string) (map[string]map[string]bool, error) {
-	content, err := afero.ReadFile(s.fs, dir+"/composer.lock")
-	if err != nil {
-		return nil, fmt.Errorf("failed to read composer.lock: %w", err)
-	}
-
-	var lock struct {
-		Packages    []lockPackage `json:"packages"`
-		PackagesDev []lockPackage `json:"packages-dev"`
-	}
-	if err := json.Unmarshal(content, &lock); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal composer.lock: %w", err)
-	}
-
-	result := make(map[string]map[string]bool)
-	for _, pkg := range append(lock.Packages, lock.PackagesDev...) {
-		// extra is optional and may be serialized as [] when empty; tolerate both.
-		var extra struct {
-			Patches map[string]map[string]string `json:"patches"`
-		}
-		if len(pkg.Extra) == 0 || json.Unmarshal(pkg.Extra, &extra) != nil {
-			continue
-		}
-		for targetPackage, byDescription := range extra.Patches {
-			for _, file := range byDescription {
-				if result[targetPackage] == nil {
-					result[targetPackage] = make(map[string]bool)
-				}
-				result[targetPackage][file] = true
-			}
-		}
-	}
-	return result, nil
+// scratchDir is the patch-test project's directory, created on first use and shared by every check.
+type scratchDir struct {
+	mu   sync.Mutex
+	path string
 }
 
-type lockPackage struct {
-	Extra json.RawMessage `json:"extra"`
+func (d *scratchDir) get(fs afero.Fs) (string, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.path != "" {
+		return d.path, nil
+	}
+	path, err := afero.TempDir(fs, "", "composer-service")
+	if err != nil {
+		return "", err
+	}
+	d.path = path
+	return path, nil
+}
+
+func (d *scratchDir) remove(fs afero.Fs) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.path == "" {
+		return nil
+	}
+	err := fs.RemoveAll(d.path)
+	d.path = ""
+	return err
 }
 
 // Appended to every scratch project so a contrib module resolves even when the project's own
@@ -210,26 +198,22 @@ func repositoryURL(raw json.RawMessage) string {
 	return entry.URL
 }
 
-func (s *CLI) initTempDir() {
-	s.tempDir, s.initErr = afero.TempDir(s.fs, "", "composer-service")
-}
-
 // resetScratchProject undoes the `composer require` each check leaves behind: without it, a
 // conflict between two unrelated checks fails the require and reads as "the patch does not
 // apply". composer.json is rebuilt here, not at init, because it carries the project's
 // repositories, unknown until a check asks.
-func (s *CLI) resetScratchProject(projectDir string) error {
+func (s *CLI) resetScratchProject(dir string, projectDir string) error {
 	composerJSON, err := s.buildScratchComposerJSON(projectDir)
 	if err != nil {
 		return fmt.Errorf("failed to build scratch composer.json: %w", err)
 	}
-	if err := afero.WriteFile(s.fs, s.tempDir+"/composer.json", composerJSON, 0644); err != nil {
+	if err := afero.WriteFile(s.fs, dir+"/composer.json", composerJSON, 0644); err != nil {
 		return fmt.Errorf("failed to reset scratch composer.json: %w", err)
 	}
-	if err := s.fs.RemoveAll(s.tempDir + "/composer.lock"); err != nil {
+	if err := s.fs.RemoveAll(dir + "/composer.lock"); err != nil {
 		return fmt.Errorf("failed to remove scratch composer.lock: %w", err)
 	}
-	if err := s.fs.RemoveAll(s.tempDir + "/vendor"); err != nil {
+	if err := s.fs.RemoveAll(dir + "/vendor"); err != nil {
 		return fmt.Errorf("failed to remove scratch vendor directory: %w", err)
 	}
 	return nil
@@ -237,102 +221,7 @@ func (s *CLI) resetScratchProject(projectDir string) error {
 
 // Cleanup removes the patch-test scratch project; defer it, or every run leaks a vendor tree.
 func (s *CLI) Cleanup() {
-	if s.tempDir == "" {
-		return
+	if err := s.scratch.remove(s.fs); err != nil {
+		s.logger.Warn("failed to remove composer scratch directory", zap.Error(err))
 	}
-	if err := s.fs.RemoveAll(s.tempDir); err != nil {
-		s.logger.Warn("failed to remove composer scratch directory", zap.String("dir", s.tempDir), zap.Error(err))
-	}
-	s.tempDir = ""
-	// Without resetting, a check after Cleanup skips initTempDir and runs in the process's own
-	// working directory (Dir: "" resolves to cwd) instead of a scratch project.
-	s.initOnce = sync.Once{}
-}
-
-type patchTestConfig struct {
-	Patches map[string]map[string]string `json:"patches"`
-}
-
-// CheckIfPatchApplies reports whether one patch still applies to packageName at packageVersion.
-func (s *CLI) CheckIfPatchApplies(ctx context.Context, projectDir string, packageName string, packageVersion string, patchPath string) (bool, error) {
-	return s.CheckIfPatchesApply(ctx, projectDir, packageName, packageVersion, []string{patchPath})
-}
-
-// requireIntoScratch installs the package under test: true when it installed, false when the
-// patch was rejected, error when composer never got the package. The third case must stay
-// distinct — false pins the package, which is wrong for an unreachable registry. Not --quiet:
-// that suppresses the message this classification reads.
-func (s *CLI) requireIntoScratch(ctx context.Context, packageName string, packageVersion string) (bool, error) {
-	out, err := s.execComposer(ctx, s.tempDir,
-		"require", "--ignore-platform-reqs", packageName+":"+constraint(packageVersion), "--with-all-dependencies")
-	if err == nil {
-		return true, nil
-	}
-
-	if reason, unresolvable := unresolvableReason(out); unresolvable {
-		return false, fmt.Errorf("could not obtain %s %s to test its patches (%s): %w", packageName, packageVersion, reason, err)
-	}
-
-	return false, nil //nolint:nilerr // composer obtained the package and the patch was rejected
-}
-
-// unresolvableReason reports whether composer could not obtain the package, and why. A rejected
-// patch wins outright: the dist-to-source fallback logs "could not be downloaded (404)" and then
-// succeeds, so the unresolvable patterns alone would misread a genuine rejection.
-//
-// Both match composer's English output, so prefer adding a pattern to loosening one.
-func unresolvableReason(out string) (string, bool) {
-	lower := strings.ToLower(out)
-
-	// The two wordings composer-patches v1 uses for a patch failure.
-	if strings.Contains(lower, "could not apply patch") || strings.Contains(lower, "cannot apply patch") {
-		return "", false
-	}
-
-	for _, candidate := range unresolvablePatterns {
-		if strings.Contains(lower, candidate.pattern) {
-			return candidate.reason, true
-		}
-	}
-	return "", false
-}
-
-var unresolvablePatterns = []struct{ pattern, reason string }{
-	{"could not find package", "not available from any configured repository"},
-	{"could not find a matching version", "not available from any configured repository"},
-	{"could not be found", "not available from any configured repository"},
-	{"invalid credentials", "repository authentication failed"},
-	{"authentication required", "repository authentication failed"},
-	{"could not be downloaded", "a required download failed"},
-}
-
-// CheckIfPatchesApply reports whether patchPaths all apply together. The keys are zero-padded
-// indexes because composer-patches v1 applies patches in key order.
-func (s *CLI) CheckIfPatchesApply(ctx context.Context, projectDir string, packageName string, packageVersion string, patchPaths []string) (bool, error) {
-	s.initOnce.Do(s.initTempDir)
-	if s.initErr != nil {
-		return false, s.initErr
-	}
-	if err := s.resetScratchProject(projectDir); err != nil {
-		return false, err
-	}
-
-	patchMap := make(map[string]string, len(patchPaths))
-	for i, p := range patchPaths {
-		patchMap[fmt.Sprintf("%010d", i)] = p
-	}
-
-	// Marshalled rather than formatted, so special characters in the arguments stay escaped.
-	patchesJSONBytes, err := json.Marshal(patchTestConfig{
-		Patches: map[string]map[string]string{packageName: patchMap},
-	})
-	if err != nil {
-		return false, fmt.Errorf("failed to marshal patch config: %w", err)
-	}
-
-	if err := afero.WriteFile(s.fs, s.tempDir+"/composer.patches.json", patchesJSONBytes, 0644); err != nil {
-		return false, err
-	}
-
-	return s.requireIntoScratch(ctx, packageName, packageVersion)
 }

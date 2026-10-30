@@ -3,7 +3,6 @@ package composer
 import (
 	"context"
 	"fmt"
-	"github.com/drupdater/drupdater/pkg/php"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/drupdater/drupdater/internal/php"
 
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
@@ -334,8 +335,8 @@ func TestConstraint(t *testing.T) {
 func TestRequireIntoScratchPinsADevPackageByCommit(t *testing.T) {
 	fake := &fakeUpdate{}
 
-	service := &CLI{newCommand: fake.command(t), logger: zap.NewNop(), tempDir: t.TempDir()}
-	ok, err := service.requireIntoScratch(t.Context(), "drupal/foo", "1.x-dev 0424dff")
+	service := &CLI{newCommand: fake.command(t), logger: zap.NewNop()}
+	ok, err := service.requireIntoScratch(t.Context(), t.TempDir(), "drupal/foo", "1.x-dev 0424dff")
 	require.NoError(t, err)
 	assert.True(t, ok)
 

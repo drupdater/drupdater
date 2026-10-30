@@ -7,11 +7,11 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/drupdater/drupdater/internal/composer"
 	"github.com/drupdater/drupdater/internal/config"
 	"github.com/drupdater/drupdater/internal/logging"
+	"github.com/drupdater/drupdater/internal/repo"
 	"github.com/drupdater/drupdater/internal/workflow"
-	"github.com/drupdater/drupdater/pkg/composer"
-	"github.com/drupdater/drupdater/pkg/repo"
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/stretchr/testify/assert"
@@ -233,7 +233,7 @@ func TestAddonsCommand(t *testing.T) {
 }
 
 func TestResolveCheckoutBranch(t *testing.T) {
-	svc := repo.NewGitRepositoryService(zap.NewNop())
+	svc := repo.New(zap.NewNop())
 
 	// initRepo creates a repo with one commit; detach leaves HEAD off any branch.
 	initRepo := func(t *testing.T, detach bool) string {

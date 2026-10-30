@@ -4,12 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/drupdater/drupdater/pkg/php"
-	"os"
 	"os/exec"
 	"regexp"
 	"strings"
-	"sync"
+
+	"github.com/drupdater/drupdater/internal/drupal"
+	"github.com/drupdater/drupdater/internal/php"
 
 	"github.com/spf13/afero"
 	"go.uber.org/zap"
@@ -22,9 +22,7 @@ type CLI struct {
 	// extraEnv is added to every invocation; see WithoutBlocking.
 	extraEnv []string
 
-	tempDir  string
-	initOnce sync.Once
-	initErr  error
+	scratch scratchDir
 }
 
 func NewCLI(logger *zap.Logger, opts ...Option) *CLI {
@@ -193,34 +191,10 @@ func (s *CLI) UpdateLockHash(ctx context.Context, dir string) error {
 	return err
 }
 
-// ConfigGetter is the one method WebRoot needs, so a caller's own interface satisfies it.
-type ConfigGetter interface {
-	GetConfig(ctx context.Context, dir string, key string) (string, error)
-}
-
-// WebRoot returns the project's Drupal web root, relative to dir and without a trailing slash.
-func WebRoot(ctx context.Context, cfg ConfigGetter, dir string) (string, error) {
-	webroot, err := cfg.GetConfig(ctx, dir, "extra.drupal-scaffold.locations.web-root")
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSuffix(webroot, "/"), nil
-}
-
 func (s *CLI) GetCustomCodeDirectories(ctx context.Context, dir string) ([]string, error) {
-	webroot, err := WebRoot(ctx, s, dir)
+	dirs, err := drupal.CustomCodeDirectories(ctx, s.fs, s, dir)
 	if err != nil {
 		s.logger.Error("failed to get Drupal web dir", zap.String("dir", dir), zap.Error(err))
-		return nil, err
 	}
-
-	possibleDirectories := []string{webroot + "/modules/custom", webroot + "/themes/custom", webroot + "/profiles/custom"}
-	var customCodeDirectories []string
-	for _, possibleDirectory := range possibleDirectories {
-		if _, err := s.fs.Stat(dir + "/" + possibleDirectory); os.IsNotExist(err) {
-			continue
-		}
-		customCodeDirectories = append(customCodeDirectories, possibleDirectory)
-	}
-	return customCodeDirectories, nil
+	return dirs, err
 }

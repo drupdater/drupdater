@@ -11,11 +11,180 @@ import (
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/go-git/go-git/v5/plumbing/transport"
 
+	"errors"
+
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+
+	"github.com/go-git/go-git/v5/storage/memory"
 )
+
+// remoteToLocalRepo builds a real local repo to list against, rather than faking go-git's ref
+// format, so a mismatch with the actual wire format is caught.
+func remoteToLocalRepo(t *testing.T, branches ...string) *git.Remote {
+	t.Helper()
+	dir := t.TempDir()
+	r, err := git.PlainInit(dir, false)
+	require.NoError(t, err)
+	wt, err := r.Worktree()
+	require.NoError(t, err)
+	hash, err := wt.Commit("init", &git.CommitOptions{
+		AllowEmptyCommits: true,
+		Author:            &object.Signature{Name: "t", Email: "t@example.com"},
+	})
+	require.NoError(t, err)
+	for _, b := range branches {
+		require.NoError(t, r.Storer.SetReference(plumbing.NewHashReference(plumbing.NewBranchReferenceName(b), hash)))
+	}
+
+	return git.NewRemote(memory.NewStorage(), &gitConfig.RemoteConfig{
+		Name: "origin",
+		URLs: []string{dir},
+	})
+}
+
+func TestBranchExists(t *testing.T) {
+	logger := zap.NewNop()
+	service := New(logger)
+
+	t.Run("branch found", func(t *testing.T) {
+		remote := remoteToLocalRepo(t, "main", "my-feature")
+		repo := NewMockRepository(t)
+		repo.EXPECT().Remote("origin").Return(remote, nil)
+
+		found, err := service.BranchExists(repo, "my-feature", "")
+		require.NoError(t, err)
+		assert.True(t, found)
+	})
+
+	t.Run("branch not found", func(t *testing.T) {
+		remote := remoteToLocalRepo(t, "main")
+		repo := NewMockRepository(t)
+		repo.EXPECT().Remote("origin").Return(remote, nil)
+
+		found, err := service.BranchExists(repo, "my-feature", "")
+		require.NoError(t, err)
+		assert.False(t, found)
+	})
+
+	t.Run("branch deleted on remote since the last fetch is not reported as existing", func(t *testing.T) {
+		// A stale cached ref, left by a branch the host auto-deleted, must not produce a false
+		// positive: BranchExists queries the live remote.
+		remote := remoteToLocalRepo(t, "main")
+		repo := NewMockRepository(t)
+		repo.EXPECT().Remote("origin").Return(remote, nil)
+
+		found, err := service.BranchExists(repo, "my-feature", "")
+		require.NoError(t, err)
+		assert.False(t, found)
+	})
+
+	t.Run("remote lookup error", func(t *testing.T) {
+		remoteErr := errors.New("no such remote")
+
+		repo := NewMockRepository(t)
+		repo.EXPECT().Remote("origin").Return(nil, remoteErr)
+
+		found, err := service.BranchExists(repo, "my-feature", "")
+		require.Error(t, err)
+		require.ErrorIs(t, err, remoteErr)
+		assert.False(t, found)
+	})
+
+	t.Run("remote list error", func(t *testing.T) {
+		remote := git.NewRemote(memory.NewStorage(), &gitConfig.RemoteConfig{
+			Name: "origin",
+			URLs: []string{t.TempDir()}, // empty dir: not a git repo, List() must fail
+		})
+		repo := NewMockRepository(t)
+		repo.EXPECT().Remote("origin").Return(remote, nil)
+
+		found, err := service.BranchExists(repo, "my-feature", "")
+		require.Error(t, err)
+		assert.False(t, found)
+	})
+}
+
+func TestGetRemoteURL(t *testing.T) {
+	logger := zap.NewNop()
+	service := New(logger)
+
+	t.Run("returns origin URL with credentials stripped", func(t *testing.T) {
+		dir := t.TempDir()
+		r, err := git.PlainInit(dir, false)
+		require.NoError(t, err)
+		_, err = r.CreateRemote(&gitConfig.RemoteConfig{
+			Name: "origin",
+			URLs: []string{"https://gitlab-ci-token:secret@example.com/group/repo.git"},
+		})
+		require.NoError(t, err)
+
+		url, err := service.GetRemoteURL(dir)
+		require.NoError(t, err)
+		assert.Equal(t, "https://example.com/group/repo.git", url)
+	})
+
+	t.Run("errors when there is no origin remote", func(t *testing.T) {
+		dir := t.TempDir()
+		_, err := git.PlainInit(dir, false)
+		require.NoError(t, err)
+
+		_, err = service.GetRemoteURL(dir)
+		require.Error(t, err)
+	})
+}
+
+func TestGetCurrentBranch(t *testing.T) {
+	logger := zap.NewNop()
+	service := New(logger)
+
+	t.Run("returns the branch HEAD points to", func(t *testing.T) {
+		dir := t.TempDir()
+		r, err := git.PlainInit(dir, false)
+		require.NoError(t, err)
+
+		// Commit once so HEAD resolves to a branch.
+		wt, err := r.Worktree()
+		require.NoError(t, err)
+		_, err = wt.Commit("init", &git.CommitOptions{
+			AllowEmptyCommits: true,
+			Author:            &object.Signature{Name: "t", Email: "t@example.com"},
+		})
+		require.NoError(t, err)
+
+		branch, err := service.GetCurrentBranch(dir)
+		require.NoError(t, err)
+		assert.Equal(t, "master", branch)
+	})
+
+	t.Run("returns empty string in detached HEAD", func(t *testing.T) {
+		dir := t.TempDir()
+		r, err := git.PlainInit(dir, false)
+		require.NoError(t, err)
+
+		wt, err := r.Worktree()
+		require.NoError(t, err)
+		hash, err := wt.Commit("init", &git.CommitOptions{
+			AllowEmptyCommits: true,
+			Author:            &object.Signature{Name: "t", Email: "t@example.com"},
+		})
+		require.NoError(t, err)
+
+		// Detach HEAD at the commit.
+		require.NoError(t, wt.Checkout(&git.CheckoutOptions{Hash: hash}))
+
+		branch, err := service.GetCurrentBranch(dir)
+		require.NoError(t, err)
+		assert.Empty(t, branch)
+	})
+
+	t.Run("errors on a non-repository path", func(t *testing.T) {
+		_, err := service.GetCurrentBranch(t.TempDir())
+		require.Error(t, err)
+	})
+}
 
 // initRepoWithCommit creates a repo containing a single empty commit.
 func initRepoWithCommit(t *testing.T) (string, *git.Repository) {
@@ -34,7 +203,7 @@ func initRepoWithCommit(t *testing.T) (string, *git.Repository) {
 }
 
 func TestGetRemoteURLFallsBackForSCPStyleURLs(t *testing.T) {
-	service := NewGitRepositoryService(zap.NewNop())
+	service := New(zap.NewNop())
 
 	dir := t.TempDir()
 	r, err := git.PlainInit(dir, false)
@@ -53,7 +222,7 @@ func TestGetRemoteURLFallsBackForSCPStyleURLs(t *testing.T) {
 }
 
 func TestGetRemoteURLErrorsOnNonRepository(t *testing.T) {
-	service := NewGitRepositoryService(zap.NewNop())
+	service := New(zap.NewNop())
 
 	_, err := service.GetRemoteURL(t.TempDir())
 	require.Error(t, err)
@@ -63,7 +232,7 @@ func TestGetRemoteURLErrorsOnNonRepository(t *testing.T) {
 }
 
 func TestGetRemoteURLErrorsWhenOriginMissing(t *testing.T) {
-	service := NewGitRepositoryService(zap.NewNop())
+	service := New(zap.NewNop())
 
 	dir := t.TempDir()
 	_, err := git.PlainInit(dir, false)
@@ -75,7 +244,7 @@ func TestGetRemoteURLErrorsWhenOriginMissing(t *testing.T) {
 }
 
 func TestIsShallowCloneErrorsOnNonRepository(t *testing.T) {
-	service := NewGitRepositoryService(zap.NewNop())
+	service := New(zap.NewNop())
 
 	_, err := service.IsShallowClone(t.TempDir())
 	require.Error(t, err)
@@ -83,14 +252,14 @@ func TestIsShallowCloneErrorsOnNonRepository(t *testing.T) {
 }
 
 func TestCloneRepository(t *testing.T) {
-	service := NewGitRepositoryService(zap.NewNop())
+	service := New(zap.NewNop())
 
 	t.Run("clones a branch and prepares the checkout", func(t *testing.T) {
 		source, r := initRepoWithCommit(t)
 		head, err := r.Head()
 		require.NoError(t, err)
 
-		checkout, err := service.CloneRepository(source, head.Name().Short(), "", "Bot", "bot@example.com")
+		checkout, err := service.CloneRepository(source, head.Name().Short(), "", Identity{Name: "Bot", Email: "bot@example.com"})
 		require.NoError(t, err)
 		path := checkout.Path
 		assert.NotNil(t, checkout.Repository)
@@ -135,7 +304,7 @@ func TestCloneRepository(t *testing.T) {
 		head, err := r.Head()
 		require.NoError(t, err)
 
-		checkout, err := service.CloneRepository(source, head.Name().Short(), "", "Bot", "bot@example.com")
+		checkout, err := service.CloneRepository(source, head.Name().Short(), "", Identity{Name: "Bot", Email: "bot@example.com"})
 		require.NoError(t, err)
 		path := checkout.Path
 		t.Cleanup(func() { _ = os.RemoveAll(path) })
@@ -166,7 +335,7 @@ func TestCloneRepository(t *testing.T) {
 	})
 
 	t.Run("returns the clone error for an unreachable repository", func(t *testing.T) {
-		_, err := service.CloneRepository(t.TempDir(), "main", "", "Bot", "bot@example.com")
+		_, err := service.CloneRepository(t.TempDir(), "main", "", Identity{Name: "Bot", Email: "bot@example.com"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "git clone")
 		require.ErrorIs(t, err, transport.ErrRepositoryNotFound)
@@ -175,21 +344,21 @@ func TestCloneRepository(t *testing.T) {
 	t.Run("returns the clone error for a branch that does not exist", func(t *testing.T) {
 		source, _ := initRepoWithCommit(t)
 
-		_, err := service.CloneRepository(source, "no-such-branch", "", "Bot", "bot@example.com")
+		_, err := service.CloneRepository(source, "no-such-branch", "", Identity{Name: "Bot", Email: "bot@example.com"})
 		require.Error(t, err)
 	})
 
 	t.Run("returns the error when the project directory cannot be created", func(t *testing.T) {
-		roService := &GitRepositoryService{logger: zap.NewNop(), fs: afero.NewReadOnlyFs(afero.NewMemMapFs())}
+		roService := &Git{logger: zap.NewNop(), fs: afero.NewReadOnlyFs(afero.NewMemMapFs())}
 
-		_, err := roService.CloneRepository("https://example.com/repo.git", "main", "", "Bot", "bot@example.com")
+		_, err := roService.CloneRepository("https://example.com/repo.git", "main", "", Identity{Name: "Bot", Email: "bot@example.com"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to create project directory")
 	})
 }
 
 func TestIsShallowClone(t *testing.T) {
-	service := NewGitRepositoryService(zap.NewNop())
+	service := New(zap.NewNop())
 
 	t.Run("a full checkout is not shallow", func(t *testing.T) {
 		dir, _ := initRepoWithCommit(t)
@@ -212,7 +381,7 @@ func TestIsShallowClone(t *testing.T) {
 		head, err := r.Head()
 		require.NoError(t, err)
 
-		checkout, err := service.CloneRepository(source, head.Name().Short(), "", "Bot", "bot@example.com")
+		checkout, err := service.CloneRepository(source, head.Name().Short(), "", Identity{Name: "Bot", Email: "bot@example.com"})
 		require.NoError(t, err)
 		path := checkout.Path
 		t.Cleanup(func() { _ = os.RemoveAll(path) })

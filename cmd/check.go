@@ -11,14 +11,14 @@ import (
 
 	"github.com/drupdater/drupdater/internal/buildinfo"
 	"github.com/drupdater/drupdater/internal/codehosting"
+	"github.com/drupdater/drupdater/internal/composer"
 	"github.com/drupdater/drupdater/internal/config"
+	"github.com/drupdater/drupdater/internal/drush"
 	"github.com/drupdater/drupdater/internal/logging"
+	"github.com/drupdater/drupdater/internal/repo"
 	"github.com/drupdater/drupdater/internal/report"
+	"github.com/drupdater/drupdater/internal/siteinstall"
 	"github.com/drupdater/drupdater/internal/workflow"
-	"github.com/drupdater/drupdater/pkg/composer"
-	"github.com/drupdater/drupdater/pkg/drupal"
-	"github.com/drupdater/drupdater/pkg/drush"
-	"github.com/drupdater/drupdater/pkg/repo"
 	"github.com/drupdater/drupdater/scripts"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
@@ -69,7 +69,7 @@ func (a app) runCheck(cmd *cobra.Command, args []string, opts options) error {
 	token := checkToken(args)
 	redactor.Register(token)
 
-	gitSvc := repo.NewGitRepositoryService(logger)
+	gitSvc := repo.New(logger)
 	var resolveErr error
 	if !cfg.Clone {
 		resolveErr = resolveCheckoutSettings(gitSvc, &cfg)
@@ -209,12 +209,12 @@ func (a app) checkVCS(ctx context.Context, logger *zap.Logger, repositoryURL str
 
 // fullCheckComposer is what the --full tier needs from composer.
 type fullCheckComposer interface {
-	drupal.Composer
+	siteinstall.Composer
 	Install(ctx context.Context, path string) error
 	Cleanup()
 }
 
-// siteInstaller is the one method the tier needs from drupal.Installer.
+// siteInstaller is the one method the tier needs from siteinstall.Installer.
 type siteInstaller interface {
 	Install(ctx context.Context, dir string, site string) error
 }
@@ -231,13 +231,13 @@ type fullCheckDeps struct {
 func realFullCheckDeps(logger *zap.Logger) fullCheckDeps {
 	return fullCheckDeps{
 		clone: func(repositoryURL string, branch string, token string) (string, error) {
-			checkout, err := repo.NewGitRepositoryService(logger).
-				CloneRepository(repositoryURL, branch, token, "", "")
+			checkout, err := repo.New(logger).
+				CloneRepository(repositoryURL, branch, token, repo.Identity{})
 			return checkout.Path, err
 		},
 		newComposer: func() fullCheckComposer { return composer.NewCLI(logger) },
 		newInstaller: func(c fullCheckComposer, dataDir string, drushInclude string) (siteInstaller, error) {
-			return drupal.NewInstaller(logger, drush.NewCLI(logger, drushInclude), c, dataDir), nil
+			return siteinstall.NewInstaller(logger, drush.NewCLI(logger, drushInclude), c, dataDir), nil
 		},
 	}
 }

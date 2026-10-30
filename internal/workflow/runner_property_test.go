@@ -3,8 +3,8 @@ package workflow
 import (
 	"testing"
 
+	"github.com/drupdater/drupdater/internal/composer"
 	"github.com/drupdater/drupdater/internal/report"
-	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/stretchr/testify/assert"
 	"pgregory.net/rapid"
 )

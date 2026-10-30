@@ -1,4 +1,4 @@
-package drupal
+package siteinstall
 
 import (
 	"context"

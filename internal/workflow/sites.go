@@ -9,7 +9,8 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/drupdater/drupdater/pkg/drush"
+	"github.com/drupdater/drupdater/internal/drupal"
+	"github.com/drupdater/drupdater/internal/drush"
 )
 
 // forEachSite runs fn per site concurrently, bounded by config.Concurrency, cancelling the rest
@@ -110,7 +111,7 @@ func (r *run) commitSiteChanges(ctx context.Context, site string, facts drush.Fa
 	if facts.ConfigSyncDirectory == "" {
 		return fmt.Errorf("failed to locate the exported configuration: site %s has no config sync directory", site)
 	}
-	if _, err := r.committer.Commit("Update configuration "+site, drush.RelativeTo(r.path, facts.ConfigSyncDirectory)); err != nil {
+	if _, err := r.committer.Commit("Update configuration "+site, drupal.RelativeTo(r.path, facts.ConfigSyncDirectory)); err != nil {
 		return fmt.Errorf("failed to commit the exported configuration: %w", err)
 	}
 

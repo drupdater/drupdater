@@ -6,13 +6,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/drupdater/drupdater/pkg/repo"
+	"github.com/drupdater/drupdater/internal/repo"
 
 	"github.com/drupdater/drupdater/internal/buildinfo"
 	"github.com/drupdater/drupdater/internal/codehosting"
+	"github.com/drupdater/drupdater/internal/composer"
 	"github.com/drupdater/drupdater/internal/config"
 	"github.com/drupdater/drupdater/internal/report"
-	"github.com/drupdater/drupdater/pkg/composer"
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/stretchr/testify/assert"
@@ -81,7 +81,7 @@ func (h *reportHarness) expectDefaults() {
 	h.composer.EXPECT().Version(anyCtx).
 		RunAndReturn(func(context.Context) (composer.Versions, error) { return h.versions, h.versionsErr }).Maybe()
 	h.vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail").Maybe()
-	h.repoSvc.EXPECT().CloneRepository(h.config.RepositoryURL, h.config.Branch, h.config.Token, "user", "mail").
+	h.repoSvc.EXPECT().CloneRepository(h.config.RepositoryURL, h.config.Branch, h.config.Token, repo.Identity{Name: "user", Email: "mail"}).
 		Return(repo.Checkout{Repository: h.repository, Worktree: h.worktree, Path: testCheckout, Author: testAuthor}, nil).Maybe()
 	h.repoSvc.EXPECT().IsShallowClone(testCheckout).Return(false, nil).Maybe()
 	h.composer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil).Maybe()
@@ -253,7 +253,7 @@ func TestReportWrittenOnFailureNamesThePhase(t *testing.T) {
 func TestReportWrittenWhenAcquiringTheWorkingCopyFails(t *testing.T) {
 	h := newReportHarness(t, false)
 	h.repoSvc.ExpectedCalls = nil
-	h.repoSvc.EXPECT().CloneRepository(mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+	h.repoSvc.EXPECT().CloneRepository(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(repo.Checkout{}, errors.New("authentication failed"))
 
 	err := h.run(t)

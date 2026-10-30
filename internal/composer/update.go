@@ -10,8 +10,8 @@ import (
 	"strings"
 
 	"github.com/spf13/afero"
-	"golang.org/x/mod/semver"
 	"go.uber.org/zap"
+	"golang.org/x/mod/semver"
 )
 
 type PackageChange struct {

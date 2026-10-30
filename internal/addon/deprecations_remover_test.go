@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/drupdater/drupdater/internal/rector"
 	"github.com/drupdater/drupdater/internal/workflow"
-	"github.com/drupdater/drupdater/pkg/rector"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

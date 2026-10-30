@@ -16,7 +16,7 @@ build: ## Build the binary
 test: ## Run tests
 	go test -v ./...
 
-# Around a minute rather than a couple of seconds: pkg/composer and pkg/drush fake subprocesses
+# Around a minute rather than a couple of seconds: internal/composer and internal/drush fake subprocesses
 # by re-executing the test binary, and -race instruments every one of those execs.
 test-race: ## Run tests with the race detector
 	go test -race ./...

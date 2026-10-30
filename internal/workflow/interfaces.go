@@ -4,9 +4,9 @@ import (
 	"context"
 
 	"github.com/drupdater/drupdater/internal/codehosting"
-	"github.com/drupdater/drupdater/pkg/composer"
-	"github.com/drupdater/drupdater/pkg/drush"
-	"github.com/drupdater/drupdater/pkg/repo"
+	"github.com/drupdater/drupdater/internal/composer"
+	"github.com/drupdater/drupdater/internal/drush"
+	"github.com/drupdater/drupdater/internal/repo"
 )
 
 // Addon hooks into workflow events. What it found reaches the merge request only through its
@@ -37,8 +37,8 @@ type Drush interface {
 // GitService clones and inspects repositories. A run's own repository is a GitRepository.
 type GitService interface {
 	BranchExists(repository repo.Repository, branch string, token string) (bool, error)
-	CloneRepository(repository string, branch string, token string, username string, email string) (repo.Checkout, error)
-	AddWorktree(ctx context.Context, source string, username string, email string) (repo.Checkout, error)
+	CloneRepository(repository string, branch string, token string, requested repo.Identity) (repo.Checkout, error)
+	AddWorktree(ctx context.Context, source string, requested repo.Identity) (repo.Checkout, error)
 	RemoveWorktree(ctx context.Context, source string, path string) error
 	ShallowCloneChecker
 }

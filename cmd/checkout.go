@@ -11,12 +11,12 @@ import (
 	"strings"
 
 	"github.com/drupdater/drupdater/internal/config"
-	"github.com/drupdater/drupdater/pkg/repo"
+	"github.com/drupdater/drupdater/internal/repo"
 	"go.uber.org/zap"
 )
 
 // resolveCheckoutSettings fills the URL and target branch from the checkout, overwriting --branch.
-func resolveCheckoutSettings(git *repo.GitRepositoryService, cfg *config.Config) error {
+func resolveCheckoutSettings(git *repo.Git, cfg *config.Config) error {
 	if cfg.RepositoryURL == "" {
 		remoteURL, err := git.GetRemoteURL(cfg.WorkingDir)
 		if err != nil {
@@ -34,7 +34,7 @@ func resolveCheckoutSettings(git *repo.GitRepositoryService, cfg *config.Config)
 }
 
 // resolveCheckoutBranch returns the checkout's branch, or the CI variable when in detached HEAD.
-func resolveCheckoutBranch(git *repo.GitRepositoryService, workingDir string) (string, error) {
+func resolveCheckoutBranch(git *repo.Git, workingDir string) (string, error) {
 	branch, err := git.GetCurrentBranch(workingDir)
 	if err != nil {
 		return "", fmt.Errorf("failed to determine branch from checkout: %w", err)

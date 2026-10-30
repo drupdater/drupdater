@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/drupdater/drupdater/pkg/repo"
+	"github.com/drupdater/drupdater/internal/repo"
 
 	"github.com/drupdater/drupdater/internal/codehosting"
+	"github.com/drupdater/drupdater/internal/composer"
 	"github.com/drupdater/drupdater/internal/config"
-	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/stretchr/testify/assert"
@@ -94,7 +94,7 @@ func TestRunWithConcurrentSites(t *testing.T) {
 		drush.EXPECT().LocalFacts(anyCtx, testCheckout, site).Return(syncFacts(testCheckout+"/config/"+site), nil)
 	}
 
-	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, "user", "mail").Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
+	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
 	repositoryService.EXPECT().IsShallowClone(testCheckout).Return(false, nil)
 	repositoryService.EXPECT().BranchExists(repository, mock.Anything, mock.Anything).Return(false, nil)
 	repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound)
