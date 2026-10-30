@@ -1,6 +1,7 @@
 package addon
 
 import (
+	"context"
 	"fmt"
 	"slices"
 	"strconv"
@@ -12,11 +13,16 @@ import (
 	"go.uber.org/zap"
 )
 
+// AuditComposer runs composer audit.
+type AuditComposer interface {
+	Audit(ctx context.Context, dir string) (composer.Audit, error)
+}
+
 // ComposerAudit runs on every update: a routine update that closes a CVE should say so. Only a
 // security run lets the audit dictate the update's scope, and abort when there is nothing to fix.
 type ComposerAudit struct {
 	logger   *zap.Logger
-	composer Composer
+	composer AuditComposer
 	security bool
 
 	beforeAudit composer.Audit
@@ -24,7 +30,7 @@ type ComposerAudit struct {
 }
 
 // NewComposerAudit creates a security auditor. security marks a `--security` run.
-func NewComposerAudit(logger *zap.Logger, composer Composer, security bool) *ComposerAudit {
+func NewComposerAudit(logger *zap.Logger, composer AuditComposer, security bool) *ComposerAudit {
 	return &ComposerAudit{
 		logger:   logger,
 		composer: composer,

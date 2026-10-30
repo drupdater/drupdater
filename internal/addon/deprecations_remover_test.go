@@ -40,7 +40,7 @@ func TestRemoveDeprecations(t *testing.T) {
 	}
 
 	t.Run("runs the project's own Rector when it has drupal-rector", func(t *testing.T) {
-		composer := NewMockComposer(t)
+		composer := NewMockDeprecationsComposer(t)
 		composer.EXPECT().IsPackageInstalled(anyCtx, "/path/to/repo", "palantirnet/drupal-rector").Return(true, nil)
 		composer.EXPECT().GetCustomCodeDirectories(anyCtx, "/path/to/repo").Return([]string{"web/modules/custom"}, nil)
 		project := NewMockRector(t)
@@ -55,7 +55,7 @@ func TestRemoveDeprecations(t *testing.T) {
 	})
 
 	t.Run("runs the bundled Rector when the project has none, committing nothing to composer.*", func(t *testing.T) {
-		composer := NewMockComposer(t)
+		composer := NewMockDeprecationsComposer(t)
 		composer.EXPECT().IsPackageInstalled(anyCtx, "/path/to/repo", "palantirnet/drupal-rector").Return(false, nil)
 		composer.EXPECT().IsPackageInstalled(anyCtx, "/path/to/repo", "rector/rector").Return(false, nil)
 		composer.EXPECT().GetCustomCodeDirectories(anyCtx, "/path/to/repo").Return([]string{"web/modules/custom"}, nil)
@@ -76,7 +76,7 @@ func TestRemoveDeprecations(t *testing.T) {
 	})
 
 	t.Run("an unreadable lock counts as no drupal-rector", func(t *testing.T) {
-		composer := NewMockComposer(t)
+		composer := NewMockDeprecationsComposer(t)
 		composer.EXPECT().IsPackageInstalled(anyCtx, "/path/to/repo", "palantirnet/drupal-rector").Return(false, assert.AnError)
 		composer.EXPECT().IsPackageInstalled(anyCtx, "/path/to/repo", "rector/rector").Return(false, assert.AnError)
 		composer.EXPECT().GetCustomCodeDirectories(anyCtx, "/path/to/repo").Return([]string{"web/modules/custom"}, nil)
@@ -91,7 +91,7 @@ func TestRemoveDeprecations(t *testing.T) {
 
 	t.Run("skips, with a warning, when the project's Rector lacks drupal-rector", func(t *testing.T) {
 		core, logs := observer.New(zapcore.WarnLevel)
-		composer := NewMockComposer(t)
+		composer := NewMockDeprecationsComposer(t)
 		composer.EXPECT().IsPackageInstalled(anyCtx, "/path/to/repo", "palantirnet/drupal-rector").Return(false, nil)
 		composer.EXPECT().IsPackageInstalled(anyCtx, "/path/to/repo", "rector/rector").Return(true, nil)
 
@@ -107,7 +107,7 @@ func TestRemoveDeprecations(t *testing.T) {
 	})
 
 	t.Run("records and commits what Rector changed", func(t *testing.T) {
-		composer := NewMockComposer(t)
+		composer := NewMockDeprecationsComposer(t)
 		composer.EXPECT().IsPackageInstalled(anyCtx, "/path/to/repo", "palantirnet/drupal-rector").Return(true, nil)
 		composer.EXPECT().GetCustomCodeDirectories(anyCtx, "/path/to/repo").Return([]string{"web/modules/custom"}, nil)
 
@@ -141,7 +141,7 @@ func TestRemoveDeprecations(t *testing.T) {
 	})
 
 	t.Run("a failing Rector fails the handler", func(t *testing.T) {
-		composer := NewMockComposer(t)
+		composer := NewMockDeprecationsComposer(t)
 		composer.EXPECT().IsPackageInstalled(anyCtx, "/path/to/repo", "palantirnet/drupal-rector").Return(true, nil)
 		composer.EXPECT().GetCustomCodeDirectories(anyCtx, "/path/to/repo").Return([]string{"web/modules/custom"}, nil)
 

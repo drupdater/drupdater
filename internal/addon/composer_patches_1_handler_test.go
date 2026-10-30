@@ -21,7 +21,7 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 	t.Run("persists and commits when a patch is removed", func(t *testing.T) {
 		const depPatch = "https://www.drupal.org/files/issues/x.patch"
 
-		composerService := NewMockComposer(t)
+		composerService := NewMockPatchesComposer(t)
 		drupalOrgService := NewMockDrupalOrg(t)
 		committer := &fakeCommitter{}
 
@@ -51,7 +51,7 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 	})
 
 	t.Run("proposes pinning a package whose patch conflicts", func(t *testing.T) {
-		composerService := NewMockComposer(t)
+		composerService := NewMockPatchesComposer(t)
 		drupalOrgService := NewMockDrupalOrg(t)
 		committer := &fakeCommitter{}
 
@@ -79,7 +79,7 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 	})
 
 	t.Run("does not persist when nothing changes", func(t *testing.T) {
-		composerService := NewMockComposer(t)
+		composerService := NewMockPatchesComposer(t)
 		drupalOrgService := NewMockDrupalOrg(t)
 		committer := &fakeCommitter{}
 
@@ -105,7 +105,7 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 	})
 
 	t.Run("treats missing extra.patches as empty", func(t *testing.T) {
-		composerService := NewMockComposer(t)
+		composerService := NewMockPatchesComposer(t)
 		committer := &fakeCommitter{}
 
 		composerService.EXPECT().GetConfig(anyCtx, path, "extra.patches").Return("", errors.New("not defined"))
@@ -121,7 +121,7 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 	})
 
 	t.Run("returns error on invalid patches JSON", func(t *testing.T) {
-		composerService := NewMockComposer(t)
+		composerService := NewMockPatchesComposer(t)
 		committer := &fakeCommitter{}
 
 		composerService.EXPECT().GetConfig(anyCtx, path, "extra.patches").Return("not-json", nil)
@@ -141,19 +141,19 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 		// Each case fails one step of the persist sequence; later steps are not expected.
 		cases := []struct {
 			name    string
-			arrange func(c *MockComposer, cm *fakeCommitter)
+			arrange func(c *MockPatchesComposer, cm *fakeCommitter)
 			wantErr string
 		}{
 			{
 				name: "SetConfig",
-				arrange: func(c *MockComposer, _ *fakeCommitter) {
+				arrange: func(c *MockPatchesComposer, _ *fakeCommitter) {
 					c.EXPECT().SetConfig(anyCtx, path, "extra.patches", mock.Anything).Return(assert.AnError)
 				},
 				wantErr: "failed to set composer config",
 			},
 			{
 				name: "UpdateLockHash",
-				arrange: func(c *MockComposer, _ *fakeCommitter) {
+				arrange: func(c *MockPatchesComposer, _ *fakeCommitter) {
 					c.EXPECT().SetConfig(anyCtx, path, "extra.patches", mock.Anything).Return(nil)
 					c.EXPECT().UpdateLockHash(anyCtx, path).Return(assert.AnError)
 				},
@@ -161,7 +161,7 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 			},
 			{
 				name: "Commit",
-				arrange: func(c *MockComposer, cm *fakeCommitter) {
+				arrange: func(c *MockPatchesComposer, cm *fakeCommitter) {
 					c.EXPECT().SetConfig(anyCtx, path, "extra.patches", mock.Anything).Return(nil)
 					c.EXPECT().UpdateLockHash(anyCtx, path).Return(nil)
 					cm.err = assert.AnError
@@ -172,7 +172,7 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 
 		for _, tc := range cases {
 			t.Run(tc.name, func(t *testing.T) {
-				composerService := NewMockComposer(t)
+				composerService := NewMockPatchesComposer(t)
 				committer := &fakeCommitter{}
 
 				composerService.EXPECT().GetConfig(anyCtx, path, "extra.patches").
@@ -195,7 +195,7 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 	})
 
 	t.Run("returns error when composer update fails", func(t *testing.T) {
-		composerService := NewMockComposer(t)
+		composerService := NewMockPatchesComposer(t)
 		committer := &fakeCommitter{}
 
 		composerService.EXPECT().GetConfig(anyCtx, path, "extra.patches").Return("{}", nil)
@@ -211,7 +211,7 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 	})
 
 	t.Run("dry-runs the update as earlier stages planned it", func(t *testing.T) {
-		composerService := NewMockComposer(t)
+		composerService := NewMockPatchesComposer(t)
 
 		composerService.EXPECT().GetConfig(anyCtx, path, "extra.patches").Return("{}", nil)
 		composerService.EXPECT().Update(anyCtx, path, []string{"drupal/core"}, []string{"drupal/token:1.13.0"}, true, true).

@@ -2,14 +2,12 @@ package cmd
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"path/filepath"
 	"slices"
 	"testing"
 
 	"github.com/drupdater/drupdater/internal"
-	"github.com/drupdater/drupdater/internal/addon"
 	"github.com/drupdater/drupdater/internal/logging"
 	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/drupdater/drupdater/pkg/composer"
@@ -17,6 +15,7 @@ import (
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/stretchr/testify/assert"
+	mock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -143,7 +142,7 @@ func TestCreateAddons(t *testing.T) {
 		config := internal.Config{
 			RunTypes: internal.RunTypesConfig{Normal: internal.RunTypeConfig{Addons: []string{"code_beautifier"}}},
 		}
-		addons, err := builtinAddons().create(logger, config, nil, nil, nil)
+		addons, err := builtinAddons().create(config, addonDeps{logger: logger})
 		require.NoError(t, err)
 		assert.Len(t, addons, len(builtinAddons().mandatory)+1)
 	})
@@ -151,7 +150,7 @@ func TestCreateAddons(t *testing.T) {
 	t.Run("composer_audit and unsupported_modules run on a normal update", func(t *testing.T) {
 		// Both are mandatory: the description joins them into one list, so either alone shows half of it.
 		config := internal.Config{RunTypes: internal.RunTypesConfig{Normal: internal.RunTypeConfig{}}}
-		addons, err := builtinAddons().create(logger, config, nil, nil, nil)
+		addons, err := builtinAddons().create(config, addonDeps{logger: logger})
 		require.NoError(t, err)
 		assert.Len(t, addons, len(builtinAddons().mandatory))
 		assert.Contains(t, builtinAddons().mandatory, "composer_audit")
@@ -169,7 +168,9 @@ func TestCreateAddons(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			config := internal.Config{Security: tt.security}
-			addons, err := builtinAddons().create(logger, config, nil, cleanAudit{}, nil)
+			cleanAudit := newMockaddonComposer(t)
+			cleanAudit.EXPECT().Audit(mock.Anything, "/repo").Return(composer.Audit{}, nil)
+			addons, err := builtinAddons().create(config, addonDeps{logger: logger, composer: cleanAudit})
 			require.NoError(t, err)
 
 			audit := addons[slices.Index(builtinAddons().mandatory, "composer_audit")]
@@ -182,14 +183,14 @@ func TestCreateAddons(t *testing.T) {
 
 	t.Run("a mandatory addon listed in the YAML is not duplicated", func(t *testing.T) {
 		config := internal.Config{RunTypes: internal.RunTypesConfig{Normal: internal.RunTypeConfig{Addons: []string{"update_hooks"}}}}
-		addons, err := builtinAddons().create(logger, config, nil, nil, nil)
+		addons, err := builtinAddons().create(config, addonDeps{logger: logger})
 		require.NoError(t, err)
 		assert.Len(t, addons, len(builtinAddons().mandatory)) // update_hooks is already mandatory
 	})
 
 	t.Run("an unknown addon name is an error", func(t *testing.T) {
 		config := internal.Config{RunTypes: internal.RunTypesConfig{Normal: internal.RunTypeConfig{Addons: []string{"does_not_exist"}}}}
-		_, err := builtinAddons().create(logger, config, nil, nil, nil)
+		_, err := builtinAddons().create(config, addonDeps{logger: logger})
 		require.Error(t, err)
 	})
 }
@@ -316,13 +317,6 @@ func TestResolveCheckoutBranch(t *testing.T) {
 func TestComposerOptions(t *testing.T) {
 	assert.Len(t, composerOptions(internal.Config{Security: true}), 1, "a security run turns blocking off")
 	assert.Empty(t, composerOptions(internal.Config{}), "a normal run keeps the project's policy")
-}
-
-// cleanAudit is a composer whose audit finds nothing. Only Audit is implemented.
-type cleanAudit struct{ addon.Composer }
-
-func (cleanAudit) Audit(context.Context, string) (composer.Audit, error) {
-	return composer.Audit{}, nil
 }
 
 func TestCommandTreesShareNoFlagState(t *testing.T) {

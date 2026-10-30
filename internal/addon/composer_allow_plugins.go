@@ -1,6 +1,7 @@
 package addon
 
 import (
+	"context"
 	"fmt"
 	"maps"
 	"slices"
@@ -10,11 +11,19 @@ import (
 	"go.uber.org/zap"
 )
 
+// AllowPluginsComposer reads and rewrites composer.json's allow-plugins list.
+type AllowPluginsComposer interface {
+	GetAllowPlugins(dir string) (composer.AllowPlugins, error)
+	GetInstalledPlugins(ctx context.Context, dir string) (map[string]any, error)
+	SetConfig(ctx context.Context, dir string, key string, value string) error
+	UnsetConfig(ctx context.Context, dir string, key string) error
+}
+
 // ComposerAllowPlugins lets an unattended update install plugins Composer would otherwise block,
 // and records each new one as denied for a human to decide on.
 type ComposerAllowPlugins struct {
 	logger   *zap.Logger
-	composer Composer
+	composer AllowPluginsComposer
 
 	original composer.AllowPlugins
 	// wildcard is set while the temporary trailing "*": true rule is in composer.json.
@@ -22,7 +31,7 @@ type ComposerAllowPlugins struct {
 	newAllowPlugins []string
 }
 
-func NewComposerAllowPlugins(logger *zap.Logger, composer Composer) *ComposerAllowPlugins {
+func NewComposerAllowPlugins(logger *zap.Logger, composer AllowPluginsComposer) *ComposerAllowPlugins {
 	return &ComposerAllowPlugins{
 		logger:   logger,
 		composer: composer,

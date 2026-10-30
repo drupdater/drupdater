@@ -224,22 +224,43 @@ func TestCreateAddonsPassesEveryDependency(t *testing.T) {
 		mandatory: []string{"probe", "probe_other"},
 	}
 
-	logger := zap.NewNop()
 	cache, err := NewCache()
 	require.NoError(t, err)
-	drushSvc := drush.NewCLI(logger, cache)
+	logger := zap.NewNop()
 	composerSvc := composer.NewCLI(logger)
 	t.Cleanup(composerSvc.Cleanup)
-	drupalOrgSvc := drupalorg.NewHTTPClient(logger)
+	deps := addonDeps{
+		logger:     logger,
+		drush:      drush.NewCLI(logger, cache),
+		composer:   composerSvc,
+		drupalOrg:  drupalorg.NewHTTPClient(logger),
+		drupalCode: drupalorg.NewDrupalCode("token"),
+	}
 
-	_, err = catalog.create(logger, internal.Config{}, drushSvc, composerSvc, drupalOrgSvc)
+	_, err = catalog.create(internal.Config{Security: true}, deps)
 	require.NoError(t, err)
 
-	assert.Same(t, logger, got.logger)
-	assert.Equal(t, drushSvc, got.drush)
-	assert.Equal(t, composerSvc, got.composer)
-	assert.Equal(t, drupalOrgSvc, got.drupalOrg)
+	want := deps
+	want.security = true
+	assert.Equal(t, want, got, "the factories get the dependencies as given, plus the run type")
 	assert.Equal(t, got, second, "every addon receives the same dependency set")
+}
+
+func TestNewAddonDepsBuildsADrupalCodeClientOnlyWithAToken(t *testing.T) {
+	logger := zap.NewNop()
+	drushSvc, composerSvc := newMockaddonDrush(t), newMockaddonComposer(t)
+	drupalOrgSvc := drupalorg.NewHTTPClient(logger)
+
+	t.Setenv("DRUPALCODE_ACCESS_TOKEN", "")
+	deps := newAddonDeps(logger, drushSvc, composerSvc, drupalOrgSvc)
+	assert.Equal(t, addonDeps{logger: logger, drush: drushSvc, composer: composerSvc, drupalOrg: drupalOrgSvc}, deps)
+	assert.Nil(t, deps.drupalCode, "composer_patches tells a missing client by nil, so no typed nil may slip in")
+
+	t.Setenv("DRUPALCODE_ACCESS_TOKEN", "secret")
+	deps = newAddonDeps(logger, drushSvc, composerSvc, drupalOrgSvc)
+	assert.IsType(t, &drupalorg.DrupalCode{}, deps.drupalCode)
+	deps.drupalCode = nil
+	assert.Equal(t, addonDeps{logger: logger, drush: drushSvc, composer: composerSvc, drupalOrg: drupalOrgSvc}, deps)
 }
 
 func TestNewRunnerBuildsTheWorkflowRunner(t *testing.T) {

@@ -20,20 +20,10 @@ import (
 )
 
 func TestNewComposerPatches1(t *testing.T) {
-	t.Run("no token leaves the gitlab client unset", func(t *testing.T) {
-		t.Setenv("DRUPALCODE_ACCESS_TOKEN", "")
-
-		h := NewComposerPatches1(zap.NewNop(), NewMockComposer(t), NewMockDrupalOrg(t), nil)
-		require.NotNil(t, h)
-		assert.Nil(t, h.gitlab, "without a token there is no drupalcode client to look up issue forks with")
-	})
-
-	t.Run("a token configures the drupalcode gitlab client", func(t *testing.T) {
-		t.Setenv("DRUPALCODE_ACCESS_TOKEN", "secret")
-
-		h := NewComposerPatches1(zap.NewNop(), NewMockComposer(t), NewMockDrupalOrg(t), nil)
-		require.NotNil(t, h)
-		assert.NotNil(t, h.gitlab)
+	t.Run("keeps the drupalcode client it is given", func(t *testing.T) {
+		drupalCode := NewMockDrupalCode(t)
+		h := NewComposerPatches1(zap.NewNop(), NewMockPatchesComposer(t), NewMockDrupalOrg(t), drupalCode, nil)
+		assert.Same(t, drupalCode, h.drupalCode)
 	})
 
 	t.Run("drops patch files from the real filesystem", func(t *testing.T) {
@@ -41,7 +31,7 @@ func TestNewComposerPatches1(t *testing.T) {
 		require.NoError(t, os.MkdirAll(filepath.Join(dir, "patches"), 0o750))
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "patches", "a.patch"), []byte("x"), 0o600))
 
-		h := NewComposerPatches1(zap.NewNop(), NewMockComposer(t), NewMockDrupalOrg(t), nil)
+		h := NewComposerPatches1(zap.NewNop(), NewMockPatchesComposer(t), NewMockDrupalOrg(t), nil, nil)
 		require.NoError(t, h.dropPatchFile(dir, "patches/a.patch"))
 		assert.NoFileExists(t, filepath.Join(dir, "patches", "a.patch"))
 	})
@@ -52,7 +42,7 @@ func TestPatchRemovalFailuresAreLogged(t *testing.T) {
 	newHandler := func(t *testing.T, removeErr error) (*ComposerPatches1, *observer.ObservedLogs) {
 		t.Helper()
 		core, logs := observer.New(zapcore.ErrorLevel)
-		composerService := NewMockComposer(t)
+		composerService := NewMockPatchesComposer(t)
 		composerService.EXPECT().IsPackageInstalled(anyCtx, "/project", "drupal/gone").Return(false, nil).Maybe()
 		return &ComposerPatches1{
 			logger:     zap.New(core),
@@ -77,7 +67,7 @@ func TestPatchRemovalFailuresAreLogged(t *testing.T) {
 }
 
 func TestComposerDiffFailure(t *testing.T) {
-	composerService := NewMockComposer(t)
+	composerService := NewMockDiffComposer(t)
 	composerService.EXPECT().Diff(anyCtx, "/tmp").Return(nil, assert.AnError)
 
 	cd := NewComposerDiff(zap.NewNop(), composerService)
@@ -88,7 +78,7 @@ func TestComposerDiffFailure(t *testing.T) {
 
 func TestComposerNormalizerErrors(t *testing.T) {
 	t.Run("install check fails", func(t *testing.T) {
-		composerService := NewMockComposer(t)
+		composerService := NewMockNormalizerComposer(t)
 		composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "ergebnis/composer-normalize").Return(false, assert.AnError)
 
 		cn := NewComposerNormalizer(zap.NewNop(), composerService)
@@ -96,7 +86,7 @@ func TestComposerNormalizerErrors(t *testing.T) {
 	})
 
 	t.Run("normalize fails", func(t *testing.T) {
-		composerService := NewMockComposer(t)
+		composerService := NewMockNormalizerComposer(t)
 		composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "ergebnis/composer-normalize").Return(true, nil)
 		composerService.EXPECT().Normalize(anyCtx, "/tmp").Return("", assert.AnError)
 
@@ -109,7 +99,7 @@ func TestComposerNormalizerErrors(t *testing.T) {
 
 func TestDeprecationsRemoverErrors(t *testing.T) {
 	t.Run("listing custom code directories fails", func(t *testing.T) {
-		composerService := NewMockComposer(t)
+		composerService := NewMockDeprecationsComposer(t)
 		composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "palantirnet/drupal-rector").Return(true, nil)
 		composerService.EXPECT().GetCustomCodeDirectories(anyCtx, "/tmp").Return(nil, assert.AnError)
 
@@ -118,7 +108,7 @@ func TestDeprecationsRemoverErrors(t *testing.T) {
 	})
 
 	t.Run("committing the removals fails", func(t *testing.T) {
-		composerService := NewMockComposer(t)
+		composerService := NewMockDeprecationsComposer(t)
 		composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "palantirnet/drupal-rector").Return(true, nil)
 		composerService.EXPECT().GetCustomCodeDirectories(anyCtx, "/tmp").Return([]string{"web/modules/custom"}, nil)
 
@@ -140,7 +130,7 @@ func TestTranslationsUpdaterErrors(t *testing.T) {
 	}
 
 	t.Run("module check fails", func(t *testing.T) {
-		drushService := NewMockDrush(t)
+		drushService := NewMockTranslationsDrush(t)
 		drushService.EXPECT().IsModuleEnabled(anyCtx, "/tmp", "site1", "locale_deploy").Return(false, assert.AnError)
 
 		tu := NewTranslationsUpdater(zap.NewNop(), drushService)
@@ -148,7 +138,7 @@ func TestTranslationsUpdaterErrors(t *testing.T) {
 	})
 
 	t.Run("localizing translations fails", func(t *testing.T) {
-		drushService := NewMockDrush(t)
+		drushService := NewMockTranslationsDrush(t)
 		drushService.EXPECT().IsModuleEnabled(anyCtx, "/tmp", "site1", "locale_deploy").Return(true, nil)
 		drushService.EXPECT().LocalizeTranslations(anyCtx, "/tmp", "site1").Return(assert.AnError)
 
@@ -159,7 +149,7 @@ func TestTranslationsUpdaterErrors(t *testing.T) {
 	t.Run("an unresolvable translation path is skipped, not fatal", func(t *testing.T) {
 		// GetTranslationPath refuses to return an empty path, because committing that would
 		// commit the entire working tree.
-		drushService := NewMockDrush(t)
+		drushService := NewMockTranslationsDrush(t)
 		drushService.EXPECT().IsModuleEnabled(anyCtx, "/tmp", "site1", "locale_deploy").Return(true, nil)
 		drushService.EXPECT().LocalizeTranslations(anyCtx, "/tmp", "site1").Return(nil)
 		drushService.EXPECT().GetTranslationPath(anyCtx, "/tmp", "site1", true).Return("", errors.New("does not resolve"))
@@ -169,7 +159,7 @@ func TestTranslationsUpdaterErrors(t *testing.T) {
 	})
 
 	t.Run("committing the translations fails", func(t *testing.T) {
-		drushService := NewMockDrush(t)
+		drushService := NewMockTranslationsDrush(t)
 		drushService.EXPECT().IsModuleEnabled(anyCtx, "/tmp", "site1", "locale_deploy").Return(true, nil)
 		drushService.EXPECT().LocalizeTranslations(anyCtx, "/tmp", "site1").Return(nil)
 		drushService.EXPECT().GetTranslationPath(anyCtx, "/tmp", "site1", true).Return("translations", nil)
@@ -183,7 +173,7 @@ func TestTranslationsUpdaterErrors(t *testing.T) {
 }
 
 func TestUpdateHooksHandlerError(t *testing.T) {
-	drushService := NewMockDrush(t)
+	drushService := NewMockUpdateHooksDrush(t)
 	drushService.EXPECT().GetUpdateHooks(anyCtx, "/tmp", "site1").Return(nil, assert.AnError)
 
 	uh := NewUpdateHooks(zap.NewNop(), drushService)
@@ -196,7 +186,7 @@ func TestUnsupportedModulesDeduplicatesAcrossSites(t *testing.T) {
 	// Multisite runs check every site; the same end-of-life module must be reported once.
 	module := drush.UnsupportedModule{Name: "old_module", InstalledVersion: "1.0", RecommendedVersion: "None"}
 
-	drushService := NewMockDrush(t)
+	drushService := NewMockUnsupportedModulesDrush(t)
 	drushService.EXPECT().GetUnsupportedModules(anyCtx, "/tmp", "site1").Return([]drush.UnsupportedModule{module}, nil)
 	drushService.EXPECT().GetUnsupportedModules(anyCtx, "/tmp", "site2").Return([]drush.UnsupportedModule{module}, nil)
 

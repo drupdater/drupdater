@@ -1,7 +1,6 @@
 package addon
 
 import (
-	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -14,8 +13,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	gitlab "gitlab.com/gitlab-org/api/client-go"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 func TestIsRemotePatch(t *testing.T) {
@@ -60,11 +60,10 @@ func TestCleanURLString(t *testing.T) {
 func TestUpdatePatches(t *testing.T) {
 
 	logger := zap.NewNop()
-	t.Setenv("DRUPALCODE_ACCESS_TOKEN", "test")
 
 	t.Run("Local patch still applies", func(t *testing.T) {
 
-		composerService := NewMockComposer(t)
+		composerService := NewMockPatchesComposer(t)
 		composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
 		drupalOrgService := NewMockDrupalOrg(t)
 
@@ -108,7 +107,7 @@ func TestUpdatePatches(t *testing.T) {
 	t.Run("Local patch is not deduplicated against dependencies", func(t *testing.T) {
 		// A local (relative) path that happens to match a dependency string must NOT be
 		// removed: local paths are package-relative, so they are not the same file.
-		composerService := NewMockComposer(t)
+		composerService := NewMockPatchesComposer(t)
 		drupalOrgService := NewMockDrupalOrg(t)
 		var removed []string
 
@@ -131,7 +130,7 @@ func TestUpdatePatches(t *testing.T) {
 	})
 
 	t.Run("GetDependencyPatches error is non-fatal", func(t *testing.T) {
-		composerService := NewMockComposer(t)
+		composerService := NewMockPatchesComposer(t)
 		drupalOrgService := NewMockDrupalOrg(t)
 		var removed []string
 
@@ -152,7 +151,7 @@ func TestUpdatePatches(t *testing.T) {
 	})
 
 	t.Run("Multiple patches apply together", func(t *testing.T) {
-		composerService := NewMockComposer(t)
+		composerService := NewMockPatchesComposer(t)
 		drupalOrgService := NewMockDrupalOrg(t)
 		var removed []string
 
@@ -174,7 +173,7 @@ func TestUpdatePatches(t *testing.T) {
 	})
 
 	t.Run("Combined patch check error is non-fatal", func(t *testing.T) {
-		composerService := NewMockComposer(t)
+		composerService := NewMockPatchesComposer(t)
 		drupalOrgService := NewMockDrupalOrg(t)
 		var removed []string
 
@@ -196,7 +195,7 @@ func TestUpdatePatches(t *testing.T) {
 	})
 
 	t.Run("Patch already provided by a dependency is removed", func(t *testing.T) {
-		composerService := NewMockComposer(t)
+		composerService := NewMockPatchesComposer(t)
 		drupalOrgService := NewMockDrupalOrg(t)
 		var removed []string
 
@@ -242,7 +241,7 @@ func TestUpdatePatches(t *testing.T) {
 
 	t.Run("Local patch not applies", func(t *testing.T) {
 
-		composerService := NewMockComposer(t)
+		composerService := NewMockPatchesComposer(t)
 		composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
 		drupalOrgService := NewMockDrupalOrg(t)
 
@@ -300,7 +299,7 @@ func TestUpdatePatches(t *testing.T) {
 
 	t.Run("Remote patch still applies", func(t *testing.T) {
 
-		composerService := NewMockComposer(t)
+		composerService := NewMockPatchesComposer(t)
 		composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
 		drupalOrgService := NewMockDrupalOrg(t)
 
@@ -354,7 +353,7 @@ func TestUpdatePatches(t *testing.T) {
 
 	t.Run("Current patch fails, remote patch still applies", func(t *testing.T) {
 
-		composerService := NewMockComposer(t)
+		composerService := NewMockPatchesComposer(t)
 		composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
 		drupalOrgService := NewMockDrupalOrg(t)
 
@@ -378,49 +377,22 @@ func TestUpdatePatches(t *testing.T) {
 		composerService.EXPECT().CheckIfPatchApplies(anyCtx, mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/remote/0001-remote.patch").Return(false, nil)
 		composerService.EXPECT().CheckIfPatchApplies(anyCtx, mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/drupal/123456-111111-alot_of_problems.diff").Return(true, nil)
 
-		var serverURL string
 		mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-
-			var jsonString []byte
-			if r.URL.Path == "/api/v4/projects/issue/drupal-123456" {
-				response := &gitlab.Project{
-					ID: 5678,
-				}
-				jsonString, _ = json.Marshal(response)
-			}
-			if r.URL.Path == "/api/v4/projects/project/drupal/merge_requests" {
-				response := []gitlab.MergeRequest{
-					{
-						ID:     1234,
-						IID:    5678,
-						Title:  "Remote patch",
-						SHA:    "111111",
-						WebURL: serverURL + "/project/drupal/-/merge_requests/1",
-					},
-				}
-				jsonString, _ = json.Marshal(response)
-			}
-			if r.URL.Path == "/project/drupal/-/merge_requests/1.diff" {
-				w.Header().Set("Content-Type", "text/plain")
-				_, _ = w.Write([]byte("patch content"))
-				return
-			}
-
-			_, err := w.Write(jsonString)
-			assert.NoError(t, err)
+			assert.Equal(t, "/project/drupal/-/merge_requests/1.diff", r.URL.Path)
+			_, _ = w.Write([]byte("patch content"))
 		}))
-		serverURL = mockServer.URL
 		defer mockServer.Close()
 
-		gitClient, _ := gitlab.NewClient("", gitlab.WithBaseURL(mockServer.URL))
+		drupalCode := NewMockDrupalCode(t)
+		drupalCode.EXPECT().IssueForkMergeRequests(anyCtx, "drupal", "123456").Return([]drupalorg.ForkMergeRequest{
+			{SHA: "111111", WebURL: mockServer.URL + "/project/drupal/-/merge_requests/1"},
+		}, nil)
 
 		updater := &ComposerPatches1{
 			logger:     logger,
 			composer:   composerService,
 			drupalOrg:  drupalOrgService,
-			gitlab:     gitClient,
+			drupalCode: drupalCode,
 			httpClient: mockServer.Client(),
 		}
 
@@ -454,7 +426,7 @@ func TestUpdatePatches(t *testing.T) {
 
 	t.Run("Current patch fails, remote patch also fails", func(t *testing.T) {
 
-		composerService := NewMockComposer(t)
+		composerService := NewMockPatchesComposer(t)
 		composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
 		drupalOrgService := NewMockDrupalOrg(t)
 
@@ -478,49 +450,22 @@ func TestUpdatePatches(t *testing.T) {
 		composerService.EXPECT().CheckIfPatchApplies(anyCtx, mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/remote/0001-remote.patch").Return(false, nil)
 		composerService.EXPECT().CheckIfPatchApplies(anyCtx, mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/drupal/123456-111111-alot_of_problems.diff").Return(false, nil)
 
-		var serverURL string
 		mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-
-			var jsonString []byte
-			if r.URL.Path == "/api/v4/projects/issue/drupal-123456" {
-				response := &gitlab.Project{
-					ID: 5678,
-				}
-				jsonString, _ = json.Marshal(response)
-			}
-			if r.URL.Path == "/api/v4/projects/project/drupal/merge_requests" {
-				response := []gitlab.MergeRequest{
-					{
-						ID:     1234,
-						IID:    5678,
-						Title:  "Remote patch",
-						SHA:    "111111",
-						WebURL: serverURL + "/project/drupal/-/merge_requests/1",
-					},
-				}
-				jsonString, _ = json.Marshal(response)
-			}
-			if r.URL.Path == "/project/drupal/-/merge_requests/1.diff" {
-				w.Header().Set("Content-Type", "text/plain")
-				_, _ = w.Write([]byte("patch content"))
-				return
-			}
-
-			_, err := w.Write(jsonString)
-			assert.NoError(t, err)
+			assert.Equal(t, "/project/drupal/-/merge_requests/1.diff", r.URL.Path)
+			_, _ = w.Write([]byte("patch content"))
 		}))
-		serverURL = mockServer.URL
 		defer mockServer.Close()
 
-		gitClient, _ := gitlab.NewClient("", gitlab.WithBaseURL(mockServer.URL))
+		drupalCode := NewMockDrupalCode(t)
+		drupalCode.EXPECT().IssueForkMergeRequests(anyCtx, "drupal", "123456").Return([]drupalorg.ForkMergeRequest{
+			{SHA: "111111", WebURL: mockServer.URL + "/project/drupal/-/merge_requests/1"},
+		}, nil)
 
 		updater := &ComposerPatches1{
 			logger:     logger,
 			composer:   composerService,
 			drupalOrg:  drupalOrgService,
-			gitlab:     gitClient,
+			drupalCode: drupalCode,
 			httpClient: mockServer.Client(),
 		}
 
@@ -563,10 +508,9 @@ func TestUpdatePatches(t *testing.T) {
 		drupalOrgService.AssertExpectations(t)
 	})
 
-	t.Run("Current patch fails and no gitlab client records a conflict", func(t *testing.T) {
-		// When DRUPALCODE_ACCESS_TOKEN is unset the gitlab client is nil; the fork lookup
-		// must be skipped instead of panicking, and the package kept at its current version.
-		composerService := NewMockComposer(t)
+	t.Run("Current patch fails and no drupalcode client records a conflict", func(t *testing.T) {
+		// Without DRUPALCODE_ACCESS_TOKEN the fork lookup is skipped, and the package held back.
+		composerService := NewMockPatchesComposer(t)
 		composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
 		drupalOrgService := NewMockDrupalOrg(t)
 		var removed []string
@@ -587,10 +531,10 @@ func TestUpdatePatches(t *testing.T) {
 		composerService.EXPECT().CheckIfPatchApplies(anyCtx, mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/remote/0001-remote.patch").Return(false, nil)
 
 		updater := &ComposerPatches1{
-			logger:    logger,
-			composer:  composerService,
-			drupalOrg: drupalOrgService,
-			gitlab:    nil,
+			logger:     logger,
+			composer:   composerService,
+			drupalOrg:  drupalOrgService,
+			drupalCode: nil,
 		}
 
 		operations := []composer.PackageChange{
@@ -612,9 +556,52 @@ func TestUpdatePatches(t *testing.T) {
 		drupalOrgService.AssertExpectations(t)
 	})
 
+	t.Run("a failed fork lookup is logged and changes nothing", func(t *testing.T) {
+		composerService := NewMockPatchesComposer(t)
+		composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
+		composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/core").Return(true, nil)
+		composerService.EXPECT().CheckIfPatchApplies(anyCtx, mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/remote/0001-remote.patch").Return(false, nil)
+
+		drupalOrgService := NewMockDrupalOrg(t)
+		drupalOrgService.EXPECT().FindIssueNumber("Issue #123456 \"With problems\"").Return("123456", true)
+		drupalOrgService.EXPECT().GetIssue(anyCtx, "123456").Return(&drupalorg.Issue{
+			ID: "123456", Title: "Alot of problems", Status: "1", URL: "https://www.drupal.org/node/123456",
+			Project: struct {
+				MaschineName string `json:"machine_name"`
+			}{MaschineName: "drupal"},
+		}, nil)
+
+		drupalCode := NewMockDrupalCode(t)
+		drupalCode.EXPECT().IssueForkMergeRequests(anyCtx, "drupal", "123456").Return(nil, assert.AnError)
+
+		core, logs := observer.New(zapcore.ErrorLevel)
+		var removed []string
+		updater := &ComposerPatches1{
+			logger:     zap.New(core),
+			composer:   composerService,
+			drupalOrg:  drupalOrgService,
+			drupalCode: drupalCode,
+			removeFile: recordRemovals(&removed),
+		}
+		patches := map[string]map[string]string{
+			"drupal/core": {"Issue #123456 \"With problems\"": "patches/remote/0001-remote.patch"},
+		}
+
+		report, newPatches := updater.updatePatches(t.Context(), "/tmp", []composer.PackageChange{
+			{Action: "Upgrade", Package: "drupal/core", From: "8.7.0", To: "8.8.0"},
+		}, patches)
+
+		assert.Empty(t, removed)
+		assert.Equal(t, PatchUpdates{}, report)
+		assert.Equal(t, map[string]map[string]string{
+			"drupal/core": {"Issue #123456: [Alot of problems](https://www.drupal.org/node/123456)": "patches/remote/0001-remote.patch"},
+		}, newPatches)
+		require.Equal(t, 1, logs.FilterMessage("failed to find the issue fork's merge requests").Len())
+	})
+
 	t.Run("Remote patch was committed and released", func(t *testing.T) {
 
-		composerService := NewMockComposer(t)
+		composerService := NewMockPatchesComposer(t)
 		composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
 		drupalOrgService := NewMockDrupalOrg(t)
 
@@ -635,31 +622,14 @@ func TestUpdatePatches(t *testing.T) {
 			},
 		}, nil)
 
-		mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-
-			var jsonString []byte
-			if r.URL.Path == "/api/v4/projects/project/drupal/-/search" {
-				response := []gitlab.Commit{
-					{
-						ID: "5678",
-					}}
-				jsonString, _ = json.Marshal(response)
-			}
-
-			_, err := w.Write(jsonString)
-			assert.NoError(t, err)
-		}))
-		defer mockServer.Close()
-
-		git, _ := gitlab.NewClient("", gitlab.WithBaseURL(mockServer.URL))
+		drupalCode := NewMockDrupalCode(t)
+		drupalCode.EXPECT().IsFixedIn(anyCtx, "drupal", "123456", "8.8.0").Return(true, nil)
 
 		updater := &ComposerPatches1{
-			logger:    logger,
-			composer:  composerService,
-			drupalOrg: drupalOrgService,
-			gitlab:    git,
+			logger:     logger,
+			composer:   composerService,
+			drupalOrg:  drupalOrgService,
+			drupalCode: drupalCode,
 		}
 
 		operations := []composer.PackageChange{
@@ -688,7 +658,7 @@ func TestUpdatePatches(t *testing.T) {
 
 	t.Run("Remote patch was committed, but not yet releases", func(t *testing.T) {
 
-		composerService := NewMockComposer(t)
+		composerService := NewMockPatchesComposer(t)
 		composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
 		drupalOrgService := NewMockDrupalOrg(t)
 
@@ -711,28 +681,14 @@ func TestUpdatePatches(t *testing.T) {
 			},
 		}, nil)
 
-		mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-
-			var jsonString []byte
-			if r.URL.Path == "/api/v4/projects/project/drupal/-/search" {
-				response := []gitlab.Commit{}
-				jsonString, _ = json.Marshal(response)
-			}
-
-			_, err := w.Write(jsonString)
-			assert.NoError(t, err)
-		}))
-		defer mockServer.Close()
-
-		git, _ := gitlab.NewClient("", gitlab.WithBaseURL(mockServer.URL))
+		drupalCode := NewMockDrupalCode(t)
+		drupalCode.EXPECT().IsFixedIn(anyCtx, "drupal", "123456", "8.8.0").Return(false, nil)
 
 		updater := &ComposerPatches1{
-			logger:    logger,
-			composer:  composerService,
-			drupalOrg: drupalOrgService,
-			gitlab:    git,
+			logger:     logger,
+			composer:   composerService,
+			drupalOrg:  drupalOrgService,
+			drupalCode: drupalCode,
 		}
 
 		operations := []composer.PackageChange{
@@ -765,7 +721,7 @@ func TestUpdatePatches(t *testing.T) {
 
 	t.Run("Module will be removed", func(t *testing.T) {
 
-		composerService := NewMockComposer(t)
+		composerService := NewMockPatchesComposer(t)
 		composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
 		drupalOrgService := NewMockDrupalOrg(t)
 
@@ -815,7 +771,7 @@ func TestUpdatePatches(t *testing.T) {
 	})
 
 	t.Run("Multiple patches conflict when applied together", func(t *testing.T) {
-		composerService := NewMockComposer(t)
+		composerService := NewMockPatchesComposer(t)
 		composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
 		drupalOrgService := NewMockDrupalOrg(t)
 		var removed []string
@@ -864,7 +820,7 @@ func TestUpdatePatches(t *testing.T) {
 	})
 
 	t.Run("Module not installed", func(t *testing.T) {
-		composerService := NewMockComposer(t)
+		composerService := NewMockPatchesComposer(t)
 		composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
 		drupalOrgService := NewMockDrupalOrg(t)
 

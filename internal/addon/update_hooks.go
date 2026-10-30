@@ -1,6 +1,7 @@
 package addon
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/drupdater/drupdater/internal/workflow"
@@ -8,14 +9,19 @@ import (
 	"go.uber.org/zap"
 )
 
+// UpdateHooksDrush lists a site's pending update hooks.
+type UpdateHooksDrush interface {
+	GetUpdateHooks(ctx context.Context, dir string, site string) (map[string]drush.UpdateHook, error)
+}
+
 type UpdateHooks struct {
 	logger *zap.Logger
-	drush  Drush
+	drush  UpdateHooksDrush
 
 	hooks workflow.PerSite[map[string]drush.UpdateHook]
 }
 
-func NewUpdateHooks(logger *zap.Logger, drush Drush) *UpdateHooks {
+func NewUpdateHooks(logger *zap.Logger, drush UpdateHooksDrush) *UpdateHooks {
 	return &UpdateHooks{
 		logger: logger,
 		drush:  drush,

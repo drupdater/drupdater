@@ -14,7 +14,7 @@ import (
 
 func TestNewUnsupportedModules(t *testing.T) {
 	logger := zap.NewNop()
-	mockDrush := NewMockDrush(t)
+	mockDrush := NewMockUnsupportedModulesDrush(t)
 
 	um := NewUnsupportedModules(logger, mockDrush)
 
@@ -26,7 +26,7 @@ func TestNewUnsupportedModules(t *testing.T) {
 
 func TestUnsupportedModules_PreSiteUpdateHandler_Success(t *testing.T) {
 	logger := zap.NewNop()
-	mockDrush := NewMockDrush(t)
+	mockDrush := NewMockUnsupportedModulesDrush(t)
 	um := NewUnsupportedModules(logger, mockDrush)
 
 	ctx := context.Background()
@@ -49,7 +49,7 @@ func TestUnsupportedModules_PreSiteUpdateHandler_Success(t *testing.T) {
 
 func TestUnsupportedModules_PreSiteUpdateHandler_Dedupe(t *testing.T) {
 	logger := zap.NewNop()
-	mockDrush := NewMockDrush(t)
+	mockDrush := NewMockUnsupportedModulesDrush(t)
 	um := NewUnsupportedModules(logger, mockDrush)
 
 	ctx := context.Background()
@@ -68,7 +68,7 @@ func TestUnsupportedModules_PreSiteUpdateHandler_Dedupe(t *testing.T) {
 
 func TestUnsupportedModules_PreSiteUpdateHandler_NoModules(t *testing.T) {
 	logger := zap.NewNop()
-	mockDrush := NewMockDrush(t)
+	mockDrush := NewMockUnsupportedModulesDrush(t)
 	um := NewUnsupportedModules(logger, mockDrush)
 
 	ctx := context.Background()
@@ -88,7 +88,7 @@ func TestUnsupportedModules_PreSiteUpdateHandler_NoModules(t *testing.T) {
 
 func TestUnsupportedModules_PreSiteUpdateHandler_Error(t *testing.T) {
 	logger := zap.NewNop()
-	mockDrush := NewMockDrush(t)
+	mockDrush := NewMockUnsupportedModulesDrush(t)
 	um := NewUnsupportedModules(logger, mockDrush)
 
 	ctx := context.Background()

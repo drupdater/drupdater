@@ -1,22 +1,29 @@
 package addon
 
 import (
+	"context"
+
 	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/drupdater/drupdater/pkg/drush"
 	"go.uber.org/zap"
 )
 
+// UnsupportedModulesDrush lists a site's modules without a supported release.
+type UnsupportedModulesDrush interface {
+	GetUnsupportedModules(ctx context.Context, dir string, site string) ([]drush.UnsupportedModule, error)
+}
+
 // UnsupportedModules detects modules Drupal's update status service reports as NOT_SUPPORTED. The
 // merge request lists them together with composer_audit's abandoned packages.
 type UnsupportedModules struct {
 	logger *zap.Logger
-	drush  Drush
+	drush  UnsupportedModulesDrush
 
 	modules workflow.PerSite[[]drush.UnsupportedModule]
 }
 
 // NewUnsupportedModules creates an unsupported modules detector.
-func NewUnsupportedModules(logger *zap.Logger, drushClient Drush) *UnsupportedModules {
+func NewUnsupportedModules(logger *zap.Logger, drushClient UnsupportedModulesDrush) *UnsupportedModules {
 	return &UnsupportedModules{
 		logger: logger,
 		drush:  drushClient,

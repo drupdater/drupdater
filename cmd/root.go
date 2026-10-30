@@ -206,7 +206,7 @@ func (a app) runUpdate(cmd *cobra.Command, args []string, opts options) error {
 		}
 	}
 
-	addons, err := a.addons.create(logger, config, drush, composer, drupalOrg)
+	addons, err := a.addons.create(config, newAddonDeps(logger, drush, composer, drupalOrg))
 	if err != nil {
 		return err
 	}
@@ -410,14 +410,43 @@ func ensureGitSafeDirectory(ctx context.Context, logger *zap.Logger, dir string)
 	}
 }
 
+// addonComposer is every builtin addon's composer interface at once; each addon sees only its own.
+type addonComposer interface {
+	addon.AllowPluginsComposer
+	addon.AuditComposer
+	addon.BeautifierComposer
+	addon.DeprecationsComposer
+	addon.DiffComposer
+	addon.NormalizerComposer
+	addon.PatchesComposer
+}
+
+// addonDrush is every builtin addon's drush interface at once.
+type addonDrush interface {
+	addon.TranslationsDrush
+	addon.UnsupportedModulesDrush
+	addon.UpdateHooksDrush
+}
+
 // addonDeps carries everything the addon constructors need.
 type addonDeps struct {
 	logger    *zap.Logger
-	drush     addon.Drush
-	composer  addon.Composer
+	drush     addonDrush
+	composer  addonComposer
 	drupalOrg addon.DrupalOrg
+	// drupalCode is nil without DRUPALCODE_ACCESS_TOKEN.
+	drupalCode addon.DrupalCode
 	// security marks a --security run. Only composer_audit reads it.
 	security bool
+}
+
+// newAddonDeps adds the drupalcode client only when DRUPALCODE_ACCESS_TOKEN is set.
+func newAddonDeps(logger *zap.Logger, drush addonDrush, composer addonComposer, drupalOrg addon.DrupalOrg) addonDeps {
+	deps := addonDeps{logger: logger, drush: drush, composer: composer, drupalOrg: drupalOrg}
+	if token := os.Getenv("DRUPALCODE_ACCESS_TOKEN"); token != "" {
+		deps.drupalCode = drupalorg.NewDrupalCode(token)
+	}
+	return deps
 }
 
 // bundledToolsBin is where the image installs tools/, so addons install nothing into the project.
@@ -446,7 +475,7 @@ func builtinAddons() addonCatalog {
 			"composer_allow_plugins": func(d addonDeps) workflow.Addon { return addon.NewComposerAllowPlugins(d.logger, d.composer) },
 			"composer_normalizer":    func(d addonDeps) workflow.Addon { return addon.NewComposerNormalizer(d.logger, d.composer) },
 			"composer_patches": func(d addonDeps) workflow.Addon {
-				return addon.NewComposerPatches1(d.logger, d.composer, d.drupalOrg, http.DefaultClient)
+				return addon.NewComposerPatches1(d.logger, d.composer, d.drupalOrg, d.drupalCode, http.DefaultClient)
 			},
 			"composer_diff":       func(d addonDeps) workflow.Addon { return addon.NewComposerDiff(d.logger, d.composer) },
 			"update_hooks":        func(d addonDeps) workflow.Addon { return addon.NewUpdateHooks(d.logger, d.drush) },
@@ -466,14 +495,8 @@ func builtinAddons() addonCatalog {
 }
 
 // create builds the mandatory addons plus the ones the active run type lists.
-func (c addonCatalog) create(
-	logger *zap.Logger,
-	config internal.Config,
-	drush addon.Drush,
-	composer addon.Composer,
-	drupalOrg addon.DrupalOrg,
-) ([]workflow.Addon, error) {
-	deps := addonDeps{logger: logger, drush: drush, composer: composer, drupalOrg: drupalOrg, security: config.Security}
+func (c addonCatalog) create(config internal.Config, deps addonDeps) ([]workflow.Addon, error) {
+	deps.security = config.Security
 
 	var addons []workflow.Addon
 	added := map[string]bool{}

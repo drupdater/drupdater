@@ -14,7 +14,7 @@ import (
 // TestNewComposerAudit tests the constructor
 func TestNewComposerAudit(t *testing.T) {
 	logger := zap.NewNop()
-	mockComposer := NewMockComposer(t)
+	mockComposer := NewMockAuditComposer(t)
 
 	audit := NewComposerAudit(logger, mockComposer, true)
 
@@ -27,7 +27,7 @@ func TestNewComposerAudit(t *testing.T) {
 // TestComposerAudit_PreComposerUpdateHandler_WithAdvisories tests handling security advisories
 func TestComposerAudit_PreComposerUpdateHandler_WithAdvisories(t *testing.T) {
 	logger := zap.NewNop()
-	mockComposer := NewMockComposer(t)
+	mockComposer := NewMockAuditComposer(t)
 	audit := NewComposerAudit(logger, mockComposer, true)
 	committer := &fakeCommitter{}
 
@@ -66,7 +66,7 @@ func TestComposerAudit_PreComposerUpdateHandler_WithAdvisories(t *testing.T) {
 // TestComposerAudit_PreComposerUpdateHandler_NoAdvisories tests when no security advisories are found
 func TestComposerAudit_PreComposerUpdateHandler_NoAdvisories(t *testing.T) {
 	logger := zap.NewNop()
-	mockComposer := NewMockComposer(t)
+	mockComposer := NewMockAuditComposer(t)
 	audit := NewComposerAudit(logger, mockComposer, true)
 	committer := &fakeCommitter{}
 
@@ -92,7 +92,7 @@ func TestComposerAudit_PreComposerUpdateHandler_NoAdvisories(t *testing.T) {
 // TestComposerAudit_PostCodeUpdateHandler tests the post-code-update handler
 func TestComposerAudit_PostCodeUpdateHandler(t *testing.T) {
 	logger := zap.NewNop()
-	mockComposer := NewMockComposer(t)
+	mockComposer := NewMockAuditComposer(t)
 	committer := &fakeCommitter{}
 	audit := NewComposerAudit(logger, mockComposer, true)
 
@@ -189,7 +189,7 @@ func TestComposerAudit_GetFixedAdvisories(t *testing.T) {
 
 // drupal/* is left to unsupported_modules, so one module is not reported twice.
 func TestComposerAudit_GetAbandonedPackages_FiltersDrupalPackages(t *testing.T) {
-	audit := NewComposerAudit(zap.NewNop(), NewMockComposer(t), true)
+	audit := NewComposerAudit(zap.NewNop(), NewMockAuditComposer(t), true)
 	audit.afterAudit = composer.Audit{
 		Abandoned: []composer.AbandonedPackage{
 			{PackageName: "drupal/token", Replacement: "drupal/core"},
@@ -209,7 +209,7 @@ func TestComposerAudit_GetAbandonedPackages_FiltersDrupalPackages(t *testing.T) 
 // TestComposerAudit_GetAbandonedPackages_UsesTheAuditAfterTheUpdate checks the list describes
 // the code the merge request contains, not the code it started from.
 func TestComposerAudit_GetAbandonedPackages_UsesTheAuditAfterTheUpdate(t *testing.T) {
-	audit := NewComposerAudit(zap.NewNop(), NewMockComposer(t), true)
+	audit := NewComposerAudit(zap.NewNop(), NewMockAuditComposer(t), true)
 	audit.beforeAudit = composer.Audit{
 		Abandoned: []composer.AbandonedPackage{{PackageName: "gone/away"}},
 	}
@@ -223,7 +223,7 @@ func TestComposerAudit_GetAbandonedPackages_UsesTheAuditAfterTheUpdate(t *testin
 // A normal run audits without taking over: narrowing or aborting here would turn every normal
 // run into a security run.
 func TestComposerAudit_PreComposerUpdateHandler_NormalMode(t *testing.T) {
-	mockComposer := NewMockComposer(t)
+	mockComposer := NewMockAuditComposer(t)
 	audit := NewComposerAudit(zap.NewNop(), mockComposer, false)
 	committer := &fakeCommitter{}
 
@@ -245,7 +245,7 @@ func TestComposerAudit_PreComposerUpdateHandler_NormalMode(t *testing.T) {
 // TestComposerAudit_PreComposerUpdateHandler_NormalModeNoAdvisories checks the abort path is
 // security-only. On a normal run "no advisories" is the healthy case, not a reason to stop.
 func TestComposerAudit_PreComposerUpdateHandler_NormalModeNoAdvisories(t *testing.T) {
-	mockComposer := NewMockComposer(t)
+	mockComposer := NewMockAuditComposer(t)
 	audit := NewComposerAudit(zap.NewNop(), mockComposer, false)
 	committer := &fakeCommitter{}
 
@@ -266,7 +266,7 @@ func TestComposerAudit_AuditFailures(t *testing.T) {
 	path := "/test/path"
 
 	t.Run("before the update", func(t *testing.T) {
-		mockComposer := NewMockComposer(t)
+		mockComposer := NewMockAuditComposer(t)
 		audit := NewComposerAudit(zap.NewNop(), mockComposer, true)
 		mockComposer.EXPECT().Audit(anyCtx, path).Return(composer.Audit{}, assert.AnError)
 
@@ -281,7 +281,7 @@ func TestComposerAudit_AuditFailures(t *testing.T) {
 	})
 
 	t.Run("after the update", func(t *testing.T) {
-		mockComposer := NewMockComposer(t)
+		mockComposer := NewMockAuditComposer(t)
 		audit := NewComposerAudit(zap.NewNop(), mockComposer, true)
 		mockComposer.EXPECT().Audit(anyCtx, path).Return(composer.Audit{}, assert.AnError)
 

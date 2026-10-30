@@ -14,7 +14,7 @@ import (
 
 func TestNewUpdateHooks(t *testing.T) {
 	logger := zap.NewNop()
-	mockDrush := NewMockDrush(t)
+	mockDrush := NewMockUpdateHooksDrush(t)
 
 	updateHooks := NewUpdateHooks(logger, mockDrush)
 
@@ -26,7 +26,7 @@ func TestNewUpdateHooks(t *testing.T) {
 
 func TestUpdateHooks_PreSiteUpdateHandler_Success(t *testing.T) {
 	logger := zap.NewNop()
-	mockDrush := NewMockDrush(t)
+	mockDrush := NewMockUpdateHooksDrush(t)
 	updateHooks := NewUpdateHooks(logger, mockDrush)
 
 	ctx := context.Background()
@@ -52,7 +52,7 @@ func TestUpdateHooks_PreSiteUpdateHandler_Success(t *testing.T) {
 
 func TestUpdateHooks_PreSiteUpdateHandler_NoHooks(t *testing.T) {
 	logger := zap.NewNop()
-	mockDrush := NewMockDrush(t)
+	mockDrush := NewMockUpdateHooksDrush(t)
 	updateHooks := NewUpdateHooks(logger, mockDrush)
 
 	ctx := context.Background()
@@ -73,7 +73,7 @@ func TestUpdateHooks_PreSiteUpdateHandler_NoHooks(t *testing.T) {
 
 func TestUpdateHooks_PreSiteUpdateHandler_Error(t *testing.T) {
 	logger := zap.NewNop()
-	mockDrush := NewMockDrush(t)
+	mockDrush := NewMockUpdateHooksDrush(t)
 	updateHooks := NewUpdateHooks(logger, mockDrush)
 
 	ctx := context.Background()

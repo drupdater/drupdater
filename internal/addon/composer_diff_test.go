@@ -13,7 +13,7 @@ import (
 
 func TestNewComposerDiff(t *testing.T) {
 	logger := zap.NewNop()
-	mockComposer := NewMockComposer(t)
+	mockComposer := NewMockDiffComposer(t)
 
 	diff := NewComposerDiff(logger, mockComposer)
 
@@ -24,7 +24,7 @@ func TestNewComposerDiff(t *testing.T) {
 
 func TestComposerDiffRecordsAndLogsTheChanges(t *testing.T) {
 	core, logs := observer.New(zap.InfoLevel)
-	mockComposer := NewMockComposer(t)
+	mockComposer := NewMockDiffComposer(t)
 	entries := []composer.DiffEntry{
 		{Package: "drupal/core", Operation: "upgrade", From: "10.3.8", To: "10.3.9", CompareURL: "https://example.com/compare"},
 		{Package: "drupal/redirect", Operation: "install", To: "1.10.0"},
@@ -45,7 +45,7 @@ func TestComposerDiffRecordsAndLogsTheChanges(t *testing.T) {
 
 func TestComposerDiffLogsASingleChange(t *testing.T) {
 	core, logs := observer.New(zap.InfoLevel)
-	mockComposer := NewMockComposer(t)
+	mockComposer := NewMockDiffComposer(t)
 	mockComposer.EXPECT().Diff(anyCtx, "/test/path").Return([]composer.DiffEntry{
 		{Package: "drupal/core", Operation: "change", From: "dev-main 1", To: "dev-main 2"},
 	}, nil)
@@ -59,7 +59,7 @@ func TestComposerDiffLogsASingleChange(t *testing.T) {
 
 func TestComposerDiffLogsNothingWithoutChanges(t *testing.T) {
 	core, logs := observer.New(zap.InfoLevel)
-	mockComposer := NewMockComposer(t)
+	mockComposer := NewMockDiffComposer(t)
 	mockComposer.EXPECT().Diff(anyCtx, "/test/path").Return(nil, nil)
 
 	cd := NewComposerDiff(zap.New(core), mockComposer)

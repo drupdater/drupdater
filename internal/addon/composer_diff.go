@@ -1,6 +1,7 @@
 package addon
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -9,14 +10,19 @@ import (
 	"go.uber.org/zap"
 )
 
+// DiffComposer diffs the lock file against the one the run started from.
+type DiffComposer interface {
+	Diff(ctx context.Context, path string) ([]composer.DiffEntry, error)
+}
+
 type ComposerDiff struct {
 	logger   *zap.Logger
-	composer Composer
+	composer DiffComposer
 
 	entries []composer.DiffEntry
 }
 
-func NewComposerDiff(logger *zap.Logger, composer Composer) *ComposerDiff {
+func NewComposerDiff(logger *zap.Logger, composer DiffComposer) *ComposerDiff {
 	return &ComposerDiff{
 		logger:   logger,
 		composer: composer,

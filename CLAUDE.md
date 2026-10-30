@@ -106,7 +106,7 @@ Where things live. For *how they work*, read `docs/explanation/` rather than dup
 | `internal/report/` | The published JSON report schema and its atomic writer |
 | `internal/logging/redact.go` | Value-based secret redaction, wrapping the zap core |
 | `internal/golden/` | Golden-file comparison and the `-update` flag; imported only from tests |
-| `pkg/` | One directory per wrapped external tool: `composer`, `drush`, `repo` (go-git), `phpcs`, `rector`, `drupal` (installer), `drupalorg` |
+| `pkg/` | One directory per wrapped external tool: `composer`, `drush`, `repo` (go-git), `phpcs`, `rector`, `drupal` (installer), `drupalorg` (drupal.org issues, and its GitLab at git.drupalcode.org) |
 | `scripts/` | PHP helpers copied into the image (`rector.php`, `unsupported-modules.php`, `config-resave.php`) |
 | `tools/` | The PHPCS and Rector the image installs to `/opt/drupdater/tools`, so addons install nothing into the project |
 
@@ -115,6 +115,7 @@ Where things live. For *how they work*, read `docs/explanation/` rather than dup
 - **Addons never call each other.** On `pre-composer-update` they return a `workflow.UpdatePlan` proposal and read the merged plan of earlier stages (`internal/workflow/plan.go`); no event is mutable.
 - **A run never touches the user's checkout.** Checkout mode works in a linked worktree (`repo.AddWorktree`), commits are signed explicitly, and nothing writes the repository's git config or shells out to git there; the update branch is the only thing a run adds.
 - **Addons never touch git.** They name the paths they changed to the event's `Commit`; the runner's committer (`internal/workflow/commit.go`) commits exactly those, and refuses when something else is already staged.
+- **Each addon declares the tool interfaces it uses**, in its own file, with only the methods it calls (`AuditComposer`, `UpdateHooksDrush`). No two addons share one — `TestNoTwoAddonsShareAToolInterface` fails otherwise — and `cmd`'s `addonComposer`/`addonDrush` embed them all.
 - **Hook stages are load-bearing** on `pre-composer-update` and `post-code-update`. See `docs/explanation/addon-architecture.md` before changing one.
 - **The MR is rendered from the report**, through its JSON. An addon reaches the description only via its report section; findings from two addons are joined there, never handed between them.
 - **`internal/addon/report.go` is a published contract.** Renaming a field there is a breaking change to `schema_version`, and `internal/addon/testdata/run_report.json` is what makes such a rename fail rather than ship. A new reporting addon belongs in that golden's `reportingAddons()`.
