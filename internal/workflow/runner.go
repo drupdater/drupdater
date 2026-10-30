@@ -387,7 +387,7 @@ func (s services) removeUpdateBranch(repository GitRepository, branch string) {
 func (r *run) resolveUpdate(ctx context.Context) (string, error) {
 	r.logger.Info("resolving dependency updates")
 
-	plan, err := r.hooks.PreComposerUpdate(NewPreComposerUpdateEvent(ctx, r.path, r.committer, UpdatePlan{}))
+	plan, err := Settle(r.hooks, NewPreComposerUpdateEvent(ctx, r.path, r.committer, UpdatePlan{}))
 	if err != nil {
 		return "", err
 	}
@@ -435,7 +435,7 @@ func (r *run) updateSharedCode(ctx context.Context) error {
 	}
 
 	postComposerUpdateEvent := NewPostComposerUpdateEvent(ctx, r.path, r.committer)
-	if err := r.hooks.PostComposerUpdate(postComposerUpdateEvent); err != nil {
+	if err := Fire(r.hooks, postComposerUpdateEvent); err != nil {
 		return err
 	}
 
@@ -450,7 +450,7 @@ func (r *run) updateSharedCode(ctx context.Context) error {
 	}
 
 	postCodeUpdateEvent := NewPostCodeUpdateEvent(ctx, r.path, r.committer)
-	if err := r.hooks.PostCodeUpdate(postCodeUpdateEvent); err != nil {
+	if err := Fire(r.hooks, postCodeUpdateEvent); err != nil {
 		return err
 	}
 
@@ -527,7 +527,7 @@ func (r *run) updateSite(ctx context.Context, site string, turn <-chan struct{},
 	}()
 
 	preSiteUpdateEvent := NewPreSiteUpdateEvent(ctx, r.path, r.committer, site)
-	if err := r.hooks.PreSiteUpdate(preSiteUpdateEvent); err != nil {
+	if err := Fire(r.hooks, preSiteUpdateEvent); err != nil {
 		return err
 	}
 
@@ -555,7 +555,7 @@ func (r *run) updateSite(ctx context.Context, site string, turn <-chan struct{},
 
 func (r *run) commitSiteChanges(ctx context.Context, site string) error {
 	postSiteUpdateEvent := NewPostSiteUpdateEvent(ctx, r.path, r.committer, site)
-	if err := r.hooks.PostSiteUpdate(postSiteUpdateEvent); err != nil {
+	if err := Fire(r.hooks, postSiteUpdateEvent); err != nil {
 		return err
 	}
 

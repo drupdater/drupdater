@@ -30,7 +30,7 @@ func TestHooksRunByStageThenAddonOrder(t *testing.T) {
 		hookAddon{hook("second change", Change)},
 	}
 
-	require.NoError(t, NewPipeline(addons).PostCodeUpdate(&PostCodeUpdateEvent{}))
+	require.NoError(t, Fire(NewPipeline(addons), &PostCodeUpdateEvent{}))
 
 	assert.Equal(t, []string{"first", "rector", "second change", "phpcbf", "audit"}, ran)
 }
@@ -45,7 +45,7 @@ func TestHooksStopAtTheFirstFailure(t *testing.T) {
 		})}},
 	}
 
-	err := NewPipeline(addons).PreSiteUpdate(&PreSiteUpdateEvent{})
+	err := Fire(NewPipeline(addons), &PreSiteUpdateEvent{})
 
 	require.ErrorIs(t, err, assert.AnError)
 	require.EqualError(t, err, "pre-site-update hook failed: "+assert.AnError.Error())
@@ -82,13 +82,13 @@ func TestPipelineCoversEveryEvent(t *testing.T) {
 
 	fires := map[string]func(*Pipeline) error{
 		"pre-composer-update": func(p *Pipeline) error {
-			_, err := p.PreComposerUpdate(&PreComposerUpdateEvent{})
+			_, err := Settle(p, &PreComposerUpdateEvent{})
 			return err
 		},
-		"post-composer-update": func(p *Pipeline) error { return p.PostComposerUpdate(&PostComposerUpdateEvent{}) },
-		"post-code-update":     func(p *Pipeline) error { return p.PostCodeUpdate(&PostCodeUpdateEvent{}) },
-		"pre-site-update":      func(p *Pipeline) error { return p.PreSiteUpdate(&PreSiteUpdateEvent{}) },
-		"post-site-update":     func(p *Pipeline) error { return p.PostSiteUpdate(&PostSiteUpdateEvent{}) },
+		"post-composer-update": func(p *Pipeline) error { return Fire(p, &PostComposerUpdateEvent{}) },
+		"post-code-update":     func(p *Pipeline) error { return Fire(p, &PostCodeUpdateEvent{}) },
+		"pre-site-update":      func(p *Pipeline) error { return Fire(p, &PreSiteUpdateEvent{}) },
+		"post-site-update":     func(p *Pipeline) error { return Fire(p, &PostSiteUpdateEvent{}) },
 	}
 	for event, fire := range fires {
 		t.Run(event, func(t *testing.T) {
@@ -117,7 +117,7 @@ func TestPreComposerUpdateMergesEveryProposal(t *testing.T) {
 		hookAddon{},
 	}
 
-	plan, err := NewPipeline(addons).PreComposerUpdate(NewPreComposerUpdateEvent(t.Context(), "/p", nil, UpdatePlan{}))
+	plan, err := Settle(NewPipeline(addons), NewPreComposerUpdateEvent(t.Context(), "/p", nil, UpdatePlan{}))
 
 	require.NoError(t, err)
 	assert.Equal(t, UpdatePlan{
@@ -131,8 +131,8 @@ func TestPreComposerUpdateStartsFromTheEventsPlan(t *testing.T) {
 	var saw UpdatePlan
 	start := UpdatePlan{Only: []string{"drupal/core"}}
 
-	plan, err := NewPipeline([]Addon{hookAddon{proposing(Change, UpdatePlan{}, &saw)}}).
-		PreComposerUpdate(NewPreComposerUpdateEvent(t.Context(), "/p", nil, start))
+	p := NewPipeline([]Addon{hookAddon{proposing(Change, UpdatePlan{}, &saw)}})
+	plan, err := Settle(p, NewPreComposerUpdateEvent(t.Context(), "/p", nil, start))
 
 	require.NoError(t, err)
 	assert.Equal(t, start, saw)
@@ -150,7 +150,7 @@ func TestPreComposerUpdateHooksSeeOnlyEarlierStages(t *testing.T) {
 		hookAddon{proposing(Change, UpdatePlan{}, &secondChange)},
 	}
 
-	_, err := NewPipeline(addons).PreComposerUpdate(NewPreComposerUpdateEvent(t.Context(), "/p", nil, UpdatePlan{}))
+	_, err := Settle(NewPipeline(addons), NewPreComposerUpdateEvent(t.Context(), "/p", nil, UpdatePlan{}))
 	require.NoError(t, err)
 
 	assert.Equal(t, narrow, firstChange, "Change sees what Prepare settled")
@@ -162,9 +162,9 @@ func TestPreComposerUpdateResultIsIndependentOfAddonOrder(t *testing.T) {
 	a := hookAddon{proposing(Change, UpdatePlan{Only: []string{"drupal/token", "drupal/core"}}, nil)}
 	b := hookAddon{proposing(Change, UpdatePlan{Only: []string{"drupal/core"}, Keep: []Pin{pin("drupal/token", "1.0.0")}}, nil)}
 
-	ab, err := NewPipeline([]Addon{a, b}).PreComposerUpdate(NewPreComposerUpdateEvent(t.Context(), "/p", nil, UpdatePlan{}))
+	ab, err := Settle(NewPipeline([]Addon{a, b}), NewPreComposerUpdateEvent(t.Context(), "/p", nil, UpdatePlan{}))
 	require.NoError(t, err)
-	ba, err := NewPipeline([]Addon{b, a}).PreComposerUpdate(NewPreComposerUpdateEvent(t.Context(), "/p", nil, UpdatePlan{}))
+	ba, err := Settle(NewPipeline([]Addon{b, a}), NewPreComposerUpdateEvent(t.Context(), "/p", nil, UpdatePlan{}))
 	require.NoError(t, err)
 
 	assert.Equal(t, ab, ba)
@@ -176,7 +176,7 @@ func TestPreComposerUpdateFailsWhenProposalsDisagree(t *testing.T) {
 		hookAddon{proposing(Change, UpdatePlan{Keep: []Pin{pin("drupal/core", "10.3.0")}}, nil)},
 	}
 
-	plan, err := NewPipeline(addons).PreComposerUpdate(NewPreComposerUpdateEvent(t.Context(), "/p", nil, UpdatePlan{}))
+	plan, err := Settle(NewPipeline(addons), NewPreComposerUpdateEvent(t.Context(), "/p", nil, UpdatePlan{}))
 
 	require.EqualError(t, err, "pre-composer-update hooks disagree: drupal/core is pinned at both 10.2.0 and 10.3.0")
 	assert.Zero(t, plan)
@@ -190,7 +190,7 @@ func TestPreComposerUpdateFailureReturnsNoPlan(t *testing.T) {
 		})}},
 	}
 
-	plan, err := NewPipeline(addons).PreComposerUpdate(NewPreComposerUpdateEvent(t.Context(), "/p", nil, UpdatePlan{}))
+	plan, err := Settle(NewPipeline(addons), NewPreComposerUpdateEvent(t.Context(), "/p", nil, UpdatePlan{}))
 
 	require.ErrorIs(t, err, assert.AnError)
 	assert.Zero(t, plan)

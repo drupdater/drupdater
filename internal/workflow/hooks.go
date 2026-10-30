@@ -57,90 +57,75 @@ type Hooks struct {
 	PostSiteUpdate     *Hook[*PostSiteUpdateEvent]
 }
 
-// Pipeline runs a set of addons' hooks, one method per event. Each method stops at the first
-// failing hook, so a later one never sees a half-done event.
+// Pipeline runs a set of addons' hooks: Fire for most events, Settle for pre-composer-update.
+// Either stops at the first failing hook, so a later one never sees a half-done event.
 type Pipeline struct {
-	preComposerUpdate  []*PlanHook
-	postComposerUpdate []*Hook[*PostComposerUpdateEvent]
-	postCodeUpdate     []*Hook[*PostCodeUpdateEvent]
-	preSiteUpdate      []*Hook[*PreSiteUpdateEvent]
-	postSiteUpdate     []*Hook[*PostSiteUpdateEvent]
+	addons []Hooks
 }
 
 // NewPipeline reads each addon's hooks once.
 func NewPipeline(addons []Addon) *Pipeline {
-	p := &Pipeline{}
-	for _, a := range addons {
-		h := a.Hooks()
-		p.preComposerUpdate = appendHook(p.preComposerUpdate, h.PreComposerUpdate)
-		p.postComposerUpdate = appendHook(p.postComposerUpdate, h.PostComposerUpdate)
-		p.postCodeUpdate = appendHook(p.postCodeUpdate, h.PostCodeUpdate)
-		p.preSiteUpdate = appendHook(p.preSiteUpdate, h.PreSiteUpdate)
-		p.postSiteUpdate = appendHook(p.postSiteUpdate, h.PostSiteUpdate)
+	hooks := make([]Hooks, len(addons))
+	for i, a := range addons {
+		hooks[i] = a.Hooks()
 	}
-	sortByStage(p.preComposerUpdate)
-	sortByStage(p.postComposerUpdate)
-	sortByStage(p.postCodeUpdate)
-	sortByStage(p.preSiteUpdate)
-	sortByStage(p.postSiteUpdate)
-	return p
+	return &Pipeline{addons: hooks}
 }
 
-// PreComposerUpdate returns the event's plan merged with every hook's proposal. Each hook sees
-// the plan as earlier stages left it, so hooks sharing a stage cannot see each other's proposals.
-func (p *Pipeline) PreComposerUpdate(e *PreComposerUpdateEvent) (UpdatePlan, error) {
+type staged interface {
+	comparable
+	stage() Stage
+}
+
+// event is one point in the run addons hook into: its name, and which field of Hooks it reads.
+type event[H staged] interface {
+	name() string
+	hook(Hooks) H
+}
+
+// Fire runs every addon's hook for e, by stage and within a stage in addon order.
+func Fire[E event[*Hook[E]]](p *Pipeline, e E) error {
+	for _, h := range ordered(p, e.hook) {
+		if err := h.Run(e); err != nil {
+			return fmt.Errorf("%s hook failed: %w", e.name(), err)
+		}
+	}
+	return nil
+}
+
+// Settle returns the event's plan merged with every hook's proposal. Each hook sees the plan as
+// earlier stages left it, so hooks sharing a stage cannot see each other's proposals.
+func Settle(p *Pipeline, e *PreComposerUpdateEvent) (UpdatePlan, error) {
+	hooks := ordered(p, e.hook)
 	plan := e.plan.clone()
 	settled := plan
-	for i, h := range p.preComposerUpdate {
-		if i > 0 && h.Stage != p.preComposerUpdate[i-1].Stage {
+	for i, h := range hooks {
+		if i > 0 && h.Stage != hooks[i-1].Stage {
 			settled = plan
 		}
 		e.plan = settled
 		proposal, err := h.Run(e)
 		if err != nil {
-			return UpdatePlan{}, fmt.Errorf("pre-composer-update hook failed: %w", err)
+			return UpdatePlan{}, fmt.Errorf("%s hook failed: %w", e.name(), err)
 		}
 		if plan, err = plan.merge(proposal); err != nil {
-			return UpdatePlan{}, fmt.Errorf("pre-composer-update hooks disagree: %w", err)
+			// merge's errors carry no identity to unwrap, so %v here would read the same.
+			// mutator-disable-next-line expression/errorf-wrap
+			return UpdatePlan{}, fmt.Errorf("%s hooks disagree: %w", e.name(), err)
 		}
 	}
 	return plan, nil
 }
 
-func (p *Pipeline) PostComposerUpdate(e *PostComposerUpdateEvent) error {
-	return runHooks("post-composer-update", p.postComposerUpdate, e)
-}
-
-func (p *Pipeline) PostCodeUpdate(e *PostCodeUpdateEvent) error {
-	return runHooks("post-code-update", p.postCodeUpdate, e)
-}
-
-func (p *Pipeline) PreSiteUpdate(e *PreSiteUpdateEvent) error {
-	return runHooks("pre-site-update", p.preSiteUpdate, e)
-}
-
-func (p *Pipeline) PostSiteUpdate(e *PostSiteUpdateEvent) error {
-	return runHooks("post-site-update", p.postSiteUpdate, e)
-}
-
-func appendHook[H comparable](hooks []H, h H) []H {
+// ordered sorts stably, so hooks sharing a stage keep addon order.
+func ordered[H staged](p *Pipeline, pick func(Hooks) H) []H {
 	var none H
-	if h == none {
-		return hooks
-	}
-	return append(hooks, h)
-}
-
-// sortByStage is stable, so hooks sharing a stage keep addon order.
-func sortByStage[H interface{ stage() Stage }](hooks []H) {
-	slices.SortStableFunc(hooks, func(a, b H) int { return cmp.Compare(a.stage(), b.stage()) })
-}
-
-func runHooks[E any](event string, hooks []*Hook[E], e E) error {
-	for _, h := range hooks {
-		if err := h.Run(e); err != nil {
-			return fmt.Errorf("%s hook failed: %w", event, err)
+	var hooks []H
+	for _, addon := range p.addons {
+		if h := pick(addon); h != none {
+			hooks = append(hooks, h)
 		}
 	}
-	return nil
+	slices.SortStableFunc(hooks, func(a, b H) int { return cmp.Compare(a.stage(), b.stage()) })
+	return hooks
 }

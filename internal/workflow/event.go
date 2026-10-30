@@ -39,6 +39,10 @@ type PreComposerUpdateEvent struct {
 	plan UpdatePlan
 }
 
+func (*PreComposerUpdateEvent) name() string { return "pre-composer-update" }
+
+func (*PreComposerUpdateEvent) hook(h Hooks) *PlanHook { return h.PreComposerUpdate }
+
 func NewPreComposerUpdateEvent(ctx context.Context, path string, committer Committer, plan UpdatePlan) *PreComposerUpdateEvent {
 	return &PreComposerUpdateEvent{
 		BasicAddonEvent: newBasicAddonEvent(ctx, path, committer),
@@ -56,6 +60,12 @@ type PostComposerUpdateEvent struct {
 	BasicAddonEvent
 }
 
+func (*PostComposerUpdateEvent) name() string { return "post-composer-update" }
+
+func (*PostComposerUpdateEvent) hook(h Hooks) *Hook[*PostComposerUpdateEvent] {
+	return h.PostComposerUpdate
+}
+
 func NewPostComposerUpdateEvent(ctx context.Context, path string, committer Committer) *PostComposerUpdateEvent {
 	return &PostComposerUpdateEvent{
 		BasicAddonEvent: newBasicAddonEvent(ctx, path, committer),
@@ -65,6 +75,10 @@ func NewPostComposerUpdateEvent(ctx context.Context, path string, committer Comm
 type PostCodeUpdateEvent struct {
 	BasicAddonEvent
 }
+
+func (*PostCodeUpdateEvent) name() string { return "post-code-update" }
+
+func (*PostCodeUpdateEvent) hook(h Hooks) *Hook[*PostCodeUpdateEvent] { return h.PostCodeUpdate }
 
 func NewPostCodeUpdateEvent(ctx context.Context, path string, committer Committer) *PostCodeUpdateEvent {
 	return &PostCodeUpdateEvent{
@@ -76,6 +90,10 @@ type PreSiteUpdateEvent struct {
 	BasicAddonEvent
 	site string
 }
+
+func (*PreSiteUpdateEvent) name() string { return "pre-site-update" }
+
+func (*PreSiteUpdateEvent) hook(h Hooks) *Hook[*PreSiteUpdateEvent] { return h.PreSiteUpdate }
 
 func NewPreSiteUpdateEvent(ctx context.Context, path string, committer Committer, site string) *PreSiteUpdateEvent {
 	return &PreSiteUpdateEvent{
@@ -92,6 +110,10 @@ type PostSiteUpdateEvent struct {
 	BasicAddonEvent
 	site string
 }
+
+func (*PostSiteUpdateEvent) name() string { return "post-site-update" }
+
+func (*PostSiteUpdateEvent) hook(h Hooks) *Hook[*PostSiteUpdateEvent] { return h.PostSiteUpdate }
 
 func NewPostSiteUpdateEvent(ctx context.Context, path string, committer Committer, site string) *PostSiteUpdateEvent {
 	return &PostSiteUpdateEvent{
