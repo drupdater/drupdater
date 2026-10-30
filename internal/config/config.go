@@ -1,9 +1,6 @@
-package internal
+package config
 
 import "time"
-
-// Version is set at build time via -ldflags, and stays "dev" for builds that skip the Makefile.
-var Version = "dev"
 
 type Config struct {
 	RepositoryURL string

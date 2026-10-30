@@ -1,25 +1,17 @@
 package cmd
 
 import (
-	"cmp"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"maps"
-	"net/http"
 	"os"
-	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"runtime"
-	"slices"
-	"strings"
 	"syscall"
 
-	"github.com/drupdater/drupdater/internal"
-	"github.com/drupdater/drupdater/internal/addon"
 	"github.com/drupdater/drupdater/internal/codehosting"
+	"github.com/drupdater/drupdater/internal/config"
 	"github.com/drupdater/drupdater/internal/logging"
 	"github.com/drupdater/drupdater/internal/report"
 	"github.com/drupdater/drupdater/internal/workflow"
@@ -27,8 +19,6 @@ import (
 	"github.com/drupdater/drupdater/pkg/drupal"
 	"github.com/drupdater/drupdater/pkg/drupalorg"
 	"github.com/drupdater/drupdater/pkg/drush"
-	"github.com/drupdater/drupdater/pkg/phpcs"
-	"github.com/drupdater/drupdater/pkg/rector"
 	"github.com/drupdater/drupdater/pkg/repo"
 	"github.com/maypok86/otter"
 	"github.com/spf13/afero"
@@ -39,7 +29,7 @@ import (
 
 // app holds everything the commands reach outside the process through; tests build their own.
 type app struct {
-	newRunner   func(logger *zap.Logger, cfg internal.Config, s workflowServices, opts ...workflow.Option) updateRunner
+	newRunner   func(logger *zap.Logger, cfg config.Config, s workflowServices, opts ...workflow.Option) updateRunner
 	newPlatform func(repositoryURL string, token string, logger *zap.Logger) (codehosting.Platform, error)
 	// newFullCheckDeps builds what the check command's --full tier clones and installs with.
 	newFullCheckDeps func(logger *zap.Logger) fullCheckDeps
@@ -50,7 +40,7 @@ type app struct {
 
 func productionApp() app {
 	return app{
-		newRunner: func(logger *zap.Logger, cfg internal.Config, s workflowServices, opts ...workflow.Option) updateRunner {
+		newRunner: func(logger *zap.Logger, cfg config.Config, s workflowServices, opts ...workflow.Option) updateRunner {
 			return workflow.New(logger, cfg, s.drush, s.platform, s.git, s.installer, s.composer, opts...)
 		},
 		newPlatform:      codehosting.New,
@@ -71,7 +61,7 @@ type workflowServices struct {
 
 // options is what one command tree's flags set; a run gets a copy, so nothing carries over.
 type options struct {
-	config internal.Config
+	config config.Config
 	// configFile is the path to .drupdater.yaml; empty means <working-dir>/.drupdater.yaml.
 	configFile string
 	// checkFull adds the check command's expensive tier.
@@ -122,14 +112,14 @@ names you can set there. See the README for the full file format.`,
 }
 
 // validateFlags rejects flag combinations before anything runs.
-func validateFlags(config internal.Config) error {
+func validateFlags(cfg config.Config) error {
 	// --clone needs an explicit repository URL; checkout mode derives it from origin.
-	if config.Clone && config.RepositoryURL == "" {
+	if cfg.Clone && cfg.RepositoryURL == "" {
 		return errors.New("--repository-url is required with --clone")
 	}
 	// Validated against what the provider factory accepts, so git@host:owner/repo.git passes.
-	if config.RepositoryURL != "" {
-		if err := codehosting.ValidateRepositoryURL(config.RepositoryURL); err != nil {
+	if cfg.RepositoryURL != "" {
+		if err := codehosting.ValidateRepositoryURL(cfg.RepositoryURL); err != nil {
 			return fmt.Errorf("invalid repository URL: %w", err)
 		}
 	}
@@ -139,28 +129,28 @@ func validateFlags(config internal.Config) error {
 // runUpdate is the body of the root command's RunE. Named rather than inline because a closure
 // assigned to RunE is invisible to `go tool cover -func`.
 func (a app) runUpdate(cmd *cobra.Command, args []string, opts options) error {
-	config := opts.config
+	cfg := opts.config
 
 	// Registered as each becomes known, so nothing is logged unredacted in between.
 	redactor := logging.NewRedactor()
 	registerEnvSecrets(redactor)
 
 	// First, so config errors are reported at all — Cobra silences them.
-	logger, err := NewLogger(config, redactor)
+	logger, err := NewLogger(cfg, redactor)
 	if err != nil {
 		// No logger yet.
 		fmt.Fprintln(cmd.ErrOrStderr(), "failed to initialize logger:", err)
 		return err
 	}
 
-	config.Token, err = resolveToken(args, config)
+	cfg.Token, err = resolveToken(args, cfg)
 	if err != nil {
 		logger.Error("missing token", zap.Error(err))
 		return err
 	}
-	redactor.Register(config.Token)
+	redactor.Register(cfg.Token)
 
-	if err := loadProjectConfig(logger, a.addons, configFilePath(opts.configFile, config.WorkingDir), &config); err != nil {
+	if err := loadProjectConfig(logger, a.addons, configFilePath(opts.configFile, cfg.WorkingDir), &cfg); err != nil {
 		return err
 	}
 
@@ -171,7 +161,7 @@ func (a app) runUpdate(cmd *cobra.Command, args []string, opts options) error {
 	}
 
 	drush := drush.NewCLI(logger, cache)
-	composer := composer.NewCLI(logger, composerOptions(config)...)
+	composer := composer.NewCLI(logger, composerOptions(cfg)...)
 	// Patch checks leave a scratch project with a full vendor tree behind otherwise.
 	defer composer.Cleanup()
 	drupalOrg := drupalorg.NewHTTPClient(logger)
@@ -185,37 +175,37 @@ func (a app) runUpdate(cmd *cobra.Command, args []string, opts options) error {
 	git := repo.NewGitRepositoryService(logger)
 
 	// In checkout mode the URL and target branch come from the checkout; --branch is --clone only.
-	if !config.Clone {
-		if err := resolveCheckoutSettings(git, &config); err != nil {
+	if !cfg.Clone {
+		if err := resolveCheckoutSettings(git, &cfg); err != nil {
 			logger.Error("cannot use the checkout", zap.Error(err))
 			return err
 		}
-		logger.Info("using checkout", zap.String("url", config.RepositoryURL), zap.String("branch", config.Branch))
+		logger.Info("using checkout", zap.String("url", cfg.RepositoryURL), zap.String("branch", cfg.Branch))
 
 		// CI mounts the checkout under another user, so git calls it "dubious ownership".
-		a.trustCheckout(cmd.Context(), logger, config.WorkingDir)
+		a.trustCheckout(cmd.Context(), logger, cfg.WorkingDir)
 	}
 
 	// Built only for a run that clones or publishes; see tokenRequired.
 	var platform codehosting.Platform
-	if tokenRequired(config) {
-		platform, err = a.newPlatform(config.RepositoryURL, config.Token, logger)
+	if tokenRequired(cfg) {
+		platform, err = a.newPlatform(cfg.RepositoryURL, cfg.Token, logger)
 		if err != nil {
 			logger.Error("failed to create VCS provider", zap.Error(err))
 			return err
 		}
 	}
 
-	addons, err := a.addons.create(config, newAddonDeps(logger, drush, composer, drupalOrg))
+	addons, err := a.addons.create(cfg, newAddonDeps(logger, drush, composer, drupalOrg))
 	if err != nil {
 		return err
 	}
 
 	var runnerOpts []workflow.Option
-	if config.ReportPath != "" {
-		runnerOpts = append(runnerOpts, workflow.WithReportSink(reportSink(logger, redactor, config.ReportPath)))
+	if cfg.ReportPath != "" {
+		runnerOpts = append(runnerOpts, workflow.WithReportSink(reportSink(logger, redactor, cfg.ReportPath)))
 	}
-	runner := a.newRunner(logger, config, workflowServices{
+	runner := a.newRunner(logger, cfg, workflowServices{
 		drush:     drush,
 		platform:  platform,
 		git:       git,
@@ -241,7 +231,7 @@ type updateRunner interface {
 
 // composerOptions lets a security run keep an unfixable advisory, reported as unresolved, rather
 // than have it block every fixable one.
-func composerOptions(cfg internal.Config) []composer.Option {
+func composerOptions(cfg config.Config) []composer.Option {
 	if cfg.Security {
 		return []composer.Option{composer.WithoutBlocking()}
 	}
@@ -260,69 +250,6 @@ func reportSink(logger *zap.Logger, redactor *logging.Redactor, path string) fun
 	}
 }
 
-// resolveToken takes the argument, else DRUPDATER_TOKEN. Mandatory only when the run will use it.
-func resolveToken(args []string, cfg internal.Config) (string, error) {
-	var token string
-	if len(args) == 1 && args[0] != "" {
-		token = args[0]
-	} else {
-		token = os.Getenv("DRUPDATER_TOKEN")
-	}
-	if token == "" && tokenRequired(cfg) {
-		return "", errors.New("no token provided: pass it as the argument or set DRUPDATER_TOKEN")
-	}
-	return token, nil
-}
-
-// tokenRequired reports whether this run clones or publishes. A checkout-mode --dry-run does neither.
-func tokenRequired(cfg internal.Config) bool {
-	return cfg.Clone || !cfg.DryRun
-}
-
-// registerEnvSecrets registers every credential-bearing environment value a subprocess may echo.
-func registerEnvSecrets(redactor *logging.Redactor) {
-	redactor.Register(os.Getenv("DRUPALCODE_ACCESS_TOKEN"))
-	registerComposerAuth(redactor, os.Getenv("COMPOSER_AUTH"))
-}
-
-// registerComposerAuth registers the credentials inside a COMPOSER_AUTH value. Composer echoes the
-// individual leaf, not the JSON blob. The raw value goes in too, for when it does not parse.
-func registerComposerAuth(redactor *logging.Redactor, composerAuth string) {
-	redactor.Register(composerAuth)
-
-	var parsed any
-	if err := json.Unmarshal([]byte(composerAuth), &parsed); err != nil {
-		return
-	}
-	redactor.Register(composerAuthSecretLeaves(parsed, "")...)
-}
-
-// composerAuthSecretLeaves returns every string value in a decoded COMPOSER_AUTH structure.
-func composerAuthSecretLeaves(v any, key string) []string {
-	switch t := v.(type) {
-	case string:
-		// http-basic commonly sets username to the literal "token", which must stay readable.
-		if key == "username" {
-			return nil
-		}
-		return []string{t}
-	case map[string]any:
-		leaves := make([]string, 0, len(t))
-		for k, val := range t {
-			leaves = append(leaves, composerAuthSecretLeaves(val, k)...)
-		}
-		return leaves
-	case []any:
-		leaves := make([]string, 0, len(t))
-		for _, val := range t {
-			leaves = append(leaves, composerAuthSecretLeaves(val, key)...)
-		}
-		return leaves
-	default:
-		return nil
-	}
-}
-
 // configFilePath returns --config when set, otherwise the working directory's .drupdater.yaml.
 func configFilePath(explicit string, workingDir string) string {
 	if explicit != "" {
@@ -332,8 +259,8 @@ func configFilePath(explicit string, workingDir string) string {
 }
 
 // loadProjectConfig layers .drupdater.yaml onto cfg. A missing file is not an error.
-func loadProjectConfig(logger *zap.Logger, catalog addonCatalog, path string, cfg *internal.Config) error {
-	found, err := internal.LoadConfigFile(path, cfg)
+func loadProjectConfig(logger *zap.Logger, catalog addonCatalog, path string, cfg *config.Config) error {
+	found, err := config.LoadFile(path, cfg)
 	if err != nil {
 		logger.Error("invalid configuration", zap.String("path", path), zap.Error(err))
 		return err
@@ -353,203 +280,6 @@ func loadProjectConfig(logger *zap.Logger, catalog addonCatalog, path string, cf
 		zap.Bool("run_types.security.auto_merge", cfg.RunTypes.Security.AutoMerge),
 	)
 	return nil
-}
-
-// resolveCheckoutSettings fills the URL and target branch from the checkout, overwriting --branch.
-func resolveCheckoutSettings(git *repo.GitRepositoryService, cfg *internal.Config) error {
-	if cfg.RepositoryURL == "" {
-		remoteURL, err := git.GetRemoteURL(cfg.WorkingDir)
-		if err != nil {
-			return fmt.Errorf("failed to determine repository URL from checkout (pass --repository-url or fix the checkout): %w", err)
-		}
-		cfg.RepositoryURL = remoteURL
-	}
-
-	branch, err := resolveCheckoutBranch(git, cfg.WorkingDir)
-	if err != nil {
-		return err
-	}
-	cfg.Branch = branch
-	return nil
-}
-
-// resolveCheckoutBranch returns the checkout's branch, or the CI variable when in detached HEAD.
-func resolveCheckoutBranch(git *repo.GitRepositoryService, workingDir string) (string, error) {
-	branch, err := git.GetCurrentBranch(workingDir)
-	if err != nil {
-		return "", fmt.Errorf("failed to determine branch from checkout: %w", err)
-	}
-	if branch == "" {
-		branch = cmp.Or(os.Getenv("GITHUB_REF_NAME"), os.Getenv("CI_COMMIT_REF_NAME"))
-	}
-	if branch == "" {
-		return "", errors.New("could not determine the target branch: the checkout is in detached HEAD and no CI branch variable (GITHUB_REF_NAME, CI_COMMIT_REF_NAME) is set")
-	}
-	return branch, nil
-}
-
-// ensureGitSafeDirectory trusts dir globally, skipping it when already listed so repeated runs
-// don't append duplicates to the user's gitconfig.
-func ensureGitSafeDirectory(ctx context.Context, logger *zap.Logger, dir string) {
-	abs, err := filepath.Abs(dir)
-	if err != nil {
-		logger.Warn("failed to resolve checkout path for safe.directory", zap.Error(err))
-		return
-	}
-
-	if out, err := exec.CommandContext(ctx, "git", "config", "--global", "--get-all", "safe.directory").Output(); err == nil {
-		for entry := range strings.SplitSeq(string(out), "\n") {
-			if entry == abs || entry == "*" {
-				return
-			}
-		}
-	}
-
-	if out, err := exec.CommandContext(ctx, "git", "config", "--global", "--add", "safe.directory", abs).CombinedOutput(); err != nil {
-		logger.Warn("failed to mark checkout as a safe git directory", zap.String("output", string(out)), zap.Error(err))
-	}
-}
-
-// addonComposer is every builtin addon's composer interface at once; each addon sees only its own.
-type addonComposer interface {
-	addon.AllowPluginsComposer
-	addon.AuditComposer
-	addon.BeautifierComposer
-	addon.DeprecationsComposer
-	addon.DiffComposer
-	addon.NormalizerComposer
-	addon.PatchesComposer
-}
-
-// addonDrush is every builtin addon's drush interface at once.
-type addonDrush interface {
-	addon.TranslationsDrush
-	addon.UnsupportedModulesDrush
-	addon.UpdateHooksDrush
-}
-
-// addonDeps carries everything the addon constructors need.
-type addonDeps struct {
-	logger    *zap.Logger
-	drush     addonDrush
-	composer  addonComposer
-	drupalOrg addon.DrupalOrg
-	// drupalCode is nil without DRUPALCODE_ACCESS_TOKEN.
-	drupalCode addon.DrupalCode
-	// security marks a --security run. Only composer_audit reads it.
-	security bool
-}
-
-// newAddonDeps adds the drupalcode client only when DRUPALCODE_ACCESS_TOKEN is set.
-func newAddonDeps(logger *zap.Logger, drush addonDrush, composer addonComposer, drupalOrg addon.DrupalOrg) addonDeps {
-	deps := addonDeps{logger: logger, drush: drush, composer: composer, drupalOrg: drupalOrg}
-	if token := os.Getenv("DRUPALCODE_ACCESS_TOKEN"); token != "" {
-		deps.drupalCode = drupalorg.NewDrupalCode(token)
-	}
-	return deps
-}
-
-// bundledToolsBin is where the image installs tools/, so addons install nothing into the project.
-const bundledToolsBin = "/opt/drupdater/tools/vendor/bin"
-
-// addonCatalog is every addon by the name .drupdater.yaml uses, and which of them always run.
-type addonCatalog struct {
-	factories map[string]func(addonDeps) workflow.Addon
-	mandatory []string
-}
-
-// builtinAddons is the catalog drupdater ships. A function, so nothing can change the one in use.
-func builtinAddons() addonCatalog {
-	return addonCatalog{
-		factories: map[string]func(addonDeps) workflow.Addon{
-			"composer_audit": func(d addonDeps) workflow.Addon {
-				return addon.NewComposerAudit(d.logger, d.composer, d.security)
-			},
-			"code_beautifier": func(d addonDeps) workflow.Addon {
-				return addon.NewCodeBeautifier(d.logger, phpcs.NewCLI(d.logger), phpcs.NewBundledCLI(d.logger, bundledToolsBin), d.composer)
-			},
-			"deprecations_remover": func(d addonDeps) workflow.Addon {
-				return addon.NewDeprecationsRemover(d.logger, rector.NewCLI(d.logger), rector.NewBundledCLI(d.logger, bundledToolsBin), d.composer)
-			},
-			"translations_updater":   func(d addonDeps) workflow.Addon { return addon.NewTranslationsUpdater(d.logger, d.drush) },
-			"composer_allow_plugins": func(d addonDeps) workflow.Addon { return addon.NewComposerAllowPlugins(d.logger, d.composer) },
-			"composer_normalizer":    func(d addonDeps) workflow.Addon { return addon.NewComposerNormalizer(d.logger, d.composer) },
-			"composer_patches": func(d addonDeps) workflow.Addon {
-				return addon.NewComposerPatches1(d.logger, d.composer, d.drupalOrg, d.drupalCode, http.DefaultClient)
-			},
-			"composer_diff":       func(d addonDeps) workflow.Addon { return addon.NewComposerDiff(d.logger, d.composer) },
-			"update_hooks":        func(d addonDeps) workflow.Addon { return addon.NewUpdateHooks(d.logger, d.drush) },
-			"unsupported_modules": func(d addonDeps) workflow.Addon { return addon.NewUnsupportedModules(d.logger, d.drush) },
-		},
-		// The description joins composer_audit's and unsupported_modules' findings into one
-		// end-of-life list, so both always run.
-		mandatory: []string{
-			"composer_allow_plugins",
-			"composer_patches",
-			"composer_diff",
-			"update_hooks",
-			"composer_audit",
-			"unsupported_modules",
-		},
-	}
-}
-
-// create builds the mandatory addons plus the ones the active run type lists.
-func (c addonCatalog) create(config internal.Config, deps addonDeps) ([]workflow.Addon, error) {
-	deps.security = config.Security
-
-	var addons []workflow.Addon
-	added := map[string]bool{}
-	build := func(name string) error {
-		if added[name] {
-			return nil
-		}
-		factory, ok := c.factories[name]
-		if !ok {
-			return fmt.Errorf("unknown addon %q", name)
-		}
-		addons = append(addons, factory(deps))
-		added[name] = true
-		return nil
-	}
-
-	for _, name := range slices.Concat(c.mandatory, config.ActiveRunType().Addons) {
-		if err := build(name); err != nil {
-			return nil, err
-		}
-	}
-	return addons, nil
-}
-
-// validate checks both run types, so a typo under run_types.security fails a normal run too.
-func (c addonCatalog) validate(config internal.Config) error {
-	for _, name := range slices.Concat(config.RunTypes.Normal.Addons, config.RunTypes.Security.Addons) {
-		if _, ok := c.factories[name]; !ok {
-			return fmt.Errorf("unknown addon %q (run \"drupdater addons\" to list valid names)", name)
-		}
-	}
-	return nil
-}
-
-// configurable returns the sorted addon names, minus the mandatory ones.
-func (c addonCatalog) configurable() []string {
-	names := slices.Sorted(maps.Keys(c.factories))
-	return slices.DeleteFunc(names, func(n string) bool { return slices.Contains(c.mandatory, n) })
-}
-
-// newAddonsCmd lists the addon names that can be set in .drupdater.yaml.
-func (a app) newAddonsCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "addons",
-		Short: "List the addon names that can be set in .drupdater.yaml",
-		Run: func(cmd *cobra.Command, _ []string) {
-			out := cmd.OutOrStdout()
-			fmt.Fprintln(out, "Addons you can set under run_types.normal.addons / run_types.security.addons in .drupdater.yaml:")
-			for _, n := range a.addons.configurable() {
-				fmt.Fprintf(out, "  %s\n", n)
-			}
-		},
-	}
 }
 
 // handleWorkflowError logs AbortErrors as warnings (non-fatal) and all others as errors (fatal).
@@ -582,11 +312,11 @@ func NewCache() (otter.Cache[string, string], error) {
 	return otter.MustBuilder[string, string](100).Build()
 }
 
-func NewLogger(config internal.Config, redactor *logging.Redactor) (*zap.Logger, error) {
+func NewLogger(cfg config.Config, redactor *logging.Redactor) (*zap.Logger, error) {
 	loggerConfig := zap.NewDevelopmentConfig()
 	loggerConfig.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 
-	if !config.Verbose {
+	if !cfg.Verbose {
 		loggerConfig.Level.SetLevel(zapcore.InfoLevel)
 		loggerConfig.DisableCaller = true
 		loggerConfig.DisableStacktrace = true

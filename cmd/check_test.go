@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/internal/config"
 	"github.com/drupdater/drupdater/internal/logging"
 	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/spf13/afero"
@@ -36,7 +36,7 @@ func TestCheckToken(t *testing.T) {
 
 func TestCheckConfigAndAddons(t *testing.T) {
 	t.Run("a missing file applies the defaults and passes", func(t *testing.T) {
-		cfg := internal.Config{}
+		cfg := config.Config{}
 		results := checkConfigAndAddons(builtinAddons(), filepath.Join(t.TempDir(), ".drupdater.yaml"), &cfg)
 
 		require.Len(t, results, 2)
@@ -50,7 +50,7 @@ func TestCheckConfigAndAddons(t *testing.T) {
 		path := filepath.Join(t.TempDir(), ".drupdater.yaml")
 		require.NoError(t, os.WriteFile(path, []byte("timeout: nope\n"), 0o600))
 
-		cfg := internal.Config{}
+		cfg := config.Config{}
 		results := checkConfigAndAddons(builtinAddons(), path, &cfg)
 
 		require.Len(t, results, 1)
@@ -62,7 +62,7 @@ func TestCheckConfigAndAddons(t *testing.T) {
 		path := filepath.Join(t.TempDir(), ".drupdater.yaml")
 		require.NoError(t, os.WriteFile(path, []byte("run_types:\n  normal:\n    addons: [no_such_addon]\n"), 0o600))
 
-		cfg := internal.Config{}
+		cfg := config.Config{}
 		results := checkConfigAndAddons(builtinAddons(), path, &cfg)
 
 		require.Len(t, results, 2)
@@ -186,7 +186,7 @@ func TestRunCheapChecks(t *testing.T) {
 	}
 
 	t.Run("everything passes", func(t *testing.T) {
-		cfg := &internal.Config{WorkingDir: "/project", RepositoryURL: "https://github.com/acme/site.git"}
+		cfg := &config.Config{WorkingDir: "/project", RepositoryURL: "https://github.com/acme/site.git"}
 		repository := fakeShallowCloneChecker{shallow: false}
 		composerSvc := fakeCheapChecksComposer{webRoot: "web"}
 
@@ -198,7 +198,7 @@ func TestRunCheapChecks(t *testing.T) {
 	})
 
 	t.Run("a shallow clone and unmet platform reqs both surface as failures", func(t *testing.T) {
-		cfg := &internal.Config{WorkingDir: "/project", RepositoryURL: "https://github.com/acme/site.git"}
+		cfg := &config.Config{WorkingDir: "/project", RepositoryURL: "https://github.com/acme/site.git"}
 		repository := fakeShallowCloneChecker{shallow: true}
 		composerSvc := fakeCheapChecksComposer{platformReqsOut: "php 8.1 required", platformReqsErr: errors.New("unmet")}
 
@@ -221,7 +221,7 @@ func TestRunCheapChecks(t *testing.T) {
 		cfgPath := filepath.Join(t.TempDir(), ".drupdater.yaml")
 		require.NoError(t, os.WriteFile(cfgPath, []byte("sites: [default, extra]\n"), 0o600))
 
-		cfg := &internal.Config{WorkingDir: "/project", RepositoryURL: "https://github.com/acme/site.git"}
+		cfg := &config.Config{WorkingDir: "/project", RepositoryURL: "https://github.com/acme/site.git"}
 		repository := fakeShallowCloneChecker{}
 		composerSvc := fakeCheapChecksComposer{webRoot: "web"}
 
@@ -238,7 +238,7 @@ func TestRunCheapChecks(t *testing.T) {
 }
 
 func TestRunFullChecksNoRepositoryURL(t *testing.T) {
-	results := testApp().runFullChecks(t.Context(), zap.NewNop(), internal.Config{}, "")
+	results := testApp().runFullChecks(t.Context(), zap.NewNop(), config.Config{}, "")
 	require.Len(t, results, 1)
 	assert.Equal(t, "sites install from configuration", results[0].Name)
 	assert.False(t, results[0].OK)
@@ -248,7 +248,7 @@ func TestRunFullChecksNoRepositoryURL(t *testing.T) {
 func TestRunFullChecksDefaultsToMainBranch(t *testing.T) {
 	// With no branch configured the clone must still try one. It fails here, but the detail
 	// names the branch it tried.
-	cfg := internal.Config{RepositoryURL: t.TempDir()}
+	cfg := config.Config{RepositoryURL: t.TempDir()}
 
 	results := testApp().runFullChecks(t.Context(), zap.NewNop(), cfg, "")
 	require.Len(t, results, 1)
@@ -260,7 +260,7 @@ func TestRunFullChecksDefaultsToMainBranch(t *testing.T) {
 func TestRunFullChecksCloneFailure(t *testing.T) {
 	// A non-repository path as the "repository URL" fails fast in CloneRepository itself, so
 	// this exercises the clone-error branch without needing composer or drush at all.
-	cfg := internal.Config{RepositoryURL: t.TempDir(), Branch: "main"}
+	cfg := config.Config{RepositoryURL: t.TempDir(), Branch: "main"}
 
 	results := testApp().runFullChecks(t.Context(), zap.NewNop(), cfg, "")
 	require.Len(t, results, 1)

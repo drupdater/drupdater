@@ -10,8 +10,8 @@ import (
 
 	"github.com/drupdater/drupdater/pkg/repo"
 
-	"github.com/drupdater/drupdater/internal"
 	"github.com/drupdater/drupdater/internal/codehosting"
+	"github.com/drupdater/drupdater/internal/config"
 	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -62,7 +62,7 @@ func TestRunWithConcurrentSites(t *testing.T) {
 	drush := NewMockDrush(t)
 
 	sites := []string{"site1", "site2", "site3", "site4"}
-	config := internal.Config{
+	config := config.Config{
 		RepositoryURL: "https://example.com/repo.git",
 		Branch:        "main",
 		Token:         "token",
@@ -155,7 +155,7 @@ func turnsRunner(t *testing.T, sites []string, concurrency int, stub func(site s
 	committer := &fakeCommitter{result: true}
 	r := testRun(services{
 		logger:    zap.NewNop(),
-		config:    internal.Config{Sites: sites, Concurrency: concurrency},
+		config:    config.Config{Sites: sites, Concurrency: concurrency},
 		installer: installer,
 		drush:     drush,
 	}, repo.Checkout{Path: testCheckout})

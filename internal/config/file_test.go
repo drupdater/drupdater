@@ -1,4 +1,4 @@
-package internal
+package config
 
 import (
 	"os"
@@ -17,10 +17,10 @@ func writeConfig(t *testing.T, body string) string {
 	return path
 }
 
-func TestLoadConfigFile(t *testing.T) {
+func TestLoadFile(t *testing.T) {
 	t.Run("missing file applies defaults", func(t *testing.T) {
 		var c Config
-		found, err := LoadConfigFile(filepath.Join(t.TempDir(), "absent.yaml"), &c)
+		found, err := LoadFile(filepath.Join(t.TempDir(), "absent.yaml"), &c)
 		require.NoError(t, err)
 		assert.False(t, found)
 
@@ -32,7 +32,7 @@ func TestLoadConfigFile(t *testing.T) {
 
 	t.Run("partial file keeps defaults for absent keys", func(t *testing.T) {
 		var c Config
-		found, err := LoadConfigFile(writeConfig(t, "run_types:\n  normal:\n    addons: [code_beautifier]\n"), &c)
+		found, err := LoadFile(writeConfig(t, "run_types:\n  normal:\n    addons: [code_beautifier]\n"), &c)
 		require.NoError(t, err)
 		assert.True(t, found)
 
@@ -44,27 +44,27 @@ func TestLoadConfigFile(t *testing.T) {
 
 	t.Run("timeout string parses into a duration", func(t *testing.T) {
 		var c Config
-		_, err := LoadConfigFile(writeConfig(t, "timeout: 90s\n"), &c)
+		_, err := LoadFile(writeConfig(t, "timeout: 90s\n"), &c)
 		require.NoError(t, err)
 		assert.Equal(t, 90*time.Second, c.Timeout)
 	})
 
 	t.Run("timeout 0 disables the timeout", func(t *testing.T) {
 		var c Config
-		_, err := LoadConfigFile(writeConfig(t, "timeout: 0\n"), &c)
+		_, err := LoadFile(writeConfig(t, "timeout: 0\n"), &c)
 		require.NoError(t, err)
 		assert.Equal(t, time.Duration(0), c.Timeout)
 	})
 
 	t.Run("invalid timeout is an error", func(t *testing.T) {
 		var c Config
-		_, err := LoadConfigFile(writeConfig(t, "timeout: not-a-duration\n"), &c)
+		_, err := LoadFile(writeConfig(t, "timeout: not-a-duration\n"), &c)
 		require.Error(t, err)
 	})
 
 	t.Run("unknown key is rejected", func(t *testing.T) {
 		var c Config
-		_, err := LoadConfigFile(writeConfig(t, "timout: 30m\n"), &c) // typo
+		_, err := LoadFile(writeConfig(t, "timout: 30m\n"), &c) // typo
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "timout")
 	})
@@ -73,7 +73,7 @@ func TestLoadConfigFile(t *testing.T) {
 		// An empty document decodes to io.EOF. That means "no keys set", the same as an absent
 		// file — it must not fail the run.
 		var c Config
-		found, err := LoadConfigFile(writeConfig(t, ""), &c)
+		found, err := LoadFile(writeConfig(t, ""), &c)
 		require.NoError(t, err)
 		assert.True(t, found)
 		assert.Equal(t, []string{"default"}, c.Sites)
@@ -83,7 +83,7 @@ func TestLoadConfigFile(t *testing.T) {
 
 	t.Run("a comments-only file applies defaults", func(t *testing.T) {
 		var c Config
-		found, err := LoadConfigFile(writeConfig(t, "# everything is commented out\n# sites: [a]\n"), &c)
+		found, err := LoadFile(writeConfig(t, "# everything is commented out\n# sites: [a]\n"), &c)
 		require.NoError(t, err)
 		assert.True(t, found)
 		assert.Equal(t, []string{"default"}, c.Sites)
@@ -92,7 +92,7 @@ func TestLoadConfigFile(t *testing.T) {
 	t.Run("an unreadable path is an error", func(t *testing.T) {
 		var c Config
 		// A directory is not os.IsNotExist, so it must surface rather than fall back.
-		_, err := LoadConfigFile(t.TempDir(), &c)
+		_, err := LoadFile(t.TempDir(), &c)
 		require.Error(t, err)
 	})
 
@@ -100,28 +100,28 @@ func TestLoadConfigFile(t *testing.T) {
 		// Every per-site phase iterates this list, so an empty one would skip installing,
 		// updating and exporting for all sites while still opening a merge request.
 		var c Config
-		_, err := LoadConfigFile(writeConfig(t, "sites: []\n"), &c)
+		_, err := LoadFile(writeConfig(t, "sites: []\n"), &c)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no sites configured")
 	})
 
 	t.Run("a null site list is rejected", func(t *testing.T) {
 		var c Config
-		_, err := LoadConfigFile(writeConfig(t, "sites:\n"), &c)
+		_, err := LoadFile(writeConfig(t, "sites:\n"), &c)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no sites configured")
 	})
 
 	t.Run("sites are applied when set", func(t *testing.T) {
 		var c Config
-		_, err := LoadConfigFile(writeConfig(t, "sites: [default, subsite_a]\n"), &c)
+		_, err := LoadFile(writeConfig(t, "sites: [default, subsite_a]\n"), &c)
 		require.NoError(t, err)
 		assert.Equal(t, []string{"default", "subsite_a"}, c.Sites)
 	})
 
 	t.Run("a run type sets its addons and auto_merge together", func(t *testing.T) {
 		var c Config
-		_, err := LoadConfigFile(writeConfig(t, `run_types:
+		_, err := LoadFile(writeConfig(t, `run_types:
   normal:
     addons: [code_beautifier]
     auto_merge: false
@@ -138,7 +138,7 @@ func TestLoadConfigFile(t *testing.T) {
 
 	t.Run("auto_merge defaults to false for both run types", func(t *testing.T) {
 		var c Config
-		found, err := LoadConfigFile(filepath.Join(t.TempDir(), "absent.yaml"), &c)
+		found, err := LoadFile(filepath.Join(t.TempDir(), "absent.yaml"), &c)
 		require.NoError(t, err)
 		assert.False(t, found)
 		assert.False(t, c.RunTypes.Normal.AutoMerge)
@@ -166,7 +166,7 @@ func TestLoadConfigFile(t *testing.T) {
 			"auto_merge:\n  normal: true\n",
 		} {
 			var c Config
-			_, err := LoadConfigFile(writeConfig(t, body), &c)
+			_, err := LoadFile(writeConfig(t, body), &c)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "grouped per run type")
 			assert.Contains(t, err.Error(), "run_types:")

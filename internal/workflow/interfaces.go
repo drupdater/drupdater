@@ -41,11 +41,11 @@ type GitService interface {
 	ShallowCloneChecker
 }
 
-// GitRepository is an alias for repo.Repository to avoid duplication.
-type GitRepository = repo.Repository
-
-// Worktree is an alias for repo.Worktree to avoid duplication.
-type Worktree = repo.Worktree
+// GitRepository and Worktree alias repo's types so mockery generates their mocks in this package.
+type (
+	GitRepository = repo.Repository
+	Worktree      = repo.Worktree
+)
 
 type Installer interface {
 	Install(ctx context.Context, dir string, site string) error

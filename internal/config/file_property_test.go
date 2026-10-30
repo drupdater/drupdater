@@ -1,4 +1,4 @@
-package internal
+package config
 
 import (
 	"fmt"
@@ -48,7 +48,7 @@ func writePropertyConfig(t require.TestingT, dir string, body string) string {
 	return path
 }
 
-func TestPropertyLoadConfigFileRoundTripsEveryKey(t *testing.T) {
+func TestPropertyLoadFileRoundTripsEveryKey(t *testing.T) {
 	dir := t.TempDir()
 
 	rapid.Check(t, func(t *rapid.T) {
@@ -58,7 +58,7 @@ func TestPropertyLoadConfigFileRoundTripsEveryKey(t *testing.T) {
 		require.NoError(t, err)
 
 		var got Config
-		found, err := LoadConfigFile(writePropertyConfig(t, dir, string(body)), &got)
+		found, err := LoadFile(writePropertyConfig(t, dir, string(body)), &got)
 		require.NoError(t, err)
 		assert.True(t, found)
 
@@ -73,7 +73,7 @@ func TestPropertyLoadConfigFileRoundTripsEveryKey(t *testing.T) {
 	})
 }
 
-func TestPropertyLoadConfigFileFillsInEveryAbsentKey(t *testing.T) {
+func TestPropertyLoadFileFillsInEveryAbsentKey(t *testing.T) {
 	dir := t.TempDir()
 	defaults := defaultFileConfig()
 
@@ -98,7 +98,7 @@ func TestPropertyLoadConfigFileFillsInEveryAbsentKey(t *testing.T) {
 		}
 
 		var got Config
-		_, err := LoadConfigFile(writePropertyConfig(t, dir, body.String()), &got)
+		_, err := LoadFile(writePropertyConfig(t, dir, body.String()), &got)
 		require.NoError(t, err)
 
 		if withSites {
@@ -128,7 +128,7 @@ func TestPropertyLoadConfigFileFillsInEveryAbsentKey(t *testing.T) {
 	})
 }
 
-func TestPropertyLoadConfigFileTreatsAnEmptyDocumentAsAbsent(t *testing.T) {
+func TestPropertyLoadFileTreatsAnEmptyDocumentAsAbsent(t *testing.T) {
 	dir := t.TempDir()
 
 	rapid.Check(t, func(t *rapid.T) {
@@ -138,11 +138,11 @@ func TestPropertyLoadConfigFileTreatsAnEmptyDocumentAsAbsent(t *testing.T) {
 		body := strings.Join(blanks, "\n")
 
 		var fromFile Config
-		_, err := LoadConfigFile(writePropertyConfig(t, dir, body), &fromFile)
+		_, err := LoadFile(writePropertyConfig(t, dir, body), &fromFile)
 		require.NoError(t, err, "body %q", body)
 
 		var fromNothing Config
-		_, err = LoadConfigFile(filepath.Join(dir, "does-not-exist.yaml"), &fromNothing)
+		_, err = LoadFile(filepath.Join(dir, "does-not-exist.yaml"), &fromNothing)
 		require.NoError(t, err)
 
 		// A file that sets no keys and no file at all are the same statement, so they must
@@ -162,9 +162,9 @@ func TestPropertyFlexTimeoutAcceptsAnyGoDuration(t *testing.T) {
 
 		// Quoted and bare must mean the same thing: `timeout: 0` decodes as an int.
 		var quoted, bare Config
-		_, err := LoadConfigFile(writePropertyConfig(t, dir, fmt.Sprintf("sites: [default]\ntimeout: %q\n", raw)), &quoted)
+		_, err := LoadFile(writePropertyConfig(t, dir, fmt.Sprintf("sites: [default]\ntimeout: %q\n", raw)), &quoted)
 		require.NoError(t, err)
-		_, err = LoadConfigFile(writePropertyConfig(t, dir, fmt.Sprintf("sites: [default]\ntimeout: %s\n", raw)), &bare)
+		_, err = LoadFile(writePropertyConfig(t, dir, fmt.Sprintf("sites: [default]\ntimeout: %s\n", raw)), &bare)
 		require.NoError(t, err)
 
 		want, err := time.ParseDuration(raw)
@@ -174,7 +174,7 @@ func TestPropertyFlexTimeoutAcceptsAnyGoDuration(t *testing.T) {
 	})
 }
 
-func TestPropertyLoadConfigFileRejectsAnEmptySiteList(t *testing.T) {
+func TestPropertyLoadFileRejectsAnEmptySiteList(t *testing.T) {
 	dir := t.TempDir()
 
 	rapid.Check(t, func(t *rapid.T) {
@@ -183,7 +183,7 @@ func TestPropertyLoadConfigFileRejectsAnEmptySiteList(t *testing.T) {
 
 		// An empty list skips every per-site phase and still opens the merge request.
 		var got Config
-		_, err := LoadConfigFile(writePropertyConfig(t, dir, empty+timeout+"\n"), &got)
+		_, err := LoadFile(writePropertyConfig(t, dir, empty+timeout+"\n"), &got)
 		require.Error(t, err, "for %q", empty+timeout)
 		assert.Contains(t, err.Error(), "no sites configured")
 	})

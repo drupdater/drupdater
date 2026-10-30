@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/internal/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -78,7 +78,7 @@ func TestRunFullChecksClonesTheConfiguredBranch(t *testing.T) {
 	inst := &fakeInstaller{}
 	a, cloneArgs := appWithFullCheckDoubles(t.TempDir(), nil, comp, inst, nil)
 
-	cfg := internal.Config{RepositoryURL: "https://example.com/acme/site.git", Branch: "develop", Sites: []string{"default"}}
+	cfg := config.Config{RepositoryURL: "https://example.com/acme/site.git", Branch: "develop", Sites: []string{"default"}}
 	results := a.runFullChecks(t.Context(), zap.NewNop(), cfg, "tok")
 
 	assert.Equal(t, []string{"https://example.com/acme/site.git", "develop", "tok"}, *cloneArgs)
@@ -96,7 +96,7 @@ func TestRunFullChecksClonesTheConfiguredBranch(t *testing.T) {
 func TestRunFullChecksDefaultsToMain(t *testing.T) {
 	a, cloneArgs := appWithFullCheckDoubles(t.TempDir(), nil, &fakeComposer{}, &fakeInstaller{}, nil)
 
-	cfg := internal.Config{RepositoryURL: "https://example.com/acme/site.git"}
+	cfg := config.Config{RepositoryURL: "https://example.com/acme/site.git"}
 	a.runFullChecks(t.Context(), zap.NewNop(), cfg, "")
 
 	require.Len(t, *cloneArgs, 3)
@@ -108,7 +108,7 @@ func TestRunFullChecksStopsAtComposerInstall(t *testing.T) {
 	inst := &fakeInstaller{}
 	a, _ := appWithFullCheckDoubles(t.TempDir(), nil, comp, inst, nil)
 
-	cfg := internal.Config{RepositoryURL: "https://example.com/acme/site.git", Sites: []string{"default"}}
+	cfg := config.Config{RepositoryURL: "https://example.com/acme/site.git", Sites: []string{"default"}}
 	results := a.runFullChecks(t.Context(), zap.NewNop(), cfg, "")
 
 	// Installing a site on top of a failed composer install would fail for a reason that has
@@ -125,7 +125,7 @@ func TestRunFullChecksReportsInstallerConstructionFailure(t *testing.T) {
 	comp := &fakeComposer{}
 	a, _ := appWithFullCheckDoubles(t.TempDir(), nil, comp, nil, errors.New("cache unavailable"))
 
-	cfg := internal.Config{RepositoryURL: "https://example.com/acme/site.git", Sites: []string{"default"}}
+	cfg := config.Config{RepositoryURL: "https://example.com/acme/site.git", Sites: []string{"default"}}
 	results := a.runFullChecks(t.Context(), zap.NewNop(), cfg, "")
 
 	// The composer install already passed, so its result is kept alongside the failure.
@@ -141,7 +141,7 @@ func TestRunFullChecksCollectsPerSiteFailures(t *testing.T) {
 	inst := &fakeInstaller{failFor: map[string]error{"broken": errors.New("missing config")}}
 	a, _ := appWithFullCheckDoubles("/clone", nil, comp, inst, nil)
 
-	cfg := internal.Config{
+	cfg := config.Config{
 		RepositoryURL: "https://example.com/acme/site.git",
 		Sites:         []string{"first", "broken", "last"},
 	}
@@ -161,7 +161,7 @@ func TestRunFullChecksStopsAtCloneFailure(t *testing.T) {
 	comp := &fakeComposer{}
 	a, _ := appWithFullCheckDoubles("", errors.New("authentication failed"), comp, &fakeInstaller{}, nil)
 
-	cfg := internal.Config{RepositoryURL: "https://example.com/acme/site.git", Sites: []string{"default"}}
+	cfg := config.Config{RepositoryURL: "https://example.com/acme/site.git", Sites: []string{"default"}}
 	results := a.runFullChecks(t.Context(), zap.NewNop(), cfg, "")
 
 	require.Len(t, results, 1)
@@ -179,7 +179,7 @@ func TestRunFullChecksRemovesTheCloneAndSiteData(t *testing.T) {
 	inst := &fakeInstaller{}
 	a, _ := appWithFullCheckDoubles(clone, nil, &fakeComposer{}, inst, nil)
 
-	cfg := internal.Config{RepositoryURL: "https://example.com/acme/site.git", Sites: []string{"default"}}
+	cfg := config.Config{RepositoryURL: "https://example.com/acme/site.git", Sites: []string{"default"}}
 	a.runFullChecks(t.Context(), zap.NewNop(), cfg, "")
 
 	require.NotEmpty(t, inst.dataDir)

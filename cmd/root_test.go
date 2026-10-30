@@ -7,7 +7,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/internal/config"
 	"github.com/drupdater/drupdater/internal/logging"
 	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/drupdater/drupdater/pkg/composer"
@@ -26,7 +26,7 @@ import (
 func TestNewLogger(t *testing.T) {
 	t.Run("verbose mode", func(t *testing.T) {
 		// Setup config with verbose mode enabled
-		config := internal.Config{
+		config := config.Config{
 			Verbose: true,
 		}
 
@@ -41,7 +41,7 @@ func TestNewLogger(t *testing.T) {
 
 	t.Run("non-verbose mode", func(t *testing.T) {
 		// Setup config with verbose mode disabled
-		config := internal.Config{
+		config := config.Config{
 			Verbose: false,
 		}
 
@@ -139,8 +139,8 @@ func TestCreateAddons(t *testing.T) {
 	logger := zaptest.NewLogger(t)
 
 	t.Run("mandatory addons plus the normal list", func(t *testing.T) {
-		config := internal.Config{
-			RunTypes: internal.RunTypesConfig{Normal: internal.RunTypeConfig{Addons: []string{"code_beautifier"}}},
+		config := config.Config{
+			RunTypes: config.RunTypesConfig{Normal: config.RunTypeConfig{Addons: []string{"code_beautifier"}}},
 		}
 		addons, err := builtinAddons().create(config, addonDeps{logger: logger})
 		require.NoError(t, err)
@@ -149,7 +149,7 @@ func TestCreateAddons(t *testing.T) {
 
 	t.Run("composer_audit and unsupported_modules run on a normal update", func(t *testing.T) {
 		// Both are mandatory: the description joins them into one list, so either alone shows half of it.
-		config := internal.Config{RunTypes: internal.RunTypesConfig{Normal: internal.RunTypeConfig{}}}
+		config := config.Config{RunTypes: config.RunTypesConfig{Normal: config.RunTypeConfig{}}}
 		addons, err := builtinAddons().create(config, addonDeps{logger: logger})
 		require.NoError(t, err)
 		assert.Len(t, addons, len(builtinAddons().mandatory))
@@ -167,7 +167,7 @@ func TestCreateAddons(t *testing.T) {
 		"a normal run is not narrowed to advisories":                       {security: false, aborts: false},
 	} {
 		t.Run(name, func(t *testing.T) {
-			config := internal.Config{Security: tt.security}
+			config := config.Config{Security: tt.security}
 			cleanAudit := newMockaddonComposer(t)
 			cleanAudit.EXPECT().Audit(mock.Anything, "/repo").Return(composer.Audit{}, nil)
 			addons, err := builtinAddons().create(config, addonDeps{logger: logger, composer: cleanAudit})
@@ -182,14 +182,14 @@ func TestCreateAddons(t *testing.T) {
 	}
 
 	t.Run("a mandatory addon listed in the YAML is not duplicated", func(t *testing.T) {
-		config := internal.Config{RunTypes: internal.RunTypesConfig{Normal: internal.RunTypeConfig{Addons: []string{"update_hooks"}}}}
+		config := config.Config{RunTypes: config.RunTypesConfig{Normal: config.RunTypeConfig{Addons: []string{"update_hooks"}}}}
 		addons, err := builtinAddons().create(config, addonDeps{logger: logger})
 		require.NoError(t, err)
 		assert.Len(t, addons, len(builtinAddons().mandatory)) // update_hooks is already mandatory
 	})
 
 	t.Run("an unknown addon name is an error", func(t *testing.T) {
-		config := internal.Config{RunTypes: internal.RunTypesConfig{Normal: internal.RunTypeConfig{Addons: []string{"does_not_exist"}}}}
+		config := config.Config{RunTypes: config.RunTypesConfig{Normal: config.RunTypeConfig{Addons: []string{"does_not_exist"}}}}
 		_, err := builtinAddons().create(config, addonDeps{logger: logger})
 		require.Error(t, err)
 	})
@@ -197,15 +197,15 @@ func TestCreateAddons(t *testing.T) {
 
 func TestValidateAddons(t *testing.T) {
 	t.Run("known names pass, including mandatory ones", func(t *testing.T) {
-		config := internal.Config{RunTypes: internal.RunTypesConfig{
-			Normal:   internal.RunTypeConfig{Addons: []string{"code_beautifier", "update_hooks"}},
-			Security: internal.RunTypeConfig{Addons: []string{"composer_normalizer"}},
+		config := config.Config{RunTypes: config.RunTypesConfig{
+			Normal:   config.RunTypeConfig{Addons: []string{"code_beautifier", "update_hooks"}},
+			Security: config.RunTypeConfig{Addons: []string{"composer_normalizer"}},
 		}}
 		require.NoError(t, builtinAddons().validate(config))
 	})
 
 	t.Run("unknown name in the normal list is an error", func(t *testing.T) {
-		config := internal.Config{RunTypes: internal.RunTypesConfig{Normal: internal.RunTypeConfig{Addons: []string{"nope"}}}}
+		config := config.Config{RunTypes: config.RunTypesConfig{Normal: config.RunTypeConfig{Addons: []string{"nope"}}}}
 		err := builtinAddons().validate(config)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "nope")
@@ -213,7 +213,7 @@ func TestValidateAddons(t *testing.T) {
 
 	t.Run("unknown name in the security list is caught regardless of mode", func(t *testing.T) {
 		// Security: false, yet a bad security-list name must still be rejected.
-		config := internal.Config{RunTypes: internal.RunTypesConfig{Security: internal.RunTypeConfig{Addons: []string{"typo"}}}}
+		config := config.Config{RunTypes: config.RunTypesConfig{Security: config.RunTypeConfig{Addons: []string{"typo"}}}}
 		require.Error(t, builtinAddons().validate(config))
 	})
 }
@@ -315,8 +315,8 @@ func TestResolveCheckoutBranch(t *testing.T) {
 }
 
 func TestComposerOptions(t *testing.T) {
-	assert.Len(t, composerOptions(internal.Config{Security: true}), 1, "a security run turns blocking off")
-	assert.Empty(t, composerOptions(internal.Config{}), "a normal run keeps the project's policy")
+	assert.Len(t, composerOptions(config.Config{Security: true}), 1, "a security run turns blocking off")
+	assert.Empty(t, composerOptions(config.Config{}), "a normal run keeps the project's policy")
 }
 
 func TestCommandTreesShareNoFlagState(t *testing.T) {

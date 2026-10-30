@@ -92,16 +92,19 @@ Where things live. For *how they work*, read `docs/explanation/` rather than dup
 
 | Path | Contains |
 |---|---|
-| `main.go` → `cmd/root.go` | Cobra commands built per call by `app`, which holds every outside dependency; `builtinAddons()` |
+| `main.go` → `cmd/root.go` | Cobra commands built per call by `app`, which holds every outside dependency |
+| `cmd/addons.go` | `builtinAddons()`, the addon catalogue, and the `addonComposer`/`addonDrush` unions |
+| `cmd/secrets.go`, `cmd/checkout.go` | Token resolution and secret registration; checkout URL/branch and `safe.directory` |
 | `cmd/check.go` | The `check` command and its cheap/full check tiers |
-| `internal/workflow/runner.go` | `Runner.Run` and the nine phases |
+| `internal/workflow/runner.go` | `Runner.Run` and the nine phases; their bodies in `update.go`, `sites.go`, `branch.go`, `publish.go` |
 | `internal/workflow/event.go` | The five workflow events and `AbortError` |
 | `internal/workflow/hooks.go` | Addon hooks, their stages, and the order they run in |
 | `internal/workflow/preflight.go` | Checks shared between `check` and the run's own `preflight` phase |
 | `internal/addon/` | The ten addons |
 | `internal/addon/report.go` | **Every addon's report contribution, together** — this file *is* the report's `addons` schema |
 | `internal/mergerequest/` | The MR title and description, rendered from the run report; its templates |
-| `internal/configfile.go` | `.drupdater.yaml` loading, defaults, strict decode, legacy-layout rejection |
+| `internal/config/` | `Config`; `file.go` loads `.drupdater.yaml`: defaults, strict decode, legacy-layout rejection |
+| `internal/buildinfo/` | `Version`, set by `-ldflags` |
 | `internal/codehosting/` | GitHub and GitLab implementations, provider factory |
 | `internal/report/` | The published JSON report schema and its atomic writer |
 | `internal/logging/redact.go` | Value-based secret redaction, wrapping the zap core |

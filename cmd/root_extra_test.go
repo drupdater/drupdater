@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/internal/config"
 	"github.com/drupdater/drupdater/internal/logging"
 	"github.com/drupdater/drupdater/pkg/repo"
 	git "github.com/go-git/go-git/v5"
@@ -23,7 +23,7 @@ import (
 
 func TestResolveToken(t *testing.T) {
 	// The zero-value config (no --clone, no --dry-run) requires a token, matching a normal run.
-	normalRun := internal.Config{}
+	normalRun := config.Config{}
 
 	t.Run("the positional argument wins", func(t *testing.T) {
 		t.Setenv("DRUPDATER_TOKEN", "from-env")
@@ -60,7 +60,7 @@ func TestResolveToken(t *testing.T) {
 	t.Run("a checkout-mode dry-run needs no token", func(t *testing.T) {
 		t.Setenv("DRUPDATER_TOKEN", "")
 
-		token, err := resolveToken(nil, internal.Config{DryRun: true})
+		token, err := resolveToken(nil, config.Config{DryRun: true})
 		require.NoError(t, err)
 		assert.Empty(t, token)
 	})
@@ -68,7 +68,7 @@ func TestResolveToken(t *testing.T) {
 	t.Run("a checkout-mode dry-run still honors a given token", func(t *testing.T) {
 		t.Setenv("DRUPDATER_TOKEN", "from-env")
 
-		token, err := resolveToken(nil, internal.Config{DryRun: true})
+		token, err := resolveToken(nil, config.Config{DryRun: true})
 		require.NoError(t, err)
 		assert.Equal(t, "from-env", token)
 	})
@@ -76,7 +76,7 @@ func TestResolveToken(t *testing.T) {
 	t.Run("--clone still requires a token even with --dry-run", func(t *testing.T) {
 		t.Setenv("DRUPDATER_TOKEN", "")
 
-		_, err := resolveToken(nil, internal.Config{Clone: true, DryRun: true})
+		_, err := resolveToken(nil, config.Config{Clone: true, DryRun: true})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "DRUPDATER_TOKEN")
 	})
@@ -84,15 +84,15 @@ func TestResolveToken(t *testing.T) {
 
 func TestTokenRequired(t *testing.T) {
 	t.Run("a normal checkout run requires a token", func(t *testing.T) {
-		assert.True(t, tokenRequired(internal.Config{}))
+		assert.True(t, tokenRequired(config.Config{}))
 	})
 
 	t.Run("--clone requires a token even with --dry-run", func(t *testing.T) {
-		assert.True(t, tokenRequired(internal.Config{Clone: true, DryRun: true}))
+		assert.True(t, tokenRequired(config.Config{Clone: true, DryRun: true}))
 	})
 
 	t.Run("checkout mode with --dry-run needs no token", func(t *testing.T) {
-		assert.False(t, tokenRequired(internal.Config{DryRun: true}))
+		assert.False(t, tokenRequired(config.Config{DryRun: true}))
 	})
 }
 
@@ -177,7 +177,7 @@ func TestLoadProjectConfig(t *testing.T) {
 	logger := zaptest.NewLogger(t)
 
 	t.Run("a missing file applies the defaults", func(t *testing.T) {
-		cfg := internal.Config{}
+		cfg := config.Config{}
 		require.NoError(t, loadProjectConfig(logger, builtinAddons(), filepath.Join(t.TempDir(), ".drupdater.yaml"), &cfg))
 
 		assert.Equal(t, []string{"default"}, cfg.Sites)
@@ -188,7 +188,7 @@ func TestLoadProjectConfig(t *testing.T) {
 		path := filepath.Join(t.TempDir(), ".drupdater.yaml")
 		require.NoError(t, os.WriteFile(path, []byte("sites: [default, sub]\ntimeout: 90s\n"), 0o600))
 
-		cfg := internal.Config{}
+		cfg := config.Config{}
 		require.NoError(t, loadProjectConfig(logger, builtinAddons(), path, &cfg))
 		assert.Equal(t, []string{"default", "sub"}, cfg.Sites)
 		assert.Equal(t, 90*time.Second, cfg.Timeout)
@@ -198,7 +198,7 @@ func TestLoadProjectConfig(t *testing.T) {
 		path := filepath.Join(t.TempDir(), ".drupdater.yaml")
 		require.NoError(t, os.WriteFile(path, []byte("timeout: nope\n"), 0o600))
 
-		cfg := internal.Config{}
+		cfg := config.Config{}
 		require.Error(t, loadProjectConfig(logger, builtinAddons(), path, &cfg))
 	})
 
@@ -206,7 +206,7 @@ func TestLoadProjectConfig(t *testing.T) {
 		path := filepath.Join(t.TempDir(), ".drupdater.yaml")
 		require.NoError(t, os.WriteFile(path, []byte("run_types:\n  normal:\n    addons: [no_such_addon]\n"), 0o600))
 
-		cfg := internal.Config{}
+		cfg := config.Config{}
 		err := loadProjectConfig(logger, builtinAddons(), path, &cfg)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no_such_addon")
@@ -239,7 +239,7 @@ func TestResolveCheckoutSettings(t *testing.T) {
 	t.Run("takes the URL and branch from the checkout", func(t *testing.T) {
 		dir := initCheckout(t, "https://token:secret@example.com/group/repo.git")
 
-		cfg := internal.Config{WorkingDir: dir, Branch: "main"}
+		cfg := config.Config{WorkingDir: dir, Branch: "main"}
 		require.NoError(t, resolveCheckoutSettings(svc, &cfg))
 
 		// Credentials embedded by CI are stripped.
@@ -251,13 +251,13 @@ func TestResolveCheckoutSettings(t *testing.T) {
 	t.Run("keeps an explicitly given repository URL", func(t *testing.T) {
 		dir := initCheckout(t, "https://example.com/group/repo.git")
 
-		cfg := internal.Config{WorkingDir: dir, RepositoryURL: "https://example.com/other/repo.git"}
+		cfg := config.Config{WorkingDir: dir, RepositoryURL: "https://example.com/other/repo.git"}
 		require.NoError(t, resolveCheckoutSettings(svc, &cfg))
 		assert.Equal(t, "https://example.com/other/repo.git", cfg.RepositoryURL)
 	})
 
 	t.Run("errors when there is no origin remote", func(t *testing.T) {
-		cfg := internal.Config{WorkingDir: initCheckout(t, "")}
+		cfg := config.Config{WorkingDir: initCheckout(t, "")}
 		err := resolveCheckoutSettings(svc, &cfg)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to determine repository URL from checkout")
@@ -276,7 +276,7 @@ func TestResolveCheckoutSettings(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, wt.Checkout(&git.CheckoutOptions{Hash: head.Hash()}))
 
-		cfg := internal.Config{WorkingDir: dir}
+		cfg := config.Config{WorkingDir: dir}
 		require.Error(t, resolveCheckoutSettings(svc, &cfg))
 	})
 }
@@ -346,26 +346,26 @@ func TestEnsureGitSafeDirectory(t *testing.T) {
 
 func TestValidateFlags(t *testing.T) {
 	t.Run("--clone without a repository URL is rejected", func(t *testing.T) {
-		err := validateFlags(internal.Config{Clone: true})
+		err := validateFlags(config.Config{Clone: true})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "--repository-url is required")
 	})
 
 	t.Run("an SCP-style repository URL is accepted", func(t *testing.T) {
-		require.NoError(t, validateFlags(internal.Config{RepositoryURL: "git@github.com:drupdater/drupdater.git"}))
+		require.NoError(t, validateFlags(config.Config{RepositoryURL: "git@github.com:drupdater/drupdater.git"}))
 	})
 
 	t.Run("an HTTPS repository URL is accepted", func(t *testing.T) {
-		require.NoError(t, validateFlags(internal.Config{RepositoryURL: "https://github.com/drupdater/drupdater.git"}))
+		require.NoError(t, validateFlags(config.Config{RepositoryURL: "https://github.com/drupdater/drupdater.git"}))
 	})
 
 	t.Run("a malformed repository URL is rejected", func(t *testing.T) {
-		err := validateFlags(internal.Config{RepositoryURL: "not a url"})
+		err := validateFlags(config.Config{RepositoryURL: "not a url"})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid repository URL")
 	})
 
 	t.Run("no repository URL is fine in checkout mode", func(t *testing.T) {
-		require.NoError(t, validateFlags(internal.Config{}))
+		require.NoError(t, validateFlags(config.Config{}))
 	})
 }

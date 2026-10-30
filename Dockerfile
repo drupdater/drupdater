@@ -24,7 +24,7 @@ RUN go env -w GOCACHE=/go-cache; \
 
 RUN --mount=type=cache,target=/gomod-cache go mod download
 RUN --mount=type=cache,target=/gomod-cache --mount=type=cache,target=/go-cache GOOS=linux go build \
-    -ldflags "-X github.com/drupdater/drupdater/internal.Version=${VERSION}" -o /build/drupdater .
+    -ldflags "-X github.com/drupdater/drupdater/internal/buildinfo.Version=${VERSION}" -o /build/drupdater .
 
 
 # Build php image.

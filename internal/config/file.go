@@ -1,4 +1,4 @@
-package internal
+package config
 
 import (
 	"bytes"
@@ -57,9 +57,9 @@ func defaultFileConfig() fileConfig {
 	}
 }
 
-// LoadConfigFile layers path's .drupdater.yaml over the defaults and applies it to c. A missing
+// LoadFile layers path's .drupdater.yaml over the defaults and applies it to c. A missing
 // file is not an error. Unknown keys are rejected so typos fail loudly.
-func LoadConfigFile(path string, c *Config) (found bool, err error) {
+func LoadFile(path string, c *Config) (found bool, err error) {
 	fc := defaultFileConfig()
 
 	data, err := os.ReadFile(path)

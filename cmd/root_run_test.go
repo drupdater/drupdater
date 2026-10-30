@@ -12,7 +12,7 @@ import (
 	"github.com/drupdater/drupdater/pkg/drush"
 	"github.com/spf13/cobra"
 
-	"github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/internal/config"
 	"github.com/drupdater/drupdater/internal/workflow"
 	git "github.com/go-git/go-git/v5"
 	gitConfig "github.com/go-git/go-git/v5/config"
@@ -38,7 +38,7 @@ func runUpdateWith(t *testing.T, a app, opts options, args ...string) error {
 func TestRunUpdateRequiresATokenWhenItWillPublish(t *testing.T) {
 	// A publishing run must fail up front, not after doing all the work it cannot deliver.
 	t.Setenv("DRUPDATER_TOKEN", "")
-	err := runUpdateWith(t, testApp(), options{config: internal.Config{WorkingDir: t.TempDir()}})
+	err := runUpdateWith(t, testApp(), options{config: config.Config{WorkingDir: t.TempDir()}})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no token provided")
 }
@@ -47,7 +47,7 @@ func TestRunUpdateTakesTheTokenFromTheArgument(t *testing.T) {
 	// The positional argument wins over the environment. This gets past token resolution and
 	// then fails on the checkout, which is what proves the token was accepted.
 	t.Setenv("DRUPDATER_TOKEN", "")
-	err := runUpdateWith(t, testApp(), options{config: internal.Config{WorkingDir: t.TempDir()}}, "token-from-argument")
+	err := runUpdateWith(t, testApp(), options{config: config.Config{WorkingDir: t.TempDir()}}, "token-from-argument")
 	require.Error(t, err)
 	assert.NotContains(t, err.Error(), "no token provided",
 		"the argument has to satisfy the token requirement")
@@ -61,7 +61,7 @@ func TestRunUpdateRejectsAnUnreadableConfigFile(t *testing.T) {
 	require.NoError(t, os.WriteFile(cfgPath, []byte("\tnot: [valid yaml"), 0o600))
 
 	t.Setenv("DRUPDATER_TOKEN", "dummy-token")
-	err := runUpdateWith(t, testApp(), options{config: internal.Config{WorkingDir: dir, DryRun: true}, configFile: cfgPath})
+	err := runUpdateWith(t, testApp(), options{config: config.Config{WorkingDir: dir, DryRun: true}, configFile: cfgPath})
 	require.Error(t, err)
 	assert.NotContains(t, err.Error(), "no token provided")
 }
@@ -75,7 +75,7 @@ func TestRunUpdateFailsOnACheckoutWithoutAnOrigin(t *testing.T) {
 
 	// A checkout-mode dry run needs no token at all, so this reaches the checkout resolution.
 	t.Setenv("DRUPDATER_TOKEN", "")
-	err = runUpdateWith(t, testApp(), options{config: internal.Config{WorkingDir: dir, DryRun: true, Sites: []string{"default"}}})
+	err = runUpdateWith(t, testApp(), options{config: config.Config{WorkingDir: dir, DryRun: true, Sites: []string{"default"}}})
 	require.Error(t, err)
 	assert.NotContains(t, err.Error(), "no token provided",
 		"a checkout-mode dry run must not demand credentials it will never use")
@@ -100,7 +100,7 @@ func (f *fakeWorkflow) Run(_ context.Context, addons []workflow.Addon) error {
 // appWithWorkflow is an app whose runs all go to fake, with the services they were given.
 func appWithWorkflow(fake *fakeWorkflow) app {
 	a := testApp()
-	a.newRunner = func(_ *zap.Logger, _ internal.Config, s workflowServices, opts ...workflow.Option) updateRunner {
+	a.newRunner = func(_ *zap.Logger, _ config.Config, s workflowServices, opts ...workflow.Option) updateRunner {
 		fake.services = s
 		fake.options = len(opts)
 		return fake
@@ -139,7 +139,7 @@ func TestRunUpdateWiresUpAndStartsTheWorkflow(t *testing.T) {
 	a := appWithWorkflow(fake)
 
 	t.Setenv("DRUPDATER_TOKEN", "dummy-token")
-	require.NoError(t, runUpdateWith(t, a, options{config: internal.Config{
+	require.NoError(t, runUpdateWith(t, a, options{config: config.Config{
 		WorkingDir: checkoutWithOrigin(t),
 		DryRun:     true,
 		Sites:      []string{"default"},
@@ -155,7 +155,7 @@ func TestRunUpdateReportsAWorkflowFailure(t *testing.T) {
 	a := appWithWorkflow(fake)
 
 	t.Setenv("DRUPDATER_TOKEN", "dummy-token")
-	err := runUpdateWith(t, a, options{config: internal.Config{
+	err := runUpdateWith(t, a, options{config: config.Config{
 		WorkingDir: checkoutWithOrigin(t),
 		DryRun:     true,
 		Sites:      []string{"default"},
@@ -170,7 +170,7 @@ func TestRunUpdateWritesTheRunReport(t *testing.T) {
 	a := appWithWorkflow(fake)
 
 	t.Setenv("DRUPDATER_TOKEN", "dummy-token")
-	require.NoError(t, runUpdateWith(t, a, options{config: internal.Config{
+	require.NoError(t, runUpdateWith(t, a, options{config: config.Config{
 		WorkingDir: checkoutWithOrigin(t),
 		DryRun:     true,
 		Sites:      []string{"default"},
@@ -237,7 +237,7 @@ func TestCreateAddonsPassesEveryDependency(t *testing.T) {
 		drupalCode: drupalorg.NewDrupalCode("token"),
 	}
 
-	_, err = catalog.create(internal.Config{Security: true}, deps)
+	_, err = catalog.create(config.Config{Security: true}, deps)
 	require.NoError(t, err)
 
 	want := deps
@@ -264,7 +264,7 @@ func TestNewAddonDepsBuildsADrupalCodeClientOnlyWithAToken(t *testing.T) {
 }
 
 func TestNewRunnerBuildsTheWorkflowRunner(t *testing.T) {
-	runner := productionApp().newRunner(zap.NewNop(), internal.Config{}, workflowServices{})
+	runner := productionApp().newRunner(zap.NewNop(), config.Config{}, workflowServices{})
 
 	assert.IsType(t, &workflow.Runner{}, runner)
 }

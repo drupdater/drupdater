@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/drupdater/drupdater/internal"
+	"github.com/drupdater/drupdater/internal/config"
 	git "github.com/go-git/go-git/v5"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -87,7 +87,7 @@ func TestCheckRedactsTheTokenAndEnvironmentSecrets(t *testing.T) {
 	cfgFile := filepath.Join(dir, ".drupdater.yaml")
 	require.NoError(t, os.WriteFile(cfgFile, []byte("bogus: [\n"), 0o600))
 
-	out, err := runCheckCmd(t, testApp(), options{config: internal.Config{WorkingDir: dir}, configFile: cfgFile}, "argsecret-0815")
+	out, err := runCheckCmd(t, testApp(), options{config: config.Config{WorkingDir: dir}, configFile: cfgFile}, "argsecret-0815")
 
 	require.Error(t, err)
 	assert.Contains(t, out, ".drupdater.yaml valid", "the config check must have printed its path")
@@ -99,11 +99,11 @@ func TestCheckResolvesTheCheckoutOnlyInCheckoutMode(t *testing.T) {
 	const unresolved = "failed to determine repository URL from checkout"
 	dir := bareCheckout(t, t.TempDir())
 
-	out, err := runCheckCmd(t, testApp(), options{config: internal.Config{WorkingDir: dir}})
+	out, err := runCheckCmd(t, testApp(), options{config: config.Config{WorkingDir: dir}})
 	require.Error(t, err)
 	assert.Contains(t, out, unresolved, "a checkout without origin cannot name its repository")
 
-	out, err = runCheckCmd(t, testApp(), options{config: internal.Config{WorkingDir: dir, Clone: true, RepositoryURL: "https://github.com/acme/site.git"}})
+	out, err = runCheckCmd(t, testApp(), options{config: config.Config{WorkingDir: dir, Clone: true, RepositoryURL: "https://github.com/acme/site.git"}})
 	require.Error(t, err)
 	assert.NotContains(t, out, unresolved, "--clone names the repository itself")
 	assert.Contains(t, out, "✓ repository host recognized")
@@ -113,7 +113,7 @@ func TestCheckRunsTheFullTierOnlyWhenAskedTo(t *testing.T) {
 	installer := &fakeInstaller{}
 	a, _ := appWithFullCheckDoubles(t.TempDir(), nil, &fakeComposer{}, installer, nil)
 	dir := bareCheckout(t, t.TempDir())
-	cfg := internal.Config{WorkingDir: dir, Clone: true, RepositoryURL: "https://github.com/acme/site.git", Sites: []string{"default"}}
+	cfg := config.Config{WorkingDir: dir, Clone: true, RepositoryURL: "https://github.com/acme/site.git", Sites: []string{"default"}}
 
 	out, _ := runCheckCmd(t, a, options{config: cfg})
 	assert.NotContains(t, out, "composer install")
@@ -125,11 +125,11 @@ func TestCheckRunsTheFullTierOnlyWhenAskedTo(t *testing.T) {
 }
 
 func TestValidateFlagsAcceptsCloneWithARepositoryURL(t *testing.T) {
-	require.NoError(t, validateFlags(internal.Config{Clone: true, RepositoryURL: "https://github.com/drupdater/drupdater.git"}))
+	require.NoError(t, validateFlags(config.Config{Clone: true, RepositoryURL: "https://github.com/drupdater/drupdater.git"}))
 }
 
 func TestValidateFlagsKeepsTheURLParsersReason(t *testing.T) {
-	err := validateFlags(internal.Config{RepositoryURL: "not a url"})
+	err := validateFlags(config.Config{RepositoryURL: "not a url"})
 	require.Error(t, err)
 	assert.Error(t, errors.Unwrap(err), "the reason the URL was rejected must survive the wrapping")
 }
@@ -149,14 +149,14 @@ func TestRunUpdateTrustsOnlyACheckoutItUpdatesInPlace(t *testing.T) {
 		dir := checkoutWithOrigin(t)
 		a, trusted := trust(appWithWorkflow(&fakeWorkflow{}))
 
-		require.NoError(t, runUpdateWith(t, a, options{config: internal.Config{WorkingDir: dir, DryRun: true}}))
+		require.NoError(t, runUpdateWith(t, a, options{config: config.Config{WorkingDir: dir, DryRun: true}}))
 		assert.Equal(t, []string{dir}, *trusted)
 	})
 
 	t.Run("clone mode trusts nothing", func(t *testing.T) {
 		a, trusted := trust(appWithWorkflow(&fakeWorkflow{}))
 
-		require.NoError(t, runUpdateWith(t, a, options{config: internal.Config{
+		require.NoError(t, runUpdateWith(t, a, options{config: config.Config{
 			WorkingDir: t.TempDir(), Clone: true, RepositoryURL: "https://github.com/acme/site.git", DryRun: true,
 		}}))
 		assert.Empty(t, *trusted, "a clone is drupdater's own, so git already trusts it")
@@ -167,7 +167,7 @@ func TestRunUpdateHandsTheWorkflowEveryService(t *testing.T) {
 	t.Setenv("DRUPDATER_TOKEN", "dummy-token")
 	fake := &fakeWorkflow{}
 
-	require.NoError(t, runUpdateWith(t, appWithWorkflow(fake), options{config: internal.Config{WorkingDir: checkoutWithOrigin(t)}}))
+	require.NoError(t, runUpdateWith(t, appWithWorkflow(fake), options{config: config.Config{WorkingDir: checkoutWithOrigin(t)}}))
 
 	assert.NotNil(t, fake.services.drush)
 	assert.NotNil(t, fake.services.platform, "a publishing run needs its platform")
@@ -180,7 +180,7 @@ func TestRunUpdateBuildsNoPlatformForATokenFreeDryRun(t *testing.T) {
 	t.Setenv("DRUPDATER_TOKEN", "")
 	fake := &fakeWorkflow{}
 
-	require.NoError(t, runUpdateWith(t, appWithWorkflow(fake), options{config: internal.Config{WorkingDir: checkoutWithOrigin(t), DryRun: true}}))
+	require.NoError(t, runUpdateWith(t, appWithWorkflow(fake), options{config: config.Config{WorkingDir: checkoutWithOrigin(t), DryRun: true}}))
 
 	assert.Nil(t, fake.services.platform, "a checkout-mode dry run neither clones nor publishes")
 }
@@ -239,11 +239,11 @@ func TestRunUpdateWritesAReportOnlyWhenAskedTo(t *testing.T) {
 	t.Setenv("DRUPDATER_TOKEN", "dummy-token")
 
 	without := &fakeWorkflow{}
-	require.NoError(t, runUpdateWith(t, appWithWorkflow(without), options{config: internal.Config{WorkingDir: checkoutWithOrigin(t), DryRun: true}}))
+	require.NoError(t, runUpdateWith(t, appWithWorkflow(without), options{config: config.Config{WorkingDir: checkoutWithOrigin(t), DryRun: true}}))
 	assert.Zero(t, without.options, "no --report, no report sink")
 
 	with := &fakeWorkflow{}
-	require.NoError(t, runUpdateWith(t, appWithWorkflow(with), options{config: internal.Config{
+	require.NoError(t, runUpdateWith(t, appWithWorkflow(with), options{config: config.Config{
 		WorkingDir: checkoutWithOrigin(t), DryRun: true, ReportPath: filepath.Join(t.TempDir(), "run.json"),
 	}}))
 	assert.Equal(t, 1, with.options)
