@@ -65,11 +65,11 @@ type Pipeline struct {
 
 // NewPipeline reads each addon's hooks once.
 func NewPipeline(addons []Addon) *Pipeline {
-	p := &Pipeline{addons: make([]Hooks, 0, len(addons))}
-	for _, a := range addons {
-		p.addons = append(p.addons, a.Hooks())
+	hooks := make([]Hooks, len(addons))
+	for i, a := range addons {
+		hooks[i] = a.Hooks()
 	}
-	return p
+	return &Pipeline{addons: hooks}
 }
 
 type staged interface {
@@ -109,6 +109,8 @@ func Settle(p *Pipeline, e *PreComposerUpdateEvent) (UpdatePlan, error) {
 			return UpdatePlan{}, fmt.Errorf("%s hook failed: %w", e.name(), err)
 		}
 		if plan, err = plan.merge(proposal); err != nil {
+			// merge's errors carry no identity to unwrap, so %v here would read the same.
+			// mutator-disable-next-line expression/errorf-wrap
 			return UpdatePlan{}, fmt.Errorf("%s hooks disagree: %w", e.name(), err)
 		}
 	}
