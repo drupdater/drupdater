@@ -152,6 +152,33 @@ func TestUpdateReadsChangesFromTheLockDiff(t *testing.T) {
 	}, changes)
 }
 
+func TestUpdateReportsAPackageMovedBetweenRequireAndRequireDevOnce(t *testing.T) {
+	dir := newUpdateProject(t)
+	fake := &fakeUpdate{diffOut: `{
+		"packages": {
+			"justinrainbow/json-schema": {"name": "justinrainbow/json-schema", "operation": "install", "version_base": null, "version_target": "6.8.2"},
+			"symfony/process": {"name": "symfony/process", "operation": "install", "version_base": null, "version_target": "v7.1.0"},
+			"drupal/dev_branch": {"name": "drupal/dev_branch", "operation": "install", "version_base": null, "version_target": "1.x-dev 141046a"},
+			"drupal/same": {"name": "drupal/same", "operation": "install", "version_base": null, "version_target": "2.0.0"}
+		},
+		"packages-dev": {
+			"justinrainbow/json-schema": {"name": "justinrainbow/json-schema", "operation": "remove", "version_base": "6.10.0", "version_target": null},
+			"symfony/process": {"name": "symfony/process", "operation": "remove", "version_base": "v7.0.9", "version_target": null},
+			"drupal/dev_branch": {"name": "drupal/dev_branch", "operation": "remove", "version_base": "1.x-dev 0424dff", "version_target": null},
+			"drupal/same": {"name": "drupal/same", "operation": "remove", "version_base": "2.0.0", "version_target": null}
+		}
+	}`}
+
+	changes, err := newUpdateCLI(fake.command(t)).Update(t.Context(), dir, nil, nil, false, false)
+	require.NoError(t, err)
+
+	assert.Equal(t, []PackageChange{
+		{Action: "Upgrade", Package: "drupal/dev_branch", From: "1.x-dev 0424dff", To: "1.x-dev 141046a"},
+		{Action: "Upgrade", Package: "symfony/process", From: "v7.0.9", To: "v7.1.0"},
+		{Action: "Downgrade", Package: "justinrainbow/json-schema", From: "6.10.0", To: "6.8.2"},
+	}, changes)
+}
+
 func TestUpdateDiffsAgainstTheLockAsItWasBeforeTheUpdate(t *testing.T) {
 	dir := newUpdateProject(t)
 	fake := &fakeUpdate{diffOut: `{"packages": [], "packages-dev": []}`}

@@ -118,6 +118,10 @@ install; `to` is absent on a removal. The list is ordered by action — `Upgrade
 `Downgrade`, `Remove`, `Install` — then by package name, and includes `require-dev`
 packages.
 
+Each package appears at most once. One that moved between `require` and `require-dev` is a
+single `Upgrade` or `Downgrade` from its old version to its new one, and is left out if its
+version stayed.
+
 A dev-branch package shows its version with the short commit, as Composer prints it
 (`"1.x-dev 0424dff"`); a new commit on the same branch is an `Upgrade`.
 
