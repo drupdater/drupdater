@@ -66,7 +66,7 @@ jobs:
         with:
           go-version-file: go.mod
           cache: true
-      # Slower than it looks: pkg/composer and pkg/drush fake subprocesses by re-executing the
+      # Slower than it looks: internal/composer and internal/drush fake subprocesses by re-executing the
       # test binary, and under -race every one of those execs starts an instrumented process.
       - name: Test with the race detector
         run: go test -race ./...

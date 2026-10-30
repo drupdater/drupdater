@@ -11,8 +11,8 @@ import (
 
 	"github.com/drupdater/drupdater/internal/buildinfo"
 	"github.com/drupdater/drupdater/internal/config"
+	"github.com/drupdater/drupdater/internal/repo"
 	"github.com/drupdater/drupdater/internal/report"
-	"github.com/drupdater/drupdater/pkg/repo"
 
 	"go.uber.org/zap"
 )
@@ -262,11 +262,12 @@ func (r *run) execute(ctx context.Context) (branch string, err error) {
 // acquireWorkingCopy clones in clone mode. In checkout mode it adds a linked worktree of the
 // checkout, so the run never changes the user's own working tree, branch or git config.
 func (s services) acquireWorkingCopy(ctx context.Context, username, email string) (repo.Checkout, error) {
+	requested := repo.Identity{Name: username, Email: email}
 	if s.config.Clone {
 		s.logger.Info("cloning repository", zap.String("url", s.config.RepositoryURL), zap.String("branch", s.config.Branch))
-		return s.git.CloneRepository(s.config.RepositoryURL, s.config.Branch, s.config.Token, username, email)
+		return s.git.CloneRepository(s.config.RepositoryURL, s.config.Branch, s.config.Token, requested)
 	}
-	return s.git.AddWorktree(ctx, s.config.WorkingDir, username, email)
+	return s.git.AddWorktree(ctx, s.config.WorkingDir, requested)
 }
 
 // cleanup removes the run's working copy, whichever mode made it. Errors only warn: a run's

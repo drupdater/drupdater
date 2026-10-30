@@ -81,7 +81,7 @@ func (r repository) RemoveBranch(name string) error {
 	return r.Storer.RemoveReference(plumbing.NewBranchReferenceName(name))
 }
 
-type GitRepositoryService struct {
+type Git struct {
 	logger *zap.Logger
 	fs     afero.Fs
 	// newCommand runs git for what go-git cannot do: linked worktrees.
@@ -97,7 +97,7 @@ func BasicAuth(token string) *http.BasicAuth {
 }
 
 // open names the path in the error: it comes from the user or CI, so a bad one must say which.
-func (rs *GitRepositoryService) open(path string) (*git.Repository, error) {
+func (rs *Git) open(path string) (*git.Repository, error) {
 	// The common dir is where a linked worktree keeps its refs, remotes and shallow file.
 	checkout, err := git.PlainOpenWithOptions(path, &git.PlainOpenOptions{EnableDotGitCommonDir: true})
 	if err != nil {
@@ -109,8 +109,9 @@ func (rs *GitRepositoryService) open(path string) (*git.Repository, error) {
 	return checkout, nil
 }
 
-func NewGitRepositoryService(logger *zap.Logger) *GitRepositoryService {
-	return &GitRepositoryService{
+// New returns a Git that runs on the host.
+func New(logger *zap.Logger) *Git {
+	return &Git{
 		logger:     logger,
 		fs:         afero.NewOsFs(),
 		newCommand: exec.CommandContext,
@@ -118,7 +119,7 @@ func NewGitRepositoryService(logger *zap.Logger) *GitRepositoryService {
 }
 
 // CloneRepository clones the branch into a new temporary directory.
-func (rs *GitRepositoryService) CloneRepository(repository string, branch string, token string, username string, email string) (Checkout, error) {
+func (rs *Git) CloneRepository(repository string, branch string, token string, requested Identity) (Checkout, error) {
 
 	h := fnv.New64a()
 	_, _ = h.Write([]byte(repository))
@@ -144,13 +145,13 @@ func (rs *GitRepositoryService) CloneRepository(repository string, branch string
 		return Checkout{}, fmt.Errorf("git clone: %w", err)
 	}
 
-	return rs.checkout(checkout, username, email)
+	return rs.checkout(checkout, requested)
 }
 
 // AddWorktree adds a linked worktree of the checkout at source, detached at its HEAD, in a new
 // temporary directory. The run works and commits there, so the user's working tree, branch and
 // config stay as they were whatever happens. Through the git CLI: go-git cannot create one.
-func (rs *GitRepositoryService) AddWorktree(ctx context.Context, source string, username string, email string) (Checkout, error) {
+func (rs *Git) AddWorktree(ctx context.Context, source string, requested Identity) (Checkout, error) {
 	if _, err := rs.open(source); err != nil {
 		return Checkout{}, err
 	}
@@ -170,11 +171,11 @@ func (rs *GitRepositoryService) AddWorktree(ctx context.Context, source string, 
 		_ = rs.RemoveWorktree(ctx, source, path)
 		return Checkout{}, err
 	}
-	return rs.checkout(checkout, username, email)
+	return rs.checkout(checkout, requested)
 }
 
 // RemoveWorktree removes a worktree AddWorktree added, its directory included.
-func (rs *GitRepositoryService) RemoveWorktree(ctx context.Context, source string, path string) error {
+func (rs *Git) RemoveWorktree(ctx context.Context, source string, path string) error {
 	out, err := rs.runGit(ctx, source, "worktree", "remove", "--force", path)
 	// The temporary parent goes either way; after a failed remove, prune drops the registration.
 	if removeErr := os.RemoveAll(filepath.Dir(path)); removeErr != nil && err == nil {
@@ -190,7 +191,7 @@ func (rs *GitRepositoryService) RemoveWorktree(ctx context.Context, source strin
 
 // runGit trusts the repository for this one command: a checkout mounted into the container is
 // owned by another user, which git refuses as "dubious ownership" — and go-git never checks.
-func (rs *GitRepositoryService) runGit(ctx context.Context, dir string, args ...string) (string, error) {
+func (rs *Git) runGit(ctx context.Context, dir string, args ...string) (string, error) {
 	command := rs.newCommand(ctx, "git", append([]string{"-c", "safe.directory=*"}, args...)...)
 	command.Dir = dir
 	out, err := command.CombinedOutput()
@@ -198,7 +199,7 @@ func (rs *GitRepositoryService) runGit(ctx context.Context, dir string, args ...
 }
 
 // GetRemoteURL returns the "origin" URL, stripped of the credentials GitLab CI embeds in it.
-func (rs *GitRepositoryService) GetRemoteURL(path string) (string, error) {
+func (rs *Git) GetRemoteURL(path string) (string, error) {
 	checkout, err := rs.open(path)
 	if err != nil {
 		return "", err
@@ -219,7 +220,7 @@ func (rs *GitRepositoryService) GetRemoteURL(path string) (string, error) {
 }
 
 // GetCurrentBranch returns HEAD's branch, or "" when detached — the usual CI state.
-func (rs *GitRepositoryService) GetCurrentBranch(path string) (string, error) {
+func (rs *Git) GetCurrentBranch(path string) (string, error) {
 	checkout, err := rs.open(path)
 	if err != nil {
 		return "", err
@@ -236,7 +237,7 @@ func (rs *GitRepositoryService) GetCurrentBranch(path string) (string, error) {
 
 // IsShallowClone reports a truncated history (CI's fetch-depth: 1). Such a checkout commits
 // fine but fails the later push with "object not found".
-func (rs *GitRepositoryService) IsShallowClone(path string) (bool, error) {
+func (rs *Git) IsShallowClone(path string) (bool, error) {
 	checkout, err := rs.open(path)
 	if err != nil {
 		return false, err
@@ -249,13 +250,13 @@ func (rs *GitRepositoryService) IsShallowClone(path string) (bool, error) {
 }
 
 // checkout pairs a repository with its worktree and the identity its commits are by: the
-// platform's user, else the one git config already supplies, else drupdater's own.
-func (rs *GitRepositoryService) checkout(checkout *git.Repository, username string, email string) (Checkout, error) {
+// requested one, else the one git config already supplies, else drupdater's own.
+func (rs *Git) checkout(checkout *git.Repository, requested Identity) (Checkout, error) {
 	scoped, err := checkout.ConfigScoped(gitconfig.SystemScope)
 	if err != nil {
 		return Checkout{}, fmt.Errorf("failed to read git config: %w", err)
 	}
-	author := Identity{Name: username, Email: email}
+	author := requested
 	if author.Name == "" {
 		author.Name = cmp.Or(scoped.User.Name, defaultCommitName)
 	}
@@ -278,7 +279,7 @@ func (rs *GitRepositoryService) checkout(checkout *git.Repository, username stri
 
 // BranchExists queries the remote: the cached refs/remotes/origin/* go stale the moment the host
 // auto-deletes a merged branch, giving a false positive.
-func (rs *GitRepositoryService) BranchExists(repository Repository, branch string, token string) (bool, error) {
+func (rs *Git) BranchExists(repository Repository, branch string, token string) (bool, error) {
 	remote, err := repository.Remote("origin")
 	if err != nil {
 		return false, fmt.Errorf("failed to get origin remote: %w", err)

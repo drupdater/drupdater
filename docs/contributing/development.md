@@ -74,7 +74,7 @@ go run . --working-dir /path/to/a/drupal/checkout --dry-run --verbose
 provides. That is supported: the two Composer settings the tool's own correctness depends
 on (`COMPOSER_PROCESS_TIMEOUT`, `COMPOSER_NO_AUDIT`) are forced by `composer.Env` on every
 invocation rather than inherited from the image — including the `composer exec` calls that
-`pkg/drush`, `pkg/phpcs` and `pkg/rector` make. The image's remaining Composer variables
+`internal/drush`, `internal/phpcs` and `internal/rector` make. The image's remaining Composer variables
 are deployment policy and need no local equivalent — see [environment
 variables](../reference/environment-variables.md#set-by-drupdater).
 
@@ -188,7 +188,7 @@ still comes from an uninstrumented run.
 
 !!! note "It takes about a minute, not a couple of seconds"
 
-    `pkg/composer` and `pkg/drush` fake subprocesses with the `TestHelperProcess` pattern, which
+    `internal/composer` and `internal/drush` fake subprocesses with the `TestHelperProcess` pattern, which
     re-executes the test binary once per faked command. Under `-race` every one of those execs
     starts an instrumented process, so those two packages account for almost all of the runtime.
     Nothing is wrong; they simply have no concurrency for the detector to find either.
@@ -239,7 +239,7 @@ That takes 25–35 minutes — the module produces roughly 3000 mutants and each
 tests for its package. To iterate on one package, pass it directly:
 
 ```bash
-RAPID_NOFAILFILE=1 go tool mutago --config mutago.yaml --coverage ./pkg/phpcs
+RAPID_NOFAILFILE=1 go tool mutago --config mutago.yaml --coverage ./internal/phpcs
 ```
 
 (`RAPID_NOFAILFILE=1` keeps the property tests from littering `testdata/rapid` — see
@@ -288,7 +288,7 @@ new tests:
   per clause, or two thirds of it can be deleted unnoticed.
 - **Error branches that need a failing filesystem.** An in-memory `afero.Fs` never fails, so
   write, close and flush error paths stay unreachable until a wrapper makes them fail on
-  demand. `internal/report` and `pkg/drupal` both have one to copy.
+  demand. `internal/report` and `internal/siteinstall` both have one to copy.
 
 The weekly run scores one package per matrix leg rather than the module in one go, so it
 finishes in the time of its slowest package and a failed leg can be re-run on its own. A
@@ -561,12 +561,14 @@ package it mocks. Do not edit those files by hand.
 | `internal/codehosting/` | The GitHub and GitLab implementations and the provider factory |
 | `internal/report/` | The published JSON report schema and its writer |
 | `internal/logging/` | The redactor |
-| `pkg/` | Thin wrappers around external tools |
+| `internal/composer/`, `drush/`, `repo/`, `phpcs/`, `rector/`, `drupalorg/`, `php/` | Thin wrappers around external tools |
+| `internal/drupal/`, `internal/siteinstall/` | Where a Drupal project keeps things; installing a throwaway site |
 | `scripts/` | PHP embedded in the binary and extracted per run: Rector's config and drupdater's Drush commands |
 
-`pkg/` wraps one external tool per directory: `composer`, `drush`, `repo` (go-git),
-`phpcs`, `rector`, `drupal` (site installer) and `drupalorg` (Drupal.org issues, and the
-git.drupalcode.org GitLab). `php` holds what the PHP wrappers share: running a command under
+The wrappers take one external tool per directory: `composer`, `drush`, `repo` (go-git),
+`phpcs`, `rector` and `drupalorg` (Drupal.org issues, and the git.drupalcode.org GitLab).
+`drupal` holds the project-layout helpers (web root, custom code directories) and
+`siteinstall` installs a site for the `check --full` tier. `php` holds what the PHP wrappers share: running a command under
 the environment Composer needs, and decoding its JSON output. Each wrapper takes the
 `php.CommandFactory` that builds its processes as a field, which is where a test fakes one.
 

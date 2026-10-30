@@ -11,15 +11,15 @@ import (
 	"syscall"
 
 	"github.com/drupdater/drupdater/internal/codehosting"
+	"github.com/drupdater/drupdater/internal/composer"
 	"github.com/drupdater/drupdater/internal/config"
+	"github.com/drupdater/drupdater/internal/drupalorg"
+	"github.com/drupdater/drupdater/internal/drush"
 	"github.com/drupdater/drupdater/internal/logging"
+	"github.com/drupdater/drupdater/internal/repo"
 	"github.com/drupdater/drupdater/internal/report"
+	"github.com/drupdater/drupdater/internal/siteinstall"
 	"github.com/drupdater/drupdater/internal/workflow"
-	"github.com/drupdater/drupdater/pkg/composer"
-	"github.com/drupdater/drupdater/pkg/drupal"
-	"github.com/drupdater/drupdater/pkg/drupalorg"
-	"github.com/drupdater/drupdater/pkg/drush"
-	"github.com/drupdater/drupdater/pkg/repo"
 	"github.com/drupdater/drupdater/scripts"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
@@ -172,8 +172,8 @@ func (a app) runUpdate(cmd *cobra.Command, args []string, opts options) error {
 		return err
 	}
 	defer os.RemoveAll(siteData)
-	installer := drupal.NewInstaller(logger, drush, composer, siteData)
-	git := repo.NewGitRepositoryService(logger)
+	installer := siteinstall.NewInstaller(logger, drush, composer, siteData)
+	git := repo.New(logger)
 
 	// In checkout mode the URL and target branch come from the checkout; --branch is --clone only.
 	if !cfg.Clone {

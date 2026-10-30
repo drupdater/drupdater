@@ -1,4 +1,4 @@
-package drupal
+package siteinstall
 
 import (
 	"bufio"
@@ -11,9 +11,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/drupdater/drupdater/pkg/composer"
 	"github.com/spf13/afero"
 	"gopkg.in/yaml.v3"
+
+	"github.com/drupdater/drupdater/internal/drupal"
 
 	"go.uber.org/zap"
 )
@@ -88,7 +89,7 @@ func (is *Installer) Install(ctx context.Context, path string, site string) (err
 const settingsMarker = "// Added by drupdater: test database settings."
 
 func (is *Installer) settingsPath(ctx context.Context, dir string, site string) (string, error) {
-	webroot, err := composer.WebRoot(ctx, is.composer, dir)
+	webroot, err := drupal.WebRoot(ctx, is.composer, dir)
 	if err != nil {
 		return "", fmt.Errorf("failed to get Drupal web dir: %w", err)
 	}

@@ -3,11 +3,11 @@ package addon
 import (
 	"testing"
 
-	"github.com/drupdater/drupdater/pkg/rector"
+	"github.com/drupdater/drupdater/internal/rector"
 
+	"github.com/drupdater/drupdater/internal/composer"
+	"github.com/drupdater/drupdater/internal/drush"
 	"github.com/drupdater/drupdater/internal/report"
-	"github.com/drupdater/drupdater/pkg/composer"
-	"github.com/drupdater/drupdater/pkg/drush"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

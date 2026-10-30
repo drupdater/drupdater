@@ -2,10 +2,11 @@ package composer
 
 import (
 	"context"
-	"github.com/drupdater/drupdater/pkg/php"
 	"os"
 	"os/exec"
 	"testing"
+
+	"github.com/drupdater/drupdater/internal/php"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

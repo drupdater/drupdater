@@ -6,10 +6,12 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/drupdater/drupdater/internal/report"
-	"github.com/drupdater/drupdater/pkg/composer"
 	git "github.com/go-git/go-git/v5"
 	"go.uber.org/zap"
+
+	"github.com/drupdater/drupdater/internal/composer"
+	"github.com/drupdater/drupdater/internal/drupal"
+	"github.com/drupdater/drupdater/internal/report"
 )
 
 // stageScaffoldChanges stages the web-root files drupal-scaffold rewrites on a core update --
@@ -36,7 +38,7 @@ func (r *run) stageScaffoldChanges(ctx context.Context) error {
 	slices.Sort(candidates)
 
 	// Looked up only when there is something to stage, to save a composer subprocess.
-	webroot, err := composer.WebRoot(ctx, r.composer, r.path)
+	webroot, err := drupal.WebRoot(ctx, r.composer, r.path)
 	if err != nil {
 		return fmt.Errorf("failed to determine web root: %w", err)
 	}

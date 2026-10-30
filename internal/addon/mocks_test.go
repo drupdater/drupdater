@@ -8,10 +8,10 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/drupdater/drupdater/pkg/composer"
-	"github.com/drupdater/drupdater/pkg/drupalorg"
-	"github.com/drupdater/drupdater/pkg/phpcs"
-	"github.com/drupdater/drupdater/pkg/rector"
+	"github.com/drupdater/drupdater/internal/composer"
+	"github.com/drupdater/drupdater/internal/drupalorg"
+	"github.com/drupdater/drupdater/internal/phpcs"
+	"github.com/drupdater/drupdater/internal/rector"
 	mock "github.com/stretchr/testify/mock"
 )
 

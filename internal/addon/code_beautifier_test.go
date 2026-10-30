@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/drupdater/drupdater/internal/phpcs"
 	"github.com/drupdater/drupdater/internal/workflow"
-	"github.com/drupdater/drupdater/pkg/phpcs"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

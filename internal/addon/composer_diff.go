@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/drupdater/drupdater/internal/composer"
 	"github.com/drupdater/drupdater/internal/workflow"
-	"github.com/drupdater/drupdater/pkg/composer"
 	"go.uber.org/zap"
 )
 

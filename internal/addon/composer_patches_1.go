@@ -13,9 +13,9 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/drupdater/drupdater/internal/composer"
+	"github.com/drupdater/drupdater/internal/drupalorg"
 	"github.com/drupdater/drupdater/internal/workflow"
-	"github.com/drupdater/drupdater/pkg/composer"
-	"github.com/drupdater/drupdater/pkg/drupalorg"
 	"go.uber.org/zap"
 )
 

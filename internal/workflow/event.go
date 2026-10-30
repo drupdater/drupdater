@@ -3,7 +3,7 @@ package workflow
 import (
 	"context"
 
-	"github.com/drupdater/drupdater/pkg/drush"
+	"github.com/drupdater/drupdater/internal/drush"
 )
 
 type AbortError struct {

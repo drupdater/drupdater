@@ -3,8 +3,8 @@ package workflow
 import (
 	"context"
 
+	composerpkg "github.com/drupdater/drupdater/internal/composer"
 	"github.com/drupdater/drupdater/internal/report"
-	composerpkg "github.com/drupdater/drupdater/pkg/composer"
 	"go.uber.org/zap"
 )
 

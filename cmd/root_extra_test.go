@@ -10,7 +10,7 @@ import (
 
 	"github.com/drupdater/drupdater/internal/config"
 	"github.com/drupdater/drupdater/internal/logging"
-	"github.com/drupdater/drupdater/pkg/repo"
+	"github.com/drupdater/drupdater/internal/repo"
 	git "github.com/go-git/go-git/v5"
 	gitConfig "github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -234,7 +234,7 @@ func initCheckout(t *testing.T, originURL string) string {
 }
 
 func TestResolveCheckoutSettings(t *testing.T) {
-	svc := repo.NewGitRepositoryService(zap.NewNop())
+	svc := repo.New(zap.NewNop())
 
 	t.Run("takes the URL and branch from the checkout", func(t *testing.T) {
 		dir := initCheckout(t, "https://token:secret@example.com/group/repo.git")

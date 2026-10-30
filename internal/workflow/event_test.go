@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/drupdater/drupdater/pkg/drush"
+	"github.com/drupdater/drupdater/internal/drush"
 )
 
 type recordedCommit struct {

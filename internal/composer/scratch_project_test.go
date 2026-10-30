@@ -3,11 +3,12 @@ package composer
 import (
 	"context"
 	"encoding/json"
-	"github.com/drupdater/drupdater/pkg/php"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
+
+	"github.com/drupdater/drupdater/internal/php"
 
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
@@ -313,7 +314,7 @@ func TestCheckIfPatchAppliesClassifiesFailures(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, applies)
 
-		content, err := afero.ReadFile(service.fs, service.tempDir+"/composer.json")
+		content, err := afero.ReadFile(service.fs, service.scratch.path+"/composer.json")
 		require.NoError(t, err)
 		assert.Contains(t, string(content), "https://repo.packagist.com/acme/")
 	})

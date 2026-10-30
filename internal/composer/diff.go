@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/drupdater/drupdater/pkg/php"
+	"github.com/drupdater/drupdater/internal/php"
 	"slices"
 	"strings"
 )

@@ -11,8 +11,8 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/drupdater/drupdater/internal/phpcs"
 	"github.com/drupdater/drupdater/internal/workflow"
-	"github.com/drupdater/drupdater/pkg/phpcs"
 
 	"go.uber.org/zap"
 )

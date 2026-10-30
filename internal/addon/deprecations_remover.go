@@ -5,8 +5,8 @@ import (
 	"context"
 	"slices"
 
+	"github.com/drupdater/drupdater/internal/rector"
 	"github.com/drupdater/drupdater/internal/workflow"
-	"github.com/drupdater/drupdater/pkg/rector"
 
 	"go.uber.org/zap"
 )
