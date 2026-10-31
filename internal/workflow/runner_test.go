@@ -1862,6 +1862,19 @@ func TestForEachSite(t *testing.T) {
 
 		require.ErrorIs(t, err, boom)
 	})
+
+	t.Run("starts no site queued behind the first error", func(t *testing.T) {
+		ws := services{logger: logger, config: config.Config{Sites: sites, Concurrency: 1}}
+
+		var started []string
+		err := ws.forEachSite(context.Background(), func(_ context.Context, _ int, site string) error {
+			started = append(started, site)
+			return assert.AnError
+		})
+
+		require.ErrorIs(t, err, assert.AnError)
+		assert.Equal(t, []string{"site1"}, started)
+	})
 }
 
 func TestCleanup(t *testing.T) {
@@ -1931,7 +1944,7 @@ func TestPostSiteUpdateSeesTheFactsReadAfterTheUpdateHooks(t *testing.T) {
 	committer.EXPECT().Commit(anyCtx, "Update configuration site1", []string{"config/after"}).Return(true, nil)
 	installer.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(nil)
 
-	require.NoError(t, ws.updateSite(t.Context(), "site1", yourTurn(), make(chan struct{})))
+	require.NoError(t, updateSite1(t.Context(), ws))
 	assert.Equal(t, after, seen)
 }
 
@@ -1949,7 +1962,7 @@ func TestUpdateSiteRestoresSettings(t *testing.T) {
 		drush.EXPECT().Facts(anyCtx, "/project", "site1").Return(syncFacts("/project/config/sync"), nil)
 		installer.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(nil).Once()
 
-		err := ws.updateSite(t.Context(), "site1", yourTurn(), make(chan struct{}))
+		err := updateSite1(t.Context(), ws)
 		require.ErrorIs(t, err, assert.AnError)
 		assert.Contains(t, err.Error(), "pre-site-update hook failed")
 	})
@@ -1960,7 +1973,7 @@ func TestUpdateSiteRestoresSettings(t *testing.T) {
 		drush.EXPECT().Facts(anyCtx, "/project", "site1").Return(syncFacts(""), assert.AnError)
 		installer.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(nil).Once()
 
-		err := ws.updateSite(t.Context(), "site1", yourTurn(), make(chan struct{}))
+		err := updateSite1(t.Context(), ws)
 		require.ErrorIs(t, err, assert.AnError)
 		assert.NotContains(t, err.Error(), "pre-site-update")
 	})
@@ -1974,7 +1987,7 @@ func TestUpdateSiteRestoresSettings(t *testing.T) {
 		drush.EXPECT().LocalFacts(anyCtx, "/project", "site1").Return(syncFacts("/project/config/sync"), nil)
 		installer.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(nil).Once()
 
-		err := ws.updateSite(t.Context(), "site1", yourTurn(), make(chan struct{}))
+		err := updateSite1(t.Context(), ws)
 		require.ErrorIs(t, err, assert.AnError)
 		assert.Contains(t, err.Error(), "post-site-update hook failed")
 	})
@@ -1988,7 +2001,7 @@ func TestUpdateSiteRestoresSettings(t *testing.T) {
 		drush.EXPECT().LocalFacts(anyCtx, "/project", "site1").Return(syncFacts(""), assert.AnError)
 		installer.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(nil).Once()
 
-		err := ws.updateSite(t.Context(), "site1", yourTurn(), make(chan struct{}))
+		err := updateSite1(t.Context(), ws)
 		require.ErrorIs(t, err, assert.AnError)
 	})
 
@@ -1999,7 +2012,7 @@ func TestUpdateSiteRestoresSettings(t *testing.T) {
 		drush.EXPECT().UpdateSite(anyCtx, "/project", "site1").Return(assert.AnError)
 		installer.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(nil).Once()
 
-		err := ws.updateSite(t.Context(), "site1", yourTurn(), make(chan struct{}))
+		err := updateSite1(t.Context(), ws)
 		require.ErrorIs(t, err, assert.AnError)
 		assert.NotContains(t, err.Error(), "restore")
 	})
@@ -2015,7 +2028,7 @@ func TestUpdateSiteRestoresSettings(t *testing.T) {
 		})
 		installer.EXPECT().RestoreSettings(mock.MatchedBy(func(ctx context.Context) bool { return ctx.Err() == nil }), "/project", "site1").Return(nil).Once()
 
-		require.ErrorIs(t, ws.updateSite(ctx, "site1", yourTurn(), make(chan struct{})), context.Canceled)
+		require.ErrorIs(t, updateSite1(ctx, ws), context.Canceled)
 	})
 
 	t.Run("a failed restore fails the site", func(t *testing.T) {
@@ -2031,7 +2044,7 @@ func TestUpdateSiteRestoresSettings(t *testing.T) {
 		ws.committer = committer
 		installer.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(assert.AnError)
 
-		err := ws.updateSite(t.Context(), "site1", yourTurn(), make(chan struct{}))
+		err := updateSite1(t.Context(), ws)
 		require.ErrorIs(t, err, assert.AnError)
 		assert.Contains(t, err.Error(), "failed to restore settings")
 	})
@@ -2040,7 +2053,31 @@ func TestUpdateSiteRestoresSettings(t *testing.T) {
 		ws, installer, _ := newRunner(t)
 		installer.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(assert.AnError)
 
-		require.ErrorIs(t, ws.updateSite(t.Context(), "site1", yourTurn(), make(chan struct{})), assert.AnError)
+		require.ErrorIs(t, updateSite1(t.Context(), ws), assert.AnError)
+	})
+
+	t.Run("of every configured site after another failed to configure, naming each failure", func(t *testing.T) {
+		ws, installer, drushMock := newRunner(t)
+		ws.config.Sites = []string{"site1", "site2"}
+		ws.config.Concurrency = 2
+		site2Configured := make(chan struct{})
+		installer.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").RunAndReturn(func(context.Context, string, string) error {
+			<-site2Configured
+			return assert.AnError
+		})
+		installer.EXPECT().ConfigureDatabase(anyCtx, "/project", "site2").RunAndReturn(func(context.Context, string, string) error {
+			close(site2Configured)
+			return nil
+		})
+		drushMock.EXPECT().Facts(anyCtx, "/project", "site2").RunAndReturn(func(ctx context.Context, _, _ string) (drush.Facts, error) {
+			<-ctx.Done()
+			return drush.Facts{}, ctx.Err()
+		})
+		installer.EXPECT().RestoreSettings(anyCtx, "/project", "site2").Return(errors.New("site2 unwritable")).Once()
+
+		err := ws.updateSites(t.Context())
+		require.ErrorIs(t, err, assert.AnError)
+		assert.Contains(t, err.Error(), "failed to restore settings of site2: site2 unwritable")
 	})
 }
 
@@ -2413,9 +2450,8 @@ func TestRunHandsAddonsTheRunsContextAndCommitter(t *testing.T) {
 	}, seen, "every addon event carries the run's context")
 }
 
-// yourTurn is a turn that has already come, for a site updated on its own.
-func yourTurn() <-chan struct{} {
-	turn := make(chan struct{})
-	close(turn)
-	return turn
+// updateSite1 runs the site update phase for site1 alone.
+func updateSite1(ctx context.Context, r *run) error {
+	r.config.Sites = []string{"site1"}
+	return r.updateSites(ctx)
 }

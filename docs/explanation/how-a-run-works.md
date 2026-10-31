@@ -103,8 +103,9 @@ hooks to update, and no way to discover which hooks the update introduces.
 The database is SQLite, in a directory of the system temp dir that belongs to this run.
 Drupal reads its database settings only from `settings.php`, so Drupdater appends a
 block pointing there, and cuts it off again as soon as the install finishes. The same
-happens around each site's update in phase 7. That leaves `settings.php` byte-for-byte
-as the project has it whenever anything is staged or committed.
+happens around the site update in phase 7. Every commit names its paths, so the appended
+block is never staged, and the run ends with `settings.php` byte-for-byte as the project
+has it.
 
 Sites are installed concurrently, limited by `--concurrency`.
 
@@ -124,14 +125,17 @@ The centre of the run:
 
 ### 7. `site update`
 
-Each site's work has two halves:
+The sites are updated in two steps, the second starting once every site has finished the
+first:
 
 1. **Concurrently, across sites:** configure the database, read the site's facts, fire
    **`pre-site-update`**, run the update hooks, resave configuration and read the facts
-   again. This half touches only the site's database.
+   again. This step touches only the site's database.
 2. **One site at a time, in `--sites` order:** fire **`post-site-update`**, export
    configuration, and commit the site's config sync directory as `Update configuration
    <site>`.
+
+Then every site's `settings.php` is put back.
 
 The facts are everything drupdater reads from a site, gathered by one call to its own
 `drupdater:facts` Drush command, which ships inside the binary and is loaded with `drush
@@ -142,11 +146,10 @@ site events carry them: `pre-site-update` the facts from before the update hooks
 `post-site-update` the ones read after them, without the drupal.org request for unsupported
 modules. The config export is committed from the directory the second read names.
 
-The second half writes into the working tree. Sites share that working tree and its git
-index, and two sites can name the same config or translation directory. A site starts its
-second half once its own first half is done and every site before it in `--sites` has
-finished its second half. Overlapping sites still overlap on the slow database work, and
-the commits come out in the same order on every run, whichever site finishes first.
+The second step writes into the working tree. Sites share that working tree and its git
+index, and two sites can name the same config or translation directory, so it is a plain
+loop. The slow database work still overlaps, and the commits come out in the same order on
+every run, whichever site finishes first.
 Drupdater commits the export itself rather than letting `drush config:export --commit` run
 git, so no git hook or git-config identity is involved.
 
@@ -236,6 +239,6 @@ it really is inside the system temp directory.
 Per-site work fans out with a limit of `--concurrency`, defaulting to `GOMAXPROCS(0)` —
 which reflects the container's CPU quota rather than the host's core count.
 
-The first site to fail cancels the rest, and no later site in `--sites` order gets to
-write into the working tree after it. Sites are not updated independently; the point is a
+The first site to fail cancels the rest, and no site writes into the working tree: the
+second step only starts once every site's database update has succeeded. Sites are not updated independently; the point is a
 single coherent request covering all of them.

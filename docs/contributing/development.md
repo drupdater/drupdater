@@ -204,18 +204,18 @@ So the concurrency tests and the detector are one tool, not two:
 
 | Test | Drives |
 |---|---|
-| `TestRunWithConcurrentSites` | The real workflow with four sites, asserting the baseline installs overlap and the committing tail does not |
+| `TestRunWithConcurrentSites` | The real workflow with four sites, asserting the baseline installs overlap and the commits do not |
 | `TestConcurrentSitesAllRecordTheirFinding` | `workflow.Fire` recording a per-site hook's finding from many sites at once |
 | `TestForEachSite` | The fan-out itself: the concurrency bound, and cancellation on first error |
-| `TestUpdateSites…` | The sites' turns: tails run in `--sites` order however the sites finish, with one site at a time too, and none runs after an earlier site fails |
+| `TestUpdateSites…` | Commits land in `--sites` order however the sites finish, with one site at a time too, and none after any site fails |
 
 Deleting the lock from `Findings` makes these tests fail under `-race` and **pass without it**.
 
 Where the shared resource is not memory, the detector cannot help and the test has to assert
-directly. The sites' turns (`Runner.updateSites`) serialise the tail of `updateSite` because
+directly. `Runner.updateSites` commits the sites one at a time because
 the sites share one git index — which is mocked in the suite, so there is no shared memory to
 observe. `TestRunWithConcurrentSites` measures peak occupancy instead, and the
-`TestUpdateSites…` tests record the order the tails ran in.
+`TestUpdateSites…` tests record the order the commits ran in.
 
 ## Mutation testing
 
