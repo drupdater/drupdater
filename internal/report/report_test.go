@@ -436,19 +436,6 @@ func TestRecorderSanitizesRepositoryURL(t *testing.T) {
 	assert.NotContains(t, rep.Repository, "token")
 }
 
-type stubReporter struct{}
-
-func (stubReporter) ReportKey() string { return "stub" }
-func (stubReporter) ReportData() any   { return 1 }
-
-func TestRecorderAddReporterIgnoresNonReporters(t *testing.T) {
-	rec := newTestRecorder()
-	rec.AddReporter(stubReporter{})
-	rec.AddReporter("not a reporter")
-
-	assert.Equal(t, map[string]any{"stub": 1}, rec.Finish().Addons)
-}
-
 func TestSnapshotLeavesTheReportOpen(t *testing.T) {
 	rec := NewRecorder("v1", ModeSecurity, true, "https://example.com/repo.git", "main", nil)
 	rec.AddSection("composer_audit", "first")

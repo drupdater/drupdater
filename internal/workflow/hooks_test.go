@@ -13,6 +13,14 @@ func (a hookAddon) Hooks() Hooks { return a.hooks }
 
 func failing[E any](E) error { return assert.AnError }
 
+// propose builds a pre-composer-update hook that only proposes a plan.
+func propose(stage Stage, fn func(*PreComposerUpdateEvent) (UpdatePlan, error)) *PlanHook {
+	return ProduceProposal(stage, func(e *PreComposerUpdateEvent) (Proposal[struct{}], error) {
+		plan, err := fn(e)
+		return Proposal[struct{}]{Plan: plan}, err
+	})
+}
+
 func TestHooksRunByStageThenAddonOrder(t *testing.T) {
 	var ran []string
 	hook := func(name string, stage Stage) Hooks {
@@ -64,7 +72,7 @@ func TestPipelineCoversEveryEvent(t *testing.T) {
 	hooks := func(name string, stage Stage) Hooks {
 		r := record(name)
 		return Hooks{
-			PreComposerUpdate:  Propose(stage, func(*PreComposerUpdateEvent) (UpdatePlan, error) { return UpdatePlan{}, r() }),
+			PreComposerUpdate:  propose(stage, func(*PreComposerUpdateEvent) (UpdatePlan, error) { return UpdatePlan{}, r() }),
 			PostComposerUpdate: On(stage, func(*PostComposerUpdateEvent) error { return r() }),
 			PostCodeUpdate:     On(stage, func(*PostCodeUpdateEvent) error { return r() }),
 			PreSiteUpdate:      On(stage, func(*PreSiteUpdateEvent) error { return r() }),
@@ -73,7 +81,7 @@ func TestPipelineCoversEveryEvent(t *testing.T) {
 	}
 	p := NewPipeline([]Addon{hookAddon{hooks("late", Inspect)}, hookAddon{hooks("early", Prepare)}})
 	broken := NewPipeline([]Addon{hookAddon{Hooks{
-		PreComposerUpdate:  Propose(Change, func(*PreComposerUpdateEvent) (UpdatePlan, error) { return UpdatePlan{}, assert.AnError }),
+		PreComposerUpdate:  propose(Change, func(*PreComposerUpdateEvent) (UpdatePlan, error) { return UpdatePlan{}, assert.AnError }),
 		PostComposerUpdate: On(Change, failing[*PostComposerUpdateEvent]),
 		PostCodeUpdate:     On(Change, failing[*PostCodeUpdateEvent]),
 		PreSiteUpdate:      On(Change, failing[*PreSiteUpdateEvent]),
@@ -102,7 +110,7 @@ func TestPipelineCoversEveryEvent(t *testing.T) {
 }
 
 func proposing(stage Stage, proposal UpdatePlan, saw *UpdatePlan) Hooks {
-	return Hooks{PreComposerUpdate: Propose(stage, func(e *PreComposerUpdateEvent) (UpdatePlan, error) {
+	return Hooks{PreComposerUpdate: propose(stage, func(e *PreComposerUpdateEvent) (UpdatePlan, error) {
 		if saw != nil {
 			*saw = e.Plan()
 		}
@@ -185,7 +193,7 @@ func TestPreComposerUpdateFailsWhenProposalsDisagree(t *testing.T) {
 func TestPreComposerUpdateFailureReturnsNoPlan(t *testing.T) {
 	addons := []Addon{
 		hookAddon{proposing(Prepare, UpdatePlan{Only: []string{"drupal/core"}}, nil)},
-		hookAddon{Hooks{PreComposerUpdate: Propose(Change, func(*PreComposerUpdateEvent) (UpdatePlan, error) {
+		hookAddon{Hooks{PreComposerUpdate: propose(Change, func(*PreComposerUpdateEvent) (UpdatePlan, error) {
 			return UpdatePlan{Only: []string{"drupal/core"}}, assert.AnError
 		})}},
 	}

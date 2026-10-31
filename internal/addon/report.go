@@ -7,13 +7,14 @@ import (
 
 	"github.com/drupdater/drupdater/internal/composer"
 	"github.com/drupdater/drupdater/internal/drush"
+	"github.com/drupdater/drupdater/internal/workflow"
 )
 
 // Every addon's contribution to the --report document, together in one file because these
 // methods are a published contract and a rename spread over eight files is easy to miss.
 //
-// Addons satisfy report.Reporter structurally, so none of them imports the report package. Keys
-// match .drupdater.yaml's addon names.
+// Each implements workflow.Reporter, reading what its hooks returned from the pipeline's
+// findings. Keys match .drupdater.yaml's addon names.
 //
 // composer_normalizer contributes nothing: what it changes is formatting, not a finding.
 
@@ -27,14 +28,20 @@ type SecurityAdvisories struct {
 	Abandoned []composer.AbandonedPackage `json:"abandoned"`
 }
 
-// ReportKey implements report.Reporter.
+// ReportKey implements workflow.Reporter.
 func (ca *ComposerAudit) ReportKey() string { return "composer_audit" }
 
-// ReportData implements report.Reporter. Both lists arrive sorted, so this stays stable.
-func (ca *ComposerAudit) ReportData() any {
-	fixed := ca.GetFixedAdvisories()
-	remaining := ca.afterAudit.Advisories
-	abandoned := ca.GetAbandonedPackages()
+// ReportData implements workflow.Reporter. Both lists arrive sorted, so this stays stable.
+func (ca *ComposerAudit) ReportData(findings *workflow.Findings) any {
+	after, audited := workflow.Shared[composer.Audit](findings, workflow.EventPostCodeUpdate)
+	// Without the after-audit every advisory found before would read as fixed.
+	if !audited {
+		return nil
+	}
+	before, _ := workflow.Shared[composer.Audit](findings, workflow.EventPreComposerUpdate)
+	fixed := fixedAdvisories(before.Finding, after.Finding)
+	remaining := after.Finding.Advisories
+	abandoned := abandonedPackages(after.Finding)
 	if len(fixed) == 0 && len(remaining) == 0 && len(abandoned) == 0 {
 		return nil
 	}
@@ -58,17 +65,19 @@ type DependencyChange struct {
 	ProjectURL string `json:"project_url,omitempty"`
 }
 
-// ReportKey implements report.Reporter.
+// ReportKey implements workflow.Reporter.
 func (cd *ComposerDiff) ReportKey() string { return "composer_diff" }
 
-// ReportData implements report.Reporter.
-func (cd *ComposerDiff) ReportData() any {
-	if len(cd.entries) == 0 {
+// ReportData implements workflow.Reporter.
+func (cd *ComposerDiff) ReportData(findings *workflow.Findings) any {
+	recorded, _ := workflow.Shared[[]composer.DiffEntry](findings, workflow.EventPostComposerUpdate)
+	entries := recorded.Finding
+	if len(entries) == 0 {
 		return nil
 	}
 
-	changes := make([]DependencyChange, 0, len(cd.entries))
-	for _, e := range cd.entries {
+	changes := make([]DependencyChange, 0, len(entries))
+	for _, e := range entries {
 		changes = append(changes, DependencyChange{
 			Package: e.Package, Operation: e.Operation, From: e.From, To: e.To,
 			Dev: e.Dev, Direct: e.Direct, CompareURL: e.CompareURL, ProjectURL: e.ProjectURL,
@@ -85,46 +94,44 @@ type PluginAllowlist struct {
 	Added []string `json:"added"`
 }
 
-// ReportKey implements report.Reporter.
+// ReportKey implements workflow.Reporter.
 func (ap *ComposerAllowPlugins) ReportKey() string { return "composer_allow_plugins" }
 
-// ReportData implements report.Reporter. Sorted: the plugins are found by ranging over a map.
-func (ap *ComposerAllowPlugins) ReportData() any {
-	if len(ap.newAllowPlugins) == 0 {
+// ReportData implements workflow.Reporter. Sorted: the plugins are found by ranging over a map.
+func (ap *ComposerAllowPlugins) ReportData(findings *workflow.Findings) any {
+	recorded, _ := workflow.Shared[[]string](findings, workflow.EventPostComposerUpdate)
+	if len(recorded.Finding) == 0 {
 		return nil
 	}
-	return PluginAllowlist{Added: slices.Sorted(slices.Values(ap.newAllowPlugins))}
+	return PluginAllowlist{Added: slices.Sorted(slices.Values(recorded.Finding))}
 }
 
 // --- update_hooks ---
 
-// ReportKey implements report.Reporter.
+// ReportKey implements workflow.Reporter.
 func (uh *UpdateHooks) ReportKey() string { return "update_hooks" }
 
-// ReportData implements report.Reporter. Keyed by site, like the merge request description:
+// ReportData implements workflow.Reporter. Keyed by site, like the merge request description:
 // in a multisite run the same module can have different pending hooks per site.
-func (uh *UpdateHooks) ReportData() any {
-	hooks := uh.hooks.All()
+func (uh *UpdateHooks) ReportData(findings *workflow.Findings) any {
+	hooks := workflow.SiteFindings[map[string]drush.UpdateHook](findings, workflow.EventPreSiteUpdate)
+	maps.DeleteFunc(hooks, func(_ string, siteHooks map[string]drush.UpdateHook) bool { return len(siteHooks) == 0 })
 	if len(hooks) == 0 {
 		return nil
-	}
-	// The values are maps too, which All's copy shares with the addon.
-	for site, siteHooks := range hooks {
-		hooks[site] = maps.Clone(siteHooks)
 	}
 	return hooks
 }
 
 // --- unsupported_modules ---
 
-// ReportKey implements report.Reporter.
+// ReportKey implements workflow.Reporter.
 func (um *UnsupportedModules) ReportKey() string { return "unsupported_modules" }
 
-// ReportData implements report.Reporter. One entry per module, however many sites have it, and
+// ReportData implements workflow.Reporter. One entry per module, however many sites have it, and
 // sorted so an unchanged project reports byte-identically.
-func (um *UnsupportedModules) ReportData() any {
+func (um *UnsupportedModules) ReportData(findings *workflow.Findings) any {
 	byName := map[string]drush.UnsupportedModule{}
-	for _, modules := range um.modules.All() {
+	for _, modules := range workflow.SiteFindings[[]drush.UnsupportedModule](findings, workflow.EventPreSiteUpdate) {
 		for _, module := range modules {
 			byName[module.Name] = module
 		}
@@ -148,20 +155,18 @@ type Patches struct {
 	Conflicts []ConflictPatch `json:"conflicts"`
 }
 
-// ReportKey implements report.Reporter.
+// ReportKey implements workflow.Reporter.
 func (h *ComposerPatches1) ReportKey() string { return "composer_patches" }
 
-// ReportData implements report.Reporter.
-func (h *ComposerPatches1) ReportData() any {
-	if !h.patchUpdates.Changes() {
+// ReportData implements workflow.Reporter.
+func (h *ComposerPatches1) ReportData(findings *workflow.Findings) any {
+	recorded, _ := workflow.Shared[PatchUpdates](findings, workflow.EventPreComposerUpdate)
+	updates := recorded.Finding
+	if !updates.Changes() {
 		return nil
 	}
 
-	return Patches{
-		Removed:   h.patchUpdates.Removed,
-		Updated:   h.patchUpdates.Updated,
-		Conflicts: h.patchUpdates.Conflicts,
-	}
+	return Patches(updates)
 }
 
 // --- code_beautifier ---
@@ -173,15 +178,16 @@ type CodingStyleFixes struct {
 	Fixable int      `json:"fixable"`
 }
 
-// ReportKey implements report.Reporter.
+// ReportKey implements workflow.Reporter.
 func (cb *CodeBeautifier) ReportKey() string { return "code_beautifier" }
 
-// ReportData implements report.Reporter.
-func (cb *CodeBeautifier) ReportData() any {
-	if len(cb.fixedFiles) == 0 {
+// ReportData implements workflow.Reporter. Fixes whose commit was not made never reached the branch.
+func (cb *CodeBeautifier) ReportData(findings *workflow.Findings) any {
+	recorded, _ := workflow.Shared[CodingStyleFixes](findings, workflow.EventPostCodeUpdate)
+	if !slices.Contains(recorded.Committed, codingStylesCommitMessage) {
 		return nil
 	}
-	return CodingStyleFixes{Files: cb.fixedFiles, Fixable: cb.fixable}
+	return recorded.Finding
 }
 
 // --- deprecations_remover ---
@@ -193,15 +199,16 @@ type DeprecationFix struct {
 	AppliedRectors []string `json:"applied_rectors,omitempty"`
 }
 
-// ReportKey implements report.Reporter.
+// ReportKey implements workflow.Reporter.
 func (dr *DeprecationsRemover) ReportKey() string { return "deprecations_remover" }
 
-// ReportData implements report.Reporter.
-func (dr *DeprecationsRemover) ReportData() any {
-	if len(dr.fixes) == 0 {
+// ReportData implements workflow.Reporter.
+func (dr *DeprecationsRemover) ReportData(findings *workflow.Findings) any {
+	recorded, _ := workflow.Shared[[]DeprecationFix](findings, workflow.EventPostCodeUpdate)
+	if len(recorded.Finding) == 0 {
 		return nil
 	}
-	return dr.fixes
+	return recorded.Finding
 }
 
 // --- translations_updater ---
@@ -214,14 +221,20 @@ type TranslationResult struct {
 	Skipped string `json:"skipped,omitempty"`
 }
 
-// ReportKey implements report.Reporter.
+// ReportKey implements workflow.Reporter.
 func (tu *TranslationsUpdater) ReportKey() string { return "translations_updater" }
 
-// ReportData implements report.Reporter. Keyed by site: each has its own translation directory.
-func (tu *TranslationsUpdater) ReportData() any {
-	results := tu.results.All()
-	if len(results) == 0 {
+// ReportData implements workflow.Reporter. Keyed by site: each has its own translation directory.
+func (tu *TranslationsUpdater) ReportData(findings *workflow.Findings) any {
+	recorded := workflow.Sites[TranslationResult](findings, workflow.EventPostSiteUpdate)
+	if len(recorded) == 0 {
 		return nil
+	}
+	results := make(map[string]TranslationResult, len(recorded))
+	for site, r := range recorded {
+		result := r.Finding
+		result.Updated = slices.Contains(r.Committed, translationsCommitMessage)
+		results[site] = result
 	}
 	return results
 }

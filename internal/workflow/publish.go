@@ -14,9 +14,7 @@ import (
 // renderMergeRequest renders from the report as it stands, so the merge request says what the
 // report says. Every addon has finished by now; the final report re-reads the same sections.
 func (r *run) renderMergeRequest() (string, string, error) {
-	for _, a := range r.addons {
-		r.rec.AddReporter(a)
-	}
+	r.hooks.Report(r.rec)
 	snapshot := r.rec.Snapshot()
 
 	description, err := mergerequest.Description(snapshot)

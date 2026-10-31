@@ -248,6 +248,25 @@ func TestReportWrittenOnFailureNamesThePhase(t *testing.T) {
 	assert.Len(t, h.got.Packages, 1, "the update is resolved before any site is installed")
 }
 
+// The merge request is rendered after the sites update, so a run failing earlier gets its addon
+// sections only from the deferred write.
+func TestReportOfARunFailingBeforeRenderingCarriesTheAddonSections(t *testing.T) {
+	h := newReportHarness(t, false)
+	h.installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(assert.AnError)
+	h.repository.EXPECT().Head().Return(nil, plumbing.ErrReferenceNotFound).Maybe()
+	h.composer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).
+		Return([]composer.PackageChange{{Action: "Upgrade", Package: "drupal/core", From: "9.0.0", To: "9.1.0"}}, nil)
+	h.composer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
+	h.repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound)
+	h.repoSvc.EXPECT().BranchExists(h.repository, "update-dummy-hash", mock.Anything).Return(false, nil)
+	h.withAddons(&reportingAddon{key: "composer_patches", data: "conflicts"})
+
+	require.ErrorIs(t, h.run(t), assert.AnError)
+
+	require.NotNil(t, h.got)
+	assert.Equal(t, map[string]any{"composer_patches": "conflicts"}, h.got.Addons)
+}
+
 // Acquiring the working copy is the first thing that can fail, and the case that "written on
 // every exit path" exists for.
 func TestReportWrittenWhenAcquiringTheWorkingCopyFails(t *testing.T) {
@@ -441,8 +460,8 @@ type reportingAddon struct {
 	data any
 }
 
-func (a *reportingAddon) ReportKey() string { return a.key }
-func (a *reportingAddon) ReportData() any   { return a.data }
+func (a *reportingAddon) ReportKey() string        { return a.key }
+func (a *reportingAddon) ReportData(*Findings) any { return a.data }
 
 func TestReportCollectsSectionsOnlyFromReporters(t *testing.T) {
 	h := newReportHarness(t, true)

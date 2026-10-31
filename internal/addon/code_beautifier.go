@@ -35,10 +35,6 @@ type CodeBeautifier struct {
 	projectPHPCS PHPCS
 	bundledPHPCS PHPCS
 	composer     BeautifierComposer
-
-	// For the report. Written once from the single post-code-update event, read after the run.
-	fixedFiles []string
-	fixable    int
 }
 
 // NewCodeBeautifier runs projectPHPCS when the project has drupal/coder, bundledPHPCS otherwise.
@@ -53,7 +49,7 @@ func NewCodeBeautifier(logger *zap.Logger, projectPHPCS PHPCS, bundledPHPCS PHPC
 
 func (cb *CodeBeautifier) Hooks() workflow.Hooks {
 	return workflow.Hooks{
-		PostCodeUpdate: workflow.On(workflow.Format, cb.postCodeUpdateHandler),
+		PostCodeUpdate: workflow.Produce(workflow.Format, cb.postCodeUpdateHandler),
 	}
 }
 
@@ -100,26 +96,32 @@ var hasPHPCSPathDefinitions = func(path string) (bool, error) {
 	return len(ruleset.Files) > 0, nil
 }
 
-func (cb *CodeBeautifier) postCodeUpdateHandler(evt *workflow.PostCodeUpdateEvent) error { //nolint:cyclop
+const codingStylesCommitMessage = "Update coding styles"
+
+// postCodeUpdateHandler leaves to ReportData whether the fixes landed: phpcbf may have changed
+// nothing even where phpcs reported something fixable.
+func (cb *CodeBeautifier) postCodeUpdateHandler(evt *workflow.PostCodeUpdateEvent) (workflow.Result[CodingStyleFixes], error) { //nolint:cyclop
 	cb.logger.Info("updating coding styles")
 
+	var result workflow.Result[CodingStyleFixes]
 	if !fileExists(evt.Path()) {
-		created, err := cb.CreatePHPCSConfig(evt.Context(), evt.Path(), evt)
+		created, err := cb.CreatePHPCSConfig(evt.Context(), evt.Path())
 		if err != nil {
-			return err
+			return workflow.Result[CodingStyleFixes]{}, err
 		}
 		if !created {
 			cb.logger.Debug("no phpcs.xml created, skipping coding style update")
-			return nil
+			return result, nil
 		}
+		result.Commits = append(result.Commits, workflow.Commit{Message: "Add PHPCS config", Paths: []string{"phpcs.xml"}})
 	} else {
 		hasPaths, err := hasPHPCSPathDefinitions(evt.Path())
 		if err != nil {
-			return err
+			return workflow.Result[CodingStyleFixes]{}, err
 		}
 		if !hasPaths {
 			cb.logger.Warn("phpcs.xml found but no file path definitions, skipping coding style update")
-			return nil
+			return result, nil
 		}
 	}
 
@@ -131,12 +133,12 @@ func (cb *CodeBeautifier) postCodeUpdateHandler(evt *workflow.PostCodeUpdateEven
 
 	codingStyleUpdateResult, err := phpcs.Run(evt.Context(), evt.Path())
 	if err != nil {
-		return fmt.Errorf("failed to run phpcs: %w", err)
+		return workflow.Result[CodingStyleFixes]{}, fmt.Errorf("failed to run phpcs: %w", err)
 	}
 
 	if codingStyleUpdateResult.Totals.Fixable == 0 {
 		cb.logger.Debug("no coding style issues found")
-		return nil
+		return result, nil
 	}
 
 	err = phpcs.RunCBF(evt.Context(), evt.Path())
@@ -153,21 +155,11 @@ func (cb *CodeBeautifier) postCodeUpdateHandler(evt *workflow.PostCodeUpdateEven
 		}
 		addedFiles = append(addedFiles, strings.TrimLeft(strings.TrimPrefix(file, evt.Path()), "/"))
 	}
-
-	// phpcbf may have changed nothing even where phpcs reported something fixable.
-	committed, err := evt.Commit("Update coding styles", addedFiles...)
-	if err != nil {
-		return err
-	}
-	if !committed {
-		cb.logger.Debug("no coding style changes to commit")
-		return nil
-	}
-
 	slices.Sort(addedFiles)
-	cb.fixedFiles = addedFiles
-	cb.fixable = codingStyleUpdateResult.Totals.Fixable
-	return nil
+
+	result.Commits = append(result.Commits, workflow.Commit{Message: codingStylesCommitMessage, Paths: addedFiles})
+	result.Finding = CodingStyleFixes{Files: addedFiles, Fixable: codingStyleUpdateResult.Totals.Fixable}
+	return result, nil
 }
 
 var phpcsTemplateStr = `<?xml version="1.0" encoding="UTF-8"?>
@@ -183,7 +175,8 @@ var phpcsTemplateStr = `<?xml version="1.0" encoding="UTF-8"?>
 </ruleset>
 `
 
-func (cb *CodeBeautifier) CreatePHPCSConfig(ctx context.Context, path string, committer workflow.Committer) (bool, error) {
+// CreatePHPCSConfig writes a phpcs.xml covering the custom code, for the caller to commit.
+func (cb *CodeBeautifier) CreatePHPCSConfig(ctx context.Context, path string) (bool, error) {
 	cb.logger.Debug("no phpcs.xml or phpcs.xml.dist file found, creating phpcs.xml")
 
 	tmpl, err := template.New("ruleset").Parse(phpcsTemplateStr)
@@ -229,10 +222,6 @@ func (cb *CodeBeautifier) CreatePHPCSConfig(ctx context.Context, path string, co
 	}
 	if err := outputFile.Close(); err != nil {
 		return false, fmt.Errorf("failed to close phpcs.xml: %w", err)
-	}
-
-	if _, err := committer.Commit("Add PHPCS config", "phpcs.xml"); err != nil {
-		return false, err
 	}
 
 	return true, nil

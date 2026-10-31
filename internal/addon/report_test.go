@@ -8,33 +8,39 @@ import (
 	"github.com/drupdater/drupdater/internal/composer"
 	"github.com/drupdater/drupdater/internal/drush"
 	"github.com/drupdater/drupdater/internal/report"
+	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// Every addon contributing to the report must satisfy report.Reporter structurally, without
-// importing the report package itself. If a signature drifts, this fails to compile.
+// Every addon contributing to the report must satisfy workflow.Reporter. If a signature drifts,
+// this fails to compile.
 var (
-	_ report.Reporter = (*ComposerAudit)(nil)
-	_ report.Reporter = (*UpdateHooks)(nil)
-	_ report.Reporter = (*UnsupportedModules)(nil)
-	_ report.Reporter = (*ComposerPatches1)(nil)
+	_ workflow.Reporter = (*ComposerAudit)(nil)
+	_ workflow.Reporter = (*ComposerDiff)(nil)
+	_ workflow.Reporter = (*ComposerAllowPlugins)(nil)
+	_ workflow.Reporter = (*UpdateHooks)(nil)
+	_ workflow.Reporter = (*UnsupportedModules)(nil)
+	_ workflow.Reporter = (*TranslationsUpdater)(nil)
+	_ workflow.Reporter = (*ComposerPatches1)(nil)
+	_ workflow.Reporter = (*CodeBeautifier)(nil)
+	_ workflow.Reporter = (*DeprecationsRemover)(nil)
 )
 
 func TestComposerAuditReportData(t *testing.T) {
 	before := composer.Advisory{CVE: "CVE-1", PackageName: "drupal/foo"}
 	stillOpen := composer.Advisory{CVE: "CVE-2", PackageName: "drupal/bar"}
 
-	ca := &ComposerAudit{
-		beforeAudit: composer.Audit{Advisories: []composer.Advisory{before, stillOpen}},
-		afterAudit: composer.Audit{
+	ca := auditFor(auditPair{
+		before: composer.Audit{Advisories: []composer.Advisory{before, stillOpen}},
+		after: composer.Audit{
 			Advisories: []composer.Advisory{stillOpen},
 			Abandoned: []composer.AbandonedPackage{
 				{PackageName: "drupal/token"},
 				{PackageName: "swiftmailer/swiftmailer", Replacement: "symfony/mailer"},
 			},
 		},
-	}
+	})
 
 	assert.Equal(t, "composer_audit", ca.ReportKey())
 
@@ -53,11 +59,11 @@ func TestComposerAuditReportData(t *testing.T) {
 // An update that resolved every advisory still emits the section: abandoned packages are a
 // standing finding no update clears.
 func TestComposerAuditReportDataOnAbandonedAlone(t *testing.T) {
-	ca := &ComposerAudit{
-		afterAudit: composer.Audit{
+	ca := auditFor(auditPair{
+		after: composer.Audit{
 			Abandoned: []composer.AbandonedPackage{{PackageName: "patchwork/jsqueeze"}},
 		},
-	}
+	})
 
 	data, ok := ca.ReportData().(SecurityAdvisories)
 	require.True(t, ok, "an abandoned package alone must still produce a section")
@@ -70,17 +76,28 @@ func TestComposerAuditReportDataOnAbandonedAlone(t *testing.T) {
 // The drupal/* filter applies before the "nothing to report" check, so a finding that belongs
 // to unsupported_modules adds no empty composer_audit section.
 func TestComposerAuditReportDataNilWhenOnlyDrupalPackagesAreAbandoned(t *testing.T) {
-	ca := &ComposerAudit{
-		afterAudit: composer.Audit{
+	ca := auditFor(auditPair{
+		after: composer.Audit{
 			Abandoned: []composer.AbandonedPackage{{PackageName: "drupal/token"}},
 		},
-	}
+	})
 
 	assert.Nil(t, ca.ReportData())
 }
 
+// A run that failed between the two audits never checked the updated code, so nothing it found
+// before the update may be reported as fixed.
+func TestComposerAuditReportDataNilWithoutTheAuditAfterTheUpdate(t *testing.T) {
+	findings := &workflow.Findings{}
+	findings.Record(workflow.EventPreComposerUpdate, "", composer.Audit{
+		Advisories: []composer.Advisory{{CVE: "CVE-1", PackageName: "drupal/core"}},
+	}, nil)
+
+	assert.Nil(t, (&ComposerAudit{}).ReportData(findings))
+}
+
 func TestComposerAuditReportDataNilWhenNothingToReport(t *testing.T) {
-	ca := &ComposerAudit{}
+	ca := auditFor(auditPair{})
 	assert.Nil(t, ca.ReportData(), "an addon with nothing to say must not add an empty section")
 }
 
@@ -90,10 +107,10 @@ func TestComposerAuditReportDataOnEitherHalfAlone(t *testing.T) {
 	t.Run("only fixed advisories", func(t *testing.T) {
 		// The update closed the advisory: worth reporting on its own, since it is the evidence
 		// the update was security-relevant.
-		ca := &ComposerAudit{
-			beforeAudit: composer.Audit{Advisories: []composer.Advisory{advisory}},
-			afterAudit:  composer.Audit{},
-		}
+		ca := auditFor(auditPair{
+			before: composer.Audit{Advisories: []composer.Advisory{advisory}},
+			after:  composer.Audit{},
+		})
 		data, ok := ca.ReportData().(SecurityAdvisories)
 		require.True(t, ok, "a fixed advisory alone must still produce a section")
 		require.Len(t, data.Fixed, 1)
@@ -104,10 +121,10 @@ func TestComposerAuditReportDataOnEitherHalfAlone(t *testing.T) {
 	t.Run("only remaining advisories", func(t *testing.T) {
 		// Nothing was fixed but something is still open: reporting this is the whole point of
 		// the audit, and suppressing it would hide a live vulnerability from the reviewer.
-		ca := &ComposerAudit{
-			beforeAudit: composer.Audit{Advisories: []composer.Advisory{advisory}},
-			afterAudit:  composer.Audit{Advisories: []composer.Advisory{advisory}},
-		}
+		ca := auditFor(auditPair{
+			before: composer.Audit{Advisories: []composer.Advisory{advisory}},
+			after:  composer.Audit{Advisories: []composer.Advisory{advisory}},
+		})
 		data, ok := ca.ReportData().(SecurityAdvisories)
 		require.True(t, ok, "a remaining advisory alone must still produce a section")
 		assert.Empty(t, data.Fixed)
@@ -129,20 +146,21 @@ func TestUpdateHooksReportData(t *testing.T) {
 	assert.Equal(t, "foo", data["default"]["foo_update_9001"].Module)
 }
 
-// ReportData must hand back a copy all the way down: what a site found stays the addon's.
-func TestUpdateHooksReportDataCopiesTheLiveMap(t *testing.T) {
+func TestUpdateHooksReportDataLeavesOutSitesWithoutHooks(t *testing.T) {
 	uh := updateHooksFor(map[string]map[string]drush.UpdateHook{
 		"default": {"foo_update_9001": drush.UpdateHook{Module: "foo"}},
+		"second":  nil,
 	})
 
-	data := uh.ReportData().(map[string]map[string]drush.UpdateHook)
-	data["default"]["injected"] = drush.UpdateHook{Module: "bar"}
-
-	assert.NotContains(t, uh.hooks.All()["default"], "injected")
+	assert.Equal(t, map[string]map[string]drush.UpdateHook{
+		"default": {"foo_update_9001": drush.UpdateHook{Module: "foo"}},
+	}, uh.ReportData())
 }
 
 func TestUpdateHooksReportDataNilWhenEmpty(t *testing.T) {
-	assert.Nil(t, (&UpdateHooks{}).ReportData())
+	assert.Nil(t, updateHooksFor(nil).ReportData())
+	assert.Nil(t, updateHooksFor(map[string]map[string]drush.UpdateHook{"default": nil}).ReportData(),
+		"a site that found none adds nothing")
 }
 
 func TestUnsupportedModulesReportDataIsSortedByName(t *testing.T) {
@@ -161,18 +179,16 @@ func TestUnsupportedModulesReportDataIsSortedByName(t *testing.T) {
 }
 
 func TestUnsupportedModulesReportDataNilWhenEmpty(t *testing.T) {
-	assert.Nil(t, (&UnsupportedModules{}).ReportData())
+	assert.Nil(t, unsupportedModulesFor(nil).ReportData())
 	assert.Nil(t, unsupportedModulesFor(map[string][]drush.UnsupportedModule{"default": nil}).ReportData(),
 		"a site that found none adds nothing")
 }
 
 func TestComposerPatchesReportData(t *testing.T) {
-	h := &ComposerPatches1{
-		patchUpdates: PatchUpdates{
-			Removed:   []RemovedPatch{{Package: "drupal/foo", Reason: "fixed upstream"}},
-			Conflicts: []ConflictPatch{{Package: "drupal/bar", NewVersion: "2.0.0"}},
-		},
-	}
+	h := patchesFor(PatchUpdates{
+		Removed:   []RemovedPatch{{Package: "drupal/foo", Reason: "fixed upstream"}},
+		Conflicts: []ConflictPatch{{Package: "drupal/bar", NewVersion: "2.0.0"}},
+	})
 
 	assert.Equal(t, "composer_patches", h.ReportKey())
 
@@ -186,15 +202,16 @@ func TestComposerPatchesReportData(t *testing.T) {
 }
 
 func TestComposerPatchesReportDataNilWhenNoPatchChanges(t *testing.T) {
-	assert.Nil(t, (&ComposerPatches1{}).ReportData())
+	assert.Nil(t, patchesFor(PatchUpdates{}).ReportData())
+	assert.Nil(t, (&ComposerPatches1{}).ReportData(&workflow.Findings{}), "a run that never got as far")
 }
 
 // Every field is mapped: the description renders composer_diff from this section alone.
 func TestComposerDiffReportData(t *testing.T) {
-	cd := &ComposerDiff{entries: []composer.DiffEntry{{
+	cd := diffFor([]composer.DiffEntry{{
 		Package: "drupal/core", Operation: "upgrade", From: "10.3.8", To: "10.3.9", Dev: true, Direct: true,
 		CompareURL: "https://example.com/compare", ProjectURL: "https://example.com/core",
-	}}}
+	}})
 
 	assert.Equal(t, "composer_diff", cd.ReportKey())
 	assert.Equal(t, []DependencyChange{{
@@ -204,39 +221,40 @@ func TestComposerDiffReportData(t *testing.T) {
 }
 
 func TestComposerDiffReportDataNilWithoutChanges(t *testing.T) {
-	assert.Nil(t, (&ComposerDiff{}).ReportData())
+	assert.Nil(t, diffFor(nil).ReportData())
 }
 
 // The plugins are collected by ranging over a map, so only the sort keeps the report stable.
 func TestComposerAllowPluginsReportDataIsSorted(t *testing.T) {
-	ap := &ComposerAllowPlugins{newAllowPlugins: []string{"zeta/plugin", "acme/plugin"}}
+	added := []string{"zeta/plugin", "acme/plugin"}
+	ap := allowPluginsFor(added)
 
 	assert.Equal(t, "composer_allow_plugins", ap.ReportKey())
 	assert.Equal(t, PluginAllowlist{Added: []string{"acme/plugin", "zeta/plugin"}}, ap.ReportData())
-	assert.Equal(t, []string{"zeta/plugin", "acme/plugin"}, ap.newAllowPlugins, "the addon's own state is left as found")
+	assert.Equal(t, []string{"zeta/plugin", "acme/plugin"}, added, "the recorded finding is left as found")
 }
 
 func TestComposerAllowPluginsReportDataNilWithoutNewPlugins(t *testing.T) {
-	assert.Nil(t, (&ComposerAllowPlugins{}).ReportData())
+	assert.Nil(t, allowPluginsFor(nil).ReportData())
 }
 
 func TestCodeBeautifierReportData(t *testing.T) {
-	cb := &CodeBeautifier{}
+	fixes := CodingStyleFixes{Files: []string{"web/modules/custom/a/a.module", "web/modules/custom/b/b.module"}, Fixable: 7}
 
 	t.Run("nothing fixed reports nothing", func(t *testing.T) {
+		cb := &CodeBeautifier{}
 		assert.Equal(t, "code_beautifier", cb.ReportKey())
-		assert.Nil(t, cb.ReportData())
+		assert.Nil(t, cb.ReportData(&workflow.Findings{}))
 	})
 
 	t.Run("reports the files it committed and what was fixable", func(t *testing.T) {
-		cb := &CodeBeautifier{
-			fixedFiles: []string{"web/modules/custom/a/a.module", "web/modules/custom/b/b.module"},
-			fixable:    7,
-		}
-		assert.Equal(t, CodingStyleFixes{
-			Files:   []string{"web/modules/custom/a/a.module", "web/modules/custom/b/b.module"},
-			Fixable: 7,
-		}, cb.ReportData())
+		assert.Equal(t, fixes, codeBeautifierFor(fixes).ReportData())
+	})
+
+	t.Run("fixes whose commit was not made report nothing", func(t *testing.T) {
+		findings := &workflow.Findings{}
+		findings.Record(workflow.EventPostCodeUpdate, "", fixes, []string{"Add PHPCS config"})
+		assert.Nil(t, (&CodeBeautifier{}).ReportData(findings))
 	})
 }
 
@@ -244,19 +262,20 @@ func TestDeprecationsRemoverReportData(t *testing.T) {
 	t.Run("nothing rewritten reports nothing", func(t *testing.T) {
 		dr := &DeprecationsRemover{}
 		assert.Equal(t, "deprecations_remover", dr.ReportKey())
-		assert.Nil(t, dr.ReportData())
+		assert.Nil(t, dr.ReportData(&workflow.Findings{}))
+		assert.Nil(t, deprecationsFor(nil).ReportData())
+		assert.Nil(t, deprecationsFor([]DeprecationFix{}).ReportData(), "an empty list is omitted, not reported as []")
 	})
 
 	t.Run("records which rules fired on which file, sorted", func(t *testing.T) {
-		dr := &DeprecationsRemover{}
-		dr.recordFixes(rector.ReturnOutput{
+		dr := deprecationsFor(deprecationFixes(rector.ReturnOutput{
 			Totals:       rector.ReturnOutputTotals{ChangedFiles: 2},
 			ChangedFiles: []string{"web/modules/custom/z/z.php", "web/modules/custom/a/a.php"},
 			FileDiffs: []rector.ReturnOutputFillDiff{
 				{File: "web/modules/custom/a/a.php", AppliedRectors: []string{"SecondRector", "FirstRector"}},
 				{File: "web/modules/custom/z/z.php", AppliedRectors: []string{"OtherRector"}},
 			},
-		})
+		}))
 
 		// Files and rule names are both sorted, so two runs over unchanged code produce
 		// byte-identical sections and a consumer can diff reports directly.
@@ -267,18 +286,17 @@ func TestDeprecationsRemoverReportData(t *testing.T) {
 	})
 
 	t.Run("a changed file with no recorded rules still reports", func(t *testing.T) {
-		dr := &DeprecationsRemover{}
-		dr.recordFixes(rector.ReturnOutput{
+		dr := deprecationsFor(deprecationFixes(rector.ReturnOutput{
 			Totals:       rector.ReturnOutputTotals{ChangedFiles: 1},
 			ChangedFiles: []string{"a.php"},
-		})
+		}))
 		assert.Equal(t, []DeprecationFix{{File: "a.php"}}, dr.ReportData())
 	})
 }
 
 func TestTranslationsUpdaterReportData(t *testing.T) {
 	t.Run("never ran reports nothing", func(t *testing.T) {
-		tu := &TranslationsUpdater{}
+		tu := translationsFor(nil)
 		assert.Equal(t, "translations_updater", tu.ReportKey())
 		assert.Nil(t, tu.ReportData())
 	})
@@ -286,49 +304,114 @@ func TestTranslationsUpdaterReportData(t *testing.T) {
 	t.Run("distinguishes updated, unchanged and skipped, per site", func(t *testing.T) {
 		// The skipped case is the one that matters: it used to be visible only in the log,
 		// so a report that omitted the site could not tell it apart from "nothing to do".
-		tu := &TranslationsUpdater{}
-		tu.record("one", TranslationResult{Path: "translations", Updated: true})
-		tu.record("two", TranslationResult{Path: "translations"})
-		tu.record("three", TranslationResult{Skipped: "locale_deploy not enabled"})
-
-		assert.Equal(t, map[string]TranslationResult{
+		results := map[string]TranslationResult{
 			"one":   {Path: "translations", Updated: true},
 			"two":   {Path: "translations"},
 			"three": {Skipped: "locale_deploy not enabled"},
-		}, tu.ReportData())
+		}
+
+		assert.Equal(t, results, translationsFor(results).ReportData())
 	})
 
-	t.Run("the returned map is a copy of guarded state", func(t *testing.T) {
-		tu := &TranslationsUpdater{}
-		tu.record("default", TranslationResult{Updated: true})
-		out := tu.ReportData().(map[string]TranslationResult)
-		out["default"] = TranslationResult{}
-		assert.True(t, tu.ReportData().(map[string]TranslationResult)["default"].Updated)
+	t.Run("only its own commit marks a site updated", func(t *testing.T) {
+		findings := &workflow.Findings{}
+		findings.Record(workflow.EventPostSiteUpdate, "default", TranslationResult{Path: "translations"}, []string{"Update configuration default"})
+
+		assert.Equal(t, map[string]TranslationResult{"default": {Path: "translations"}},
+			(&TranslationsUpdater{}).ReportData(findings))
 	})
 }
 
-// updateHooksFor, unsupportedModulesFor and translationsFor build an addon holding what its
-// per-site hook would have recorded for each site.
-func updateHooksFor(perSite map[string]map[string]drush.UpdateHook) *UpdateHooks {
-	uh := &UpdateHooks{}
+// withFindings is a reporting addon holding what the pipeline would have recorded from its hooks.
+type withFindings struct {
+	addon    workflow.Reporter
+	findings *workflow.Findings
+}
+
+func (w withFindings) ReportKey() string { return w.addon.ReportKey() }
+
+func (w withFindings) ReportData() any { return w.addon.ReportData(w.findings) }
+
+// updateHooksFor, unsupportedModulesFor and translationsFor build an addon with what its per-site
+// hook would have returned for each site.
+func updateHooksFor(perSite map[string]map[string]drush.UpdateHook) withFindings {
+	findings := &workflow.Findings{}
 	for site, hooks := range perSite {
-		uh.hooks.Set(site, hooks)
+		findings.Record(workflow.EventPreSiteUpdate, site, hooks, nil)
 	}
-	return uh
+	return withFindings{&UpdateHooks{}, findings}
 }
 
-func unsupportedModulesFor(perSite map[string][]drush.UnsupportedModule) *UnsupportedModules {
-	um := &UnsupportedModules{}
+func unsupportedModulesFor(perSite map[string][]drush.UnsupportedModule) withFindings {
+	findings := &workflow.Findings{}
 	for site, modules := range perSite {
-		um.modules.Set(site, modules)
+		findings.Record(workflow.EventPreSiteUpdate, site, modules, nil)
 	}
-	return um
+	return withFindings{&UnsupportedModules{}, findings}
 }
 
-func translationsFor(perSite map[string]TranslationResult) *TranslationsUpdater {
-	tu := &TranslationsUpdater{}
+// translationsFor records an Updated result as its hook's commit having been made.
+func translationsFor(perSite map[string]TranslationResult) withFindings {
+	findings := &workflow.Findings{}
 	for site, result := range perSite {
-		tu.results.Set(site, result)
+		var committed []string
+		if result.Updated {
+			committed = []string{translationsCommitMessage}
+		}
+		result.Updated = false
+		findings.Record(workflow.EventPostSiteUpdate, site, result, committed)
 	}
-	return tu
+	return withFindings{&TranslationsUpdater{}, findings}
+}
+
+// patchesFor builds composer_patches with what its pre-composer-update hook would have returned.
+func patchesFor(updates PatchUpdates) withFindings {
+	findings := &workflow.Findings{}
+	findings.Record(workflow.EventPreComposerUpdate, "", updates, nil)
+	return withFindings{&ComposerPatches1{}, findings}
+}
+
+type auditPair struct{ before, after composer.Audit }
+
+// auditFor builds composer_audit with the audits its two hooks would have returned.
+func auditFor(audits auditPair) withFindings {
+	findings := &workflow.Findings{}
+	findings.Record(workflow.EventPreComposerUpdate, "", audits.before, nil)
+	findings.Record(workflow.EventPostCodeUpdate, "", audits.after, nil)
+	return withFindings{&ComposerAudit{}, findings}
+}
+
+// diffFor builds composer_diff with the entries its post-composer-update hook would have returned.
+func diffFor(entries []composer.DiffEntry) withFindings {
+	findings := &workflow.Findings{}
+	findings.Record(workflow.EventPostComposerUpdate, "", entries, nil)
+	return withFindings{&ComposerDiff{}, findings}
+}
+
+// allowPluginsFor builds composer_allow_plugins with the plugins its post-update hook denied.
+func allowPluginsFor(added []string) withFindings {
+	findings := &workflow.Findings{}
+	findings.Record(workflow.EventPostComposerUpdate, "", added, nil)
+	return withFindings{&ComposerAllowPlugins{}, findings}
+}
+
+// codeBeautifierFor builds code_beautifier with fixes its post-code-update hook committed.
+func codeBeautifierFor(fixes CodingStyleFixes) withFindings {
+	findings := &workflow.Findings{}
+	findings.Record(workflow.EventPostCodeUpdate, "", fixes, []string{codingStylesCommitMessage})
+	return withFindings{&CodeBeautifier{}, findings}
+}
+
+// deprecationsFor builds deprecations_remover with what its post-code-update hook returned.
+func deprecationsFor(fixes []DeprecationFix) withFindings {
+	findings := &workflow.Findings{}
+	findings.Record(workflow.EventPostCodeUpdate, "", fixes, nil)
+	return withFindings{&DeprecationsRemover{}, findings}
+}
+
+// reportSection is addon key's section as the pipeline's hooks left it.
+func reportSection(p *workflow.Pipeline, key string) any {
+	rec := report.NewRecorder("dev", report.ModeNormal, false, "", "", nil)
+	p.Report(rec)
+	return rec.Snapshot().Addons[key]
 }

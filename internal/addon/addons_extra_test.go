@@ -70,8 +70,8 @@ func TestComposerDiffFailure(t *testing.T) {
 	composerService.EXPECT().Diff(anyCtx, "/tmp").Return(nil, assert.AnError)
 
 	cd := NewComposerDiff(zap.NewNop(), composerService)
-	err := cd.postComposerUpdateHandler(workflow.NewPostComposerUpdateEvent(t.Context(), "/tmp", nil))
-	require.Error(t, err)
+	_, err := cd.postComposerUpdateHandler(workflow.NewPostComposerUpdateEvent(t.Context(), "/tmp", nil))
+	require.ErrorIs(t, err, assert.AnError)
 	assert.Contains(t, err.Error(), "failed to get diff")
 }
 
@@ -103,7 +103,8 @@ func TestDeprecationsRemoverErrors(t *testing.T) {
 		composerService.EXPECT().GetCustomCodeDirectories(anyCtx, "/tmp").Return(nil, assert.AnError)
 
 		dr := NewDeprecationsRemover(zap.NewNop(), NewMockRector(t), NewMockRector(t), composerService)
-		require.Error(t, dr.postCodeUpdateHandler(workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", nil)))
+		_, err := dr.postCodeUpdateHandler(workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", nil))
+		require.Error(t, err)
 	})
 
 	t.Run("committing the removals fails", func(t *testing.T) {
@@ -119,7 +120,9 @@ func TestDeprecationsRemoverErrors(t *testing.T) {
 
 		committer := &fakeCommitter{err: assert.AnError}
 		dr := NewDeprecationsRemover(zap.NewNop(), runner, NewMockRector(t), composerService)
-		require.ErrorIs(t, dr.postCodeUpdateHandler(workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", committer)), assert.AnError)
+		p, err := firePostCodeUpdate(dr, workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", committer))
+		require.ErrorIs(t, err, assert.AnError)
+		assert.Nil(t, reportSection(p, "deprecations_remover"), "a run whose commit failed records nothing")
 	})
 }
 
@@ -130,7 +133,8 @@ func TestTranslationsUpdaterErrors(t *testing.T) {
 
 		tu := NewTranslationsUpdater(zap.NewNop(), drushService)
 		evt := workflow.NewPostSiteUpdateEvent(t.Context(), "/tmp", &fakeCommitter{}, "site1", drush.Facts{Modules: []string{"locale_deploy"}})
-		require.ErrorIs(t, tu.postSiteUpdateHandler(evt), assert.AnError)
+		_, err := tu.postSiteUpdateHandler(evt)
+		require.ErrorIs(t, err, assert.AnError)
 	})
 
 	t.Run("committing the translations fails", func(t *testing.T) {
@@ -138,11 +142,10 @@ func TestTranslationsUpdaterErrors(t *testing.T) {
 		drushService := NewMockTranslationsDrush(t)
 		drushService.EXPECT().LocalizeTranslations(anyCtx, project, "site1").Return(nil)
 
-		tu := NewTranslationsUpdater(zap.NewNop(), drushService)
-		err := tu.postSiteUpdateHandler(workflow.NewPostSiteUpdateEvent(t.Context(), project, &fakeCommitter{err: assert.AnError}, "site1", facts))
+		p := workflow.NewPipeline([]workflow.Addon{NewTranslationsUpdater(zap.NewNop(), drushService)})
+		err := workflow.Fire(p, workflow.NewPostSiteUpdateEvent(t.Context(), project, &fakeCommitter{err: assert.AnError}, "site1", facts))
 		require.ErrorIs(t, err, assert.AnError)
-		assert.Contains(t, err.Error(), "failed to commit translation path")
-		assert.Empty(t, tu.results.All(), "a site whose commit failed has no outcome to report")
+		assert.Nil(t, reportSection(p, "translations_updater"), "a site whose commit failed has no outcome to report")
 	})
 }
 

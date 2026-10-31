@@ -12,8 +12,6 @@ import (
 // merge request lists them together with composer_audit's abandoned packages.
 type UnsupportedModules struct {
 	logger *zap.Logger
-
-	modules workflow.PerSite[[]drush.UnsupportedModule]
 }
 
 // NewUnsupportedModules creates an unsupported modules detector.
@@ -25,26 +23,20 @@ func NewUnsupportedModules(logger *zap.Logger) *UnsupportedModules {
 
 func (um *UnsupportedModules) Hooks() workflow.Hooks {
 	return workflow.Hooks{
-		PreSiteUpdate: workflow.On(workflow.Inspect, um.preSiteUpdateHandler),
+		PreSiteUpdate: workflow.Observe(um.preSiteUpdateHandler),
 	}
 }
 
 // preSiteUpdateHandler checks a site. Best-effort: an unreachable status service is not an error.
-func (um *UnsupportedModules) preSiteUpdateHandler(evt *workflow.PreSiteUpdateEvent) error {
-
+func (um *UnsupportedModules) preSiteUpdateHandler(evt *workflow.PreSiteUpdateEvent) ([]drush.UnsupportedModule, error) {
 	facts := evt.Facts()
 	if facts.UnsupportedModulesError != "" {
 		um.logger.Warn("failed to check for unsupported modules", zap.String("site", evt.Site()), zap.Error(errors.New(facts.UnsupportedModulesError)))
-		return nil
+		return nil, nil
 	}
 	modules := facts.UnsupportedModules
-	if len(modules) == 0 {
-		return nil
+	if len(modules) > 0 {
+		um.logger.Info("unsupported modules found", zap.String("site", evt.Site()), zap.Int("count", len(modules)))
 	}
-
-	um.modules.Set(evt.Site(), modules)
-
-	um.logger.Info("unsupported modules found", zap.String("site", evt.Site()), zap.Int("count", len(modules)))
-
-	return nil
+	return modules, nil
 }

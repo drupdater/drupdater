@@ -18,8 +18,6 @@ type DiffComposer interface {
 type ComposerDiff struct {
 	logger   *zap.Logger
 	composer DiffComposer
-
-	entries []composer.DiffEntry
 }
 
 func NewComposerDiff(logger *zap.Logger, composer DiffComposer) *ComposerDiff {
@@ -31,22 +29,21 @@ func NewComposerDiff(logger *zap.Logger, composer DiffComposer) *ComposerDiff {
 
 func (cd *ComposerDiff) Hooks() workflow.Hooks {
 	return workflow.Hooks{
-		PostComposerUpdate: workflow.On(workflow.Inspect, cd.postComposerUpdateHandler),
+		PostComposerUpdate: workflow.Observe(cd.postComposerUpdateHandler),
 	}
 }
 
-func (cd *ComposerDiff) postComposerUpdateHandler(evt *workflow.PostComposerUpdateEvent) error {
+func (cd *ComposerDiff) postComposerUpdateHandler(evt *workflow.PostComposerUpdateEvent) ([]composer.DiffEntry, error) {
 	entries, err := cd.composer.Diff(evt.Context(), evt.Path())
 	if err != nil {
-		return fmt.Errorf("failed to get diff: %w", err)
+		return nil, fmt.Errorf("failed to get diff: %w", err)
 	}
-	cd.entries = entries
 
 	if len(entries) > 0 {
 		cd.logger.Info("dependency diff\n" + plainDiff(entries))
 	}
 
-	return nil
+	return entries, nil
 }
 
 // plainDiff is the log's rendering: one line per package, without the links a terminal can't use.

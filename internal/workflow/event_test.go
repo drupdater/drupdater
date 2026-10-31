@@ -29,10 +29,10 @@ func (f *fakeCommitter) Commit(message string, paths ...string) (bool, error) {
 
 // assertCommitsThrough checks that evt hands a commit to the committer it was built with.
 func assertCommitsThrough(t *testing.T, evt interface {
-	Commit(string, ...string) (bool, error)
+	commit(string, ...string) (bool, error)
 }, committer *fakeCommitter) {
 	t.Helper()
-	committed, err := evt.Commit("Update things", "a.php", "b/")
+	committed, err := evt.commit("Update things", "a.php", "b/")
 	require.ErrorIs(t, err, committer.err)
 	assert.Equal(t, committer.result, committed)
 	assert.Equal(t, []recordedCommit{{message: "Update things", paths: []string{"a.php", "b/"}}}, committer.commits)

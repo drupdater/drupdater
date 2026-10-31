@@ -24,9 +24,6 @@ type ComposerAudit struct {
 	logger   *zap.Logger
 	composer AuditComposer
 	security bool
-
-	beforeAudit composer.Audit
-	afterAudit  composer.Audit
 }
 
 // NewComposerAudit creates a security auditor. security marks a `--security` run.
@@ -40,28 +37,27 @@ func NewComposerAudit(logger *zap.Logger, composer AuditComposer, security bool)
 
 func (ca *ComposerAudit) Hooks() workflow.Hooks {
 	return workflow.Hooks{
-		PreComposerUpdate: workflow.Propose(workflow.Prepare, ca.preComposerUpdateHandler),
-		PostCodeUpdate:    workflow.On(workflow.Inspect, ca.postCodeUpdateHandler),
+		PreComposerUpdate: workflow.ProduceProposal(workflow.Prepare, ca.preComposerUpdateHandler),
+		PostCodeUpdate:    workflow.ProduceFrom(workflow.Inspect, ca.postCodeUpdateHandler),
 	}
 }
 
 // preComposerUpdateHandler audits the pre-update code. A security run narrows the update to the
 // affected packages and aborts when there are none; a normal run only records the audit.
-func (ca *ComposerAudit) preComposerUpdateHandler(evt *workflow.PreComposerUpdateEvent) (workflow.UpdatePlan, error) {
-	var err error
-
-	ca.beforeAudit, err = ca.composer.Audit(evt.Context(), evt.Path())
+func (ca *ComposerAudit) preComposerUpdateHandler(evt *workflow.PreComposerUpdateEvent) (workflow.Proposal[composer.Audit], error) {
+	before, err := ca.composer.Audit(evt.Context(), evt.Path())
 	if err != nil {
-		return workflow.UpdatePlan{}, fmt.Errorf("failed to run composer audit: %w", err)
+		return workflow.Proposal[composer.Audit]{}, fmt.Errorf("failed to run composer audit: %w", err)
 	}
 
+	proposal := workflow.Proposal[composer.Audit]{Finding: before}
 	if !ca.security {
-		return workflow.UpdatePlan{}, nil
+		return proposal, nil
 	}
 
 	// Several advisories often name one package; merging the plan deduplicates them.
-	packagesToUpdate := make([]string, 0, len(ca.beforeAudit.Advisories))
-	for _, advisory := range ca.beforeAudit.Advisories {
+	packagesToUpdate := make([]string, 0, len(before.Advisories))
+	for _, advisory := range before.Advisories {
 		packagesToUpdate = append(packagesToUpdate, advisory.PackageName)
 	}
 
@@ -71,34 +67,35 @@ func (ca *ComposerAudit) preComposerUpdateHandler(evt *workflow.PreComposerUpdat
 	}
 
 	if len(packagesToUpdate) == 0 {
-		return workflow.UpdatePlan{}, workflow.AbortError{Msg: "No security advisories found"}
+		return workflow.Proposal[composer.Audit]{}, workflow.AbortError{Msg: "No security advisories found"}
 	}
 
-	return workflow.UpdatePlan{Only: packagesToUpdate, MinimalChanges: true}, nil
+	proposal.Plan = workflow.UpdatePlan{Only: packagesToUpdate, MinimalChanges: true}
+	return proposal, nil
 }
 
-func (ca *ComposerAudit) postCodeUpdateHandler(evt *workflow.PostCodeUpdateEvent) error {
-
-	var err error
-	ca.afterAudit, err = ca.composer.Audit(evt.Context(), evt.Path())
+// postCodeUpdateHandler audits the updated code, against the audit taken before the update.
+func (ca *ComposerAudit) postCodeUpdateHandler(evt *workflow.PostCodeUpdateEvent, earlier *workflow.Findings) (workflow.Result[composer.Audit], error) {
+	after, err := ca.composer.Audit(evt.Context(), evt.Path())
 	if err != nil {
-		return fmt.Errorf("failed to run composer audit after update: %w", err)
+		return workflow.Result[composer.Audit]{}, fmt.Errorf("failed to run composer audit after update: %w", err)
 	}
 
+	before, _ := workflow.Shared[composer.Audit](earlier, workflow.EventPreComposerUpdate)
 	ca.logger.Info("security advisories",
-		zap.Int("fixed", len(ca.GetFixedAdvisories())),
-		zap.Int("unresolved", len(ca.afterAudit.Advisories)),
-		zap.Int("abandoned", len(ca.GetAbandonedPackages())),
+		zap.Int("fixed", len(fixedAdvisories(before.Finding, after))),
+		zap.Int("unresolved", len(after.Advisories)),
+		zap.Int("abandoned", len(abandonedPackages(after))),
 	)
 
-	return nil
+	return workflow.Result[composer.Audit]{Finding: after}, nil
 }
 
-// GetAbandonedPackages returns the post-update audit's abandoned packages, minus drupal/*:
-// unsupported_modules reports those from drupal.org's release data, and twice reads as two findings.
-func (ca *ComposerAudit) GetAbandonedPackages() []composer.AbandonedPackage {
-	abandoned := make([]composer.AbandonedPackage, 0, len(ca.afterAudit.Abandoned))
-	for _, pkg := range ca.afterAudit.Abandoned {
+// abandonedPackages returns the audit's abandoned packages, minus drupal/*: unsupported_modules
+// reports those from drupal.org's release data, and twice reads as two findings.
+func abandonedPackages(audit composer.Audit) []composer.AbandonedPackage {
+	abandoned := make([]composer.AbandonedPackage, 0, len(audit.Abandoned))
+	for _, pkg := range audit.Abandoned {
 		if strings.HasPrefix(pkg.PackageName, "drupal/") {
 			continue
 		}
@@ -107,15 +104,15 @@ func (ca *ComposerAudit) GetAbandonedPackages() []composer.AbandonedPackage {
 	return abandoned
 }
 
-// GetFixedAdvisories returns the advisories present before the update but not after.
-func (ca *ComposerAudit) GetFixedAdvisories() []composer.Advisory {
-	afterKeys := make(map[string]bool, len(ca.afterAudit.Advisories))
-	for _, afterAdvisory := range ca.afterAudit.Advisories {
+// fixedAdvisories returns the advisories present before the update but not after.
+func fixedAdvisories(before, after composer.Audit) []composer.Advisory {
+	afterKeys := make(map[string]bool, len(after.Advisories))
+	for _, afterAdvisory := range after.Advisories {
 		afterKeys[advisoryKey(afterAdvisory)] = true
 	}
 
 	var fixed = make([]composer.Advisory, 0)
-	for _, beforeAdvisory := range ca.beforeAudit.Advisories {
+	for _, beforeAdvisory := range before.Advisories {
 		if !afterKeys[advisoryKey(beforeAdvisory)] {
 			fixed = append(fixed, beforeAdvisory)
 		}

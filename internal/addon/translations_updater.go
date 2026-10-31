@@ -20,8 +20,6 @@ type TranslationsDrush interface {
 type TranslationsUpdater struct {
 	logger *zap.Logger
 	drush  TranslationsDrush
-
-	results workflow.PerSite[TranslationResult]
 }
 
 func NewTranslationsUpdater(logger *zap.Logger, drush TranslationsDrush) *TranslationsUpdater {
@@ -33,45 +31,41 @@ func NewTranslationsUpdater(logger *zap.Logger, drush TranslationsDrush) *Transl
 
 func (tu *TranslationsUpdater) Hooks() workflow.Hooks {
 	return workflow.Hooks{
-		PostSiteUpdate: workflow.On(workflow.Change, tu.postSiteUpdateHandler),
+		PostSiteUpdate: workflow.Produce(workflow.Change, tu.postSiteUpdateHandler),
 	}
 }
 
-func (tu *TranslationsUpdater) postSiteUpdateHandler(evt *workflow.PostSiteUpdateEvent) error {
-
+// postSiteUpdateHandler leaves Updated to ReportData, which knows whether the commit was made.
+func (tu *TranslationsUpdater) postSiteUpdateHandler(evt *workflow.PostSiteUpdateEvent) (workflow.Result[TranslationResult], error) {
 	facts := evt.Facts()
 	if !facts.ModuleEnabled("locale_deploy") {
 		tu.logger.Info("locale_deploy not enabled, skipping translations update", zap.String("site", evt.Site()))
-		tu.record(evt.Site(), TranslationResult{Skipped: "locale_deploy not enabled"})
-		return nil
+		return translationsSkipped("locale_deploy not enabled"), nil
 	}
 
 	tu.logger.Info("updating translations")
 
 	if err := tu.drush.LocalizeTranslations(evt.Context(), evt.Path(), evt.Site()); err != nil {
-		return err
+		return workflow.Result[TranslationResult]{}, err
 	}
 
 	translationPath, err := existingDir(facts.TranslationPath)
 	if err != nil {
 		tu.logger.Info("translation path not available, skipping translations update", zap.String("site", evt.Site()), zap.Error(err))
-		tu.record(evt.Site(), TranslationResult{Skipped: "translation path not available: " + err.Error()})
-		return nil
+		return translationsSkipped("translation path not available: " + err.Error()), nil
 	}
 	translationPath = drupal.RelativeTo(evt.Path(), translationPath)
 
-	committed, err := evt.Commit("Update translations", translationPath)
-	if err != nil {
-		return fmt.Errorf("failed to commit translation path: %w", err)
-	}
-	if !committed {
-		tu.logger.Debug("nothing to commit")
-		tu.record(evt.Site(), TranslationResult{Path: translationPath})
-		return nil
-	}
+	return workflow.Result[TranslationResult]{
+		Commits: []workflow.Commit{{Message: translationsCommitMessage, Paths: []string{translationPath}}},
+		Finding: TranslationResult{Path: translationPath},
+	}, nil
+}
 
-	tu.record(evt.Site(), TranslationResult{Path: translationPath, Updated: true})
-	return nil
+const translationsCommitMessage = "Update translations"
+
+func translationsSkipped(reason string) workflow.Result[TranslationResult] {
+	return workflow.Result[TranslationResult]{Finding: TranslationResult{Skipped: reason}}
 }
 
 // existingDir refuses an empty path, which would reach git as the whole working tree.
@@ -83,9 +77,4 @@ func existingDir(path string) (string, error) {
 		return "", fmt.Errorf("%s is not an existing directory", path)
 	}
 	return path, nil
-}
-
-// record stores a site's outcome for the report.
-func (tu *TranslationsUpdater) record(site string, result TranslationResult) {
-	tu.results.Set(site, result)
 }

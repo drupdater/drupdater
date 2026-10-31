@@ -400,7 +400,7 @@ func TestRunAbortedByAnAddonInstallsNoSite(t *testing.T) {
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil).Once()
 
-	aborts := hookAddon{Hooks{PreComposerUpdate: Propose(Prepare, func(*PreComposerUpdateEvent) (UpdatePlan, error) {
+	aborts := hookAddon{Hooks{PreComposerUpdate: propose(Prepare, func(*PreComposerUpdateEvent) (UpdatePlan, error) {
 		return UpdatePlan{}, AbortError{Msg: "No security advisories found"}
 	})}}
 
@@ -432,10 +432,10 @@ func TestRunUpdatesAsTheAddonsPlanned(t *testing.T) {
 	mockComposer.EXPECT().Update(anyCtx, testCheckout, []string{"drupal/core"}, []string{"drupal/core:10.2.0"}, true, false).
 		Return(nil, nil)
 
-	narrows := hookAddon{Hooks{PreComposerUpdate: Propose(Prepare, func(*PreComposerUpdateEvent) (UpdatePlan, error) {
+	narrows := hookAddon{Hooks{PreComposerUpdate: propose(Prepare, func(*PreComposerUpdateEvent) (UpdatePlan, error) {
 		return UpdatePlan{Only: []string{"drupal/core"}, MinimalChanges: true}, nil
 	})}}
-	pins := hookAddon{Hooks{PreComposerUpdate: Propose(Change, func(*PreComposerUpdateEvent) (UpdatePlan, error) {
+	pins := hookAddon{Hooks{PreComposerUpdate: propose(Change, func(*PreComposerUpdateEvent) (UpdatePlan, error) {
 		return UpdatePlan{Keep: []Pin{{Package: "drupal/core", Version: "10.2.0"}}}, nil
 	})}}
 
@@ -905,7 +905,7 @@ func TestASecondRunLeavesTheFirstRunsBranchAlone(t *testing.T) {
 	h.expectFullRun(t)
 	// The second run fails resolving its update, before it creates a branch of its own.
 	runs := 0
-	h.withAddons(hookAddon{Hooks{PreComposerUpdate: Propose(Prepare, func(*PreComposerUpdateEvent) (UpdatePlan, error) {
+	h.withAddons(hookAddon{Hooks{PreComposerUpdate: propose(Prepare, func(*PreComposerUpdateEvent) (UpdatePlan, error) {
 		runs++
 		if runs == 2 {
 			return UpdatePlan{}, assert.AnError
@@ -1664,7 +1664,7 @@ func TestRunFireEventError(t *testing.T) {
 	repositoryService.EXPECT().IsShallowClone(testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
 
-	fails := hookAddon{Hooks{PreComposerUpdate: Propose(Change, func(*PreComposerUpdateEvent) (UpdatePlan, error) {
+	fails := hookAddon{Hooks{PreComposerUpdate: propose(Change, func(*PreComposerUpdateEvent) (UpdatePlan, error) {
 		return UpdatePlan{}, errors.New("audit unavailable")
 	})}}
 
@@ -2130,7 +2130,7 @@ const testCheckout = "/drupdater-test/checkout"
 // testRun is a run over checkout with s, built by newRun as Run builds one.
 func testRun(s services, checkout repo.Checkout, addons ...Addon) *run {
 	rec := report.NewRecorder(buildinfo.Version, report.ModeNormal, false, "", "", nil)
-	return newRun(s, checkout, addons, rec)
+	return newRun(s, checkout, NewPipeline(addons), rec)
 }
 
 // anyCtx matches any non-nil context.Context: the errgroup derives a child, so the exact value
@@ -2360,7 +2360,7 @@ func TestRunHandsAddonsTheRunsContextAndCommitter(t *testing.T) {
 		seen[name] = e.Context().Value(runKey{}) == "this run"
 	}
 	observer := hookAddon{Hooks{
-		PreComposerUpdate: Propose(Change, func(e *PreComposerUpdateEvent) (UpdatePlan, error) {
+		PreComposerUpdate: propose(Change, func(e *PreComposerUpdateEvent) (UpdatePlan, error) {
 			carriesRun("pre-composer-update", e)
 			return UpdatePlan{}, nil
 		}),
@@ -2368,10 +2368,9 @@ func TestRunHandsAddonsTheRunsContextAndCommitter(t *testing.T) {
 			carriesRun("post-composer-update", e)
 			return nil
 		}),
-		PostCodeUpdate: On(Change, func(e *PostCodeUpdateEvent) error {
+		PostCodeUpdate: Produce(Change, func(e *PostCodeUpdateEvent) (Result[struct{}], error) {
 			carriesRun("post-code-update", e)
-			_, err := e.Commit("Remove deprecations", "web/modules/custom/a.php")
-			return err
+			return Result[struct{}]{Commits: []Commit{{"Remove deprecations", []string{"web/modules/custom/a.php"}}}}, nil
 		}),
 		PreSiteUpdate: On(Change, func(e *PreSiteUpdateEvent) error {
 			carriesRun("pre-site-update", e)

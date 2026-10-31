@@ -4,6 +4,8 @@ import (
 	"cmp"
 	"fmt"
 	"slices"
+
+	"github.com/drupdater/drupdater/internal/report"
 )
 
 // Stage orders the hooks of one event: every Prepare hook runs before any Change hook, and so on.
@@ -24,12 +26,37 @@ const (
 // Hook is one addon's handler for the event E, run at Stage.
 type Hook[E any] struct {
 	Stage Stage
-	Run   func(E) error
+	run   func(E, *Findings) (Result[any], error)
+	// produces marks a hook built by Produce, whose finding the pipeline records.
+	produces bool
 }
 
-// On builds the hook running fn at stage.
+// On builds a hook that only acts on the project: it commits nothing and finds nothing.
 func On[E any](stage Stage, fn func(E) error) *Hook[E] {
-	return &Hook[E]{Stage: stage, Run: fn}
+	return &Hook[E]{Stage: stage, run: func(e E, _ *Findings) (Result[any], error) { return Result[any]{}, fn(e) }}
+}
+
+// Produce builds the hook running fn at stage. The pipeline commits the Result's Commits in order
+// and records its Finding for the addon's ReportData.
+func Produce[E, F any](stage Stage, fn func(E) (Result[F], error)) *Hook[E] {
+	return ProduceFrom(stage, func(e E, _ *Findings) (Result[F], error) { return fn(e) })
+}
+
+// ProduceFrom is Produce for a hook that reads what its own addon's earlier hooks found, such as
+// a post-update hook undoing what the pre-update one did. It never sees another addon's.
+func ProduceFrom[E, F any](stage Stage, fn func(E, *Findings) (Result[F], error)) *Hook[E] {
+	return &Hook[E]{Stage: stage, produces: true, run: func(e E, earlier *Findings) (Result[any], error) {
+		r, err := fn(e, earlier)
+		return Result[any]{Commits: r.Commits, Finding: r.Finding}, err
+	}}
+}
+
+// Observe builds an Inspect hook that only finds something and changes nothing.
+func Observe[E, F any](fn func(E) (F, error)) *Hook[E] {
+	return Produce(Inspect, func(e E) (Result[F], error) {
+		finding, err := fn(e)
+		return Result[F]{Finding: finding}, err
+	})
 }
 
 func (h *Hook[E]) stage() Stage { return h.Stage }
@@ -38,12 +65,16 @@ func (h *Hook[E]) stage() Stage { return h.Stage }
 // which the zero UpdatePlan leaves unchanged.
 type PlanHook struct {
 	Stage Stage
-	Run   func(*PreComposerUpdateEvent) (UpdatePlan, error)
+	run   func(*PreComposerUpdateEvent) (Proposal[any], error)
 }
 
-// Propose builds the pre-composer-update hook running fn at stage.
-func Propose(stage Stage, fn func(*PreComposerUpdateEvent) (UpdatePlan, error)) *PlanHook {
-	return &PlanHook{Stage: stage, Run: fn}
+// ProduceProposal builds the pre-composer-update hook running fn at stage. Like Produce, the
+// pipeline commits the Proposal's Commits and records its Finding.
+func ProduceProposal[F any](stage Stage, fn func(*PreComposerUpdateEvent) (Proposal[F], error)) *PlanHook {
+	return &PlanHook{Stage: stage, run: func(e *PreComposerUpdateEvent) (Proposal[any], error) {
+		p, err := fn(e)
+		return Proposal[any]{Plan: p.Plan, Commits: p.Commits, Finding: p.Finding}, err
+	}}
 }
 
 func (h *PlanHook) stage() Stage { return h.Stage }
@@ -60,16 +91,28 @@ type Hooks struct {
 // Pipeline runs a set of addons' hooks: Fire for most events, Settle for pre-composer-update.
 // Either stops at the first failing hook, so a later one never sees a half-done event.
 type Pipeline struct {
-	addons []Hooks
+	addons   []Addon
+	hooks    []Hooks
+	findings []*Findings
 }
 
 // NewPipeline reads each addon's hooks once.
 func NewPipeline(addons []Addon) *Pipeline {
-	hooks := make([]Hooks, len(addons))
+	p := &Pipeline{addons: addons, hooks: make([]Hooks, len(addons)), findings: make([]*Findings, len(addons))}
 	for i, a := range addons {
-		hooks[i] = a.Hooks()
+		p.hooks[i] = a.Hooks()
+		p.findings[i] = &Findings{}
 	}
-	return &Pipeline{addons: hooks}
+	return p
+}
+
+// Report adds every reporting addon's section to rec.
+func (p *Pipeline) Report(rec *report.Recorder) {
+	for i, a := range p.addons {
+		if r, ok := a.(Reporter); ok {
+			rec.AddSection(r.ReportKey(), r.ReportData(p.findings[i]))
+		}
+	}
 }
 
 type staged interface {
@@ -77,17 +120,31 @@ type staged interface {
 	stage() Stage
 }
 
-// event is one point in the run addons hook into: its name, and which field of Hooks it reads.
+// event is one point in the run addons hook into: its name, which field of Hooks it reads, and
+// the committer its hooks' Changes go to.
 type event[H staged] interface {
 	name() string
 	hook(Hooks) H
+	commit(message string, paths ...string) (bool, error)
 }
 
 // Fire runs every addon's hook for e, by stage and within a stage in addon order.
 func Fire[E event[*Hook[E]]](p *Pipeline, e E) error {
+	site := ""
+	if s, ok := any(e).(interface{ Site() string }); ok {
+		site = s.Site()
+	}
 	for _, h := range ordered(p, e.hook) {
-		if err := h.Run(e); err != nil {
+		result, err := h.hook.run(e, p.findings[h.addon])
+		if err != nil {
 			return fmt.Errorf("%s hook failed: %w", e.name(), err)
+		}
+		committed, err := commitAll(e, result.Commits)
+		if err != nil {
+			return fmt.Errorf("%s hook failed: %w", e.name(), err)
+		}
+		if h.hook.produces {
+			p.findings[h.addon].Record(e.name(), site, result.Finding, committed)
 		}
 	}
 	return nil
@@ -100,15 +157,20 @@ func Settle(p *Pipeline, e *PreComposerUpdateEvent) (UpdatePlan, error) {
 	plan := e.plan.clone()
 	settled := plan
 	for i, h := range hooks {
-		if i > 0 && h.Stage != hooks[i-1].Stage {
+		if i > 0 && h.hook.Stage != hooks[i-1].hook.Stage {
 			settled = plan
 		}
 		e.plan = settled
-		proposal, err := h.Run(e)
+		proposal, err := h.hook.run(e)
 		if err != nil {
 			return UpdatePlan{}, fmt.Errorf("%s hook failed: %w", e.name(), err)
 		}
-		if plan, err = plan.merge(proposal); err != nil {
+		committed, err := commitAll(e, proposal.Commits)
+		if err != nil {
+			return UpdatePlan{}, fmt.Errorf("%s hook failed: %w", e.name(), err)
+		}
+		p.findings[h.addon].Record(e.name(), "", proposal.Finding, committed)
+		if plan, err = plan.merge(proposal.Plan); err != nil {
 			// merge's errors carry no identity to unwrap, so %v here would read the same.
 			// mutator-disable-next-line expression/errorf-wrap
 			return UpdatePlan{}, fmt.Errorf("%s hooks disagree: %w", e.name(), err)
@@ -117,15 +179,21 @@ func Settle(p *Pipeline, e *PreComposerUpdateEvent) (UpdatePlan, error) {
 	return plan, nil
 }
 
+// addonHook is a hook with the index of the addon it belongs to.
+type addonHook[H any] struct {
+	addon int
+	hook  H
+}
+
 // ordered sorts stably, so hooks sharing a stage keep addon order.
-func ordered[H staged](p *Pipeline, pick func(Hooks) H) []H {
+func ordered[H staged](p *Pipeline, pick func(Hooks) H) []addonHook[H] {
 	var none H
-	var hooks []H
-	for _, addon := range p.addons {
+	var hooks []addonHook[H]
+	for i, addon := range p.hooks {
 		if h := pick(addon); h != none {
-			hooks = append(hooks, h)
+			hooks = append(hooks, addonHook[H]{addon: i, hook: h})
 		}
 	}
-	slices.SortStableFunc(hooks, func(a, b H) int { return cmp.Compare(a.stage(), b.stage()) })
+	slices.SortStableFunc(hooks, func(a, b addonHook[H]) int { return cmp.Compare(a.hook.stage(), b.hook.stage()) })
 	return hooks
 }

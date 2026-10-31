@@ -33,9 +33,10 @@ func TestComposerDiffRecordsAndLogsTheChanges(t *testing.T) {
 	mockComposer.EXPECT().Diff(anyCtx, "/test/path").Return(entries, nil)
 
 	cd := NewComposerDiff(zap.New(core), mockComposer)
-	require.NoError(t, cd.postComposerUpdateHandler(workflow.NewPostComposerUpdateEvent(t.Context(), "/test/path", nil)))
+	found, err := cd.postComposerUpdateHandler(workflow.NewPostComposerUpdateEvent(t.Context(), "/test/path", nil))
+	require.NoError(t, err)
 
-	assert.Equal(t, entries, cd.entries)
+	assert.Equal(t, entries, found)
 	require.Equal(t, 1, logs.Len())
 	assert.Equal(t, "dependency diff\n"+
 		"upgrade drupal/core: 10.3.8 → 10.3.9\n"+
@@ -51,7 +52,8 @@ func TestComposerDiffLogsASingleChange(t *testing.T) {
 	}, nil)
 
 	cd := NewComposerDiff(zap.New(core), mockComposer)
-	require.NoError(t, cd.postComposerUpdateHandler(workflow.NewPostComposerUpdateEvent(t.Context(), "/test/path", nil)))
+	_, err := cd.postComposerUpdateHandler(workflow.NewPostComposerUpdateEvent(t.Context(), "/test/path", nil))
+	require.NoError(t, err)
 
 	require.Equal(t, 1, logs.Len())
 	assert.Equal(t, "dependency diff\nchange drupal/core: dev-main 1 → dev-main 2\n", logs.All()[0].Message)
@@ -63,8 +65,8 @@ func TestComposerDiffLogsNothingWithoutChanges(t *testing.T) {
 	mockComposer.EXPECT().Diff(anyCtx, "/test/path").Return(nil, nil)
 
 	cd := NewComposerDiff(zap.New(core), mockComposer)
-	require.NoError(t, cd.postComposerUpdateHandler(workflow.NewPostComposerUpdateEvent(t.Context(), "/test/path", nil)))
+	_, err := cd.postComposerUpdateHandler(workflow.NewPostComposerUpdateEvent(t.Context(), "/test/path", nil))
+	require.NoError(t, err)
 
 	assert.Zero(t, logs.Len())
-	assert.Nil(t, cd.ReportData())
 }
