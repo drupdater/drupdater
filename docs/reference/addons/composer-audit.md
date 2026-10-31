@@ -176,7 +176,8 @@ project are byte-identical. `replacement` is the successor the maintainers sugge
 `""` when they suggested none.
 
 Omitted entirely when the run found no advisories at all, which on a normal update is the
-common case.
+common case — and when the run failed before auditing the updated code, since without that
+audit every advisory found beforehand would wrongly read as fixed.
 
 ## Pull request section
 

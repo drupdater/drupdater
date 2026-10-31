@@ -33,8 +33,12 @@ func (ca *ComposerAudit) ReportKey() string { return "composer_audit" }
 
 // ReportData implements workflow.Reporter. Both lists arrive sorted, so this stays stable.
 func (ca *ComposerAudit) ReportData(findings *workflow.Findings) any {
+	after, audited := workflow.Shared[composer.Audit](findings, workflow.EventPostCodeUpdate)
+	// Without the after-audit every advisory found before would read as fixed.
+	if !audited {
+		return nil
+	}
 	before, _ := workflow.Shared[composer.Audit](findings, workflow.EventPreComposerUpdate)
-	after, _ := workflow.Shared[composer.Audit](findings, workflow.EventPostCodeUpdate)
 	fixed := fixedAdvisories(before.Finding, after.Finding)
 	remaining := after.Finding.Advisories
 	abandoned := abandonedPackages(after.Finding)

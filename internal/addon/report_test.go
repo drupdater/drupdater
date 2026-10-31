@@ -85,6 +85,17 @@ func TestComposerAuditReportDataNilWhenOnlyDrupalPackagesAreAbandoned(t *testing
 	assert.Nil(t, ca.ReportData())
 }
 
+// A run that failed between the two audits never checked the updated code, so nothing it found
+// before the update may be reported as fixed.
+func TestComposerAuditReportDataNilWithoutTheAuditAfterTheUpdate(t *testing.T) {
+	findings := &workflow.Findings{}
+	findings.Record(workflow.EventPreComposerUpdate, "", composer.Audit{
+		Advisories: []composer.Advisory{{CVE: "CVE-1", PackageName: "drupal/core"}},
+	}, nil)
+
+	assert.Nil(t, (&ComposerAudit{}).ReportData(findings))
+}
+
 func TestComposerAuditReportDataNilWhenNothingToReport(t *testing.T) {
 	ca := auditFor(auditPair{})
 	assert.Nil(t, ca.ReportData(), "an addon with nothing to say must not add an empty section")
