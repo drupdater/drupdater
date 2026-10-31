@@ -40,9 +40,8 @@ type services struct {
 // run is one call to Run from its working copy on. Everything in it is fixed by newRun.
 type run struct {
 	services
-	hooks  *Pipeline
-	addons []Addon
-	rec    *report.Recorder
+	hooks *Pipeline
+	rec   *report.Recorder
 
 	repository GitRepository
 	worktree   Worktree
@@ -52,11 +51,10 @@ type run struct {
 	committer Committer
 }
 
-func newRun(s services, checkout repo.Checkout, addons []Addon, rec *report.Recorder) *run {
+func newRun(s services, checkout repo.Checkout, hooks *Pipeline, rec *report.Recorder) *run {
 	return &run{
 		services:   s,
-		hooks:      NewPipeline(addons),
-		addons:     addons,
+		hooks:      hooks,
 		rec:        rec,
 		repository: checkout.Repository,
 		worktree:   checkout.Worktree,
@@ -110,6 +108,7 @@ func (r *Runner) Run(ctx context.Context, addons []Addon) (err error) {
 		mode = report.ModeSecurity
 	}
 	rec := report.NewRecorder(buildinfo.Version, mode, r.config.DryRun, r.config.RepositoryURL, r.config.Branch, r.config.Sites)
+	hooks := NewPipeline(addons)
 
 	// Registered first, so it runs last and covers every exit path. An AbortError means there
 	// was nothing to do, not that the run failed.
@@ -120,9 +119,7 @@ func (r *Runner) Run(ctx context.Context, addons []Addon) (err error) {
 		if _, ok := errors.AsType[AbortError](err); ok {
 			rec.SetNoChanges()
 		}
-		for _, a := range addons {
-			rec.AddReporter(a)
-		}
+		hooks.Report(rec)
 		r.reportSink(rec.Finish())
 	}()
 
@@ -159,7 +156,7 @@ func (r *Runner) Run(ctx context.Context, addons []Addon) (err error) {
 		r.cleanup(context.WithoutCancel(ctx), checkout.Path)
 	}()
 
-	branch, err := newRun(r.services, checkout, addons, rec).execute(ctx)
+	branch, err := newRun(r.services, checkout, hooks, rec).execute(ctx)
 	if err != nil {
 		r.removeUpdateBranch(checkout.Repository, branch)
 	}

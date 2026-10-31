@@ -18,10 +18,9 @@ func TestNewUpdateHooks(t *testing.T) {
 
 	assert.NotNil(t, updateHooks)
 	assert.Equal(t, logger, updateHooks.logger)
-	assert.Empty(t, updateHooks.hooks.All())
 }
 
-func TestUpdateHooksRecordsTheSitesPendingHooks(t *testing.T) {
+func TestUpdateHooksFindsTheSitesPendingHooks(t *testing.T) {
 	updateHooks := NewUpdateHooks(zap.NewNop())
 	pending := map[string]drush.UpdateHook{
 		"module1_update_8001": {Module: "module1", Description: "Update description"},
@@ -29,15 +28,30 @@ func TestUpdateHooksRecordsTheSitesPendingHooks(t *testing.T) {
 
 	evt := workflow.NewPreSiteUpdateEvent(context.Background(), "/test/path", &fakeCommitter{}, "default", drush.Facts{UpdateHooks: pending})
 
-	require.NoError(t, updateHooks.preSiteUpdateHandler(evt))
-	assert.Equal(t, map[string]map[string]drush.UpdateHook{"default": pending}, updateHooks.hooks.All())
+	found, err := updateHooks.preSiteUpdateHandler(evt)
+	require.NoError(t, err)
+	assert.Equal(t, pending, found)
 }
 
-func TestUpdateHooksRecordsNothingWithoutPendingHooks(t *testing.T) {
+func TestUpdateHooksFindsNothingWithoutPendingHooks(t *testing.T) {
 	updateHooks := NewUpdateHooks(zap.NewNop())
 
 	evt := workflow.NewPreSiteUpdateEvent(context.Background(), "/test/path", &fakeCommitter{}, "default", drush.Facts{UpdateHooks: map[string]drush.UpdateHook{}})
 
-	require.NoError(t, updateHooks.preSiteUpdateHandler(evt))
-	assert.NotContains(t, updateHooks.hooks.All(), "default")
+	found, err := updateHooks.preSiteUpdateHandler(evt)
+	require.NoError(t, err)
+	assert.Empty(t, found)
+}
+
+func TestUpdateHooksReportsEverySiteItFiredFor(t *testing.T) {
+	updateHooks := NewUpdateHooks(zap.NewNop())
+	p := workflow.NewPipeline([]workflow.Addon{updateHooks})
+	pending := map[string]drush.UpdateHook{"node_update_10001": {Module: "node"}}
+
+	for _, site := range []string{"default", "second"} {
+		evt := workflow.NewPreSiteUpdateEvent(t.Context(), "/project", &fakeCommitter{}, site, drush.Facts{UpdateHooks: pending})
+		require.NoError(t, workflow.Fire(p, evt))
+	}
+
+	assert.Equal(t, map[string]map[string]drush.UpdateHook{"default": pending, "second": pending}, reportSection(p, "update_hooks"))
 }

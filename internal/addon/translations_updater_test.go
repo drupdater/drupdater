@@ -26,34 +26,30 @@ func translationsSite(t *testing.T) (string, drush.Facts) {
 }
 
 func TestUpdateTranslationsEventHandlerWithoutLocaleDeploy(t *testing.T) {
-	mockDrush := NewMockTranslationsDrush(t)
-	handler := NewTranslationsUpdater(zap.NewNop(), mockDrush)
-	committer := &fakeCommitter{}
+	handler := NewTranslationsUpdater(zap.NewNop(), NewMockTranslationsDrush(t))
 
-	event := workflow.NewPostSiteUpdateEvent(context.Background(), "/tmp", committer, "example.com", drush.Facts{Modules: []string{"locale"}})
-	require.NoError(t, handler.postSiteUpdateHandler(event))
+	event := workflow.NewPostSiteUpdateEvent(context.Background(), "/tmp", &fakeCommitter{}, "example.com", drush.Facts{Modules: []string{"locale"}})
+	result, err := handler.postSiteUpdateHandler(event)
+	require.NoError(t, err)
 
 	// Without it, "skipped because locale_deploy is off" and "changed nothing" read the same.
-	assert.Equal(t, map[string]TranslationResult{
-		"example.com": {Skipped: "locale_deploy not enabled"},
-	}, handler.results.All())
-	assert.Empty(t, committer.commits)
+	assert.Equal(t, workflow.Result[TranslationResult]{Finding: TranslationResult{Skipped: "locale_deploy not enabled"}}, result)
 }
 
 func TestUpdateTranslationsEventHandlerWithLocaleDeploy(t *testing.T) {
 	project, facts := translationsSite(t)
 	mockDrush := NewMockTranslationsDrush(t)
 	handler := NewTranslationsUpdater(zap.NewNop(), mockDrush)
-	committer := &fakeCommitter{}
 	mockDrush.EXPECT().LocalizeTranslations(anyCtx, project, "example.com").Return(nil)
 
-	event := workflow.NewPostSiteUpdateEvent(context.Background(), project, committer, "example.com", facts)
-	require.NoError(t, handler.postSiteUpdateHandler(event))
+	event := workflow.NewPostSiteUpdateEvent(context.Background(), project, &fakeCommitter{}, "example.com", facts)
+	result, err := handler.postSiteUpdateHandler(event)
+	require.NoError(t, err)
 
-	assert.Equal(t, map[string]TranslationResult{
-		"example.com": {Path: "translations", Updated: true},
-	}, handler.results.All(), "a committed translation update has to be reported as updated")
-	assert.Equal(t, []recordedCommit{{message: "Update translations", paths: []string{"translations"}}}, committer.commits)
+	assert.Equal(t, workflow.Result[TranslationResult]{
+		Commits: []workflow.Commit{{Message: "Update translations", Paths: []string{"translations"}}},
+		Finding: TranslationResult{Path: "translations"},
+	}, result)
 }
 
 // A soft skip, never a commit: an empty path would commit the entire working tree.
@@ -66,32 +62,38 @@ func TestUpdateTranslationsEventHandlerSkipsWhenTranslationPathUnavailable(t *te
 		t.Run(name, func(t *testing.T) {
 			mockDrush := NewMockTranslationsDrush(t)
 			handler := NewTranslationsUpdater(zap.NewNop(), mockDrush)
-			committer := &fakeCommitter{}
 			mockDrush.EXPECT().LocalizeTranslations(anyCtx, "/tmp", "example.com").Return(nil)
 
 			facts := drush.Facts{Modules: []string{"locale_deploy"}, TranslationPath: translationPath}
-			event := workflow.NewPostSiteUpdateEvent(context.Background(), "/tmp", committer, "example.com", facts)
-			require.NoError(t, handler.postSiteUpdateHandler(event))
+			event := workflow.NewPostSiteUpdateEvent(context.Background(), "/tmp", &fakeCommitter{}, "example.com", facts)
+			result, err := handler.postSiteUpdateHandler(event)
+			require.NoError(t, err)
 
-			result := handler.results.All()["example.com"]
-			assert.Empty(t, result.Path)
-			assert.False(t, result.Updated)
-			assert.Contains(t, result.Skipped, "translation path not available")
-			assert.Empty(t, committer.commits)
+			assert.Empty(t, result.Commits)
+			assert.Empty(t, result.Finding.Path)
+			assert.Contains(t, result.Finding.Skipped, "translation path not available")
 		})
 	}
 }
 
-func TestUpdateTranslationsEventHandlerRecordsNothingToCommit(t *testing.T) {
-	project, facts := translationsSite(t)
-	mockDrush := NewMockTranslationsDrush(t)
-	handler := NewTranslationsUpdater(zap.NewNop(), mockDrush)
-	mockDrush.EXPECT().LocalizeTranslations(anyCtx, project, "example.com").Return(nil)
+func TestTranslationsUpdaterReportsUpdatedOnlyWhenTheCommitWasMade(t *testing.T) {
+	for name, tt := range map[string]struct {
+		committer *fakeCommitter
+		want      TranslationResult
+	}{
+		"committed":         {&fakeCommitter{}, TranslationResult{Path: "translations", Updated: true}},
+		"nothing to commit": {&fakeCommitter{unchanged: true}, TranslationResult{Path: "translations"}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			project, facts := translationsSite(t)
+			mockDrush := NewMockTranslationsDrush(t)
+			mockDrush.EXPECT().LocalizeTranslations(anyCtx, project, "example.com").Return(nil)
+			p := workflow.NewPipeline([]workflow.Addon{NewTranslationsUpdater(zap.NewNop(), mockDrush)})
 
-	event := workflow.NewPostSiteUpdateEvent(context.Background(), project, &fakeCommitter{unchanged: true}, "example.com", facts)
-	require.NoError(t, handler.postSiteUpdateHandler(event))
+			require.NoError(t, workflow.Fire(p, workflow.NewPostSiteUpdateEvent(t.Context(), project, tt.committer, "example.com", facts)))
 
-	assert.Equal(t, map[string]TranslationResult{
-		"example.com": {Path: "translations"},
-	}, handler.results.All())
+			assert.Equal(t, map[string]TranslationResult{"example.com": tt.want}, reportSection(p, "translations_updater"))
+			assert.Equal(t, []recordedCommit{{message: "Update translations", paths: []string{"translations"}}}, tt.committer.commits)
+		})
+	}
 }

@@ -8,17 +8,20 @@ import (
 	"github.com/drupdater/drupdater/internal/composer"
 	"github.com/drupdater/drupdater/internal/drush"
 	"github.com/drupdater/drupdater/internal/report"
+	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // Every addon contributing to the report must satisfy report.Reporter structurally, without
-// importing the report package itself. If a signature drifts, this fails to compile.
+// importing the report package itself, or workflow.Reporter when its hooks return their findings.
+// If a signature drifts, this fails to compile.
 var (
-	_ report.Reporter = (*ComposerAudit)(nil)
-	_ report.Reporter = (*UpdateHooks)(nil)
-	_ report.Reporter = (*UnsupportedModules)(nil)
-	_ report.Reporter = (*ComposerPatches1)(nil)
+	_ report.Reporter   = (*ComposerAudit)(nil)
+	_ report.Reporter   = (*ComposerPatches1)(nil)
+	_ workflow.Reporter = (*UpdateHooks)(nil)
+	_ workflow.Reporter = (*UnsupportedModules)(nil)
+	_ workflow.Reporter = (*TranslationsUpdater)(nil)
 )
 
 func TestComposerAuditReportData(t *testing.T) {
@@ -129,20 +132,21 @@ func TestUpdateHooksReportData(t *testing.T) {
 	assert.Equal(t, "foo", data["default"]["foo_update_9001"].Module)
 }
 
-// ReportData must hand back a copy all the way down: what a site found stays the addon's.
-func TestUpdateHooksReportDataCopiesTheLiveMap(t *testing.T) {
+func TestUpdateHooksReportDataLeavesOutSitesWithoutHooks(t *testing.T) {
 	uh := updateHooksFor(map[string]map[string]drush.UpdateHook{
 		"default": {"foo_update_9001": drush.UpdateHook{Module: "foo"}},
+		"second":  nil,
 	})
 
-	data := uh.ReportData().(map[string]map[string]drush.UpdateHook)
-	data["default"]["injected"] = drush.UpdateHook{Module: "bar"}
-
-	assert.NotContains(t, uh.hooks.All()["default"], "injected")
+	assert.Equal(t, map[string]map[string]drush.UpdateHook{
+		"default": {"foo_update_9001": drush.UpdateHook{Module: "foo"}},
+	}, uh.ReportData())
 }
 
 func TestUpdateHooksReportDataNilWhenEmpty(t *testing.T) {
-	assert.Nil(t, (&UpdateHooks{}).ReportData())
+	assert.Nil(t, updateHooksFor(nil).ReportData())
+	assert.Nil(t, updateHooksFor(map[string]map[string]drush.UpdateHook{"default": nil}).ReportData(),
+		"a site that found none adds nothing")
 }
 
 func TestUnsupportedModulesReportDataIsSortedByName(t *testing.T) {
@@ -161,7 +165,7 @@ func TestUnsupportedModulesReportDataIsSortedByName(t *testing.T) {
 }
 
 func TestUnsupportedModulesReportDataNilWhenEmpty(t *testing.T) {
-	assert.Nil(t, (&UnsupportedModules{}).ReportData())
+	assert.Nil(t, unsupportedModulesFor(nil).ReportData())
 	assert.Nil(t, unsupportedModulesFor(map[string][]drush.UnsupportedModule{"default": nil}).ReportData(),
 		"a site that found none adds nothing")
 }
@@ -278,7 +282,7 @@ func TestDeprecationsRemoverReportData(t *testing.T) {
 
 func TestTranslationsUpdaterReportData(t *testing.T) {
 	t.Run("never ran reports nothing", func(t *testing.T) {
-		tu := &TranslationsUpdater{}
+		tu := translationsFor(nil)
 		assert.Equal(t, "translations_updater", tu.ReportKey())
 		assert.Nil(t, tu.ReportData())
 	})
@@ -286,49 +290,75 @@ func TestTranslationsUpdaterReportData(t *testing.T) {
 	t.Run("distinguishes updated, unchanged and skipped, per site", func(t *testing.T) {
 		// The skipped case is the one that matters: it used to be visible only in the log,
 		// so a report that omitted the site could not tell it apart from "nothing to do".
-		tu := &TranslationsUpdater{}
-		tu.record("one", TranslationResult{Path: "translations", Updated: true})
-		tu.record("two", TranslationResult{Path: "translations"})
-		tu.record("three", TranslationResult{Skipped: "locale_deploy not enabled"})
-
-		assert.Equal(t, map[string]TranslationResult{
+		results := map[string]TranslationResult{
 			"one":   {Path: "translations", Updated: true},
 			"two":   {Path: "translations"},
 			"three": {Skipped: "locale_deploy not enabled"},
-		}, tu.ReportData())
+		}
+
+		assert.Equal(t, results, translationsFor(results).ReportData())
 	})
 
-	t.Run("the returned map is a copy of guarded state", func(t *testing.T) {
-		tu := &TranslationsUpdater{}
-		tu.record("default", TranslationResult{Updated: true})
-		out := tu.ReportData().(map[string]TranslationResult)
-		out["default"] = TranslationResult{}
-		assert.True(t, tu.ReportData().(map[string]TranslationResult)["default"].Updated)
+	t.Run("only its own commit marks a site updated", func(t *testing.T) {
+		findings := &workflow.Findings{}
+		findings.Record(workflow.EventPostSiteUpdate, "default", TranslationResult{Path: "translations"}, []string{"Update configuration default"})
+
+		assert.Equal(t, map[string]TranslationResult{"default": {Path: "translations"}},
+			(&TranslationsUpdater{}).ReportData(findings))
 	})
 }
 
-// updateHooksFor, unsupportedModulesFor and translationsFor build an addon holding what its
-// per-site hook would have recorded for each site.
-func updateHooksFor(perSite map[string]map[string]drush.UpdateHook) *UpdateHooks {
-	uh := &UpdateHooks{}
+// withFindings is a reporting addon holding what the pipeline recorded from its hooks, so it reads
+// as a report.Reporter the way the golden report and these tests add every other addon.
+type withFindings struct {
+	addon interface {
+		workflow.Addon
+		workflow.Reporter
+	}
+	findings *workflow.Findings
+}
+
+func (w withFindings) Hooks() workflow.Hooks { return w.addon.Hooks() }
+
+func (w withFindings) ReportKey() string { return w.addon.ReportKey() }
+
+func (w withFindings) ReportData() any { return w.addon.ReportData(w.findings) }
+
+// updateHooksFor, unsupportedModulesFor and translationsFor build an addon with what its per-site
+// hook would have returned for each site.
+func updateHooksFor(perSite map[string]map[string]drush.UpdateHook) withFindings {
+	findings := &workflow.Findings{}
 	for site, hooks := range perSite {
-		uh.hooks.Set(site, hooks)
+		findings.Record(workflow.EventPreSiteUpdate, site, hooks, nil)
 	}
-	return uh
+	return withFindings{&UpdateHooks{}, findings}
 }
 
-func unsupportedModulesFor(perSite map[string][]drush.UnsupportedModule) *UnsupportedModules {
-	um := &UnsupportedModules{}
+func unsupportedModulesFor(perSite map[string][]drush.UnsupportedModule) withFindings {
+	findings := &workflow.Findings{}
 	for site, modules := range perSite {
-		um.modules.Set(site, modules)
+		findings.Record(workflow.EventPreSiteUpdate, site, modules, nil)
 	}
-	return um
+	return withFindings{&UnsupportedModules{}, findings}
 }
 
-func translationsFor(perSite map[string]TranslationResult) *TranslationsUpdater {
-	tu := &TranslationsUpdater{}
+// translationsFor records an Updated result as its hook's commit having been made.
+func translationsFor(perSite map[string]TranslationResult) withFindings {
+	findings := &workflow.Findings{}
 	for site, result := range perSite {
-		tu.results.Set(site, result)
+		var committed []string
+		if result.Updated {
+			committed = []string{translationsCommitMessage}
+		}
+		result.Updated = false
+		findings.Record(workflow.EventPostSiteUpdate, site, result, committed)
 	}
-	return tu
+	return withFindings{&TranslationsUpdater{}, findings}
+}
+
+// reportSection is addon key's section as the pipeline's hooks left it.
+func reportSection(p *workflow.Pipeline, key string) any {
+	rec := report.NewRecorder("dev", report.ModeNormal, false, "", "", nil)
+	p.Report(rec)
+	return rec.Snapshot().Addons[key]
 }

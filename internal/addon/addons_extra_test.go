@@ -130,7 +130,8 @@ func TestTranslationsUpdaterErrors(t *testing.T) {
 
 		tu := NewTranslationsUpdater(zap.NewNop(), drushService)
 		evt := workflow.NewPostSiteUpdateEvent(t.Context(), "/tmp", &fakeCommitter{}, "site1", drush.Facts{Modules: []string{"locale_deploy"}})
-		require.ErrorIs(t, tu.postSiteUpdateHandler(evt), assert.AnError)
+		_, err := tu.postSiteUpdateHandler(evt)
+		require.ErrorIs(t, err, assert.AnError)
 	})
 
 	t.Run("committing the translations fails", func(t *testing.T) {
@@ -138,11 +139,10 @@ func TestTranslationsUpdaterErrors(t *testing.T) {
 		drushService := NewMockTranslationsDrush(t)
 		drushService.EXPECT().LocalizeTranslations(anyCtx, project, "site1").Return(nil)
 
-		tu := NewTranslationsUpdater(zap.NewNop(), drushService)
-		err := tu.postSiteUpdateHandler(workflow.NewPostSiteUpdateEvent(t.Context(), project, &fakeCommitter{err: assert.AnError}, "site1", facts))
+		p := workflow.NewPipeline([]workflow.Addon{NewTranslationsUpdater(zap.NewNop(), drushService)})
+		err := workflow.Fire(p, workflow.NewPostSiteUpdateEvent(t.Context(), project, &fakeCommitter{err: assert.AnError}, "site1", facts))
 		require.ErrorIs(t, err, assert.AnError)
-		assert.Contains(t, err.Error(), "failed to commit translation path")
-		assert.Empty(t, tu.results.All(), "a site whose commit failed has no outcome to report")
+		assert.Nil(t, reportSection(p, "translations_updater"), "a site whose commit failed has no outcome to report")
 	})
 }
 

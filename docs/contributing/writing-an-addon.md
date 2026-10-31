@@ -49,21 +49,34 @@ func NewYourAddon(logger *zap.Logger, composer YourAddonComposer) *YourAddon {
 
 func (a *YourAddon) Hooks() workflow.Hooks {
 	return workflow.Hooks{
-		PostCodeUpdate: workflow.On(workflow.Change, a.postCodeUpdate),
+		PostCodeUpdate: workflow.Produce(workflow.Change, a.postCodeUpdate),
 	}
 }
 
-func (a *YourAddon) postCodeUpdate(evt *workflow.PostCodeUpdateEvent) error {
-	// Change files under evt.Path(), then name them; false means nothing changed.
-	_, err := evt.Commit("Describe the change", "web/modules/custom")
-	return err
+// YourFinding is what the hook found, which ReportData turns into the report section.
+type YourFinding struct {
+	Files []string `json:"files"`
+}
+
+func (a *YourAddon) postCodeUpdate(evt *workflow.PostCodeUpdateEvent) (workflow.Result[YourFinding], error) {
+	// Change files under evt.Path(), then name them; the pipeline commits them.
+	return workflow.Result[YourFinding]{
+		Commits: []workflow.Commit{{Message: "Describe the change", Paths: []string{"web/modules/custom"}}},
+		Finding: YourFinding{Files: []string{"web/modules/custom/acme/acme.module"}},
+	}, nil
 }
 ```
 
 The `workflow.Addon` interface is the whole contract. An addon renders nothing itself: what
-it found reaches the pull request through its [report section](#4-report). An addon that changes files commits
-them by naming them to the event, never through git itself — see [Committing
-changes](../explanation/addon-architecture.md#committing-changes).
+it found reaches the pull request through its [report section](#4-report). A hook built with `workflow.Produce`
+returns what it found and the commits it wants, and keeps neither: the pipeline makes the
+commits, never the addon through git — see [Committing
+changes](../explanation/addon-architecture.md#committing-changes) — and hands the findings
+back to `ReportData`. A hook that only inspects is built with `workflow.Observe`, which returns a
+finding and no commits.
+
+Some older addons still use `workflow.On`, committing through `evt.Commit` and keeping their
+findings in fields. They are being moved over; write a new addon the `Produce` way.
 
 Declare the interface for each tool your addon calls in its own file, listing only the methods
 it calls, as above. Its constructor then shows what the addon can do to the project, and its
@@ -98,13 +111,12 @@ addon to `TestAddonHookStages`.
 `pre-site-update` and `post-site-update` fire **once per site, from a goroutine per site**.
 `pre-site-update` hooks run concurrently. `post-site-update` hooks run one site at a time,
 in `--sites` order, because they may write into the shared working tree, but still from
-different goroutines. Keep what either kind of hook finds in a `workflow.PerSite[T]` field: the hook calls `Set(evt.Site(), value)` for its
-own site, and `ReportData` reads `All()`, a copy, and merges the sites — deduplicating, say,
-as `unsupported_modules` does. The lock lives inside `PerSite`, so there is none to forget.
+different goroutines. So a per-site hook returns what it finds, and the pipeline records it
+per site, under its own lock. `ReportData` reads every site's finding with
+`workflow.SiteFindings` and merges them — deduplicating, say, as `unsupported_modules` does.
 
 An addon with a per-site hook may not have a map, slice or mutex field at all:
-`TestPerSiteHooksShareStateOnlyThroughPerSite` fails if it does. Add the addon to
-`internal/addon/concurrency_test.go` as well, which fires its hook from many sites at once.
+`TestPerSiteHooksKeepNoStateOfTheirOwn` fails if it does.
 
 ## 2. Register it
 
@@ -139,13 +151,19 @@ Implement two methods in `internal/addon/report.go` — **not** in your addon's 
 ```go
 func (a *YourAddon) ReportKey() string { return "your_addon" }
 
-func (a *YourAddon) ReportData() any {
-	if len(a.results) == 0 {
+func (a *YourAddon) ReportData(findings *workflow.Findings) any {
+	recorded := workflow.Sites[YourFinding](findings, workflow.EventPostSiteUpdate)
+	if len(recorded) == 0 {
 		return nil // omitted from the report entirely
 	}
-	return a.results
+	return recorded
 }
 ```
+
+`findings` is what the addon's hooks returned over the run. `workflow.Sites` reads a per-site
+event's findings, each with `Committed`, the messages of the hook's commits that were made —
+so a section can say whether a change really landed, as `translations_updater`'s `updated`
+does. An older addon whose hooks keep their findings implements `ReportData() any` instead.
 
 They live together in one file because collectively they *are* the report's `addons`
 schema, which is a published contract. Scattered across ten files, it is very easy to
@@ -187,8 +205,9 @@ reference](../reference/addons/index.md), so a good one becomes the published ex
 ## 6. Test it
 
 Changed packages need **≥ 90% coverage**. Existing addon tests show the pattern: construct
-the addon with mocks, call its hook with an event, assert on both the side effects and
-`ReportData()`.
+the addon with mocks, call its hook with an event, and assert on the `Result` it returns. To
+test the section, fire the hook through a `workflow.NewPipeline` and read what
+`Pipeline.Report` adds to a `report.Recorder`.
 
 When your addon depends on another one's hook running first, test the two through a
 `workflow.NewPipeline` rather than calling the hooks yourself: `workflow.Fire(p, event)` (or
@@ -214,7 +233,7 @@ Template output is easy to get subtly wrong, and `--dry-run` still renders it.
 - [ ] `ReportKey`/`ReportData` in `internal/addon/report.go`, returning `nil` when empty
 - [ ] Output sorted for deterministic reports
 - [ ] Description section, if any, rendered from the report section and pinned by a golden
-- [ ] Per-site findings kept in a `workflow.PerSite`, if it hooks into a site event
+- [ ] Findings returned from the hooks, not kept on the addon
 - [ ] Template and golden file, if it appears in the request
 - [ ] Tests, package at ≥ 90% coverage
 - [ ] Documented: a page under `docs/reference/addons/`, listed in the catalogue table, and

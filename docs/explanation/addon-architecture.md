@@ -81,14 +81,18 @@ description](#rendering-the-request-description).
 
 ## Committing changes
 
-Addons never touch git. One that changes files names them to the event's
-`Commit(message, paths...)`, and the runner commits exactly those paths — files or
-directories, deletions included — under that message.
+Addons never touch git. A hook that changes files returns them as `Commits` in its
+`workflow.Result`, and the pipeline commits exactly those paths — files or directories,
+deletions included — under each message, in order, before the next hook runs. A later stage
+therefore sees an earlier stage's change already committed. (Addons not yet moved to
+`workflow.Produce` name their paths to the event's `Commit(message, paths...)` instead, with
+the same effect.)
 
 Two rules make that safe without any addon knowing about the others:
 
-- **Paths without a change are not committed.** `Commit` reports `false` and makes no
-  commit, so an addon need not check first whether its tool changed anything.
+- **Paths without a change are not committed.** No commit is made, and the hook's finding
+  records which of its commits were, so an addon need not check first whether its tool
+  changed anything.
 - **A commit never carries someone else's change.** If anything outside the named paths is
   already staged, the commit is refused with an error naming it. A half-staged change from
   one addon cannot end up under another's message, whatever order they ran in.

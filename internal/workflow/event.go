@@ -6,6 +6,15 @@ import (
 	"github.com/drupdater/drupdater/internal/drush"
 )
 
+// The events' names, which a Reporter passes to Sites to read what its hooks found.
+const (
+	EventPreComposerUpdate  = "pre-composer-update"
+	EventPostComposerUpdate = "post-composer-update"
+	EventPostCodeUpdate     = "post-code-update"
+	EventPreSiteUpdate      = "pre-site-update"
+	EventPostSiteUpdate     = "post-site-update"
+)
+
 type AbortError struct {
 	Msg string
 }
@@ -43,7 +52,7 @@ type PreComposerUpdateEvent struct {
 	plan UpdatePlan
 }
 
-func (*PreComposerUpdateEvent) name() string { return "pre-composer-update" }
+func (*PreComposerUpdateEvent) name() string { return EventPreComposerUpdate }
 
 func (*PreComposerUpdateEvent) hook(h Hooks) *PlanHook { return h.PreComposerUpdate }
 
@@ -64,7 +73,7 @@ type PostComposerUpdateEvent struct {
 	BasicAddonEvent
 }
 
-func (*PostComposerUpdateEvent) name() string { return "post-composer-update" }
+func (*PostComposerUpdateEvent) name() string { return EventPostComposerUpdate }
 
 func (*PostComposerUpdateEvent) hook(h Hooks) *Hook[*PostComposerUpdateEvent] {
 	return h.PostComposerUpdate
@@ -80,7 +89,7 @@ type PostCodeUpdateEvent struct {
 	BasicAddonEvent
 }
 
-func (*PostCodeUpdateEvent) name() string { return "post-code-update" }
+func (*PostCodeUpdateEvent) name() string { return EventPostCodeUpdate }
 
 func (*PostCodeUpdateEvent) hook(h Hooks) *Hook[*PostCodeUpdateEvent] { return h.PostCodeUpdate }
 
@@ -96,7 +105,7 @@ type PreSiteUpdateEvent struct {
 	facts drush.Facts
 }
 
-func (*PreSiteUpdateEvent) name() string { return "pre-site-update" }
+func (*PreSiteUpdateEvent) name() string { return EventPreSiteUpdate }
 
 func (*PreSiteUpdateEvent) hook(h Hooks) *Hook[*PreSiteUpdateEvent] { return h.PreSiteUpdate }
 
@@ -123,7 +132,7 @@ type PostSiteUpdateEvent struct {
 	facts drush.Facts
 }
 
-func (*PostSiteUpdateEvent) name() string { return "post-site-update" }
+func (*PostSiteUpdateEvent) name() string { return EventPostSiteUpdate }
 
 func (*PostSiteUpdateEvent) hook(h Hooks) *Hook[*PostSiteUpdateEvent] { return h.PostSiteUpdate }
 

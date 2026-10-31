@@ -172,10 +172,10 @@ contract, not when it is merely large.
 ## The race detector
 
 Drupdater runs the per-site phases concurrently — an `errgroup` bounded by `--concurrency`, one
-goroutine per site — and several addons accumulate state across those goroutines. That state
-lives in a `workflow.PerSite`, which does the locking, and
-`TestPerSiteHooksShareStateOnlyThroughPerSite` rejects an addon with a per-site hook that keeps a
-map, slice or mutex of its own. The race detector checks the rest: coverage proves a line ran,
+goroutine per site — and what the per-site hooks find is gathered across those goroutines. The
+hooks return it and the pipeline records it in a `workflow.Findings`, which does the locking;
+`TestPerSiteHooksKeepNoStateOfTheirOwn` rejects an addon with a per-site hook that keeps a map,
+slice or mutex of its own. The race detector checks the rest: coverage proves a line ran,
 mutation testing proves a test would notice a *changed* line, and both are blind to two
 goroutines touching the same memory.
 
@@ -206,13 +206,11 @@ So the concurrency tests and the detector are one tool, not two:
 | Test | Drives |
 |---|---|
 | `TestRunWithConcurrentSites` | The real workflow with four sites, asserting the baseline installs overlap and the committing tail does not |
-| `internal/addon/concurrency_test.go` | Each addon's per-site handler, fired from all sites at once |
-| `TestPerSiteUnderConcurrentSites` | `workflow.PerSite` itself, written from many sites at once |
+| `TestConcurrentSitesAllRecordTheirFinding` | `workflow.Fire` recording a per-site hook's finding from many sites at once |
 | `TestForEachSite` | The fan-out itself: the concurrency bound, and cancellation on first error |
 | `TestUpdateSites…` | The sites' turns: tails run in `--sites` order however the sites finish, with one site at a time too, and none runs after an earlier site fails |
 
-Deleting the lock from `PerSite` makes these tests fail under `-race` and **pass without it**.
-When you add an addon with a per-site hook, add it to `concurrency_test.go` too.
+Deleting the lock from `Findings` makes these tests fail under `-race` and **pass without it**.
 
 Where the shared resource is not memory, the detector cannot help and the test has to assert
 directly. The sites' turns (`Runner.updateSites`) serialise the tail of `updateSite` because

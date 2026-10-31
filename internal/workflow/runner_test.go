@@ -2130,7 +2130,7 @@ const testCheckout = "/drupdater-test/checkout"
 // testRun is a run over checkout with s, built by newRun as Run builds one.
 func testRun(s services, checkout repo.Checkout, addons ...Addon) *run {
 	rec := report.NewRecorder(buildinfo.Version, report.ModeNormal, false, "", "", nil)
-	return newRun(s, checkout, addons, rec)
+	return newRun(s, checkout, NewPipeline(addons), rec)
 }
 
 // anyCtx matches any non-nil context.Context: the errgroup derives a child, so the exact value

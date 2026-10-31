@@ -24,34 +24,36 @@ func TestNewUnsupportedModules(t *testing.T) {
 
 	assert.NotNil(t, um)
 	assert.Equal(t, logger, um.logger)
-	assert.Empty(t, um.modules.All())
 }
 
-func TestUnsupportedModulesRecordsTheSitesModules(t *testing.T) {
+func TestUnsupportedModulesFindsTheSitesModules(t *testing.T) {
 	um := NewUnsupportedModules(zap.NewNop())
 	modules := []drush.UnsupportedModule{{Name: "module_a", InstalledVersion: "1.0.0", RecommendedVersion: "None"}}
 
-	require.NoError(t, um.preSiteUpdateHandler(unsupportedEvent("default", drush.Facts{UnsupportedModules: modules})))
+	found, err := um.preSiteUpdateHandler(unsupportedEvent("default", drush.Facts{UnsupportedModules: modules}))
 
-	assert.Equal(t, map[string][]drush.UnsupportedModule{"default": modules}, um.modules.All())
+	require.NoError(t, err)
+	assert.Equal(t, modules, found)
 }
 
 func TestUnsupportedModulesReportsAModuleTwoSitesShareOnce(t *testing.T) {
 	um := NewUnsupportedModules(zap.NewNop())
+	p := workflow.NewPipeline([]workflow.Addon{um})
 	shared := drush.UnsupportedModule{Name: "module_a", InstalledVersion: "1.0.0", RecommendedVersion: "None"}
 
-	require.NoError(t, um.preSiteUpdateHandler(unsupportedEvent("site1", drush.Facts{UnsupportedModules: []drush.UnsupportedModule{shared}})))
-	require.NoError(t, um.preSiteUpdateHandler(unsupportedEvent("site2", drush.Facts{UnsupportedModules: []drush.UnsupportedModule{shared}})))
+	require.NoError(t, workflow.Fire(p, unsupportedEvent("site1", drush.Facts{UnsupportedModules: []drush.UnsupportedModule{shared}})))
+	require.NoError(t, workflow.Fire(p, unsupportedEvent("site2", drush.Facts{UnsupportedModules: []drush.UnsupportedModule{shared}})))
 
-	assert.Equal(t, []drush.UnsupportedModule{shared}, um.ReportData())
+	assert.Equal(t, []drush.UnsupportedModule{shared}, reportSection(p, "unsupported_modules"))
 }
 
-func TestUnsupportedModulesRecordsNothingWithoutModules(t *testing.T) {
+func TestUnsupportedModulesFindsNothingWithoutModules(t *testing.T) {
 	um := NewUnsupportedModules(zap.NewNop())
 
-	require.NoError(t, um.preSiteUpdateHandler(unsupportedEvent("default", drush.Facts{})))
+	found, err := um.preSiteUpdateHandler(unsupportedEvent("default", drush.Facts{}))
 
-	assert.Empty(t, um.modules.All())
+	require.NoError(t, err)
+	assert.Nil(t, found)
 }
 
 // Best-effort: an unreachable update status service must not abort the run.
@@ -63,9 +65,10 @@ func TestUnsupportedModulesOnlyWarnsWhenTheStatusServiceFailed(t *testing.T) {
 		UnsupportedModules:      []drush.UnsupportedModule{{Name: "ignored"}},
 	}
 
-	require.NoError(t, um.preSiteUpdateHandler(unsupportedEvent("default", facts)))
+	found, err := um.preSiteUpdateHandler(unsupportedEvent("default", facts))
 
-	assert.Empty(t, um.modules.All())
+	require.NoError(t, err)
+	assert.Nil(t, found)
 	require.Equal(t, 1, logs.Len())
 	assert.Equal(t, "updates.drupal.org unreachable", logs.All()[0].ContextMap()["error"])
 }

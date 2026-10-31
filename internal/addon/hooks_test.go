@@ -81,10 +81,10 @@ func TestAddonHookStages(t *testing.T) {
 	}
 }
 
-// Per-site hooks fire concurrently, so an addon with one keeps what they find in a
-// workflow.PerSite and nowhere else: a map, slice or mutex of its own is how a shared write
-// goes unguarded, and -race only notices when a test happens to overlap two sites.
-func TestPerSiteHooksShareStateOnlyThroughPerSite(t *testing.T) {
+// Per-site hooks fire concurrently, so an addon with one returns what it finds for the pipeline to
+// record: a map, slice or mutex of its own is how a shared write goes unguarded, and -race only
+// notices when a test happens to overlap two sites.
+func TestPerSiteHooksKeepNoStateOfTheirOwn(t *testing.T) {
 	for name, tt := range everyAddon {
 		hooks := tt.addon.Hooks()
 		if hooks.PreSiteUpdate == nil && hooks.PostSiteUpdate == nil {
@@ -95,9 +95,9 @@ func TestPerSiteHooksShareStateOnlyThroughPerSite(t *testing.T) {
 			for field := range addonType.Fields() {
 				switch {
 				case field.Type.Kind() == reflect.Map, field.Type.Kind() == reflect.Slice:
-					t.Errorf("%s.%s is a %s: keep per-site findings in a workflow.PerSite", addonType.Name(), field.Name, field.Type.Kind())
+					t.Errorf("%s.%s is a %s: return per-site findings from the hook instead", addonType.Name(), field.Name, field.Type.Kind())
 				case field.Type == reflect.TypeFor[sync.Mutex](), field.Type == reflect.TypeFor[sync.RWMutex]():
-					t.Errorf("%s.%s is a mutex: workflow.PerSite does the locking", addonType.Name(), field.Name)
+					t.Errorf("%s.%s is a mutex: the pipeline's Findings does the locking", addonType.Name(), field.Name)
 				}
 			}
 		})
