@@ -14,9 +14,6 @@ import (
 
 	"github.com/drupdater/drupdater/internal/config"
 	"github.com/drupdater/drupdater/internal/workflow"
-	git "github.com/go-git/go-git/v5"
-	gitConfig "github.com/go-git/go-git/v5/config"
-	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -70,12 +67,11 @@ func TestRunUpdateFailsOnACheckoutWithoutAnOrigin(t *testing.T) {
 	// Checkout mode derives the repository URL from the origin remote. A checkout without one
 	// cannot be resolved, and the run must say so instead of proceeding with an empty URL.
 	dir := t.TempDir()
-	_, err := git.PlainInit(dir, false)
-	require.NoError(t, err)
+	gitInit(t, dir)
 
 	// A checkout-mode dry run needs no token at all, so this reaches the checkout resolution.
 	t.Setenv("DRUPDATER_TOKEN", "")
-	err = runUpdateWith(t, testApp(), options{config: config.Config{WorkingDir: dir, DryRun: true, Sites: []string{"default"}}})
+	err := runUpdateWith(t, testApp(), options{config: config.Config{WorkingDir: dir, DryRun: true, Sites: []string{"default"}}})
 	require.Error(t, err)
 	assert.NotContains(t, err.Error(), "no token provided",
 		"a checkout-mode dry run must not demand credentials it will never use")
@@ -113,23 +109,9 @@ func appWithWorkflow(fake *fakeWorkflow) app {
 func checkoutWithOrigin(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
-	r, err := git.PlainInit(dir, false)
-	require.NoError(t, err)
-
 	// A commit, so HEAD resolves and the branch can be derived from the checkout.
-	wt, err := r.Worktree()
-	require.NoError(t, err)
-	_, err = wt.Commit("init", &git.CommitOptions{
-		AllowEmptyCommits: true,
-		Author:            &object.Signature{Name: "t", Email: "t@example.com"},
-	})
-	require.NoError(t, err)
-
-	_, err = r.CreateRemote(&gitConfig.RemoteConfig{
-		Name: "origin",
-		URLs: []string{"https://github.com/acme/site.git"},
-	})
-	require.NoError(t, err)
+	gitInitWithCommit(t, dir)
+	gitIn(t, dir, "remote", "add", "origin", "https://github.com/acme/site.git")
 	return dir
 }
 

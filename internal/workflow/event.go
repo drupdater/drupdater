@@ -38,7 +38,7 @@ func (e *BasicAddonEvent) Path() string {
 }
 
 func (e *BasicAddonEvent) commit(message string, paths ...string) (bool, error) {
-	return e.committer.Commit(message, paths...)
+	return e.committer.Commit(e.ctx, message, paths...)
 }
 
 // newBasicAddonEvent builds the context every addon event carries.

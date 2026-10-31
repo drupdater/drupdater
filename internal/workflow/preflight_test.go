@@ -13,9 +13,9 @@ import (
 func TestCheckGitHistoryComplete(t *testing.T) {
 	t.Run("a full clone passes", func(t *testing.T) {
 		repository := NewMockGitService(t)
-		repository.EXPECT().IsShallowClone("/tmp").Return(false, nil)
+		repository.EXPECT().IsShallowClone(anyCtx, "/tmp").Return(false, nil)
 
-		result := CheckGitHistoryComplete(repository, "/tmp")
+		result := CheckGitHistoryComplete(t.Context(), repository, "/tmp")
 		assert.True(t, result.OK)
 		assert.Empty(t, result.Detail)
 		// The name is what identifies the check in the output; a passing result with a blank
@@ -25,9 +25,9 @@ func TestCheckGitHistoryComplete(t *testing.T) {
 
 	t.Run("a shallow clone fails with an actionable message", func(t *testing.T) {
 		repository := NewMockGitService(t)
-		repository.EXPECT().IsShallowClone("/tmp").Return(true, nil)
+		repository.EXPECT().IsShallowClone(anyCtx, "/tmp").Return(true, nil)
 
-		result := CheckGitHistoryComplete(repository, "/tmp")
+		result := CheckGitHistoryComplete(t.Context(), repository, "/tmp")
 		assert.False(t, result.OK)
 		assert.NotEmpty(t, result.Name, "a failing check has to say which check failed")
 		assert.Contains(t, result.Detail, "shallow checkout detected")
@@ -36,9 +36,9 @@ func TestCheckGitHistoryComplete(t *testing.T) {
 
 	t.Run("an error determining depth fails the check", func(t *testing.T) {
 		repository := NewMockGitService(t)
-		repository.EXPECT().IsShallowClone("/tmp").Return(false, errors.New("open failed"))
+		repository.EXPECT().IsShallowClone(anyCtx, "/tmp").Return(false, errors.New("open failed"))
 
-		result := CheckGitHistoryComplete(repository, "/tmp")
+		result := CheckGitHistoryComplete(t.Context(), repository, "/tmp")
 		assert.False(t, result.OK)
 		assert.Contains(t, result.Detail, "open failed")
 	})

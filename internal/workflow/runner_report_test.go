@@ -13,8 +13,6 @@ import (
 	"github.com/drupdater/drupdater/internal/composer"
 	"github.com/drupdater/drupdater/internal/config"
 	"github.com/drupdater/drupdater/internal/report"
-	git "github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -81,9 +79,9 @@ func (h *reportHarness) expectDefaults() {
 	h.composer.EXPECT().Version(anyCtx).
 		RunAndReturn(func(context.Context) (composer.Versions, error) { return h.versions, h.versionsErr }).Maybe()
 	h.vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail").Maybe()
-	h.repoSvc.EXPECT().CloneRepository(h.config.RepositoryURL, h.config.Branch, h.config.Token, repo.Identity{Name: "user", Email: "mail"}).
+	h.repoSvc.EXPECT().CloneRepository(anyCtx, h.config.RepositoryURL, h.config.Branch, h.config.Token, repo.Identity{Name: "user", Email: "mail"}).
 		Return(repo.Checkout{Repository: h.repository, Worktree: h.worktree, Path: testCheckout, Author: testAuthor}, nil).Maybe()
-	h.repoSvc.EXPECT().IsShallowClone(testCheckout).Return(false, nil).Maybe()
+	h.repoSvc.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil).Maybe()
 	h.composer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil).Maybe()
 	h.composer.EXPECT().Install(anyCtx, testCheckout).Return(nil).Maybe()
 }
@@ -92,9 +90,10 @@ func (h *reportHarness) expectDefaults() {
 func (h *reportHarness) expectFullRun(t *testing.T) {
 	t.Helper()
 
-	h.worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil).Maybe()
-	h.worktree.EXPECT().AddGlob(mock.Anything).Return(nil).Maybe()
-	h.worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
+	h.worktree.EXPECT().Commit(anyCtx, mock.Anything, mock.Anything).Return(nil).Maybe()
+	h.worktree.EXPECT().StageGlob(anyCtx, mock.Anything).Return(nil).Maybe()
+	h.worktree.EXPECT().Unstaged(anyCtx).Return(nil, nil).Maybe()
+	h.worktree.EXPECT().Staged(anyCtx).Return(nil, nil).Maybe()
 
 	h.installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil).Maybe()
 	h.installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil).Maybe()
@@ -102,13 +101,13 @@ func (h *reportHarness) expectFullRun(t *testing.T) {
 	h.drush.EXPECT().UpdateSite(anyCtx, testCheckout, "site1").Return(nil).Maybe()
 	h.drush.EXPECT().ExportConfiguration(anyCtx, testCheckout, "site1").Return(nil).Maybe()
 	h.drush.EXPECT().Facts(anyCtx, testCheckout, "site1").Return(syncFacts(testCheckout+"/config/sync"), nil).Maybe()
-	h.worktree.EXPECT().Add("config/sync").Return(plumbing.ZeroHash, nil).Maybe()
+	h.worktree.EXPECT().Stage(anyCtx, []string{"config/sync"}).Return(nil).Maybe()
 	expectUpdateBranch(h.repository)
 	h.drush.EXPECT().ConfigResave(anyCtx, testCheckout, "site1").Return(nil).Maybe()
 	h.drush.EXPECT().LocalFacts(anyCtx, testCheckout, "site1").Return(syncFacts(testCheckout+"/config/sync"), nil).Maybe()
 
-	h.repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound).Maybe()
-	h.repoSvc.EXPECT().BranchExists(h.repository, mock.Anything, mock.Anything).Return(false, nil).Maybe()
+	h.repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil).Maybe()
+	h.repository.EXPECT().RemoteBranchExists(anyCtx, mock.Anything, mock.Anything).Return(false, nil).Maybe()
 	h.composer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil).Maybe()
 	h.composer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).
 		Return([]composer.PackageChange{{Action: "Upgrade", Package: "drupal/core", From: "9.0.0", To: "9.1.0"}}, nil).Maybe()
@@ -137,7 +136,7 @@ func (h *reportHarness) run(t *testing.T) error {
 func TestReportWrittenOnSuccessfulRun(t *testing.T) {
 	h := newReportHarness(t, false)
 	h.expectFullRun(t)
-	h.repository.EXPECT().Push(mock.Anything).Return(nil)
+	h.repository.EXPECT().Push(anyCtx, mock.Anything, mock.Anything).Return(nil)
 	h.vcsProvider.EXPECT().CreateMergeRequest(anyCtx, mock.Anything, mock.Anything, mock.Anything, "main").
 		Return(codehosting.MergeRequest{URL: "https://example.com/mr/1"}, nil)
 
@@ -164,7 +163,7 @@ func TestReportWrittenOnSuccessfulRun(t *testing.T) {
 func TestReportRecordsTheToolVersions(t *testing.T) {
 	h := newReportHarness(t, false)
 	h.expectFullRun(t)
-	h.repository.EXPECT().Push(mock.Anything).Return(nil)
+	h.repository.EXPECT().Push(anyCtx, mock.Anything, mock.Anything).Return(nil)
 	h.vcsProvider.EXPECT().CreateMergeRequest(anyCtx, mock.Anything, mock.Anything, mock.Anything, "main").
 		Return(codehosting.MergeRequest{}, nil)
 
@@ -180,7 +179,7 @@ func TestUnreadableToolVersionsDoNotFailTheRun(t *testing.T) {
 	h := newReportHarness(t, false)
 	h.versionsErr = errors.New("composer: command not found")
 	h.expectFullRun(t)
-	h.repository.EXPECT().Push(mock.Anything).Return(nil)
+	h.repository.EXPECT().Push(anyCtx, mock.Anything, mock.Anything).Return(nil)
 	h.vcsProvider.EXPECT().CreateMergeRequest(anyCtx, mock.Anything, mock.Anything, mock.Anything, "main").
 		Return(codehosting.MergeRequest{}, nil)
 
@@ -197,7 +196,7 @@ func TestUnreadableToolVersionsDoNotFailTheRun(t *testing.T) {
 func TestReportRepositoryURLHasNoCredentials(t *testing.T) {
 	h := newReportHarness(t, false)
 	h.expectFullRun(t)
-	h.repository.EXPECT().Push(mock.Anything).Return(nil)
+	h.repository.EXPECT().Push(anyCtx, mock.Anything, mock.Anything).Return(nil)
 	h.vcsProvider.EXPECT().CreateMergeRequest(anyCtx, mock.Anything, mock.Anything, mock.Anything, "main").
 		Return(codehosting.MergeRequest{}, nil)
 
@@ -230,12 +229,12 @@ func TestReportWrittenOnDryRun(t *testing.T) {
 func TestReportWrittenOnFailureNamesThePhase(t *testing.T) {
 	h := newReportHarness(t, false)
 	h.installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(errors.New("drush exploded"))
-	h.repository.EXPECT().Head().Return(nil, plumbing.ErrReferenceNotFound).Maybe()
+	h.repository.EXPECT().Head(anyCtx).Return("", assert.AnError).Maybe()
 	h.composer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).
 		Return([]composer.PackageChange{{Action: "Upgrade", Package: "drupal/core", From: "9.0.0", To: "9.1.0"}}, nil)
 	h.composer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
-	h.repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound)
-	h.repoSvc.EXPECT().BranchExists(h.repository, "update-dummy-hash", mock.Anything).Return(false, nil)
+	h.repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
+	h.repository.EXPECT().RemoteBranchExists(anyCtx, "update-dummy-hash", mock.Anything).Return(false, nil)
 
 	err := h.run(t)
 
@@ -253,12 +252,12 @@ func TestReportWrittenOnFailureNamesThePhase(t *testing.T) {
 func TestReportOfARunFailingBeforeRenderingCarriesTheAddonSections(t *testing.T) {
 	h := newReportHarness(t, false)
 	h.installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(assert.AnError)
-	h.repository.EXPECT().Head().Return(nil, plumbing.ErrReferenceNotFound).Maybe()
+	h.repository.EXPECT().Head(anyCtx).Return("", assert.AnError).Maybe()
 	h.composer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).
 		Return([]composer.PackageChange{{Action: "Upgrade", Package: "drupal/core", From: "9.0.0", To: "9.1.0"}}, nil)
 	h.composer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
-	h.repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound)
-	h.repoSvc.EXPECT().BranchExists(h.repository, "update-dummy-hash", mock.Anything).Return(false, nil)
+	h.repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
+	h.repository.EXPECT().RemoteBranchExists(anyCtx, "update-dummy-hash", mock.Anything).Return(false, nil)
 	h.withAddons(&reportingAddon{key: "composer_patches", data: "conflicts"})
 
 	require.ErrorIs(t, h.run(t), assert.AnError)
@@ -272,7 +271,7 @@ func TestReportOfARunFailingBeforeRenderingCarriesTheAddonSections(t *testing.T)
 func TestReportWrittenWhenAcquiringTheWorkingCopyFails(t *testing.T) {
 	h := newReportHarness(t, false)
 	h.repoSvc.ExpectedCalls = nil
-	h.repoSvc.EXPECT().CloneRepository(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+	h.repoSvc.EXPECT().CloneRepository(anyCtx, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(repo.Checkout{}, errors.New("authentication failed"))
 
 	err := h.run(t)
@@ -293,7 +292,7 @@ func TestReportNoChangesIsNotAFailure(t *testing.T) {
 	h.installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil).Maybe()
 	h.installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil).Maybe()
 	h.installer.EXPECT().RestoreSettings(anyCtx, testCheckout, "site1").Return(nil).Maybe()
-	h.repository.EXPECT().Head().Return(nil, plumbing.ErrReferenceNotFound).Maybe()
+	h.repository.EXPECT().Head(anyCtx).Return("", assert.AnError).Maybe()
 	h.composer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).
 		Return([]composer.PackageChange{}, nil)
 
@@ -355,7 +354,7 @@ func TestReportedMergeRequestContentIsWhatWasPublished(t *testing.T) {
 	h := newReportHarness(t, false)
 	h.expectFullRun(t)
 	h.withAddons(advisoryAddon())
-	h.repository.EXPECT().Push(mock.Anything).Return(nil)
+	h.repository.EXPECT().Push(anyCtx, mock.Anything, mock.Anything).Return(nil)
 
 	var publishedTitle, publishedDescription string
 	h.vcsProvider.EXPECT().CreateMergeRequest(anyCtx, mock.Anything, mock.Anything, mock.Anything, "main").
@@ -388,8 +387,8 @@ func TestReportNamesTheRenderPhaseWhenAssemblyFails(t *testing.T) {
 	assert.Equal(t, "render merge request", h.got.FailedPhase)
 	assert.Contains(t, h.got.Error, "failed to read the report's addon sections")
 	// A failure after the branch was created removes it, or the next run would stop on it.
-	h.repository.AssertCalled(t, "SetBranch", "update-dummy-hash", testHead.Hash())
-	h.repository.AssertCalled(t, "RemoveBranch", "update-dummy-hash")
+	h.repository.AssertCalled(t, "SetBranch", mock.Anything, "update-dummy-hash", testHead)
+	h.repository.AssertCalled(t, "RemoveBranch", mock.Anything, "update-dummy-hash")
 	assert.Empty(t, h.got.MergeRequestTitle)
 	assert.Empty(t, h.got.MergeRequestDescription)
 }
@@ -409,7 +408,7 @@ func TestReportRecordsAutoMergeOutcome(t *testing.T) {
 	t.Run("not requested leaves auto_merge absent", func(t *testing.T) {
 		h := newReportHarness(t, false)
 		h.expectFullRun(t)
-		h.repository.EXPECT().Push(mock.Anything).Return(nil)
+		h.repository.EXPECT().Push(anyCtx, mock.Anything, mock.Anything).Return(nil)
 		h.vcsProvider.EXPECT().CreateMergeRequest(anyCtx, mock.Anything, mock.Anything, mock.Anything, "main").
 			Return(codehosting.MergeRequest{URL: "https://example.com/mr/1"}, nil)
 
@@ -423,7 +422,7 @@ func TestReportRecordsAutoMergeOutcome(t *testing.T) {
 		h := newReportHarness(t, false)
 		h.config.RunTypes.Normal.AutoMerge = true
 		h.expectFullRun(t)
-		h.repository.EXPECT().Push(mock.Anything).Return(nil)
+		h.repository.EXPECT().Push(anyCtx, mock.Anything, mock.Anything).Return(nil)
 		h.vcsProvider.EXPECT().CreateMergeRequest(anyCtx, mock.Anything, mock.Anything, mock.Anything, "main").
 			Return(codehosting.MergeRequest{URL: "https://example.com/mr/1"}, nil)
 		h.vcsProvider.EXPECT().EnableAutoMerge(anyCtx, mock.Anything).Return(nil)
@@ -439,7 +438,7 @@ func TestReportRecordsAutoMergeOutcome(t *testing.T) {
 		h := newReportHarness(t, false)
 		h.config.RunTypes.Normal.AutoMerge = true
 		h.expectFullRun(t)
-		h.repository.EXPECT().Push(mock.Anything).Return(nil)
+		h.repository.EXPECT().Push(anyCtx, mock.Anything, mock.Anything).Return(nil)
 		h.vcsProvider.EXPECT().CreateMergeRequest(anyCtx, mock.Anything, mock.Anything, mock.Anything, "main").
 			Return(codehosting.MergeRequest{URL: "https://example.com/mr/1"}, nil)
 		h.vcsProvider.EXPECT().EnableAutoMerge(anyCtx, mock.Anything).

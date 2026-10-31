@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	"github.com/drupdater/drupdater/internal/config"
-	git "github.com/go-git/go-git/v5"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -34,8 +33,7 @@ func executeTree(t *testing.T, a app, args ...string) (string, error) {
 func bareCheckout(t *testing.T, dir string) string {
 	t.Helper()
 	require.NoError(t, os.MkdirAll(dir, 0o750))
-	_, err := git.PlainInit(dir, false)
-	require.NoError(t, err)
+	gitInit(t, dir)
 	return dir
 }
 

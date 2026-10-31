@@ -1,35 +1,51 @@
 package workflow
 
 import (
+	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/drupdater/drupdater/internal/repo"
-	git "github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
-// newCommitRepo returns a real repository whose first commit tracks files, and its directory.
-func newCommitRepo(t *testing.T, files map[string]string) (*git.Repository, *git.Worktree, string) {
+var testAuthor = repo.Identity{Name: "Drupdater Bot", Email: "bot@example.com"}
+
+// gitIn runs git in dir as a test fixture would, with an identity of its own.
+func gitIn(t *testing.T, dir string, args ...string) string {
 	t.Helper()
-	dir := t.TempDir()
-	repository, err := git.PlainInit(dir, false)
-	require.NoError(t, err)
-	worktree, err := repository.Worktree()
-	require.NoError(t, err)
+	cmd := exec.CommandContext(t.Context(), "git", append([]string{"-C", dir}, args...)...)
+	cmd.Env = append(os.Environ(),
+		"GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t",
+		"GIT_CONFIG_NOSYSTEM=1", "HOME="+t.TempDir(),
+	)
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+	return strings.TrimSpace(string(out))
+}
+
+// newCommitRepo returns a worktree of a real repository whose first commit tracks files, as a run
+// gets one, and the worktree's directory.
+func newCommitRepo(t *testing.T, files map[string]string) (Worktree, string) {
+	t.Helper()
+	source := t.TempDir()
+	gitIn(t, source, "init", "--quiet", "--initial-branch=main")
 	for name, content := range files {
-		writeFile(t, dir, name, content)
-		_, err := worktree.Add(name)
-		require.NoError(t, err)
+		writeFile(t, source, name, content)
 	}
-	_, err = worktree.Commit("init", &git.CommitOptions{Author: &object.Signature{Name: "t", Email: "t@t"}})
+	gitIn(t, source, "add", "--all")
+	gitIn(t, source, "commit", "--quiet", "--allow-empty", "-m", "init")
+
+	service := repo.New(zap.NewNop())
+	checkout, err := service.AddWorktree(t.Context(), source, testAuthor)
 	require.NoError(t, err)
-	return repository, worktree, dir
+	t.Cleanup(func() { _ = service.RemoveWorktree(context.Background(), source, checkout.Path) })
+	return checkout.Worktree, checkout.Path
 }
 
 func writeFile(t *testing.T, dir string, name string, content string) {
@@ -38,43 +54,16 @@ func writeFile(t *testing.T, dir string, name string, content string) {
 	require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(content), 0o600))
 }
 
-// headFiles lists what HEAD's commit changed relative to its parent, with its message.
-var testAuthor = repo.Identity{Name: "Drupdater Bot", Email: "bot@example.com"}
-
-func headFiles(t *testing.T, repository *git.Repository) (string, []string) {
+// headFiles is HEAD's message and the files it changed relative to its parent.
+func headFiles(t *testing.T, dir string) (string, []string) {
 	t.Helper()
-	ref, err := repository.Head()
-	require.NoError(t, err)
-	commit, err := repository.CommitObject(ref.Hash())
-	require.NoError(t, err)
-	parent, err := commit.Parent(0)
-	require.NoError(t, err)
-	patch, err := parent.Patch(commit)
-	require.NoError(t, err)
-	var files []string
-	for _, fp := range patch.FilePatches() {
-		from, to := fp.Files()
-		if to != nil {
-			files = append(files, to.Path())
-		} else {
-			files = append(files, from.Path())
-		}
-	}
-	return commit.Message, files
-}
-
-func withGitIdentity(t *testing.T) {
-	t.Helper()
-	// The committer leaves the author to go-git, which reads it from the global git config.
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
-	require.NoError(t, os.WriteFile(filepath.Join(home, ".gitconfig"), []byte("[user]\n\tname = t\n\temail = t@t\n"), 0o600))
+	message := gitIn(t, dir, "log", "-1", "--format=%B")
+	files := strings.Fields(gitIn(t, dir, "diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD"))
+	return message, files
 }
 
 func TestCommitterCommitsExactlyThePathsNamed(t *testing.T) {
-	withGitIdentity(t)
-	repository, worktree, dir := newCommitRepo(t, map[string]string{
+	worktree, dir := newCommitRepo(t, map[string]string{
 		"composer.json":         "{}",
 		"patches/old.patch":     "old",
 		"web/modules/custom/a":  "a",
@@ -89,99 +78,84 @@ func TestCommitterCommitsExactlyThePathsNamed(t *testing.T) {
 	writeFile(t, dir, "scratch.txt", "untracked and not named")
 
 	committer := newGitCommitter(worktree, testAuthor)
-	committed, err := committer.Commit("Update patches",
+	committed, err := committer.Commit(t.Context(), "Update patches",
 		"composer.json", "composer.lock", "patches/old.patch", "patches/new.patch", "translations")
 
 	require.NoError(t, err)
 	assert.True(t, committed)
-	message, files := headFiles(t, repository)
+	message, files := headFiles(t, dir)
 	assert.Equal(t, "Update patches", message)
 	assert.ElementsMatch(t, []string{"composer.json", "patches/old.patch", "patches/new.patch", "translations/fr.po"}, files,
 		"a deletion, a new file and a directory are staged; an unnamed sibling and a missing path are not")
-	head, err := repository.Head()
-	require.NoError(t, err)
-	commit, err := repository.CommitObject(head.Hash())
-	require.NoError(t, err)
-	author := repo.Identity{Name: commit.Author.Name, Email: commit.Author.Email}
-	committedBy := repo.Identity{Name: commit.Committer.Name, Email: commit.Committer.Email}
-	assert.Equal(t, testAuthor, author)
-	assert.Equal(t, testAuthor, committedBy, "signed explicitly, so no identity has to be in git config")
+	assert.Equal(t, "Drupdater Bot <bot@example.com> Drupdater Bot <bot@example.com>",
+		gitIn(t, dir, "log", "-1", "--format=%an <%ae> %cn <%ce>"), "signed explicitly, so no identity has to be in git config")
 
-	status, err := worktree.Status()
+	unstaged, err := worktree.Unstaged(t.Context())
 	require.NoError(t, err)
-	assert.Equal(t, git.Modified, status.File("translations-backup/x").Worktree, "an unnamed change stays in the worktree")
+	assert.Equal(t, []string{"translations-backup/x"}, unstaged, "an unnamed change stays in the worktree")
 
 	// A second commit through the same committer: the first must have released it.
 	writeFile(t, dir, "translations-backup/x", "now named")
-	committed, err = committer.Commit("Back up translations", "translations-backup")
+	committed, err = committer.Commit(t.Context(), "Back up translations", "translations-backup")
 	require.NoError(t, err)
 	assert.True(t, committed)
-	message, files = headFiles(t, repository)
+	message, files = headFiles(t, dir)
 	assert.Equal(t, "Back up translations", message)
 	assert.Equal(t, []string{"translations-backup/x"}, files)
 }
 
 func TestCommitterSkipsPathsWithoutChanges(t *testing.T) {
-	withGitIdentity(t)
-	repository, worktree, _ := newCommitRepo(t, map[string]string{"composer.json": "{}"})
-	before, err := repository.Head()
-	require.NoError(t, err)
+	worktree, dir := newCommitRepo(t, map[string]string{"composer.json": "{}"})
+	before := gitIn(t, dir, "rev-parse", "HEAD")
 
-	committed, err := newGitCommitter(worktree, testAuthor).Commit("Update patches", "composer.json", "composer.lock")
+	committed, err := newGitCommitter(worktree, testAuthor).Commit(t.Context(), "Update patches", "composer.json", "composer.lock")
 
 	require.NoError(t, err)
 	assert.False(t, committed)
-	after, err := repository.Head()
-	require.NoError(t, err)
-	assert.Equal(t, before.Hash(), after.Hash(), "no empty commit")
+	assert.Equal(t, before, gitIn(t, dir, "rev-parse", "HEAD"), "no empty commit")
 }
 
 func TestCommitterRefusesToCarryAnotherStagedChange(t *testing.T) {
-	withGitIdentity(t)
-	repository, worktree, dir := newCommitRepo(t, map[string]string{"composer.json": "{}", "web/a.php": "a"})
-	before, err := repository.Head()
-	require.NoError(t, err)
+	worktree, dir := newCommitRepo(t, map[string]string{"composer.json": "{}", "web/a.php": "a"})
+	before := gitIn(t, dir, "rev-parse", "HEAD")
 	writeFile(t, dir, "composer.json", `{"changed":true}`)
-	_, err = worktree.Add("composer.json")
-	require.NoError(t, err)
+	gitIn(t, dir, "add", "composer.json")
 	writeFile(t, dir, "web/a.php", "fixed")
 
-	committed, err := newGitCommitter(worktree, testAuthor).Commit("Update coding styles", "web/a.php")
+	committed, err := newGitCommitter(worktree, testAuthor).Commit(t.Context(), "Update coding styles", "web/a.php")
 
 	require.ErrorContains(t, err, `refusing to commit "Update coding styles": composer.json already staged`)
 	assert.False(t, committed)
-	after, err := repository.Head()
-	require.NoError(t, err)
-	assert.Equal(t, before.Hash(), after.Hash())
+	assert.Equal(t, before, gitIn(t, dir, "rev-parse", "HEAD"))
 }
 
 func TestCommitterFailures(t *testing.T) {
 	t.Run("staging", func(t *testing.T) {
 		worktree := NewMockWorktree(t)
-		worktree.EXPECT().Add("web/a.php").Return(plumbing.ZeroHash, assert.AnError)
+		worktree.EXPECT().Stage(anyCtx, []string{"web/a.php"}).Return(assert.AnError)
 
-		_, err := newGitCommitter(worktree, testAuthor).Commit("Remove deprecations", "web/a.php")
+		_, err := newGitCommitter(worktree, testAuthor).Commit(t.Context(), "Remove deprecations", "web/a.php")
 		require.ErrorIs(t, err, assert.AnError)
 		assert.Contains(t, err.Error(), "failed to stage web/a.php")
 	})
 
-	t.Run("reading the status", func(t *testing.T) {
+	t.Run("reading what is staged", func(t *testing.T) {
 		worktree := NewMockWorktree(t)
-		worktree.EXPECT().Add("web/a.php").Return(plumbing.ZeroHash, nil)
-		worktree.EXPECT().Status().Return(nil, assert.AnError)
+		worktree.EXPECT().Stage(anyCtx, []string{"web/a.php"}).Return(nil)
+		worktree.EXPECT().Staged(anyCtx).Return(nil, assert.AnError)
 
-		_, err := newGitCommitter(worktree, testAuthor).Commit("Remove deprecations", "web/a.php")
+		_, err := newGitCommitter(worktree, testAuthor).Commit(t.Context(), "Remove deprecations", "web/a.php")
 		require.ErrorIs(t, err, assert.AnError)
-		assert.Contains(t, err.Error(), "failed to read worktree status")
+		assert.Contains(t, err.Error(), "failed to read the staged changes")
 	})
 
 	t.Run("committing", func(t *testing.T) {
 		worktree := NewMockWorktree(t)
-		worktree.EXPECT().Add("web/a.php").Return(plumbing.ZeroHash, nil)
-		worktree.EXPECT().Status().Return(git.Status{"web/a.php": {Staging: git.Modified}}, nil)
-		worktree.EXPECT().Commit("Remove deprecations", mock.Anything).Return(plumbing.ZeroHash, assert.AnError)
+		worktree.EXPECT().Stage(anyCtx, []string{"web/a.php"}).Return(nil)
+		worktree.EXPECT().Staged(anyCtx).Return([]string{"web/a.php"}, nil)
+		worktree.EXPECT().Commit(anyCtx, "Remove deprecations", testAuthor).Return(assert.AnError)
 
-		committed, err := newGitCommitter(worktree, testAuthor).Commit("Remove deprecations", "web/a.php")
+		committed, err := newGitCommitter(worktree, testAuthor).Commit(t.Context(), "Remove deprecations", "web/a.php")
 		require.ErrorIs(t, err, assert.AnError)
 		assert.False(t, committed)
 		assert.Contains(t, err.Error(), `failed to commit "Remove deprecations"`)

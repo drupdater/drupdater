@@ -111,7 +111,7 @@ func (r *run) commitSiteChanges(ctx context.Context, site string, facts drush.Fa
 	if facts.ConfigSyncDirectory == "" {
 		return fmt.Errorf("failed to locate the exported configuration: site %s has no config sync directory", site)
 	}
-	if _, err := r.committer.Commit("Update configuration "+site, drupal.RelativeTo(r.path, facts.ConfigSyncDirectory)); err != nil {
+	if _, err := r.committer.Commit(ctx, "Update configuration "+site, drupal.RelativeTo(r.path, facts.ConfigSyncDirectory)); err != nil {
 		return fmt.Errorf("failed to commit the exported configuration: %w", err)
 	}
 

@@ -17,8 +17,6 @@ import (
 	"github.com/drupdater/drupdater/internal/golden"
 	"github.com/drupdater/drupdater/internal/repo"
 	"github.com/drupdater/drupdater/internal/report"
-	git "github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -48,10 +46,11 @@ func TestRun(t *testing.T) {
 	}
 
 	worktree := NewMockWorktree(t)
-	worktree.EXPECT().Add("config/sync").Return(plumbing.ZeroHash, nil).Maybe()
-	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
-	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
-	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
+	worktree.EXPECT().Stage(anyCtx, []string{"config/sync"}).Return(nil).Maybe()
+	worktree.EXPECT().Commit(anyCtx, mock.Anything, mock.Anything).Return(nil)
+	worktree.EXPECT().StageGlob(anyCtx, mock.Anything).Return(nil)
+	worktree.EXPECT().Unstaged(anyCtx).Return(nil, nil).Maybe()
+	worktree.EXPECT().Staged(anyCtx).Return(nil, nil).Maybe()
 
 	installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil)
 	installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil)
@@ -63,13 +62,13 @@ func TestRun(t *testing.T) {
 	drush.EXPECT().ConfigResave(anyCtx, testCheckout, "site1").Return(nil)
 	drush.EXPECT().LocalFacts(anyCtx, testCheckout, "site1").Return(syncFacts(testCheckout+"/config/sync"), nil)
 
-	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
-	repositoryService.EXPECT().IsShallowClone(testCheckout).Return(false, nil)
+	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
+	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
-	repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound)
-	repositoryService.EXPECT().BranchExists(repository, mock.Anything, mock.Anything).Return(false, nil)
+	repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
+	repository.EXPECT().RemoteBranchExists(anyCtx, mock.Anything, mock.Anything).Return(false, nil)
 
-	repository.EXPECT().Push(mock.Anything).Return(nil)
+	repository.EXPECT().Push(anyCtx, mock.Anything, mock.Anything).Return(nil)
 
 	// Captured rather than matched on: as an expectation a changed description fails as an
 	// unexpected call, and the diff that would say what changed is never printed. The other
@@ -130,10 +129,11 @@ func TestRunPublishUsesLiveContext(t *testing.T) {
 	}
 
 	worktree := NewMockWorktree(t)
-	worktree.EXPECT().Add("config/sync").Return(plumbing.ZeroHash, nil).Maybe()
-	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
-	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
-	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
+	worktree.EXPECT().Stage(anyCtx, []string{"config/sync"}).Return(nil).Maybe()
+	worktree.EXPECT().Commit(anyCtx, mock.Anything, mock.Anything).Return(nil)
+	worktree.EXPECT().StageGlob(anyCtx, mock.Anything).Return(nil)
+	worktree.EXPECT().Unstaged(anyCtx).Return(nil, nil).Maybe()
+	worktree.EXPECT().Staged(anyCtx).Return(nil, nil).Maybe()
 
 	installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil)
 	installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil)
@@ -145,13 +145,13 @@ func TestRunPublishUsesLiveContext(t *testing.T) {
 	drush.EXPECT().ConfigResave(anyCtx, testCheckout, "site1").Return(nil)
 	drush.EXPECT().LocalFacts(anyCtx, testCheckout, "site1").Return(syncFacts(testCheckout+"/config/sync"), nil)
 
-	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
-	repositoryService.EXPECT().IsShallowClone(testCheckout).Return(false, nil)
+	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
+	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
-	repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound)
-	repositoryService.EXPECT().BranchExists(repository, mock.Anything, mock.Anything).Return(false, nil)
+	repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
+	repository.EXPECT().RemoteBranchExists(anyCtx, mock.Anything, mock.Anything).Return(false, nil)
 
-	repository.EXPECT().Push(mock.Anything).Return(nil)
+	repository.EXPECT().Push(anyCtx, mock.Anything, mock.Anything).Return(nil)
 
 	fixture, err := os.ReadFile("testdata/dependency_update.md")
 	require.NoError(t, err, "Failed to read test fixture")
@@ -203,15 +203,16 @@ func TestRunSiteFailureDoesNotPublish(t *testing.T) {
 
 	// updateSharedCode completes fully (site updates only start once it's done).
 	worktree := NewMockWorktree(t)
-	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
-	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
-	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
+	worktree.EXPECT().Commit(anyCtx, mock.Anything, mock.Anything).Return(nil)
+	worktree.EXPECT().StageGlob(anyCtx, mock.Anything).Return(nil)
+	worktree.EXPECT().Unstaged(anyCtx).Return(nil, nil).Maybe()
+	worktree.EXPECT().Staged(anyCtx).Return(nil, nil).Maybe()
 
-	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
-	repositoryService.EXPECT().IsShallowClone(testCheckout).Return(false, nil)
+	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
+	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
-	repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound)
-	repositoryService.EXPECT().BranchExists(repository, mock.Anything, mock.Anything).Return(false, nil)
+	repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
+	repository.EXPECT().RemoteBranchExists(anyCtx, mock.Anything, mock.Anything).Return(false, nil)
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
 
@@ -238,7 +239,7 @@ func TestRunSiteFailureDoesNotPublish(t *testing.T) {
 	require.ErrorIs(t, err, updateErr)
 	// The branch only exists once every commit is made, so a failed site update leaves none.
 	repository.AssertNotCalled(t, "SetBranch", mock.Anything, mock.Anything)
-	repository.AssertNotCalled(t, "RemoveBranch", mock.Anything)
+	repository.AssertNotCalled(t, "RemoveBranch", mock.Anything, mock.Anything)
 	repository.AssertNotCalled(t, "Push", mock.Anything)
 	vcsProvider.AssertNotCalled(t, "CreateMergeRequest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
@@ -267,8 +268,8 @@ func TestRunTimeout(t *testing.T) {
 
 	worktree := NewMockWorktree(t)
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
-	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
-	repositoryService.EXPECT().IsShallowClone(testCheckout).Return(false, nil)
+	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
+	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
 
 	// Both phases block on the context, simulating a wedged subprocess; the run
@@ -314,10 +315,10 @@ func TestRunPlatformReqsFail(t *testing.T) {
 
 	worktree := NewMockWorktree(t)
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
-	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
+	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
 
 	// The platform check fails → updateSharedCode aborts.
-	repositoryService.EXPECT().IsShallowClone(testCheckout).Return(false, nil)
+	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("php 8.1.0 failed", errors.New("unmet platform requirements"))
 
 	// installCode (and a site install) may run concurrently before the cancel propagates.
@@ -359,8 +360,8 @@ func TestRunNoChanges(t *testing.T) {
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
 
-	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
-	repositoryService.EXPECT().IsShallowClone(testCheckout).Return(false, nil)
+	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
+	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
 
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil).Once()
@@ -395,8 +396,8 @@ func TestRunAbortedByAnAddonInstallsNoSite(t *testing.T) {
 
 	worktree := NewMockWorktree(t)
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
-	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
-	repositoryService.EXPECT().IsShallowClone(testCheckout).Return(false, nil)
+	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
+	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil).Once()
 
@@ -425,8 +426,8 @@ func TestRunUpdatesAsTheAddonsPlanned(t *testing.T) {
 
 	worktree := NewMockWorktree(t)
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
-	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
-	repositoryService.EXPECT().IsShallowClone(testCheckout).Return(false, nil)
+	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
+	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil).Once()
 	mockComposer.EXPECT().Update(anyCtx, testCheckout, []string{"drupal/core"}, []string{"drupal/core:10.2.0"}, true, false).
@@ -460,15 +461,16 @@ func TestRunInstallsSitesAtTheOldCode(t *testing.T) {
 	config := config.Config{RepositoryURL: "https://example.com/repo.git", Branch: "main", Token: "token", Clone: true, Sites: []string{"site1"}, DryRun: true}
 
 	worktree := NewMockWorktree(t)
-	worktree.EXPECT().Add("config/sync").Return(plumbing.ZeroHash, nil).Maybe()
-	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
-	worktree.EXPECT().Status().Return(git.Status{}, nil)
-	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.ZeroHash, nil)
+	worktree.EXPECT().Stage(anyCtx, []string{"config/sync"}).Return(nil).Maybe()
+	worktree.EXPECT().StageGlob(anyCtx, mock.Anything).Return(nil)
+	worktree.EXPECT().Unstaged(anyCtx).Return(nil, nil)
+	worktree.EXPECT().Staged(anyCtx).Return(nil, nil)
+	worktree.EXPECT().Commit(anyCtx, mock.Anything, mock.Anything).Return(nil)
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
-	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
-	repositoryService.EXPECT().IsShallowClone(testCheckout).Return(false, nil)
-	repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound)
+	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
+	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
+	repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
 	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
 
@@ -544,7 +546,7 @@ func TestUpdateSharedCodeFailures(t *testing.T) {
 	t.Run("staging composer files", func(t *testing.T) {
 		ws, mockComposer, worktree := newRunner(t, Hooks{})
 		mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
-		worktree.EXPECT().AddGlob("composer.*").Return(assert.AnError)
+		worktree.EXPECT().StageGlob(anyCtx, "composer.*").Return(assert.AnError)
 
 		err := ws.updateSharedCode(t.Context())
 		require.ErrorIs(t, err, assert.AnError)
@@ -554,9 +556,9 @@ func TestUpdateSharedCodeFailures(t *testing.T) {
 	t.Run("committing", func(t *testing.T) {
 		ws, mockComposer, worktree := newRunner(t, Hooks{})
 		mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
-		worktree.EXPECT().AddGlob("composer.*").Return(nil)
-		worktree.EXPECT().Status().Return(git.Status{}, nil)
-		worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.ZeroHash, assert.AnError)
+		worktree.EXPECT().StageGlob(anyCtx, "composer.*").Return(nil)
+		worktree.EXPECT().Unstaged(anyCtx).Return(nil, nil)
+		worktree.EXPECT().Commit(anyCtx, mock.Anything, mock.Anything).Return(assert.AnError)
 
 		err := ws.updateSharedCode(t.Context())
 		require.ErrorIs(t, err, assert.AnError)
@@ -566,9 +568,9 @@ func TestUpdateSharedCodeFailures(t *testing.T) {
 	t.Run("post-code-update", func(t *testing.T) {
 		ws, mockComposer, worktree := newRunner(t, Hooks{PostCodeUpdate: On(Change, failing[*PostCodeUpdateEvent])})
 		mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
-		worktree.EXPECT().AddGlob("composer.*").Return(nil)
-		worktree.EXPECT().Status().Return(git.Status{}, nil)
-		worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.ZeroHash, nil)
+		worktree.EXPECT().StageGlob(anyCtx, "composer.*").Return(nil)
+		worktree.EXPECT().Unstaged(anyCtx).Return(nil, nil)
+		worktree.EXPECT().Commit(anyCtx, mock.Anything, mock.Anything).Return(nil)
 
 		err := ws.updateSharedCode(t.Context())
 		require.ErrorIs(t, err, assert.AnError)
@@ -586,27 +588,27 @@ func TestCreateUpdateBranch(t *testing.T) {
 
 	t.Run("points the branch at HEAD", func(t *testing.T) {
 		ws, repository := newRun(t)
-		repository.EXPECT().Head().Return(testHead, nil)
-		repository.EXPECT().SetBranch("update-x", testHead.Hash()).Return(nil)
+		repository.EXPECT().Head(anyCtx).Return(testHead, nil)
+		repository.EXPECT().SetBranch(anyCtx, "update-x", testHead).Return(nil)
 
-		require.NoError(t, ws.createUpdateBranch("update-x"))
+		require.NoError(t, ws.createUpdateBranch(t.Context(), "update-x"))
 	})
 
 	t.Run("reading HEAD fails", func(t *testing.T) {
 		ws, repository := newRun(t)
-		repository.EXPECT().Head().Return(nil, assert.AnError)
+		repository.EXPECT().Head(anyCtx).Return("", assert.AnError)
 
-		err := ws.createUpdateBranch("update-x")
+		err := ws.createUpdateBranch(t.Context(), "update-x")
 		require.ErrorIs(t, err, assert.AnError)
 		assert.Contains(t, err.Error(), "failed to read HEAD")
 	})
 
 	t.Run("creating the branch fails", func(t *testing.T) {
 		ws, repository := newRun(t)
-		repository.EXPECT().Head().Return(testHead, nil)
-		repository.EXPECT().SetBranch("update-x", testHead.Hash()).Return(assert.AnError)
+		repository.EXPECT().Head(anyCtx).Return(testHead, nil)
+		repository.EXPECT().SetBranch(anyCtx, "update-x", testHead).Return(assert.AnError)
 
-		err := ws.createUpdateBranch("update-x")
+		err := ws.createUpdateBranch(t.Context(), "update-x")
 		require.ErrorIs(t, err, assert.AnError)
 		assert.Contains(t, err.Error(), "failed to create branch update-x")
 	})
@@ -618,12 +620,9 @@ func TestUpdateSharedCodeSignsItsCommit(t *testing.T) {
 	worktree := NewMockWorktree(t)
 	ws := testRun(services{logger: zap.NewNop(), composer: mockComposer}, repo.Checkout{Worktree: worktree, Path: testCheckout, Author: testAuthor})
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
-	worktree.EXPECT().AddGlob("composer.*").Return(nil)
-	worktree.EXPECT().Status().Return(git.Status{}, nil)
-	worktree.EXPECT().Commit("Update composer.json and composer.lock", mock.MatchedBy(func(opts *git.CommitOptions) bool {
-		return opts.Author.Name == testAuthor.Name && opts.Author.Email == testAuthor.Email &&
-			opts.Committer.Name == testAuthor.Name && opts.Committer.Email == testAuthor.Email
-	})).Return(plumbing.ZeroHash, nil)
+	worktree.EXPECT().StageGlob(anyCtx, "composer.*").Return(nil)
+	worktree.EXPECT().Unstaged(anyCtx).Return(nil, nil)
+	worktree.EXPECT().Commit(anyCtx, "Update composer.json and composer.lock", testAuthor).Return(nil)
 
 	require.NoError(t, ws.updateSharedCode(t.Context()))
 }
@@ -643,30 +642,30 @@ func TestRunCreatesTheUpdateBranchAfterTheLastCommit(t *testing.T) {
 	config := config.Config{RepositoryURL: "https://example.com/repo.git", Branch: "main", Clone: true, Sites: []string{"site1"}, DryRun: true}
 
 	worktree := NewMockWorktree(t)
-	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
-	worktree.EXPECT().Add("config/sync").Return(plumbing.ZeroHash, nil)
+	worktree.EXPECT().StageGlob(anyCtx, mock.Anything).Return(nil)
+	worktree.EXPECT().Stage(anyCtx, []string{"config/sync"}).Return(nil)
+	worktree.EXPECT().Unstaged(anyCtx).Return(nil, nil)
 	// The exported configuration changed, so its commit is not skipped as empty.
-	worktree.EXPECT().Status().Return(git.Status{"config/sync/system.site.yml": {Staging: git.Modified}}, nil)
-	worktree.EXPECT().Commit(mock.Anything, mock.Anything).RunAndReturn(func(message string, _ *git.CommitOptions) (plumbing.Hash, error) {
+	worktree.EXPECT().Staged(anyCtx).Return([]string{"config/sync/system.site.yml"}, nil)
+	worktree.EXPECT().Commit(anyCtx, mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, message string, _ repo.Identity) error {
 		record("commit: " + message)
-		return plumbing.ZeroHash, nil
+		return nil
 	})
-	repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound)
-	repository.EXPECT().Head().Return(testHead, nil)
-	repository.EXPECT().SetBranch("update-dummy-hash", testHead.Hash()).RunAndReturn(func(string, plumbing.Hash) error {
+	repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
+	repository.EXPECT().Head(anyCtx).Return(testHead, nil)
+	repository.EXPECT().SetBranch(anyCtx, "update-dummy-hash", testHead).RunAndReturn(func(context.Context, string, string) error {
 		record("branch")
 		return nil
 	})
 
-	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, "", repo.Identity{}).
+	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, "", repo.Identity{}).
 		Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
-	repositoryService.EXPECT().IsShallowClone(testCheckout).Return(false, nil)
+	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
 	mockComposer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).
 		Return([]composer.PackageChange{{Package: "drupal/core", From: "9.0.0", To: "9.1.0"}}, nil)
 	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
-	mockComposer.EXPECT().GetConfig(anyCtx, testCheckout, "extra.drupal-scaffold.locations.web-root").Return("web", nil)
 	installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil)
 	installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil)
 	installer.EXPECT().RestoreSettings(anyCtx, testCheckout, "site1").Return(nil)
@@ -709,11 +708,11 @@ func TestRunBranchAlreadyExists(t *testing.T) {
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
 
-	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
-	repositoryService.EXPECT().IsShallowClone(testCheckout).Return(false, nil)
+	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
+	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
-	repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound)
-	repositoryService.EXPECT().BranchExists(repository, mock.Anything, mock.Anything).Return(true, nil)
+	repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
+	repository.EXPECT().RemoteBranchExists(anyCtx, mock.Anything, mock.Anything).Return(true, nil)
 
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
 	mockComposer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).Return([]composer.PackageChange{
@@ -738,7 +737,7 @@ func TestRunBranchAlreadyExists(t *testing.T) {
 
 func TestRunLocalBranchAlreadyExists(t *testing.T) {
 	// Regression: a local ref left by a prior run of the same content hash must abort with the
-	// clean AbortError, not go-git's raw message from the checkout that follows — and the
+	// clean AbortError, not git's raw message from creating the branch later — and the
 	// remote check must not run at all once the local ref is found.
 	logger := zap.NewNop()
 	installer := NewMockInstaller(t)
@@ -763,11 +762,10 @@ func TestRunLocalBranchAlreadyExists(t *testing.T) {
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
 
-	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
-	repositoryService.EXPECT().IsShallowClone(testCheckout).Return(false, nil)
+	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
+	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
-	repository.EXPECT().Reference(plumbing.NewBranchReferenceName("update-dummy-hash"), false).
-		Return(plumbing.NewHashReference(plumbing.NewBranchReferenceName("update-dummy-hash"), plumbing.NewHash("stale")), nil)
+	repository.EXPECT().BranchExists(anyCtx, "update-dummy-hash").Return(true, nil)
 
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
 	mockComposer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).Return([]composer.PackageChange{
@@ -811,11 +809,11 @@ func TestRunLocalBranchLookupError(t *testing.T) {
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
 
-	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
-	repositoryService.EXPECT().IsShallowClone(testCheckout).Return(false, nil)
+	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
+	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
 	lookupErr := errors.New("corrupt ref")
-	repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, lookupErr)
+	repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, lookupErr)
 
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
 	mockComposer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).Return([]composer.PackageChange{
@@ -853,10 +851,11 @@ func TestRunWithDryRun(t *testing.T) {
 	}
 
 	worktree := NewMockWorktree(t)
-	worktree.EXPECT().Add("config/sync").Return(plumbing.ZeroHash, nil).Maybe()
-	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
-	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
-	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
+	worktree.EXPECT().Stage(anyCtx, []string{"config/sync"}).Return(nil).Maybe()
+	worktree.EXPECT().Commit(anyCtx, mock.Anything, mock.Anything).Return(nil)
+	worktree.EXPECT().StageGlob(anyCtx, mock.Anything).Return(nil)
+	worktree.EXPECT().Unstaged(anyCtx).Return(nil, nil).Maybe()
+	worktree.EXPECT().Staged(anyCtx).Return(nil, nil).Maybe()
 
 	installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil)
 	installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil)
@@ -868,10 +867,10 @@ func TestRunWithDryRun(t *testing.T) {
 	drush.EXPECT().ConfigResave(anyCtx, testCheckout, "site1").Return(nil)
 	drush.EXPECT().LocalFacts(anyCtx, testCheckout, "site1").Return(syncFacts(testCheckout+"/config/sync"), nil)
 
-	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
-	repositoryService.EXPECT().IsShallowClone(testCheckout).Return(false, nil)
+	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
+	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
-	repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound)
+	repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
 
@@ -917,8 +916,8 @@ func TestASecondRunLeavesTheFirstRunsBranchAlone(t *testing.T) {
 	require.NoError(t, runner.Run(t.Context(), h.addons))
 	require.ErrorIs(t, runner.Run(t.Context(), h.addons), assert.AnError)
 
-	h.repository.AssertCalled(t, "SetBranch", "update-dummy-hash", testHead.Hash())
-	h.repository.AssertNotCalled(t, "RemoveBranch", mock.Anything)
+	h.repository.AssertCalled(t, "SetBranch", mock.Anything, "update-dummy-hash", testHead)
+	h.repository.AssertNotCalled(t, "RemoveBranch", mock.Anything, mock.Anything)
 }
 
 func TestRunFailsWhenComposerInstallFails(t *testing.T) {
@@ -936,27 +935,27 @@ func TestRunFailsWhenComposerInstallFails(t *testing.T) {
 func TestRunRemovesTheBranchWhenPublishingFails(t *testing.T) {
 	h := newReportHarness(t, false)
 	h.expectFullRun(t)
-	h.repository.EXPECT().Push(mock.Anything).Return(assert.AnError)
+	h.repository.EXPECT().Push(anyCtx, mock.Anything, mock.Anything).Return(assert.AnError)
 
 	err := h.run(t)
 
 	require.ErrorContains(t, err, "failed to push changes")
 	assert.Equal(t, "publish", h.got.FailedPhase)
-	h.repository.AssertCalled(t, "RemoveBranch", "update-dummy-hash")
+	h.repository.AssertCalled(t, "RemoveBranch", mock.Anything, "update-dummy-hash")
 }
 
 func TestRunRemovesNoBranchWhenCreatingItFails(t *testing.T) {
 	h := newReportHarness(t, true)
 	// Ahead of expectFullRun, whose branch expectations would otherwise answer first.
-	h.repository.EXPECT().Head().Return(testHead, nil)
-	h.repository.EXPECT().SetBranch("update-dummy-hash", testHead.Hash()).Return(assert.AnError)
+	h.repository.EXPECT().Head(anyCtx).Return(testHead, nil)
+	h.repository.EXPECT().SetBranch(anyCtx, "update-dummy-hash", testHead).Return(assert.AnError)
 	h.expectFullRun(t)
 
 	err := h.run(t)
 
 	require.ErrorContains(t, err, "failed to create branch update-dummy-hash")
 	assert.Equal(t, "site update", h.got.FailedPhase)
-	h.repository.AssertNotCalled(t, "RemoveBranch", mock.Anything)
+	h.repository.AssertNotCalled(t, "RemoveBranch", mock.Anything, mock.Anything)
 }
 
 func TestRunCheckoutDryRunWithoutPlatform(t *testing.T) {
@@ -980,10 +979,11 @@ func TestRunCheckoutDryRunWithoutPlatform(t *testing.T) {
 	}
 
 	worktree := NewMockWorktree(t)
-	worktree.EXPECT().Add("config/sync").Return(plumbing.ZeroHash, nil).Maybe()
-	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
-	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
-	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
+	worktree.EXPECT().Stage(anyCtx, []string{"config/sync"}).Return(nil).Maybe()
+	worktree.EXPECT().Commit(anyCtx, mock.Anything, mock.Anything).Return(nil)
+	worktree.EXPECT().StageGlob(anyCtx, mock.Anything).Return(nil)
+	worktree.EXPECT().Unstaged(anyCtx).Return(nil, nil).Maybe()
+	worktree.EXPECT().Staged(anyCtx).Return(nil, nil).Maybe()
 
 	installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil)
 	installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil)
@@ -997,12 +997,10 @@ func TestRunCheckoutDryRunWithoutPlatform(t *testing.T) {
 
 	repositoryService.EXPECT().AddWorktree(anyCtx, config.WorkingDir, repo.Identity{}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
 	repositoryService.EXPECT().RemoveWorktree(anyCtx, config.WorkingDir, testCheckout).Return(nil)
-	repositoryService.EXPECT().IsShallowClone(testCheckout).Return(false, nil)
+	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
-	repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound)
-	// Checkout mode (Clone is unset): Run captures HEAD up front so it can restore the
-	// checkout if the run fails. This run succeeds, so it is never used to restore anything.
-	repository.EXPECT().Head().Return(plumbing.NewHashReference(plumbing.NewBranchReferenceName("main"), plumbing.NewHash("a")), nil)
+	repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
+	repository.EXPECT().Head(anyCtx).Return(testHead, nil)
 
 	mockComposer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).Return([]composer.PackageChange{
 		{
@@ -1053,10 +1051,11 @@ func TestPublishWorkDeletesBranchOnMRFailure(t *testing.T) {
 	}
 
 	worktree := NewMockWorktree(t)
-	worktree.EXPECT().Add("config/sync").Return(plumbing.ZeroHash, nil).Maybe()
-	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
-	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
-	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
+	worktree.EXPECT().Stage(anyCtx, []string{"config/sync"}).Return(nil).Maybe()
+	worktree.EXPECT().Commit(anyCtx, mock.Anything, mock.Anything).Return(nil)
+	worktree.EXPECT().StageGlob(anyCtx, mock.Anything).Return(nil)
+	worktree.EXPECT().Unstaged(anyCtx).Return(nil, nil).Maybe()
+	worktree.EXPECT().Staged(anyCtx).Return(nil, nil).Maybe()
 
 	installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil)
 	installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil)
@@ -1068,13 +1067,13 @@ func TestPublishWorkDeletesBranchOnMRFailure(t *testing.T) {
 	drush.EXPECT().ConfigResave(anyCtx, testCheckout, "site1").Return(nil)
 	drush.EXPECT().LocalFacts(anyCtx, testCheckout, "site1").Return(syncFacts(testCheckout+"/config/sync"), nil)
 
-	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
-	repositoryService.EXPECT().IsShallowClone(testCheckout).Return(false, nil)
+	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
+	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
-	repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound)
-	repositoryService.EXPECT().BranchExists(repository, mock.Anything, mock.Anything).Return(false, nil)
+	repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
+	repository.EXPECT().RemoteBranchExists(anyCtx, mock.Anything, mock.Anything).Return(false, nil)
 
-	repository.EXPECT().Push(mock.Anything).Return(nil)
+	repository.EXPECT().Push(anyCtx, mock.Anything, mock.Anything).Return(nil)
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
 
@@ -1119,10 +1118,11 @@ func TestPublishWorkLogsWarningWhenDeleteBranchFails(t *testing.T) {
 	}
 
 	worktree := NewMockWorktree(t)
-	worktree.EXPECT().Add("config/sync").Return(plumbing.ZeroHash, nil).Maybe()
-	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
-	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
-	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
+	worktree.EXPECT().Stage(anyCtx, []string{"config/sync"}).Return(nil).Maybe()
+	worktree.EXPECT().Commit(anyCtx, mock.Anything, mock.Anything).Return(nil)
+	worktree.EXPECT().StageGlob(anyCtx, mock.Anything).Return(nil)
+	worktree.EXPECT().Unstaged(anyCtx).Return(nil, nil).Maybe()
+	worktree.EXPECT().Staged(anyCtx).Return(nil, nil).Maybe()
 
 	installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil)
 	installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil)
@@ -1134,13 +1134,13 @@ func TestPublishWorkLogsWarningWhenDeleteBranchFails(t *testing.T) {
 	drush.EXPECT().ConfigResave(anyCtx, testCheckout, "site1").Return(nil)
 	drush.EXPECT().LocalFacts(anyCtx, testCheckout, "site1").Return(syncFacts(testCheckout+"/config/sync"), nil)
 
-	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
-	repositoryService.EXPECT().IsShallowClone(testCheckout).Return(false, nil)
+	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
+	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
-	repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound)
-	repositoryService.EXPECT().BranchExists(repository, mock.Anything, mock.Anything).Return(false, nil)
+	repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
+	repository.EXPECT().RemoteBranchExists(anyCtx, mock.Anything, mock.Anything).Return(false, nil)
 
-	repository.EXPECT().Push(mock.Anything).Return(nil)
+	repository.EXPECT().Push(anyCtx, mock.Anything, mock.Anything).Return(nil)
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
 
@@ -1187,10 +1187,11 @@ func TestPublishWorkPushFails(t *testing.T) {
 	}
 
 	worktree := NewMockWorktree(t)
-	worktree.EXPECT().Add("config/sync").Return(plumbing.ZeroHash, nil).Maybe()
-	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
-	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
-	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
+	worktree.EXPECT().Stage(anyCtx, []string{"config/sync"}).Return(nil).Maybe()
+	worktree.EXPECT().Commit(anyCtx, mock.Anything, mock.Anything).Return(nil)
+	worktree.EXPECT().StageGlob(anyCtx, mock.Anything).Return(nil)
+	worktree.EXPECT().Unstaged(anyCtx).Return(nil, nil).Maybe()
+	worktree.EXPECT().Staged(anyCtx).Return(nil, nil).Maybe()
 
 	installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil)
 	installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil)
@@ -1202,14 +1203,14 @@ func TestPublishWorkPushFails(t *testing.T) {
 	drush.EXPECT().ConfigResave(anyCtx, testCheckout, "site1").Return(nil)
 	drush.EXPECT().LocalFacts(anyCtx, testCheckout, "site1").Return(syncFacts(testCheckout+"/config/sync"), nil)
 
-	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
-	repositoryService.EXPECT().IsShallowClone(testCheckout).Return(false, nil)
+	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
+	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
-	repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound)
-	repositoryService.EXPECT().BranchExists(repository, mock.Anything, mock.Anything).Return(false, nil)
+	repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
+	repository.EXPECT().RemoteBranchExists(anyCtx, mock.Anything, mock.Anything).Return(false, nil)
 
 	pushErr := errors.New("authentication failed")
-	repository.EXPECT().Push(mock.Anything).Return(pushErr)
+	repository.EXPECT().Push(anyCtx, mock.Anything, mock.Anything).Return(pushErr)
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
 
@@ -1250,8 +1251,8 @@ func TestRunGetLockHashError(t *testing.T) {
 	worktree := NewMockWorktree(t)
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
-	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
-	repositoryService.EXPECT().IsShallowClone(testCheckout).Return(false, nil)
+	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
+	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
 	mockComposer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).Return([]composer.PackageChange{
@@ -1293,8 +1294,8 @@ func TestRunBranchExistsError(t *testing.T) {
 	worktree := NewMockWorktree(t)
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
-	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
-	repositoryService.EXPECT().IsShallowClone(testCheckout).Return(false, nil)
+	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
+	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
 	mockComposer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).Return([]composer.PackageChange{
@@ -1303,8 +1304,8 @@ func TestRunBranchExistsError(t *testing.T) {
 	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
 
 	branchErr := errors.New("git remote unreachable")
-	repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound)
-	repositoryService.EXPECT().BranchExists(repository, mock.Anything, mock.Anything).Return(false, branchErr)
+	repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
+	repository.EXPECT().RemoteBranchExists(anyCtx, mock.Anything, mock.Anything).Return(false, branchErr)
 
 	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
 	err := workflowService.Run(ctx, nil)
@@ -1337,9 +1338,10 @@ func TestRunConfigResaveError(t *testing.T) {
 	}
 
 	worktree := NewMockWorktree(t)
-	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
-	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
-	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
+	worktree.EXPECT().Commit(anyCtx, mock.Anything, mock.Anything).Return(nil)
+	worktree.EXPECT().StageGlob(anyCtx, mock.Anything).Return(nil)
+	worktree.EXPECT().Unstaged(anyCtx).Return(nil, nil).Maybe()
+	worktree.EXPECT().Staged(anyCtx).Return(nil, nil).Maybe()
 
 	installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil)
 	installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil)
@@ -1351,11 +1353,11 @@ func TestRunConfigResaveError(t *testing.T) {
 	drush.EXPECT().ConfigResave(anyCtx, testCheckout, "site1").Return(resaveErr)
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
-	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
-	repositoryService.EXPECT().IsShallowClone(testCheckout).Return(false, nil)
+	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
+	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
-	repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound)
-	repositoryService.EXPECT().BranchExists(repository, mock.Anything, mock.Anything).Return(false, nil)
+	repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
+	repository.EXPECT().RemoteBranchExists(anyCtx, mock.Anything, mock.Anything).Return(false, nil)
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
 	mockComposer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).Return([]composer.PackageChange{
 		{Package: "drupal/core", From: "9.0.0", To: "9.1.0"},
@@ -1392,10 +1394,11 @@ func TestRunExportConfigurationError(t *testing.T) {
 	}
 
 	worktree := NewMockWorktree(t)
-	worktree.EXPECT().Add("config/sync").Return(plumbing.ZeroHash, nil).Maybe()
-	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
-	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
-	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
+	worktree.EXPECT().Stage(anyCtx, []string{"config/sync"}).Return(nil).Maybe()
+	worktree.EXPECT().Commit(anyCtx, mock.Anything, mock.Anything).Return(nil)
+	worktree.EXPECT().StageGlob(anyCtx, mock.Anything).Return(nil)
+	worktree.EXPECT().Unstaged(anyCtx).Return(nil, nil).Maybe()
+	worktree.EXPECT().Staged(anyCtx).Return(nil, nil).Maybe()
 
 	installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil)
 	installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil)
@@ -1409,11 +1412,11 @@ func TestRunExportConfigurationError(t *testing.T) {
 	drush.EXPECT().ExportConfiguration(anyCtx, testCheckout, "site1").Return(exportErr)
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
-	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
-	repositoryService.EXPECT().IsShallowClone(testCheckout).Return(false, nil)
+	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
+	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
-	repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound)
-	repositoryService.EXPECT().BranchExists(repository, mock.Anything, mock.Anything).Return(false, nil)
+	repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
+	repository.EXPECT().RemoteBranchExists(anyCtx, mock.Anything, mock.Anything).Return(false, nil)
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
 	mockComposer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).Return([]composer.PackageChange{
 		{Package: "drupal/core", From: "9.0.0", To: "9.1.0"},
@@ -1451,10 +1454,11 @@ func TestRunWithAutoMerge(t *testing.T) {
 	}
 
 	worktree := NewMockWorktree(t)
-	worktree.EXPECT().Add("config/sync").Return(plumbing.ZeroHash, nil).Maybe()
-	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
-	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
-	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
+	worktree.EXPECT().Stage(anyCtx, []string{"config/sync"}).Return(nil).Maybe()
+	worktree.EXPECT().Commit(anyCtx, mock.Anything, mock.Anything).Return(nil)
+	worktree.EXPECT().StageGlob(anyCtx, mock.Anything).Return(nil)
+	worktree.EXPECT().Unstaged(anyCtx).Return(nil, nil).Maybe()
+	worktree.EXPECT().Staged(anyCtx).Return(nil, nil).Maybe()
 
 	installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil)
 	installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil)
@@ -1466,12 +1470,12 @@ func TestRunWithAutoMerge(t *testing.T) {
 	drush.EXPECT().ConfigResave(anyCtx, testCheckout, "site1").Return(nil)
 	drush.EXPECT().LocalFacts(anyCtx, testCheckout, "site1").Return(syncFacts(testCheckout+"/config/sync"), nil)
 
-	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
-	repositoryService.EXPECT().IsShallowClone(testCheckout).Return(false, nil)
+	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
+	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
-	repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound)
-	repositoryService.EXPECT().BranchExists(repository, mock.Anything, mock.Anything).Return(false, nil)
-	repository.EXPECT().Push(mock.Anything).Return(nil)
+	repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
+	repository.EXPECT().RemoteBranchExists(anyCtx, mock.Anything, mock.Anything).Return(false, nil)
+	repository.EXPECT().Push(anyCtx, mock.Anything, mock.Anything).Return(nil)
 
 	fixture, err := os.ReadFile("testdata/dependency_update.md")
 	require.NoError(t, err)
@@ -1520,10 +1524,11 @@ func TestRunAutoMergeError(t *testing.T) {
 	}
 
 	worktree := NewMockWorktree(t)
-	worktree.EXPECT().Add("config/sync").Return(plumbing.ZeroHash, nil).Maybe()
-	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
-	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
-	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
+	worktree.EXPECT().Stage(anyCtx, []string{"config/sync"}).Return(nil).Maybe()
+	worktree.EXPECT().Commit(anyCtx, mock.Anything, mock.Anything).Return(nil)
+	worktree.EXPECT().StageGlob(anyCtx, mock.Anything).Return(nil)
+	worktree.EXPECT().Unstaged(anyCtx).Return(nil, nil).Maybe()
+	worktree.EXPECT().Staged(anyCtx).Return(nil, nil).Maybe()
 
 	installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil)
 	installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil)
@@ -1535,12 +1540,12 @@ func TestRunAutoMergeError(t *testing.T) {
 	drush.EXPECT().ConfigResave(anyCtx, testCheckout, "site1").Return(nil)
 	drush.EXPECT().LocalFacts(anyCtx, testCheckout, "site1").Return(syncFacts(testCheckout+"/config/sync"), nil)
 
-	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
-	repositoryService.EXPECT().IsShallowClone(testCheckout).Return(false, nil)
+	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
+	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
-	repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound)
-	repositoryService.EXPECT().BranchExists(repository, mock.Anything, mock.Anything).Return(false, nil)
-	repository.EXPECT().Push(mock.Anything).Return(nil)
+	repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
+	repository.EXPECT().RemoteBranchExists(anyCtx, mock.Anything, mock.Anything).Return(false, nil)
+	repository.EXPECT().Push(anyCtx, mock.Anything, mock.Anything).Return(nil)
 
 	createdMR := codehosting.MergeRequest{ID: 42, URL: "http://example.com/mr/42"}
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
@@ -1588,10 +1593,11 @@ func TestRunAutoMergeSkippedWhenDisabled(t *testing.T) {
 	}
 
 	worktree := NewMockWorktree(t)
-	worktree.EXPECT().Add("config/sync").Return(plumbing.ZeroHash, nil).Maybe()
-	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
-	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
-	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
+	worktree.EXPECT().Stage(anyCtx, []string{"config/sync"}).Return(nil).Maybe()
+	worktree.EXPECT().Commit(anyCtx, mock.Anything, mock.Anything).Return(nil)
+	worktree.EXPECT().StageGlob(anyCtx, mock.Anything).Return(nil)
+	worktree.EXPECT().Unstaged(anyCtx).Return(nil, nil).Maybe()
+	worktree.EXPECT().Staged(anyCtx).Return(nil, nil).Maybe()
 
 	installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil)
 	installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil)
@@ -1603,12 +1609,12 @@ func TestRunAutoMergeSkippedWhenDisabled(t *testing.T) {
 	drush.EXPECT().ConfigResave(anyCtx, testCheckout, "site1").Return(nil)
 	drush.EXPECT().LocalFacts(anyCtx, testCheckout, "site1").Return(syncFacts(testCheckout+"/config/sync"), nil)
 
-	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
-	repositoryService.EXPECT().IsShallowClone(testCheckout).Return(false, nil)
+	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
+	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
-	repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound)
-	repositoryService.EXPECT().BranchExists(repository, mock.Anything, mock.Anything).Return(false, nil)
-	repository.EXPECT().Push(mock.Anything).Return(nil)
+	repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
+	repository.EXPECT().RemoteBranchExists(anyCtx, mock.Anything, mock.Anything).Return(false, nil)
+	repository.EXPECT().Push(anyCtx, mock.Anything, mock.Anything).Return(nil)
 
 	fixture, err := os.ReadFile("testdata/dependency_update.md")
 	require.NoError(t, err)
@@ -1651,17 +1657,17 @@ func TestRunFireEventError(t *testing.T) {
 	}
 
 	worktree := NewMockWorktree(t)
-	worktree.EXPECT().Add("config/sync").Return(plumbing.ZeroHash, nil).Maybe()
+	worktree.EXPECT().Stage(anyCtx, []string{"config/sync"}).Return(nil).Maybe()
 	// updateSharedCode checks out a dedicated work branch before firing the first event.
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
 
 	// The run acquires the working copy by cloning once (--clone mode).
-	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).
+	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).
 		Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
 
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
-	repositoryService.EXPECT().IsShallowClone(testCheckout).Return(false, nil)
+	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
 
 	fails := hookAddon{Hooks{PreComposerUpdate: propose(Change, func(*PreComposerUpdateEvent) (UpdatePlan, error) {
@@ -1701,10 +1707,11 @@ func checkoutModeRun(t *testing.T, source, worktreePath string) (*Runner, *MockG
 	config := config.Config{Branch: "main", Token: "token", WorkingDir: source, Sites: []string{"site1"}}
 
 	worktree := NewMockWorktree(t)
-	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
-	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
-	worktree.EXPECT().Add("config/sync").Return(plumbing.ZeroHash, nil)
-	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
+	worktree.EXPECT().Commit(anyCtx, mock.Anything, mock.Anything).Return(nil)
+	worktree.EXPECT().StageGlob(anyCtx, mock.Anything).Return(nil)
+	worktree.EXPECT().Stage(anyCtx, []string{"config/sync"}).Return(nil)
+	worktree.EXPECT().Unstaged(anyCtx).Return(nil, nil).Maybe()
+	worktree.EXPECT().Staged(anyCtx).Return(nil, nil).Maybe()
 
 	installer.EXPECT().Install(anyCtx, worktreePath, "site1").Return(nil)
 	installer.EXPECT().ConfigureDatabase(anyCtx, worktreePath, "site1").Return(nil)
@@ -1718,11 +1725,11 @@ func checkoutModeRun(t *testing.T, source, worktreePath string) (*Runner, *MockG
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
 	repositoryService.EXPECT().AddWorktree(anyCtx, source, repo.Identity{Name: "user", Email: "mail"}).
 		Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: worktreePath, Author: testAuthor}, nil)
-	repositoryService.EXPECT().IsShallowClone(worktreePath).Return(false, nil)
+	repositoryService.EXPECT().IsShallowClone(anyCtx, worktreePath).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, worktreePath).Return("", nil)
-	repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound)
-	repositoryService.EXPECT().BranchExists(repository, mock.Anything, mock.Anything).Return(false, nil)
-	repository.EXPECT().Push(mock.Anything).Return(nil)
+	repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
+	repository.EXPECT().RemoteBranchExists(anyCtx, mock.Anything, mock.Anything).Return(false, nil)
+	repository.EXPECT().Push(anyCtx, mock.Anything, mock.Anything).Return(nil)
 	vcsProvider.EXPECT().CreateMergeRequest(anyCtx, mock.Anything, mock.Anything, "update-dummy-hash", config.Branch).Return(codehosting.MergeRequest{}, nil)
 
 	mockComposer.EXPECT().Update(anyCtx, worktreePath, mock.Anything, mock.Anything, false, false).Return([]composer.PackageChange{
@@ -1743,9 +1750,9 @@ func TestRunWorksInAWorktreeOfTheCheckout(t *testing.T) {
 
 	require.NoError(t, runner.Run(context.Background(), nil))
 
-	repository.AssertCalled(t, "SetBranch", "update-dummy-hash", testHead.Hash())
-	repository.AssertNotCalled(t, "RemoveBranch", mock.Anything)
-	repositoryService.AssertNotCalled(t, "CloneRepository", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	repository.AssertCalled(t, "SetBranch", mock.Anything, "update-dummy-hash", testHead)
+	repository.AssertNotCalled(t, "RemoveBranch", mock.Anything, mock.Anything)
+	repositoryService.AssertNotCalled(t, "CloneRepository", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
 
 // A worktree that will not go away is a leftover temporary directory, not a failed update.
@@ -1774,7 +1781,7 @@ func TestRunRemovesItsWorktreeEvenWhenCancelled(t *testing.T) {
 
 	repositoryService.EXPECT().AddWorktree(anyCtx, source, repo.Identity{}).
 		Return(repo.Checkout{Repository: NewMockGitRepository(t), Worktree: NewMockWorktree(t), Path: testCheckout, Author: testAuthor}, nil)
-	repositoryService.EXPECT().IsShallowClone(testCheckout).RunAndReturn(func(string) (bool, error) {
+	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).RunAndReturn(func(context.Context, string) (bool, error) {
 		cancel()
 		return false, context.Canceled
 	})
@@ -1788,15 +1795,15 @@ func TestRunRemovesItsWorktreeEvenWhenCancelled(t *testing.T) {
 
 func TestRemoveUpdateBranch(t *testing.T) {
 	t.Run("nothing to remove before a branch was created", func(t *testing.T) {
-		services{logger: zap.NewNop()}.removeUpdateBranch(NewMockGitRepository(t), "")
+		services{logger: zap.NewNop()}.removeUpdateBranch(t.Context(), NewMockGitRepository(t), "")
 	})
 
 	t.Run("a failure to remove only warns", func(t *testing.T) {
 		core, logs := observer.New(zap.WarnLevel)
 		repository := NewMockGitRepository(t)
-		repository.EXPECT().RemoveBranch("update-x").Return(assert.AnError)
+		repository.EXPECT().RemoveBranch(anyCtx, "update-x").Return(assert.AnError)
 
-		services{logger: zap.New(core)}.removeUpdateBranch(repository, "update-x")
+		services{logger: zap.New(core)}.removeUpdateBranch(t.Context(), repository, "update-x")
 
 		warnings := logs.FilterMessage("failed to remove the failed run's update branch").All()
 		require.Len(t, warnings, 1)
@@ -1921,7 +1928,7 @@ func TestPostSiteUpdateSeesTheFactsReadAfterTheUpdateHooks(t *testing.T) {
 	after := drush.Facts{ConfigSyncDirectory: "/project/config/after", Modules: []string{"locale_deploy"}}
 	drushMock.EXPECT().LocalFacts(anyCtx, "/project", "site1").Return(after, nil)
 	drushMock.EXPECT().ExportConfiguration(anyCtx, "/project", "site1").Return(nil)
-	committer.EXPECT().Commit("Update configuration site1", []string{"config/after"}).Return(true, nil)
+	committer.EXPECT().Commit(anyCtx, "Update configuration site1", []string{"config/after"}).Return(true, nil)
 	installer.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(nil)
 
 	require.NoError(t, ws.updateSite(t.Context(), "site1", yourTurn(), make(chan struct{})))
@@ -2020,7 +2027,7 @@ func TestUpdateSiteRestoresSettings(t *testing.T) {
 		drush.EXPECT().LocalFacts(anyCtx, "/project", "site1").Return(syncFacts("/project/config/sync"), nil)
 		drush.EXPECT().ExportConfiguration(anyCtx, "/project", "site1").Return(nil)
 		committer := NewMockCommitter(t)
-		committer.EXPECT().Commit("Update configuration site1", []string{"config/sync"}).Return(true, nil)
+		committer.EXPECT().Commit(anyCtx, "Update configuration site1", []string{"config/sync"}).Return(true, nil)
 		ws.committer = committer
 		installer.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(assert.AnError)
 
@@ -2052,7 +2059,7 @@ func TestCommitSiteChangesCommitsTheExportedConfiguration(t *testing.T) {
 
 	t.Run("the site's sync directory, under its own message", func(t *testing.T) {
 		ws, committer := newRunner(t)
-		committer.EXPECT().Commit("Update configuration site1", []string{"config/site1"}).Return(true, nil)
+		committer.EXPECT().Commit(anyCtx, "Update configuration site1", []string{"config/site1"}).Return(true, nil)
 
 		require.NoError(t, ws.commitSiteChanges(t.Context(), "site1", syncFacts("/project/config/site1")))
 	})
@@ -2066,7 +2073,7 @@ func TestCommitSiteChangesCommitsTheExportedConfiguration(t *testing.T) {
 
 	t.Run("a refused commit", func(t *testing.T) {
 		ws, committer := newRunner(t)
-		committer.EXPECT().Commit("Update configuration site1", []string{"config/site1"}).Return(false, assert.AnError)
+		committer.EXPECT().Commit(anyCtx, "Update configuration site1", []string{"config/site1"}).Return(false, assert.AnError)
 
 		err := ws.commitSiteChanges(t.Context(), "site1", syncFacts("/project/config/site1"))
 		require.ErrorIs(t, err, assert.AnError)
@@ -2080,46 +2087,62 @@ func TestEnsureUpdateBranchAvailable(t *testing.T) {
 	newCheckout := func(t *testing.T) *MockGitRepository {
 		t.Helper()
 		checkout := NewMockGitRepository(t)
-		checkout.EXPECT().Reference(plumbing.NewBranchReferenceName(branch), false).Return(nil, plumbing.ErrReferenceNotFound)
+		checkout.EXPECT().BranchExists(anyCtx, branch).Return(false, nil)
 		return checkout
 	}
 
-	t.Run("a dry run never reaches the remote", func(t *testing.T) {
-		// A --dry-run never pushes, so the remote is never reached. BranchExists is left
-		// unstubbed, so the mock fails the test if it is called.
-		repository := NewMockGitService(t)
-		ws := testRun(services{logger: zap.NewNop(), git: repository, config: config.Config{DryRun: true}}, repo.Checkout{Repository: newCheckout(t), Path: testCheckout})
+	t.Run("a branch left locally by a failed run aborts", func(t *testing.T) {
+		checkout := NewMockGitRepository(t)
+		checkout.EXPECT().BranchExists(anyCtx, branch).Return(true, nil)
+		ws := testRun(services{logger: zap.NewNop(), config: config.Config{Token: "tok"}}, repo.Checkout{Repository: checkout, Path: testCheckout})
 
-		require.NoError(t, ws.ensureUpdateBranchAvailable(branch))
+		err := ws.ensureUpdateBranchAvailable(t.Context(), branch)
+		var abort AbortError
+		require.ErrorAs(t, err, &abort)
+		assert.Contains(t, abort.Msg, "already exists locally")
+	})
+
+	t.Run("a failed local lookup is surfaced", func(t *testing.T) {
+		checkout := NewMockGitRepository(t)
+		checkout.EXPECT().BranchExists(anyCtx, branch).Return(false, assert.AnError)
+		ws := testRun(services{logger: zap.NewNop()}, repo.Checkout{Repository: checkout, Path: testCheckout})
+
+		err := ws.ensureUpdateBranchAvailable(t.Context(), branch)
+		require.ErrorIs(t, err, assert.AnError)
+		assert.NotErrorAs(t, err, &AbortError{})
+	})
+
+	t.Run("a dry run never reaches the remote", func(t *testing.T) {
+		// RemoteBranchExists is left unstubbed, so the mock fails the test if it is called.
+		ws := testRun(services{logger: zap.NewNop(), config: config.Config{DryRun: true}}, repo.Checkout{Repository: newCheckout(t), Path: testCheckout})
+
+		require.NoError(t, ws.ensureUpdateBranchAvailable(t.Context(), branch))
 	})
 
 	t.Run("a real run asks the remote and aborts when the branch is taken", func(t *testing.T) {
 		checkout := newCheckout(t)
-		repository := NewMockGitService(t)
-		repository.EXPECT().BranchExists(checkout, branch, "tok").Return(true, nil)
-		ws := testRun(services{logger: zap.NewNop(), git: repository, config: config.Config{DryRun: false, Token: "tok"}}, repo.Checkout{Repository: checkout, Path: testCheckout})
+		checkout.EXPECT().RemoteBranchExists(anyCtx, branch, "tok").Return(true, nil)
+		ws := testRun(services{logger: zap.NewNop(), config: config.Config{Token: "tok"}}, repo.Checkout{Repository: checkout, Path: testCheckout})
 
-		err := ws.ensureUpdateBranchAvailable(branch)
+		err := ws.ensureUpdateBranchAvailable(t.Context(), branch)
 		var abort AbortError
 		require.ErrorAs(t, err, &abort)
 	})
 
 	t.Run("a real run proceeds when the remote does not have the branch", func(t *testing.T) {
 		checkout := newCheckout(t)
-		repository := NewMockGitService(t)
-		repository.EXPECT().BranchExists(checkout, branch, "tok").Return(false, nil)
-		ws := testRun(services{logger: zap.NewNop(), git: repository, config: config.Config{DryRun: false, Token: "tok"}}, repo.Checkout{Repository: checkout, Path: testCheckout})
+		checkout.EXPECT().RemoteBranchExists(anyCtx, branch, "tok").Return(false, nil)
+		ws := testRun(services{logger: zap.NewNop(), config: config.Config{Token: "tok"}}, repo.Checkout{Repository: checkout, Path: testCheckout})
 
-		require.NoError(t, ws.ensureUpdateBranchAvailable(branch))
+		require.NoError(t, ws.ensureUpdateBranchAvailable(t.Context(), branch))
 	})
 
 	t.Run("a remote failure is surfaced", func(t *testing.T) {
 		checkout := newCheckout(t)
-		repository := NewMockGitService(t)
-		repository.EXPECT().BranchExists(checkout, branch, "").Return(false, assert.AnError)
-		ws := testRun(services{logger: zap.NewNop(), git: repository, config: config.Config{DryRun: false}}, repo.Checkout{Repository: checkout, Path: testCheckout})
+		checkout.EXPECT().RemoteBranchExists(anyCtx, branch, "").Return(false, assert.AnError)
+		ws := testRun(services{logger: zap.NewNop()}, repo.Checkout{Repository: checkout, Path: testCheckout})
 
-		err := ws.ensureUpdateBranchAvailable(branch)
+		err := ws.ensureUpdateBranchAvailable(t.Context(), branch)
 		require.ErrorContains(t, err, "failed to check if branch exists")
 	})
 }
@@ -2146,14 +2169,14 @@ func expectVersionLookup(composerMock *MockComposer) {
 // workBranchCheckout pins both options: Create because neither branch exists yet, and Keep
 // because dropping it resets the tree and discards the changes the work branch exists to carry.
 // testHead is where a mocked run's HEAD stands when it creates its update branch.
-var testHead = plumbing.NewHashReference(plumbing.HEAD, plumbing.NewHash("1a2b3c"))
+const testHead = "1a2b3c"
 
 // expectUpdateBranch lets a run create its update branch at HEAD, which a run that gets that far
 // does after committing the updated dependencies.
 func expectUpdateBranch(repository *MockGitRepository) {
-	repository.EXPECT().Head().Return(testHead, nil).Maybe()
-	repository.EXPECT().SetBranch(mock.Anything, testHead.Hash()).Return(nil).Maybe()
-	repository.EXPECT().RemoveBranch(mock.Anything).Return(nil).Maybe()
+	repository.EXPECT().Head(anyCtx).Return(testHead, nil).Maybe()
+	repository.EXPECT().SetBranch(anyCtx, mock.Anything, testHead).Return(nil).Maybe()
+	repository.EXPECT().RemoveBranch(anyCtx, mock.Anything).Return(nil).Maybe()
 }
 
 func TestStageScaffoldChanges(t *testing.T) {
@@ -2166,22 +2189,11 @@ func TestStageScaffoldChanges(t *testing.T) {
 		return c
 	}
 
-	t.Run("stages tracked changes and leaves untracked files alone", func(t *testing.T) {
+	t.Run("stages the changed tracked files in the web root, sorted", func(t *testing.T) {
 		// A core update rewrites the scaffolded files; vendor/ is untracked and belongs to nobody.
 		worktree := NewMockWorktree(t)
-		worktree.EXPECT().Status().Return(git.Status{
-			"web/.htaccess":       {Worktree: git.Modified},
-			"web/robots.txt":      {Worktree: git.Modified},
-			"web/core/foo.php":    {Worktree: git.Untracked},
-			"vendor/autoload.php": {Worktree: git.Untracked},
-			"README.md":           {Worktree: git.Unmodified},
-		}, nil)
-
-		var staged []string
-		worktree.EXPECT().Add(mock.Anything).RunAndReturn(func(path string) (plumbing.Hash, error) {
-			staged = append(staged, path)
-			return plumbing.ZeroHash, nil
-		})
+		worktree.EXPECT().Unstaged(anyCtx).Return([]string{"web/robots.txt", "web/.htaccess"}, nil)
+		worktree.EXPECT().Stage(anyCtx, []string{"web/.htaccess", "web/robots.txt"}).Return(nil)
 
 		ws := testRun(services{
 			logger:   logger,
@@ -2190,28 +2202,20 @@ func TestStageScaffoldChanges(t *testing.T) {
 		}, repo.Checkout{Worktree: worktree, Path: "/project"})
 
 		require.NoError(t, ws.stageScaffoldChanges(context.Background()))
-		// Sorted, so the commit a run produces does not depend on map iteration order.
-		assert.Equal(t, []string{"web/.htaccess", "web/robots.txt"}, staged)
 	})
 
 	t.Run("stages nothing outside the web root", func(t *testing.T) {
 		// Regression: staging every tracked change swept the config export into the
 		// shared-code commit, still carrying the installer's sqlite entry, and the next run
 		// then refused to install from it. Those trees belong to the per-site export.
+		// "webhooks/" is in the list because a prefix match on "web" rather than "web/" would
+		// pull it in.
 		worktree := NewMockWorktree(t)
-		worktree.EXPECT().Status().Return(git.Status{
-			"web/robots.txt":                 {Worktree: git.Modified},
-			"config/sync/core.extension.yml": {Worktree: git.Modified},
-			"config/second/system.site.yml":  {Worktree: git.Modified},
-			"translations/drupal.de.po":      {Worktree: git.Modified},
-			"webhooks/notes.md":              {Worktree: git.Modified},
+		worktree.EXPECT().Unstaged(anyCtx).Return([]string{
+			"config/sync/core.extension.yml", "config/second/system.site.yml",
+			"translations/drupal.de.po", "web/robots.txt", "webhooks/notes.md",
 		}, nil)
-
-		var staged []string
-		worktree.EXPECT().Add(mock.Anything).RunAndReturn(func(path string) (plumbing.Hash, error) {
-			staged = append(staged, path)
-			return plumbing.ZeroHash, nil
-		})
+		worktree.EXPECT().Stage(anyCtx, []string{"web/robots.txt"}).Return(nil)
 
 		ws := testRun(services{
 			logger:   logger,
@@ -2220,14 +2224,30 @@ func TestStageScaffoldChanges(t *testing.T) {
 		}, repo.Checkout{Worktree: worktree, Path: "/project"})
 
 		require.NoError(t, ws.stageScaffoldChanges(context.Background()))
-		// "webhooks/" is in the list because a prefix match on "web" rather than "web/" would
-		// pull it in.
-		assert.Equal(t, []string{"web/robots.txt"}, staged)
+	})
+
+	t.Run("stages nothing when only files outside the web root changed", func(t *testing.T) {
+		// Stage is left unstubbed, so the mock fails the test if it is called.
+		worktree := NewMockWorktree(t)
+		worktree.EXPECT().Unstaged(anyCtx).Return([]string{"config/sync/core.extension.yml"}, nil)
+
+		ws := testRun(services{logger: logger, composer: newComposer("web/")}, repo.Checkout{Worktree: worktree, Path: "/project"})
+
+		require.NoError(t, ws.stageScaffoldChanges(context.Background()))
+	})
+
+	t.Run("looks up no web root when nothing changed", func(t *testing.T) {
+		worktree := NewMockWorktree(t)
+		worktree.EXPECT().Unstaged(anyCtx).Return(nil, nil)
+
+		ws := testRun(services{logger: logger, composer: NewMockComposer(t)}, repo.Checkout{Worktree: worktree, Path: "/project"})
+
+		require.NoError(t, ws.stageScaffoldChanges(context.Background()))
 	})
 
 	t.Run("propagates a status failure", func(t *testing.T) {
 		worktree := NewMockWorktree(t)
-		worktree.EXPECT().Status().Return(nil, errors.New("boom"))
+		worktree.EXPECT().Unstaged(anyCtx).Return(nil, errors.New("boom"))
 
 		ws := testRun(services{logger: logger, composer: newComposer("web/")}, repo.Checkout{Worktree: worktree, Path: "/project"})
 
@@ -2238,7 +2258,7 @@ func TestStageScaffoldChanges(t *testing.T) {
 
 	t.Run("propagates a web root failure", func(t *testing.T) {
 		worktree := NewMockWorktree(t)
-		worktree.EXPECT().Status().Return(git.Status{"web/robots.txt": {Worktree: git.Modified}}, nil)
+		worktree.EXPECT().Unstaged(anyCtx).Return([]string{"web/robots.txt"}, nil)
 
 		composerCLI := NewMockComposer(t)
 		composerCLI.EXPECT().GetConfig(mock.Anything, "/project", "extra.drupal-scaffold.locations.web-root").
@@ -2253,8 +2273,8 @@ func TestStageScaffoldChanges(t *testing.T) {
 
 	t.Run("propagates a staging failure", func(t *testing.T) {
 		worktree := NewMockWorktree(t)
-		worktree.EXPECT().Status().Return(git.Status{"web/robots.txt": {Worktree: git.Modified}}, nil)
-		worktree.EXPECT().Add("web/robots.txt").Return(plumbing.ZeroHash, errors.New("locked"))
+		worktree.EXPECT().Unstaged(anyCtx).Return([]string{"web/robots.txt"}, nil)
+		worktree.EXPECT().Stage(anyCtx, []string{"web/robots.txt"}).Return(errors.New("locked"))
 
 		ws := testRun(services{logger: logger, composer: newComposer("web/")}, repo.Checkout{Worktree: worktree, Path: "/project"})
 
@@ -2286,15 +2306,15 @@ func TestRunFailsWhenScaffoldChangesCannotBeStaged(t *testing.T) {
 	}
 
 	worktree := NewMockWorktree(t)
-	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
-	worktree.EXPECT().Status().Return(nil, assert.AnError)
+	worktree.EXPECT().StageGlob(anyCtx, mock.Anything).Return(nil)
+	worktree.EXPECT().Unstaged(anyCtx).Return(nil, assert.AnError)
 
 	installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil)
 
-	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).
+	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).
 		Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
-	repositoryService.EXPECT().IsShallowClone(testCheckout).Return(false, nil)
-	repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound).Maybe()
+	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
+	repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil).Maybe()
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
 
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
@@ -2302,7 +2322,7 @@ func TestRunFailsWhenScaffoldChangesCannotBeStaged(t *testing.T) {
 	mockComposer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).
 		Return([]composer.PackageChange{{Package: "drupal/core", From: "9.0.0", To: "9.1.0"}}, nil)
 	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
-	repositoryService.EXPECT().BranchExists(repository, "update-dummy-hash", "token").Return(false, nil)
+	repository.EXPECT().RemoteBranchExists(anyCtx, "update-dummy-hash", "token").Return(false, nil)
 
 	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
 	err := workflowService.Run(context.Background(), nil)
@@ -2326,20 +2346,20 @@ func TestRunHandsAddonsTheRunsContextAndCommitter(t *testing.T) {
 	config := config.Config{RepositoryURL: "https://example.com/repo.git", Branch: "main", Token: "token", Clone: true, Sites: []string{"site1"}, DryRun: true}
 
 	worktree := NewMockWorktree(t)
-	worktree.EXPECT().Add("config/sync").Return(plumbing.ZeroHash, nil).Maybe()
-	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
-	worktree.EXPECT().Status().Return(git.Status{}, nil).Once()
-	worktree.EXPECT().Commit("Update composer.json and composer.lock", mock.Anything).Return(plumbing.ZeroHash, nil)
+	worktree.EXPECT().Stage(anyCtx, []string{"config/sync"}).Return(nil).Maybe()
+	worktree.EXPECT().StageGlob(anyCtx, mock.Anything).Return(nil)
+	worktree.EXPECT().Unstaged(anyCtx).Return(nil, nil).Once()
+	worktree.EXPECT().Commit(anyCtx, "Update composer.json and composer.lock", mock.Anything).Return(nil)
 	// What an addon committing from post-code-update reaches: the run's own worktree.
-	worktree.EXPECT().Add("web/modules/custom/a.php").Return(plumbing.ZeroHash, nil)
-	worktree.EXPECT().Status().Return(git.Status{"web/modules/custom/a.php": {Staging: git.Modified}}, nil).Once()
-	worktree.EXPECT().Commit("Remove deprecations", mock.Anything).Return(plumbing.ZeroHash, nil)
-	worktree.EXPECT().Status().Return(git.Status{}, nil).Once()
+	worktree.EXPECT().Stage(anyCtx, []string{"web/modules/custom/a.php"}).Return(nil)
+	worktree.EXPECT().Staged(anyCtx).Return([]string{"web/modules/custom/a.php"}, nil).Once()
+	worktree.EXPECT().Commit(anyCtx, "Remove deprecations", mock.Anything).Return(nil)
+	worktree.EXPECT().Staged(anyCtx).Return(nil, nil).Once()
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
-	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
-	repositoryService.EXPECT().IsShallowClone(testCheckout).Return(false, nil)
-	repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound)
+	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
+	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
+	repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
 	mockComposer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).

@@ -562,7 +562,7 @@ package it mocks. Do not edit those files by hand.
 | `internal/drupal/`, `internal/siteinstall/` | Where a Drupal project keeps things; installing a throwaway site |
 | `scripts/` | PHP embedded in the binary and extracted per run: Rector's config and drupdater's Drush commands |
 
-The wrappers take one external tool per directory: `composer`, `drush`, `repo` (go-git),
+The wrappers take one external tool per directory: `composer`, `drush`, `repo` (the git CLI),
 `phpcs`, `rector` and `drupalorg` (Drupal.org issues, and the git.drupalcode.org GitLab).
 `drupal` holds the project-layout helpers (web root, custom code directories) and
 `siteinstall` installs a site for the `check --full` tier. `php` holds what the PHP wrappers share: running a command under

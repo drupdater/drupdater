@@ -12,8 +12,6 @@ import (
 	"github.com/drupdater/drupdater/internal/logging"
 	"github.com/drupdater/drupdater/internal/repo"
 	"github.com/drupdater/drupdater/internal/workflow"
-	git "github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/stretchr/testify/assert"
 	mock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -238,30 +236,22 @@ func TestResolveCheckoutBranch(t *testing.T) {
 	// initRepo creates a repo with one commit; detach leaves HEAD off any branch.
 	initRepo := func(t *testing.T, detach bool) string {
 		dir := t.TempDir()
-		r, err := git.PlainInit(dir, false)
-		require.NoError(t, err)
-		wt, err := r.Worktree()
-		require.NoError(t, err)
-		h, err := wt.Commit("init", &git.CommitOptions{
-			AllowEmptyCommits: true,
-			Author:            &object.Signature{Name: "t", Email: "t@example.com"},
-		})
-		require.NoError(t, err)
+		gitInitWithCommit(t, dir)
 		if detach {
-			require.NoError(t, wt.Checkout(&git.CheckoutOptions{Hash: h}))
+			gitIn(t, dir, "checkout", "--quiet", "--detach")
 		}
 		return dir
 	}
 
 	t.Run("uses the checkout's current branch", func(t *testing.T) {
-		branch, err := resolveCheckoutBranch(svc, initRepo(t, false))
+		branch, err := resolveCheckoutBranch(t.Context(), svc, initRepo(t, false))
 		require.NoError(t, err)
-		assert.Equal(t, "master", branch)
+		assert.Equal(t, "main", branch)
 	})
 
 	t.Run("falls back to CI variable when detached", func(t *testing.T) {
 		t.Setenv("GITHUB_REF_NAME", "release-1")
-		branch, err := resolveCheckoutBranch(svc, initRepo(t, true))
+		branch, err := resolveCheckoutBranch(t.Context(), svc, initRepo(t, true))
 		require.NoError(t, err)
 		assert.Equal(t, "release-1", branch)
 	})
@@ -269,7 +259,7 @@ func TestResolveCheckoutBranch(t *testing.T) {
 	t.Run("errors when detached and no CI variable", func(t *testing.T) {
 		t.Setenv("GITHUB_REF_NAME", "")
 		t.Setenv("CI_COMMIT_REF_NAME", "")
-		_, err := resolveCheckoutBranch(svc, initRepo(t, true))
+		_, err := resolveCheckoutBranch(t.Context(), svc, initRepo(t, true))
 		require.Error(t, err)
 	})
 
@@ -277,7 +267,7 @@ func TestResolveCheckoutBranch(t *testing.T) {
 		// Both CI variables: covering only GitHub would let the GitLab operand be dropped.
 		t.Setenv("GITHUB_REF_NAME", "")
 		t.Setenv("CI_COMMIT_REF_NAME", "release-2")
-		branch, err := resolveCheckoutBranch(svc, initRepo(t, true))
+		branch, err := resolveCheckoutBranch(t.Context(), svc, initRepo(t, true))
 		require.NoError(t, err)
 		assert.Equal(t, "release-2", branch)
 	})
@@ -285,16 +275,16 @@ func TestResolveCheckoutBranch(t *testing.T) {
 	t.Run("prefers the GitHub variable when both are set", func(t *testing.T) {
 		t.Setenv("GITHUB_REF_NAME", "from-github")
 		t.Setenv("CI_COMMIT_REF_NAME", "from-gitlab")
-		branch, err := resolveCheckoutBranch(svc, initRepo(t, true))
+		branch, err := resolveCheckoutBranch(t.Context(), svc, initRepo(t, true))
 		require.NoError(t, err)
 		assert.Equal(t, "from-github", branch)
 	})
 
 	t.Run("errors when the path is not a checkout", func(t *testing.T) {
-		_, err := resolveCheckoutBranch(svc, t.TempDir())
+		_, err := resolveCheckoutBranch(t.Context(), svc, t.TempDir())
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to determine branch from checkout")
-		require.ErrorIs(t, err, git.ErrRepositoryNotExists, "the cause must survive the wrapper")
+		require.ErrorIs(t, err, repo.ErrNotARepository, "the cause must survive the wrapper")
 	})
 }
 
@@ -324,8 +314,7 @@ func TestRootCommandValidatesTheFlagsItParsed(t *testing.T) {
 
 func TestCheckCommandReadsTheRootFlags(t *testing.T) {
 	dir := t.TempDir()
-	_, err := git.PlainInit(dir, false)
-	require.NoError(t, err)
+	gitInit(t, dir)
 	reportPath := filepath.Join(t.TempDir(), "check.json")
 
 	root := testApp().newRootCmd()

@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"context"
 	"strconv"
 	"sync"
 	"testing"
@@ -18,8 +19,8 @@ func siteEvent(t *testing.T, committer Committer) *PostSiteUpdateEvent {
 
 func TestProducedCommitsAreMadeInOrderAndRecordedWhenMade(t *testing.T) {
 	committer := NewMockCommitter(t)
-	committer.EXPECT().Commit("Add PHPCS config", []string{"phpcs.xml"}).Return(true, nil).Once()
-	committer.EXPECT().Commit("Update coding styles", []string{"web/a.php"}).Return(false, nil).Once()
+	committer.EXPECT().Commit(anyCtx, "Add PHPCS config", []string{"phpcs.xml"}).Return(true, nil).Once()
+	committer.EXPECT().Commit(anyCtx, "Update coding styles", []string{"web/a.php"}).Return(false, nil).Once()
 	p := NewPipeline([]Addon{hookAddon{Hooks{PostSiteUpdate: Produce(Format, func(*PostSiteUpdateEvent) (Result[string], error) {
 		return Result[string]{
 			Commits: []Commit{{"Add PHPCS config", []string{"phpcs.xml"}}, {"Update coding styles", []string{"web/a.php"}}},
@@ -37,7 +38,7 @@ func TestProducedCommitsAreMadeInOrderAndRecordedWhenMade(t *testing.T) {
 func TestAProducedCommitIsMadeBeforeTheNextStageRuns(t *testing.T) {
 	var ran []string
 	committer := NewMockCommitter(t)
-	committer.EXPECT().Commit("Remove deprecations", []string{"web/a.php"}).RunAndReturn(func(string, ...string) (bool, error) {
+	committer.EXPECT().Commit(anyCtx, "Remove deprecations", []string{"web/a.php"}).RunAndReturn(func(context.Context, string, ...string) (bool, error) {
 		ran = append(ran, "commit")
 		return true, nil
 	})
@@ -59,7 +60,7 @@ func TestAProducedCommitIsMadeBeforeTheNextStageRuns(t *testing.T) {
 
 func TestAFailedCommitStopsTheEventAndRecordsNothing(t *testing.T) {
 	committer := NewMockCommitter(t)
-	committer.EXPECT().Commit("Update translations", []string{"translations"}).Return(false, assert.AnError)
+	committer.EXPECT().Commit(anyCtx, "Update translations", []string{"translations"}).Return(false, assert.AnError)
 	later := false
 	p := NewPipeline([]Addon{
 		hookAddon{Hooks{PostSiteUpdate: Produce(Change, func(*PostSiteUpdateEvent) (Result[string], error) {
@@ -184,7 +185,7 @@ func TestPipelineReportsOnlyReporters(t *testing.T) {
 
 func TestProducedProposalIsCommittedRecordedAndMerged(t *testing.T) {
 	committer := NewMockCommitter(t)
-	committer.EXPECT().Commit("Update patches", []string{"composer.json"}).Return(true, nil)
+	committer.EXPECT().Commit(anyCtx, "Update patches", []string{"composer.json"}).Return(true, nil)
 	pin := UpdatePlan{Keep: []Pin{pin("drupal/core", "10.2.0")}}
 	hook := ProduceProposal(Change, func(*PreComposerUpdateEvent) (Proposal[string], error) {
 		return Proposal[string]{Plan: pin, Commits: []Commit{{"Update patches", []string{"composer.json"}}}, Finding: "patched"}, nil
@@ -205,7 +206,7 @@ func TestProducedProposalIsCommittedRecordedAndMerged(t *testing.T) {
 
 func TestAFailedProposalCommitStopsTheSettle(t *testing.T) {
 	committer := NewMockCommitter(t)
-	committer.EXPECT().Commit("Update patches", []string{"composer.json"}).Return(false, assert.AnError)
+	committer.EXPECT().Commit(anyCtx, "Update patches", []string{"composer.json"}).Return(false, assert.AnError)
 	p := NewPipeline([]Addon{hookAddon{Hooks{PreComposerUpdate: ProduceProposal(Change, func(*PreComposerUpdateEvent) (Proposal[string], error) {
 		return Proposal[string]{Plan: UpdatePlan{Only: []string{"drupal/core"}}, Commits: []Commit{{"Update patches", []string{"composer.json"}}}}, nil
 	})}}})

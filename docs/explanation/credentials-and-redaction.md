@@ -112,6 +112,14 @@ its failure details are passed through the redactor explicitly.
   description.
 - It does not send credentials anywhere except the host they belong to.
 
-The push itself authenticates with HTTP basic auth using the token as the password and a
-placeholder username — the username is not meaningful to either platform, it merely has to
-be non-empty.
+Git authenticates the clone, the push and the remote branch check with HTTP basic auth,
+using the token as the password and a placeholder username — the username is not meaningful
+to either platform, it merely has to be non-empty. The token reaches git through a
+credential helper that reads it from an environment variable set on that one git process:
+never on its command line, which other processes on the host can read, and never in a git
+config file. The helper replaces any the user configured, and git is never allowed to
+prompt, so a missing credential fails the run instead of hanging the job.
+
+The push goes to `origin`'s URL with any credentials in it stripped, so the token decides
+who pushes: GitLab CI writes a job token into the checkout's `origin` that is not allowed to
+push.

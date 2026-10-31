@@ -12,7 +12,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/drupdater/drupdater/internal/config"
-	git "github.com/go-git/go-git/v5"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -36,8 +35,7 @@ func TestCheckCommandReportsFailuresAndExitsNonZero(t *testing.T) {
 	// A bare checkout with no Drupal project: every project-dependent check fails, which is
 	// the command's unhappy path end to end.
 	dir := t.TempDir()
-	_, err := git.PlainInit(dir, false)
-	require.NoError(t, err)
+	gitInit(t, dir)
 
 	reportPath := filepath.Join(t.TempDir(), "check.json")
 	out, err := runCheckCmd(t, testApp(), options{config: config.Config{WorkingDir: dir, Sites: []string{"default"}, ReportPath: reportPath}})
@@ -70,12 +68,11 @@ func TestCheckCommandReportsFailuresAndExitsNonZero(t *testing.T) {
 
 func TestCheckCommandWithoutReportPathWritesNoReport(t *testing.T) {
 	dir := t.TempDir()
-	_, err := git.PlainInit(dir, false)
-	require.NoError(t, err)
+	gitInit(t, dir)
 
 	// An empty ReportPath must not write anything, rather than defaulting to some file in the
 	// working directory.
-	_, err = runCheckCmd(t, testApp(), options{config: config.Config{WorkingDir: dir, Sites: []string{"default"}}})
+	_, err := runCheckCmd(t, testApp(), options{config: config.Config{WorkingDir: dir, Sites: []string{"default"}}})
 	require.Error(t, err)
 
 	entries, readErr := os.ReadDir(dir)
