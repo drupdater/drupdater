@@ -14,7 +14,7 @@ import (
 )
 
 // forEachSite runs fn per site concurrently, bounded by config.Concurrency, cancelling the rest
-// on the first error. Sites start in config order, which updateSite's turns rely on.
+// on the first error. A site whose slot frees up only after that error never starts.
 func (s services) forEachSite(ctx context.Context, fn func(context.Context, int, string) error) error {
 	g, groupCtx := errgroup.WithContext(ctx)
 	limit := s.config.Concurrency
@@ -24,77 +24,77 @@ func (s services) forEachSite(ctx context.Context, fn func(context.Context, int,
 	g.SetLimit(limit)
 	for i, site := range s.config.Sites {
 		g.Go(func() error {
+			if err := groupCtx.Err(); err != nil {
+				// mutator-disable-next-line statement/return equivalent: the group keeps its first error
+				return err
+			}
 			return fn(groupCtx, i, site)
 		})
 	}
 	return g.Wait()
 }
 
-// updateSites runs updateSite for every site, handing each its turn: turns[i] closes once site i
-// may write into the working tree, which happens only after every earlier site has.
-func (r *run) updateSites(ctx context.Context) error {
-	turns := make([]chan struct{}, len(r.config.Sites)+1)
-	for i := range turns {
-		turns[i] = make(chan struct{})
-	}
-	close(turns[0])
-	return r.forEachSite(ctx, func(ctx context.Context, i int, site string) error {
-		return r.updateSite(ctx, site, turns[i], turns[i+1])
-	})
-}
-
-// updateSite updates the site's database concurrently with the other sites, then waits for its
-// turn to write into the shared working tree: two sites may share a config or translation
-// directory, and the commits land in --sites order however the sites finish.
-func (r *run) updateSite(ctx context.Context, site string, turn <-chan struct{}, next chan<- struct{}) (err error) {
-	r.logger.Info("updating site", zap.String("site", site))
-
-	if err := r.installer.ConfigureDatabase(ctx, r.path, site); err != nil {
-		return fmt.Errorf("failed to configure database: %w", err)
-	}
-	// Uncancelled: the first failing site cancels ctx, and the rest must still be put back.
+// updateSites updates every site's database concurrently, then writes each site's changes into
+// the working tree one site at a time, in --sites order: the sites share one git index, and two
+// may name the same config or translation directory.
+func (r *run) updateSites(ctx context.Context) (err error) {
+	updated := make([]drush.Facts, len(r.config.Sites))
+	configured := make([]bool, len(r.config.Sites))
+	// Uncancelled: the first failing site cancels ctx, and every site must still be put back.
 	defer func() {
-		if restoreErr := r.installer.RestoreSettings(context.WithoutCancel(ctx), r.path, site); restoreErr != nil {
-			err = errors.Join(err, fmt.Errorf("failed to restore settings: %w", restoreErr))
+		for i, site := range r.config.Sites {
+			if !configured[i] {
+				continue
+			}
+			if restoreErr := r.installer.RestoreSettings(context.WithoutCancel(ctx), r.path, site); restoreErr != nil {
+				err = errors.Join(err, fmt.Errorf("failed to restore settings of %s: %w", site, restoreErr))
+			}
 		}
 	}()
 
-	facts, err := r.drush.Facts(ctx, r.path, site)
-	if err != nil {
+	if err := r.forEachSite(ctx, func(ctx context.Context, i int, site string) error {
+		if err := r.installer.ConfigureDatabase(ctx, r.path, site); err != nil {
+			return fmt.Errorf("failed to configure database: %w", err)
+		}
+		configured[i] = true
+		facts, err := r.updateDatabase(ctx, site)
+		updated[i] = facts
+		return err
+	}); err != nil {
 		return err
 	}
 
-	preSiteUpdateEvent := NewPreSiteUpdateEvent(ctx, r.path, r.committer, site, facts)
-	if err := Fire(r.hooks, preSiteUpdateEvent); err != nil {
-		return err
+	for i, site := range r.config.Sites {
+		if err := r.commitSiteChanges(ctx, site, updated[i]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// updateDatabase runs the site's update hooks and returns its facts as they stand afterwards.
+func (r *run) updateDatabase(ctx context.Context, site string) (drush.Facts, error) {
+	r.logger.Info("updating site", zap.String("site", site))
+
+	facts, err := r.drush.Facts(ctx, r.path, site)
+	if err != nil {
+		return drush.Facts{}, err
+	}
+
+	if err := Fire(r.hooks, NewPreSiteUpdateEvent(ctx, r.path, r.committer, site, facts)); err != nil {
+		return drush.Facts{}, err
 	}
 
 	if err := r.drush.UpdateSite(ctx, r.path, site); err != nil {
-		return fmt.Errorf("failed to update site: %w", err)
-
+		return drush.Facts{}, fmt.Errorf("failed to update site: %w", err)
 	}
 
 	if err := r.drush.ConfigResave(ctx, r.path, site); err != nil {
-		return fmt.Errorf("failed to resave config: %w", err)
-
+		return drush.Facts{}, fmt.Errorf("failed to resave config: %w", err)
 	}
 
 	// Read again: an update hook may enable a module or move a path the facts named before.
-	updated, err := r.drush.LocalFacts(ctx, r.path, site)
-	if err != nil {
-		return err
-	}
-
-	select {
-	case <-turn:
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-	if err := r.commitSiteChanges(ctx, site, updated); err != nil {
-		return err
-	}
-	close(next)
-	return nil
+	return r.drush.LocalFacts(ctx, r.path, site)
 }
 
 func (r *run) commitSiteChanges(ctx context.Context, site string, facts drush.Facts) error {

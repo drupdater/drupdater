@@ -112,10 +112,10 @@ addon to `TestAddonHookStages`.
 
 ### Concurrency
 
-`pre-site-update` and `post-site-update` fire **once per site, from a goroutine per site**.
-`pre-site-update` hooks run concurrently. `post-site-update` hooks run one site at a time,
-in `--sites` order, because they may write into the shared working tree, but still from
-different goroutines. So a per-site hook returns what it finds, and the pipeline records it
+`pre-site-update` and `post-site-update` fire **once per site**. `pre-site-update` hooks run
+from a goroutine per site, concurrently. `post-site-update` hooks run in a plain loop, one site
+at a time in `--sites` order, once every site's database is updated, because they may write into
+the shared working tree. So a per-site hook returns what it finds, and the pipeline records it
 per site, under its own lock. `ReportData` reads every site's finding with
 `workflow.SiteFindings` and merges them — deduplicating, say, as `unsupported_modules` does.
 
