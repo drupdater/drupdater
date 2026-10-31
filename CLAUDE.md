@@ -92,7 +92,9 @@ Where things live. For *how they work*, read `docs/explanation/` rather than dup
 
 | Path | Contains |
 |---|---|
-| `main.go` → `cmd/root.go` | Cobra commands built per call by `app`, which holds every outside dependency |
+| `main.go` → `sdk.Main` → `cmd/root.go` | Cobra commands built per call by `app`, which holds every outside dependency |
+| `sdk/`, `sdk/sdktest/` | **The public API** for addons built outside drupdater: re-exports of the addon contract, `Main`, and a test harness |
+| `internal/external/` | What an external addon is registered and built with; `cmd` reads it, `sdk` re-exports it |
 | `cmd/addons.go` | `builtinAddons()`, the addon catalogue, and the `addonComposer`/`addonDrush` unions |
 | `cmd/secrets.go`, `cmd/checkout.go` | Token resolution and secret registration; checkout URL/branch and `safe.directory` |
 | `cmd/check.go` | The `check` command and its cheap/full check tiers |
@@ -128,6 +130,7 @@ Where things live. For *how they work*, read `docs/explanation/` rather than dup
 - **The MR is rendered from the report**, through its JSON. An addon reaches the description only via its report section; findings from two addons are joined there, never handed between them.
 - **`internal/addon/report.go` is a published contract.** Renaming a field there is a breaking change to `schema_version`, and `internal/addon/testdata/run_report.json` is what makes such a rename fail rather than ship. A new reporting addon belongs in that golden's `reportingAddons()`.
 - **Report types mirror rather than reuse internal types** (`report.PackageChange` vs `composer.PackageChange`) so an internal refactor can't rename a published field.
+- **`sdk/` is a published Go API.** It aliases `internal/workflow`'s addon contract, so renaming or changing an exported name there breaks addons built outside drupdater. External addons get composer and drush only through `Exec`, never the typed methods.
 - **The report's deferred write is registered first**, so it runs last and is emitted on every exit path.
 - **`cmd` has no mutable package state.** Everything that reaches outside the process — building the runner and the platform, the `--full` tier's clone, trusting a checkout in the global git config — is a field of `app`, and commands are built per call by `app.newRootCmd()`. A test overrides a field on its own `testApp()`; it never swaps a package variable.
 - **A `workflow.Runner` holds only its shared `services`.** Per-run state lives on `run`, built complete by `newRun` once the working copy exists; nothing on it is assigned later.

@@ -203,3 +203,22 @@ func TestPreComposerUpdateFailureReturnsNoPlan(t *testing.T) {
 	require.ErrorIs(t, err, assert.AnError)
 	assert.Zero(t, plan)
 }
+
+type describingAddon struct {
+	hookAddon
+	key, template string
+}
+
+func (a describingAddon) ReportKey() string           { return a.key }
+func (describingAddon) ReportData(*Findings) any      { return nil }
+func (a describingAddon) DescriptionTemplate() string { return a.template }
+
+func TestDescriptionTemplatesAreThoseOfDescribingAddonsByReportKey(t *testing.T) {
+	p := NewPipeline([]Addon{
+		hookAddon{},
+		describingAddon{key: "acme", template: "## Acme"},
+		describingAddon{key: "other", template: "## Other"},
+	})
+
+	assert.Equal(t, map[string]string{"acme": "## Acme", "other": "## Other"}, p.DescriptionTemplates())
+}

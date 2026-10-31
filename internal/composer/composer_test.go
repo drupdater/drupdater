@@ -1377,3 +1377,20 @@ func TestGetDependencyPatchesErrors(t *testing.T) {
 		assert.Contains(t, err.Error(), "failed to unmarshal composer.lock")
 	})
 }
+
+func TestExecRunsComposerWithTheGivenArgumentsAndReturnsItsOutput(t *testing.T) {
+	service := &CLI{logger: zap.NewNop()}
+	var got []string
+	service.newCommand = func(ctx context.Context, name string, arg ...string) *exec.Cmd {
+		got = append([]string{name}, arg...)
+		cs := append([]string{"-test.run=TestHelperProcess", "--", "custom output"}, arg...)
+		cmd := exec.CommandContext(ctx, os.Args[0], cs...)
+		cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
+		return cmd
+	}
+
+	out, err := service.Exec(t.Context(), "/tmp", "show", "--direct")
+	require.NoError(t, err)
+	assert.Equal(t, "custom output", out)
+	assert.Equal(t, []string{"show", "--direct"}, got[len(got)-2:])
+}

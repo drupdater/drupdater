@@ -104,7 +104,8 @@ otherwise `normal` applies.
 The configurable addons to run. The six mandatory addons always run regardless. Naming one
 here is accepted but redundant — it changes nothing. Run [`drupdater
 addons`](cli/addons.md) to list the configurable names, or see the [addon
-reference](addons/index.md).
+reference](addons/index.md). A binary [built with addons of its
+own](../how-to/build-an-external-addon.md) accepts their names too.
 
 The security default is empty on purpose: a security update should be a minimal, focused
 fix, so only the mandatory addons run.

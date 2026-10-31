@@ -23,4 +23,6 @@ New to Drupdater? Start with the [tutorials](../tutorials/index.md) instead.
 ## Operating it
 
 - [Consume the run report](consume-the-run-report.md) — assert on a run from CI
+- [Build an addon outside Drupdater](build-an-external-addon.md) — your own addons, in your
+  own module and binary
 - [Troubleshoot a run](troubleshoot.md)

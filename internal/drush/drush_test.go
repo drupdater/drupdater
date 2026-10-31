@@ -393,3 +393,20 @@ func TestConfigResaveRunsTheIncludedCommand(t *testing.T) {
 
 	assert.Equal(t, []string{"composer", "exec", "--", "drush", "--include=/opt/include", "drupdater:config-resave"}, *args)
 }
+
+func TestExecRunsDrushForTheSiteWithTheGivenArguments(t *testing.T) {
+	t.Setenv("GO_WANT_HELPER_PROCESS", "1")
+	t.Setenv("GO_HELPER_PROCESS_RAW", "1")
+	cli := NewCLI(zap.NewNop(), "/opt/include")
+	var args []string
+	cli.newCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
+		args = arg
+		cs := append([]string{"-test.run=TestHelperProcess", "--", "cache rebuilt"}, arg...)
+		return exec.CommandContext(ctx, os.Args[0], cs...)
+	}
+
+	out, err := cli.Exec(t.Context(), "/tmp", "site1", "cache:rebuild")
+	require.NoError(t, err)
+	assert.Equal(t, "cache rebuilt", out)
+	assert.Equal(t, []string{"exec", "--", "drush", "cache:rebuild"}, args[len(args)-4:])
+}

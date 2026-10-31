@@ -10,6 +10,7 @@ import (
 	"github.com/drupdater/drupdater/internal/addon"
 	"github.com/drupdater/drupdater/internal/config"
 	"github.com/drupdater/drupdater/internal/drupalorg"
+	"github.com/drupdater/drupdater/internal/external"
 	"github.com/drupdater/drupdater/internal/phpcs"
 	"github.com/drupdater/drupdater/internal/rector"
 	"github.com/drupdater/drupdater/internal/workflow"
@@ -17,8 +18,9 @@ import (
 	"go.uber.org/zap"
 )
 
-// addonComposer is every builtin addon's composer interface at once; each addon sees only its own.
+// addonComposer is every addon's composer interface at once; each addon sees only its own.
 type addonComposer interface {
+	external.Composer
 	addon.AllowPluginsComposer
 	addon.AuditComposer
 	addon.BeautifierComposer
@@ -28,8 +30,9 @@ type addonComposer interface {
 	addon.PatchesComposer
 }
 
-// addonDrush is every builtin addon's drush interface at once.
+// addonDrush is every addon's drush interface at once.
 type addonDrush interface {
+	external.Drush
 	addon.TranslationsDrush
 }
 
@@ -115,7 +118,15 @@ func (c addonCatalog) create(cfg config.Config, deps addonDeps) ([]workflow.Addo
 		if !ok {
 			return fmt.Errorf("unknown addon %q", name)
 		}
-		addons = append(addons, factory(deps))
+		built := factory(deps)
+		if built == nil {
+			return fmt.Errorf("addon %q built nothing", name)
+		}
+		// Keyed otherwise, its section would read as another addon's, or overwrite it.
+		if r, ok := built.(workflow.Reporter); ok && r.ReportKey() != name {
+			return fmt.Errorf("addon %q reports under %q: the report key must be the addon's name", name, r.ReportKey())
+		}
+		addons = append(addons, built)
 		added[name] = true
 		return nil
 	}
@@ -126,6 +137,29 @@ func (c addonCatalog) create(cfg config.Config, deps addonDeps) ([]workflow.Addo
 		}
 	}
 	return addons, nil
+}
+
+// withExternal adds addons built outside drupdater, configurable like any other. A name may not
+// shadow another addon's, or a project's .drupdater.yaml would silently run a different one.
+func (c addonCatalog) withExternal(registrations []external.Registration) (addonCatalog, error) {
+	factories := maps.Clone(c.factories)
+	for _, reg := range registrations {
+		if err := reg.Validate(); err != nil {
+			return addonCatalog{}, err
+		}
+		if _, taken := factories[reg.Name]; taken {
+			return addonCatalog{}, fmt.Errorf("addon %q is already registered", reg.Name)
+		}
+		factories[reg.Name] = func(d addonDeps) workflow.Addon {
+			return reg.New(external.Deps{
+				Logger:   d.logger.Named(reg.Name),
+				Composer: d.composer,
+				Drush:    d.drush,
+				Security: d.security,
+			})
+		}
+	}
+	return addonCatalog{factories: factories, mandatory: c.mandatory}, nil
 }
 
 // validate checks both run types, so a typo under run_types.security fails a normal run too.

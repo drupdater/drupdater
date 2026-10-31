@@ -57,6 +57,12 @@ func (s *CLI) execComposer(ctx context.Context, dir string, args ...string) (str
 	return s.command(dir).Combined(ctx, args...)
 }
 
+// Exec runs composer with args in dir and returns its combined output: the escape hatch for an
+// addon outside drupdater, which the typed methods were not written for.
+func (s *CLI) Exec(ctx context.Context, dir string, args ...string) (string, error) {
+	return s.execComposer(ctx, dir, args...)
+}
+
 // execComposerJSON returns stdout only, so composer's stderr notices cannot corrupt the payload.
 func (s *CLI) execComposerJSON(ctx context.Context, dir string, args ...string) (string, error) {
 	stdout, _, err := s.command(dir).Split(ctx, args...)

@@ -22,6 +22,10 @@ to the [run report](../run-report.md), or both.
 | [`composer_normalizer`](composer-normalizer.md) | Configurable | `post-composer-update` | — |
 | [`unsupported_modules`](unsupported-modules.md) | Always | `pre-site-update` | `unsupported_modules` |
 
+Addons can also be [built outside Drupdater](../../how-to/build-an-external-addon.md) and
+compiled into a binary of your own. They are always configurable, and listed by `drupdater
+addons` next to the builtin ones.
+
 ## Mandatory versus configurable
 
 **Six addons always run** and cannot be disabled:

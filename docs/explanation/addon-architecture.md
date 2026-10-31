@@ -183,7 +183,9 @@ which is why a request for a small update is short rather than full of empty hea
 sections appear in a fixed order: what needs a decision first, the logs last.
 
 Templates are embedded in the binary, so the rendered output is fixed at build time and
-cannot be affected by the project being updated. If the description would exceed GitHub's
+cannot be affected by the project being updated. An addon built outside Drupdater brings its
+own template by implementing `Describer`; it is rendered against that addon's section as read
+back from the report's JSON, so the same rule holds — it can only show what it published. If the description would exceed GitHub's
 65,536-byte limit, it is rendered again without the dependency table's links.
 
 ## Reporting
@@ -198,3 +200,22 @@ across nine files, it is very easy to rename a field without noticing that a con
 depends on it.
 
 See [Why a run report](why-a-run-report.md).
+
+## Addons outside Drupdater
+
+The addon contract — `Addon`, `Hooks`, the events, stages, hook builders and findings — is
+re-exported by the public `sdk` package, so an addon can live in another module and be
+compiled into a binary of its own with `sdk.Main`. Drupdater's own `main.go` is
+`sdk.Main()` with nothing registered: a custom binary differs only by its registrations.
+
+Re-exported rather than moved, because the runner drives hooks through unexported fields
+and methods; aliases give an external addon exactly the types the builtin ones use without
+handing it the runner's controls.
+
+An external addon is always configurable — mandatory means "the update or its changelog
+needs it", which only Drupdater's own addons can claim. Its name may not shadow another's,
+and its report key must be its name, so a report still reads the way the project is
+configured. It gets composer and drush only through a generic `Exec`: the typed tool
+methods are written for the builtin addons and change with them.
+
+See [Build an addon outside Drupdater](../how-to/build-an-external-addon.md).

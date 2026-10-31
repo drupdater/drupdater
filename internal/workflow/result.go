@@ -96,6 +96,14 @@ type Reporter interface {
 	ReportData(findings *Findings) any
 }
 
+// Describer is a Reporter that also adds a section to the merge request description: a
+// text/template rendered against its own report section, read back from the report's JSON.
+// The builtin addons' sections are rendered by internal/mergerequest instead.
+type Describer interface {
+	Reporter
+	DescriptionTemplate() string
+}
+
 // SiteFindings returns just the findings of Sites, for an addon that does not report commits.
 func SiteFindings[F any](f *Findings, event string) map[string]F {
 	out := map[string]F{}

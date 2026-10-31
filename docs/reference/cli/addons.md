@@ -23,6 +23,9 @@ Addons you can set under run_types.normal.addons / run_types.security.addons in 
 The command lists only the **configurable** addons — the ones it is meaningful to put in
 a `run_types.*.addons` list. It deliberately omits:
 
+Addons registered by a [binary built with your own
+addons](../../how-to/build-an-external-addon.md) are configurable, so they are listed too.
+
 - The six [mandatory addons](../addons/index.md) (`composer_allow_plugins`,
   `composer_patches`, `composer_diff`, `update_hooks`, `composer_audit`,
   `unsupported_modules`), which always run and cannot be disabled.
