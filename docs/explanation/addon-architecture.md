@@ -25,7 +25,7 @@ other one is disabled" — because none of them ever depended on another being t
 | `post-composer-update` | After the resolved update is installed into `vendor/`, before the commit | — |
 | `post-code-update` | After `composer.json`/`.lock` are committed | — |
 | `pre-site-update` | Before each site's update hooks, concurrently across sites | The site name and its facts |
-| `post-site-update` | After each site's hooks, before config export; one site at a time, in `--sites` order | The site name and its facts |
+| `post-site-update` | After every site's hooks, before its config export; one site at a time, in `--sites` order | The site name and its facts |
 
 A site's facts — config sync directory, translation path, enabled modules, pending update hooks,
 unsupported modules — are read from the site, so an addon asks the event rather than Drush.
