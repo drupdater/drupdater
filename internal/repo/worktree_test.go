@@ -101,7 +101,25 @@ func TestCommitFailsWithNothingStaged(t *testing.T) {
 	isolateGitConfig(t)
 	_, checkout := addWorktree(t, "Bot", "bot@example.com")
 
-	require.ErrorContains(t, checkout.Worktree.Commit(t.Context(), "Nothing", checkout.Author), "git commit")
+	err := checkout.Worktree.Commit(t.Context(), "Nothing", checkout.Author)
+
+	require.ErrorContains(t, err, "git commit")
+	var exitErr *exec.ExitError
+	require.ErrorAs(t, err, &exitErr, "git's own failure survives the wrapper")
+}
+
+// A failed git command is an error, whatever it printed, and keeps git's own failure in it.
+func TestFailedGitCommandsAreErrors(t *testing.T) {
+	isolateGitConfig(t)
+	empty := &workingCopy{git: New(), dir: initRepo(t)}
+	var exitErr *exec.ExitError
+
+	_, err := empty.Head(t.Context())
+	require.ErrorAs(t, err, &exitErr, "a repository without a commit has no HEAD")
+
+	require.ErrorAs(t, empty.SetBranch(t.Context(), "update-abc", "not-a-commit"), &exitErr)
+	require.ErrorAs(t, empty.RemoveBranch(t.Context(), "no/such//branch"), &exitErr)
+	require.ErrorAs(t, empty.StageGlob(t.Context(), "nothing-matches-*"), &exitErr)
 }
 
 // The update branch is the one thing a run leaves in the user's repository, and only on purpose.
@@ -185,7 +203,10 @@ func TestStage(t *testing.T) {
 	})
 
 	t.Run("only skipped paths stage nothing", func(t *testing.T) {
+		// Changes everywhere else, which a git add with no paths left would sweep up.
 		checkout := setup(t)
+		writeFile(t, checkout.Path, "tracked.txt", "b")
+		writeFile(t, checkout.Path, "untracked.txt", "b")
 
 		require.NoError(t, checkout.Worktree.Stage(t.Context(), "missing"))
 		require.NoError(t, checkout.Worktree.Stage(t.Context()))
@@ -211,7 +232,10 @@ func TestStage(t *testing.T) {
 		wc := &workingCopy{git: New(), dir: t.TempDir()}
 		writeFile(t, wc.dir, "a.txt", "a")
 
-		require.Error(t, wc.Stage(t.Context(), "a.txt"))
+		err := wc.Stage(t.Context(), "a.txt")
+		require.ErrorContains(t, err, "failed to read which paths git ignores")
+		var exitErr *exec.ExitError
+		require.ErrorAs(t, err, &exitErr)
 	})
 
 	t.Run("Unstaged lists only tracked files with unstaged changes", func(t *testing.T) {
@@ -276,6 +300,7 @@ func TestRemoveWorktreeFailsWhenGitCannotRunAtAll(t *testing.T) {
 	err := service.RemoveWorktree(t.Context(), filepath.Join(dir, "missing"), filepath.Join(dir, "x", "checkout"))
 
 	require.ErrorContains(t, err, "failed to remove the worktree at")
+	require.ErrorIs(t, err, fs.ErrNotExist, "git could not even start in a directory that is not there")
 }
 
 func TestAddWorktreeErrors(t *testing.T) {
@@ -296,6 +321,8 @@ func TestAddWorktreeErrors(t *testing.T) {
 		_, err := service.AddWorktree(t.Context(), dir, Identity{})
 
 		require.ErrorContains(t, err, "failed to add a worktree of "+dir)
+		var exitErr *exec.ExitError
+		require.ErrorAs(t, err, &exitErr)
 		matches, globErr := filepath.Glob(filepath.Join(os.TempDir(), "drupdater-worktree-*", "checkout"))
 		require.NoError(t, globErr)
 		for _, m := range matches {

@@ -72,7 +72,7 @@ func TestRunUpdateFailsOnACheckoutWithoutAnOrigin(t *testing.T) {
 	// A checkout-mode dry run needs no token at all, so this reaches the checkout resolution.
 	t.Setenv("DRUPDATER_TOKEN", "")
 	err := runUpdateWith(t, testApp(), options{config: config.Config{WorkingDir: dir, DryRun: true, Sites: []string{"default"}}})
-	require.Error(t, err)
+	require.ErrorContains(t, err, "failed to determine repository URL from checkout")
 	assert.NotContains(t, err.Error(), "no token provided",
 		"a checkout-mode dry run must not demand credentials it will never use")
 }

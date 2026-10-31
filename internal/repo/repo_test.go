@@ -2,6 +2,7 @@ package repo
 
 import (
 	"context"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -43,6 +44,15 @@ func TestRemoteBranchExists(t *testing.T) {
 		found, err := checkout.Repository.RemoteBranchExists(t.Context(), "my-feature", "")
 		require.NoError(t, err)
 		assert.False(t, found, "a name that is only a prefix of another branch does not count")
+	})
+
+	t.Run("a branch whose name merely ends in the one asked for does not count", func(t *testing.T) {
+		// ls-remote matches a pattern against the tail of each ref, so it lists this one too.
+		_, checkout := cloneOf(t, "team/refs/heads/my-feature")
+
+		found, err := checkout.Repository.RemoteBranchExists(t.Context(), "my-feature", "")
+		require.NoError(t, err)
+		assert.False(t, found)
 	})
 
 	t.Run("branch deleted on remote since the last fetch is not reported as existing", func(t *testing.T) {
@@ -214,6 +224,9 @@ func TestNonRepositoryPathsAreRejected(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			_, err := service.GetRemoteURL(t.Context(), path)
 			require.ErrorIs(t, err, ErrNotARepository)
+			if name == "a missing directory" {
+				require.ErrorIs(t, err, fs.ErrNotExist, "a path that is not there says so")
+			}
 			require.ErrorContains(t, err, "--working-dir must be the repository root")
 
 			_, err = service.GetCurrentBranch(t.Context(), path)

@@ -135,12 +135,10 @@ func (rs *Git) runAuthenticated(ctx context.Context, dir string, token string, a
 	return stdout.String(), nil
 }
 
-// exitCode is the code git exited with, or -1 when it did not run to an exit.
-func exitCode(err error) int {
-	if exitErr, ok := errors.AsType[*exec.ExitError](err); ok {
-		return exitErr.ExitCode()
-	}
-	return -1
+// exitedWith reports whether git ran to completion and exited with code.
+func exitedWith(err error, code int) bool {
+	exitErr, ok := errors.AsType[*exec.ExitError](err)
+	return ok && exitErr.ExitCode() == code
 }
 
 // open checks that path is the root of a repository. It names the path in the error: it comes
@@ -160,19 +158,12 @@ func (rs *Git) open(ctx context.Context, path string) error {
 	return nil
 }
 
-// samePath compares through symlinks: a temporary directory is often reached through one.
+// samePath compares the directories themselves: a temporary directory is often reached through a
+// symlink, and a working directory may be given relative.
 func samePath(a, b string) bool {
-	resolve := func(p string) string {
-		abs, err := filepath.Abs(p)
-		if err != nil {
-			return p
-		}
-		if resolved, err := filepath.EvalSymlinks(abs); err == nil {
-			return resolved
-		}
-		return abs
-	}
-	return resolve(a) == resolve(b)
+	infoA, errA := os.Stat(a)
+	infoB, errB := os.Stat(b)
+	return errA == nil && errB == nil && os.SameFile(infoA, infoB)
 }
 
 // CloneRepository clones the branch into a new temporary directory.
@@ -269,7 +260,7 @@ func (rs *Git) GetCurrentBranch(ctx context.Context, path string) (string, error
 		return "", err
 	}
 	out, err := rs.run(ctx, path, "symbolic-ref", "--quiet", "--short", "HEAD")
-	if exitCode(err) == 1 {
+	if exitedWith(err, 1) {
 		return "", nil
 	}
 	if err != nil {
@@ -306,12 +297,9 @@ func (rs *Git) checkout(ctx context.Context, path string, requested Identity) Ch
 	return Checkout{Repository: wc, Worktree: wc, Path: path, Author: author}
 }
 
-// configValue is "" when key is unset, which git reports with exit code 1.
+// configValue is "" when key is unset: git then exits 1 and prints nothing.
 func (rs *Git) configValue(ctx context.Context, dir string, key string) string {
-	out, err := rs.run(ctx, dir, "config", "--get", key)
-	if err != nil {
-		return ""
-	}
+	out, _ := rs.run(ctx, dir, "config", "--get", key)
 	return strings.TrimSpace(out)
 }
 
@@ -328,7 +316,7 @@ func (w *workingCopy) Head(ctx context.Context) (string, error) {
 
 func (w *workingCopy) BranchExists(ctx context.Context, name string) (bool, error) {
 	_, err := w.git.run(ctx, w.dir, "show-ref", "--verify", "--quiet", "refs/heads/"+name)
-	if exitCode(err) == 1 {
+	if exitedWith(err, 1) {
 		return false, nil
 	}
 	return err == nil, err
@@ -377,8 +365,12 @@ func (w *workingCopy) RemoteBranchExists(ctx context.Context, name string, token
 
 func (w *workingCopy) Stage(ctx context.Context, paths ...string) error {
 	stageable, err := w.stageable(ctx, paths)
-	if err != nil || len(stageable) == 0 {
+	if err != nil {
 		return err
+	}
+	// With no pathspec at all, git add --all would stage the whole tree.
+	if len(stageable) == 0 {
+		return nil
 	}
 	_, err = w.git.run(ctx, w.dir, append([]string{"add", "--all", "--"}, literal(stageable)...)...)
 	return err
@@ -403,8 +395,8 @@ func (w *workingCopy) stageable(ctx context.Context, paths []string) ([]string, 
 	cmd := w.git.command(ctx, w.dir, "", "check-ignore", "--stdin", "-z")
 	cmd.Stdin = strings.NewReader(strings.Join(known, "\x00") + "\x00")
 	out, err := cmd.Output()
-	if err != nil && exitCode(err) != 1 {
-		return nil, fmt.Errorf("git check-ignore: %w", err)
+	if err != nil && !exitedWith(err, 1) {
+		return nil, fmt.Errorf("failed to read which paths git ignores: %w", err)
 	}
 	ignored := splitZ(string(out))
 	return slices.DeleteFunc(known, func(p string) bool { return slices.Contains(ignored, p) }), nil

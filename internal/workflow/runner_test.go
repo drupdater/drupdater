@@ -2194,14 +2194,16 @@ func TestStageScaffoldChanges(t *testing.T) {
 		worktree := NewMockWorktree(t)
 		worktree.EXPECT().Unstaged(anyCtx).Return([]string{"web/robots.txt", "web/.htaccess"}, nil)
 		worktree.EXPECT().Stage(anyCtx, []string{"web/.htaccess", "web/robots.txt"}).Return(nil)
+		core, logs := observer.New(zap.InfoLevel)
 
 		ws := testRun(services{
-			logger:   logger,
+			logger:   zap.New(core),
 			config:   config.Config{Sites: []string{"default"}},
 			composer: newComposer("web/"),
 		}, repo.Checkout{Worktree: worktree, Path: "/project"})
 
 		require.NoError(t, ws.stageScaffoldChanges(context.Background()))
+		require.Equal(t, 1, logs.FilterMessage("staged scaffold changes").Len())
 	})
 
 	t.Run("stages nothing outside the web root", func(t *testing.T) {
@@ -2274,12 +2276,12 @@ func TestStageScaffoldChanges(t *testing.T) {
 	t.Run("propagates a staging failure", func(t *testing.T) {
 		worktree := NewMockWorktree(t)
 		worktree.EXPECT().Unstaged(anyCtx).Return([]string{"web/robots.txt"}, nil)
-		worktree.EXPECT().Stage(anyCtx, []string{"web/robots.txt"}).Return(errors.New("locked"))
+		worktree.EXPECT().Stage(anyCtx, []string{"web/robots.txt"}).Return(assert.AnError)
 
 		ws := testRun(services{logger: logger, composer: newComposer("web/")}, repo.Checkout{Worktree: worktree, Path: "/project"})
 
 		err := ws.stageScaffoldChanges(context.Background())
-		require.Error(t, err)
+		require.ErrorIs(t, err, assert.AnError)
 		assert.Contains(t, err.Error(), "failed to stage web/robots.txt")
 	})
 }
