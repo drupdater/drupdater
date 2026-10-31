@@ -30,15 +30,15 @@ func CheckFailed(name string, detail string) CheckResult {
 
 // ShallowCloneChecker is all CheckGitHistoryComplete needs, so a caller can supply a small double.
 type ShallowCloneChecker interface {
-	IsShallowClone(path string) (bool, error)
+	IsShallowClone(ctx context.Context, path string) (bool, error)
 }
 
 // CheckGitHistoryComplete reports whether workingDir is a shallow clone, which commits fine but
 // fails the push much later with a cryptic "object not found".
-func CheckGitHistoryComplete(repository ShallowCloneChecker, workingDir string) CheckResult {
+func CheckGitHistoryComplete(ctx context.Context, repository ShallowCloneChecker, workingDir string) CheckResult {
 	const name = "git history complete (not a shallow clone)"
 
-	shallow, err := repository.IsShallowClone(workingDir)
+	shallow, err := repository.IsShallowClone(ctx, workingDir)
 	if err != nil {
 		return CheckFailed(name, fmt.Sprintf("could not determine clone depth: %s", err))
 	}

@@ -5,9 +5,6 @@ import (
 	"fmt"
 
 	"github.com/drupdater/drupdater/internal/mergerequest"
-	"github.com/drupdater/drupdater/internal/repo"
-	git "github.com/go-git/go-git/v5"
-	gitConfig "github.com/go-git/go-git/v5/config"
 	"go.uber.org/zap"
 )
 
@@ -26,14 +23,7 @@ func (r *run) renderMergeRequest() (string, string, error) {
 }
 
 func (r *run) publish(ctx context.Context, updateBranchName, title, description string) error {
-	err := r.repository.Push(&git.PushOptions{
-		RemoteName: "origin",
-		RefSpecs: []gitConfig.RefSpec{
-			gitConfig.RefSpec(fmt.Sprintf("refs/heads/%s:refs/heads/%s", updateBranchName, updateBranchName)),
-		},
-		Auth: repo.BasicAuth(r.config.Token),
-	})
-
+	err := r.repository.Push(ctx, updateBranchName, r.config.Token)
 	if err != nil {
 		return fmt.Errorf("failed to push changes: %w", err)
 	}

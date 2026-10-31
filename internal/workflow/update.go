@@ -6,7 +6,6 @@ import (
 	"slices"
 	"strings"
 
-	git "github.com/go-git/go-git/v5"
 	"go.uber.org/zap"
 
 	"github.com/drupdater/drupdater/internal/composer"
@@ -19,44 +18,31 @@ import (
 //
 // Tracked paths only: vendor/ and web/core legitimately sit untracked in the checkout.
 func (r *run) stageScaffoldChanges(ctx context.Context) error {
-	status, err := r.worktree.Status()
+	changed, err := r.worktree.Unstaged(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to read worktree status: %w", err)
 	}
-
-	// Sorted so the staging order does not depend on map iteration.
-	candidates := make([]string, 0, len(status))
-	for file, fileStatus := range status {
-		if fileStatus.Worktree == git.Untracked || fileStatus.Worktree == git.Unmodified {
-			continue
-		}
-		candidates = append(candidates, file)
-	}
-	if len(candidates) == 0 {
+	if len(changed) == 0 {
 		return nil
 	}
-	slices.Sort(candidates)
 
 	// Looked up only when there is something to stage, to save a composer subprocess.
 	webroot, err := drupal.WebRoot(ctx, r.composer, r.path)
 	if err != nil {
 		return fmt.Errorf("failed to determine web root: %w", err)
 	}
-	staged := make([]string, 0, len(candidates))
-	for _, file := range candidates {
-		// Web root only: everything outside it belongs to a later phase, and sweeping it in
-		// here would commit it mid-update, still carrying the baseline install's state.
-		if !strings.HasPrefix(file, webroot+"/") {
-			continue
-		}
-		if _, err := r.worktree.Add(file); err != nil {
-			return fmt.Errorf("failed to stage %s: %w", file, err)
-		}
-		staged = append(staged, file)
+	// Web root only: everything outside it belongs to a later phase, and sweeping it in here
+	// would commit it mid-update, still carrying the baseline install's state.
+	staged := slices.DeleteFunc(slices.Sorted(slices.Values(changed)), func(file string) bool {
+		return !strings.HasPrefix(file, webroot+"/")
+	})
+	if len(staged) == 0 {
+		return nil
 	}
-	if len(staged) > 0 {
-		r.logger.Info("staged scaffold changes", zap.Strings("files", staged))
+	if err := r.worktree.Stage(ctx, staged...); err != nil {
+		return fmt.Errorf("failed to stage %s: %w", strings.Join(staged, ", "), err)
 	}
+	r.logger.Info("staged scaffold changes", zap.Strings("files", staged))
 	return nil
 }
 
@@ -99,7 +85,7 @@ func (r *run) resolveUpdate(ctx context.Context) (string, error) {
 	}
 	updateBranchName := fmt.Sprintf("update-%s", composerLockHash)
 
-	if err := r.ensureUpdateBranchAvailable(updateBranchName); err != nil {
+	if err := r.ensureUpdateBranchAvailable(ctx, updateBranchName); err != nil {
 		return "", err
 	}
 	return updateBranchName, nil
@@ -117,13 +103,13 @@ func (r *run) updateSharedCode(ctx context.Context) error {
 		return err
 	}
 
-	if err := r.worktree.AddGlob("composer.*"); err != nil {
+	if err := r.worktree.StageGlob(ctx, "composer.*"); err != nil {
 		return fmt.Errorf("failed to add composer.* files: %w", err)
 	}
 	if err := r.stageScaffoldChanges(ctx); err != nil {
 		return err
 	}
-	if _, err := r.worktree.Commit("Update composer.json and composer.lock", commitOptions(r.author)); err != nil {
+	if err := r.worktree.Commit(ctx, "Update composer.json and composer.lock", r.author); err != nil {
 		return fmt.Errorf("failed to commit composer.json and composer.lock: %w", err)
 	}
 

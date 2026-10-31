@@ -16,16 +16,16 @@ import (
 )
 
 // resolveCheckoutSettings fills the URL and target branch from the checkout, overwriting --branch.
-func resolveCheckoutSettings(git *repo.Git, cfg *config.Config) error {
+func resolveCheckoutSettings(ctx context.Context, git *repo.Git, cfg *config.Config) error {
 	if cfg.RepositoryURL == "" {
-		remoteURL, err := git.GetRemoteURL(cfg.WorkingDir)
+		remoteURL, err := git.GetRemoteURL(ctx, cfg.WorkingDir)
 		if err != nil {
 			return fmt.Errorf("failed to determine repository URL from checkout (pass --repository-url or fix the checkout): %w", err)
 		}
 		cfg.RepositoryURL = remoteURL
 	}
 
-	branch, err := resolveCheckoutBranch(git, cfg.WorkingDir)
+	branch, err := resolveCheckoutBranch(ctx, git, cfg.WorkingDir)
 	if err != nil {
 		return err
 	}
@@ -34,8 +34,8 @@ func resolveCheckoutSettings(git *repo.Git, cfg *config.Config) error {
 }
 
 // resolveCheckoutBranch returns the checkout's branch, or the CI variable when in detached HEAD.
-func resolveCheckoutBranch(git *repo.Git, workingDir string) (string, error) {
-	branch, err := git.GetCurrentBranch(workingDir)
+func resolveCheckoutBranch(ctx context.Context, git *repo.Git, workingDir string) (string, error) {
+	branch, err := git.GetCurrentBranch(ctx, workingDir)
 	if err != nil {
 		return "", fmt.Errorf("failed to determine branch from checkout: %w", err)
 	}

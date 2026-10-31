@@ -173,11 +173,11 @@ func (a app) runUpdate(cmd *cobra.Command, args []string, opts options) error {
 	}
 	defer os.RemoveAll(siteData)
 	installer := siteinstall.NewInstaller(logger, drush, composer, siteData)
-	git := repo.New(logger)
+	git := repo.New()
 
 	// In checkout mode the URL and target branch come from the checkout; --branch is --clone only.
 	if !cfg.Clone {
-		if err := resolveCheckoutSettings(git, &cfg); err != nil {
+		if err := resolveCheckoutSettings(cmd.Context(), git, &cfg); err != nil {
 			logger.Error("cannot use the checkout", zap.Error(err))
 			return err
 		}

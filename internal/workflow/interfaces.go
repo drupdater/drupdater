@@ -36,8 +36,7 @@ type Drush interface {
 
 // GitService clones and inspects repositories. A run's own repository is a GitRepository.
 type GitService interface {
-	BranchExists(repository repo.Repository, branch string, token string) (bool, error)
-	CloneRepository(repository string, branch string, token string, requested repo.Identity) (repo.Checkout, error)
+	CloneRepository(ctx context.Context, repository string, branch string, token string, requested repo.Identity) (repo.Checkout, error)
 	AddWorktree(ctx context.Context, source string, requested repo.Identity) (repo.Checkout, error)
 	RemoveWorktree(ctx context.Context, source string, path string) error
 	ShallowCloneChecker

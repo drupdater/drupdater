@@ -1,6 +1,7 @@
 package addon
 
 import (
+	"context"
 	"sync"
 
 	"github.com/drupdater/drupdater/internal/workflow"
@@ -20,7 +21,7 @@ type fakeCommitter struct {
 	err       error
 }
 
-func (f *fakeCommitter) Commit(message string, paths ...string) (bool, error) {
+func (f *fakeCommitter) Commit(_ context.Context, message string, paths ...string) (bool, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.commits = append(f.commits, recordedCommit{message: message, paths: paths})

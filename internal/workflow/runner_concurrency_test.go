@@ -13,8 +13,6 @@ import (
 	"github.com/drupdater/drupdater/internal/codehosting"
 	"github.com/drupdater/drupdater/internal/composer"
 	"github.com/drupdater/drupdater/internal/config"
-	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -73,9 +71,10 @@ func TestRunWithConcurrentSites(t *testing.T) {
 	}
 
 	worktree := NewMockWorktree(t)
-	worktree.EXPECT().Commit(mock.Anything, mock.Anything).Return(plumbing.NewHash(""), nil)
-	worktree.EXPECT().AddGlob(mock.Anything).Return(nil)
-	worktree.EXPECT().Status().Return(git.Status{}, nil).Maybe()
+	worktree.EXPECT().Commit(anyCtx, mock.Anything, mock.Anything).Return(nil)
+	worktree.EXPECT().StageGlob(anyCtx, mock.Anything).Return(nil)
+	worktree.EXPECT().Unstaged(anyCtx).Return(nil, nil).Maybe()
+	worktree.EXPECT().Staged(anyCtx).Return(nil, nil).Maybe()
 
 	// Two opposite invariants, measured by peak occupancy rather than by the race detector: the
 	// git index the commit tail writes is mocked here, so nothing about it is shared memory.
@@ -89,16 +88,16 @@ func TestRunWithConcurrentSites(t *testing.T) {
 		drush.EXPECT().Facts(anyCtx, testCheckout, site).Return(syncFacts(testCheckout+"/config/"+site), nil)
 		drush.EXPECT().UpdateSite(anyCtx, testCheckout, site).Return(nil)
 		drush.EXPECT().ExportConfiguration(anyCtx, testCheckout, site).RunAndReturn(commitTail.probe)
-		worktree.EXPECT().Add("config/"+site).Return(plumbing.ZeroHash, nil)
+		worktree.EXPECT().Stage(anyCtx, []string{"config/" + site}).Return(nil)
 		drush.EXPECT().ConfigResave(anyCtx, testCheckout, site).Return(nil)
 		drush.EXPECT().LocalFacts(anyCtx, testCheckout, site).Return(syncFacts(testCheckout+"/config/"+site), nil)
 	}
 
-	repositoryService.EXPECT().CloneRepository(config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
-	repositoryService.EXPECT().IsShallowClone(testCheckout).Return(false, nil)
-	repositoryService.EXPECT().BranchExists(repository, mock.Anything, mock.Anything).Return(false, nil)
-	repository.EXPECT().Reference(mock.Anything, mock.Anything).Return(nil, plumbing.ErrReferenceNotFound)
-	repository.EXPECT().Push(mock.Anything).Return(nil)
+	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
+	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
+	repository.EXPECT().RemoteBranchExists(anyCtx, mock.Anything, mock.Anything).Return(false, nil)
+	repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
+	repository.EXPECT().Push(anyCtx, mock.Anything, mock.Anything).Return(nil)
 
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)

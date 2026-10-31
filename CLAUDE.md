@@ -109,7 +109,7 @@ Where things live. For *how they work*, read `docs/explanation/` rather than dup
 | `internal/report/` | The published JSON report schema and its atomic writer |
 | `internal/logging/redact.go` | Value-based secret redaction, wrapping the zap core |
 | `internal/golden/` | Golden-file comparison and the `-update` flag; imported only from tests |
-| `internal/composer/`, `drush/`, `repo/`, `phpcs/`, `rector/`, `drupalorg/` | One directory per wrapped external tool: `repo` is go-git, `drupalorg` is drupal.org issues and its GitLab at git.drupalcode.org |
+| `internal/composer/`, `drush/`, `repo/`, `phpcs/`, `rector/`, `drupalorg/` | One directory per wrapped external tool: `repo` is the git CLI, `drupalorg` is drupal.org issues and its GitLab at git.drupalcode.org |
 | `internal/drupal/` | Where a Drupal project keeps things: web root, custom code directories, drush-reported paths |
 | `internal/siteinstall/` | Installs a throwaway SQLite site for the `check --full` tier |
 | `internal/php/` | What the PHP wrappers share: running a command under Composer's environment, decoding JSON output, and the `CommandFactory` each wrapper holds as its test seam |
@@ -119,7 +119,8 @@ Where things live. For *how they work*, read `docs/explanation/` rather than dup
 ### Invariants worth knowing before editing
 
 - **Addons never call each other.** On `pre-composer-update` they return a `workflow.UpdatePlan` proposal and read the merged plan of earlier stages (`internal/workflow/plan.go`); no event is mutable.
-- **A run never touches the user's checkout.** Checkout mode works in a linked worktree (`repo.AddWorktree`), commits are signed explicitly, and nothing writes the repository's git config or shells out to git there; the update branch is the only thing a run adds.
+- **A run never touches the user's checkout.** Checkout mode works in a linked worktree (`repo.AddWorktree`), commits are signed explicitly, and nothing writes the repository's git config; the update branch is the only thing a run leaves behind.
+- **Every git operation goes through `repo.Git`**, the git CLI with `commonArgs` (`internal/repo/repo.go`): ownership check off, no hooks, no signing. A token reaches git only through the credential helper's environment, never argv or a config file.
 - **Addons never touch git.** A `workflow.Produce` (or, on `pre-composer-update`, `workflow.ProduceProposal`) hook returns the paths it changed as `Commits`, and an `On` hook can commit nothing; the runner's committer (`internal/workflow/commit.go`) commits exactly those, and refuses when something else is already staged.
 - **Each addon declares the tool interfaces it uses**, in its own file, with only the methods it calls (`AuditComposer`, `UpdateHooksDrush`). No two addons share one — `TestNoTwoAddonsShareAToolInterface` fails otherwise — and `cmd`'s `addonComposer`/`addonDrush` embed them all.
 - **An event type names itself and its `Hooks` field** (`name()`, `hook()` in `internal/workflow/event.go`), so `workflow.Fire` runs any event and `Pipeline` has no per-event code. A new event is that type, its `Hooks` field, and the `Fire` call in the runner.

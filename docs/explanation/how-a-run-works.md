@@ -28,14 +28,23 @@ temporary directory.
 The worktree shares the checkout's history but has its own files and its own `HEAD`, so
 nothing the run does reaches the checkout: not its branch, not its working tree, not its
 untracked files. A worktree holds only tracked files, which is why the next phases install
-`vendor/` there from scratch, just as in a clone. Creating one needs the `git` CLI, which
-the Docker image includes. Drupdater's git commands pass `-c safe.directory=*`: a checkout
-mounted into the container belongs to another user, which git would otherwise refuse as
-"dubious ownership". Nothing is written to any git config for it.
+`vendor/` there from scratch, just as in a clone.
+
+Every git operation runs the `git` CLI, which the Docker image includes. Each command
+overrides, for itself alone, the configuration that belongs to the project's developers
+rather than to a run:
+
+- `-c safe.directory=*`: a checkout mounted into the container belongs to another user,
+  which git would otherwise refuse as "dubious ownership".
+- `-c core.hooksPath=/dev/null`, plus `--no-verify` on commit and push: the project's hooks
+  are for its developers' commits, and a failing one would block the run's.
+- `-c commit.gpgSign=false`: a signing setup needs a key the CI runner does not have.
+
+Nothing is written to any git config for any of it.
 
 Commits are signed explicitly — the platform's user, else the identity git config supplies,
 else `drupdater <drupdater@localhost>` — so drupdater writes nothing into the repository's
-git config, and runs none of its hooks.
+git config.
 
 This is a recorded phase rather than setup because a bad token, an unreachable host or an
 unreadable checkout is one of the most common real failures — and a failure here should be

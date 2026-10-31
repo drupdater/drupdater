@@ -158,7 +158,7 @@ func (r *Runner) Run(ctx context.Context, addons []Addon) (err error) {
 
 	branch, err := newRun(r.services, checkout, hooks, rec).execute(ctx)
 	if err != nil {
-		r.removeUpdateBranch(checkout.Repository, branch)
+		r.removeUpdateBranch(context.WithoutCancel(ctx), checkout.Repository, branch)
 	}
 	return err
 }
@@ -168,7 +168,7 @@ func (r *run) execute(ctx context.Context) (branch string, err error) {
 	// Fail fast on the prerequisites "drupdater check" shares. Extension requirements are
 	// deliberately not among them — see CheckPlatformReqs.
 	if err := r.rec.Run("preflight", func() error {
-		if result := CheckGitHistoryComplete(r.git, r.path); !result.OK {
+		if result := CheckGitHistoryComplete(ctx, r.git, r.path); !result.OK {
 			return fmt.Errorf("%s: %s", result.Name, result.Detail)
 		}
 		if result := CheckPlatformRequirements(ctx, r.composer, r.path); !result.OK {
@@ -225,7 +225,7 @@ func (r *run) execute(ctx context.Context) (branch string, err error) {
 		if err := r.updateSites(ctx); err != nil {
 			return err
 		}
-		if err := r.createUpdateBranch(updateBranchName); err != nil {
+		if err := r.createUpdateBranch(ctx, updateBranchName); err != nil {
 			return err
 		}
 		branch = updateBranchName
@@ -262,7 +262,7 @@ func (s services) acquireWorkingCopy(ctx context.Context, username, email string
 	requested := repo.Identity{Name: username, Email: email}
 	if s.config.Clone {
 		s.logger.Info("cloning repository", zap.String("url", s.config.RepositoryURL), zap.String("branch", s.config.Branch))
-		return s.git.CloneRepository(s.config.RepositoryURL, s.config.Branch, s.config.Token, requested)
+		return s.git.CloneRepository(ctx, s.config.RepositoryURL, s.config.Branch, s.config.Token, requested)
 	}
 	return s.git.AddWorktree(ctx, s.config.WorkingDir, requested)
 }

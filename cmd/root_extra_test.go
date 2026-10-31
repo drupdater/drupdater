@@ -11,9 +11,6 @@ import (
 	"github.com/drupdater/drupdater/internal/config"
 	"github.com/drupdater/drupdater/internal/logging"
 	"github.com/drupdater/drupdater/internal/repo"
-	git "github.com/go-git/go-git/v5"
-	gitConfig "github.com/go-git/go-git/v5/config"
-	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -217,48 +214,39 @@ func TestLoadProjectConfig(t *testing.T) {
 func initCheckout(t *testing.T, originURL string) string {
 	t.Helper()
 	dir := t.TempDir()
-	r, err := git.PlainInit(dir, false)
-	require.NoError(t, err)
-	wt, err := r.Worktree()
-	require.NoError(t, err)
-	_, err = wt.Commit("init", &git.CommitOptions{
-		AllowEmptyCommits: true,
-		Author:            &object.Signature{Name: "t", Email: "t@example.com"},
-	})
-	require.NoError(t, err)
+	gitInitWithCommit(t, dir)
 	if originURL != "" {
-		_, err = r.CreateRemote(&gitConfig.RemoteConfig{Name: "origin", URLs: []string{originURL}})
-		require.NoError(t, err)
+		gitIn(t, dir, "remote", "add", "origin", originURL)
 	}
 	return dir
 }
 
 func TestResolveCheckoutSettings(t *testing.T) {
-	svc := repo.New(zap.NewNop())
+	svc := repo.New()
 
 	t.Run("takes the URL and branch from the checkout", func(t *testing.T) {
 		dir := initCheckout(t, "https://token:secret@example.com/group/repo.git")
 
 		cfg := config.Config{WorkingDir: dir, Branch: "main"}
-		require.NoError(t, resolveCheckoutSettings(svc, &cfg))
+		require.NoError(t, resolveCheckoutSettings(t.Context(), svc, &cfg))
 
 		// Credentials embedded by CI are stripped.
 		assert.Equal(t, "https://example.com/group/repo.git", cfg.RepositoryURL)
 		// --branch is overridden by what the checkout actually has.
-		assert.Equal(t, "master", cfg.Branch)
+		assert.Equal(t, "main", cfg.Branch)
 	})
 
 	t.Run("keeps an explicitly given repository URL", func(t *testing.T) {
 		dir := initCheckout(t, "https://example.com/group/repo.git")
 
 		cfg := config.Config{WorkingDir: dir, RepositoryURL: "https://example.com/other/repo.git"}
-		require.NoError(t, resolveCheckoutSettings(svc, &cfg))
+		require.NoError(t, resolveCheckoutSettings(t.Context(), svc, &cfg))
 		assert.Equal(t, "https://example.com/other/repo.git", cfg.RepositoryURL)
 	})
 
 	t.Run("errors when there is no origin remote", func(t *testing.T) {
 		cfg := config.Config{WorkingDir: initCheckout(t, "")}
-		err := resolveCheckoutSettings(svc, &cfg)
+		err := resolveCheckoutSettings(t.Context(), svc, &cfg)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to determine repository URL from checkout")
 	})
@@ -268,16 +256,10 @@ func TestResolveCheckoutSettings(t *testing.T) {
 		t.Setenv("CI_COMMIT_REF_NAME", "")
 
 		dir := initCheckout(t, "https://example.com/group/repo.git")
-		r, err := git.PlainOpen(dir)
-		require.NoError(t, err)
-		head, err := r.Head()
-		require.NoError(t, err)
-		wt, err := r.Worktree()
-		require.NoError(t, err)
-		require.NoError(t, wt.Checkout(&git.CheckoutOptions{Hash: head.Hash()}))
+		gitIn(t, dir, "checkout", "--quiet", "--detach")
 
 		cfg := config.Config{WorkingDir: dir}
-		require.Error(t, resolveCheckoutSettings(svc, &cfg))
+		require.Error(t, resolveCheckoutSettings(t.Context(), svc, &cfg))
 	})
 }
 

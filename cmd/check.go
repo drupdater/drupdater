@@ -69,16 +69,16 @@ func (a app) runCheck(cmd *cobra.Command, args []string, opts options) error {
 	token := checkToken(args)
 	redactor.Register(token)
 
-	gitSvc := repo.New(logger)
+	ctx := cmd.Context()
+	gitSvc := repo.New()
 	var resolveErr error
 	if !cfg.Clone {
-		resolveErr = resolveCheckoutSettings(gitSvc, &cfg)
+		resolveErr = resolveCheckoutSettings(ctx, gitSvc, &cfg)
 	}
 
 	composerCLI := composer.NewCLI(logger)
 	defer composerCLI.Cleanup()
 
-	ctx := cmd.Context()
 	results := a.runCheapChecks(ctx, logger, configFilePath(opts.configFile, cfg.WorkingDir), &cfg, gitSvc, composerCLI, afero.NewOsFs(), token, resolveErr)
 
 	if opts.checkFull {
@@ -116,7 +116,7 @@ func (a app) runCheapChecks(
 ) []workflow.CheckResult {
 	var results []workflow.CheckResult
 	results = append(results, checkConfigAndAddons(a.addons, cfgFilePath, cfg)...)
-	results = append(results, workflow.CheckGitHistoryComplete(repository, cfg.WorkingDir))
+	results = append(results, workflow.CheckGitHistoryComplete(ctx, repository, cfg.WorkingDir))
 	results = append(results, workflow.CheckPlatformRequirements(ctx, composerSvc, cfg.WorkingDir))
 	for _, site := range cfg.Sites {
 		results = append(results, workflow.CheckSiteSettings(ctx, composerSvc, fs, cfg.WorkingDir, site))
@@ -222,7 +222,7 @@ type siteInstaller interface {
 // fullCheckDeps holds constructors rather than values, so the tier keeps its build order:
 // composer only once the clone succeeded, the installer only once composer install did.
 type fullCheckDeps struct {
-	clone        func(repositoryURL string, branch string, token string) (string, error)
+	clone        func(ctx context.Context, repositoryURL string, branch string, token string) (string, error)
 	newComposer  func() fullCheckComposer
 	newInstaller func(c fullCheckComposer, dataDir string, drushInclude string) (siteInstaller, error)
 }
@@ -230,9 +230,9 @@ type fullCheckDeps struct {
 // realFullCheckDeps builds the dependencies that really clone and install.
 func realFullCheckDeps(logger *zap.Logger) fullCheckDeps {
 	return fullCheckDeps{
-		clone: func(repositoryURL string, branch string, token string) (string, error) {
-			checkout, err := repo.New(logger).
-				CloneRepository(repositoryURL, branch, token, repo.Identity{})
+		clone: func(ctx context.Context, repositoryURL string, branch string, token string) (string, error) {
+			checkout, err := repo.New().
+				CloneRepository(ctx, repositoryURL, branch, token, repo.Identity{})
 			return checkout.Path, err
 		},
 		newComposer: func() fullCheckComposer { return composer.NewCLI(logger) },
@@ -256,7 +256,7 @@ func (a app) runFullChecks(ctx context.Context, logger *zap.Logger, cfg config.C
 
 	deps := a.newFullCheckDeps(logger)
 
-	path, err := deps.clone(cfg.RepositoryURL, branch, token)
+	path, err := deps.clone(ctx, cfg.RepositoryURL, branch, token)
 	if err != nil {
 		return []workflow.CheckResult{workflow.CheckFailed("clone for full check", err.Error())}
 	}

@@ -62,7 +62,7 @@ func appWithFullCheckDoubles(clonePath string, cloneErr error, composerDouble *f
 	a := testApp()
 	a.newFullCheckDeps = func(*zap.Logger) fullCheckDeps {
 		return fullCheckDeps{
-			clone: func(repositoryURL string, branch string, token string) (string, error) {
+			clone: func(_ context.Context, repositoryURL string, branch string, token string) (string, error) {
 				*cloneArgs = []string{repositoryURL, branch, token}
 				return clonePath, cloneErr
 			},

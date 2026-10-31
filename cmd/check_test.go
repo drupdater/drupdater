@@ -155,7 +155,9 @@ type fakeShallowCloneChecker struct {
 	err     error
 }
 
-func (f fakeShallowCloneChecker) IsShallowClone(string) (bool, error) { return f.shallow, f.err }
+func (f fakeShallowCloneChecker) IsShallowClone(context.Context, string) (bool, error) {
+	return f.shallow, f.err
+}
 
 type fakeCheapChecksComposer struct {
 	platformReqsOut string
