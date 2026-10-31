@@ -25,11 +25,8 @@ func (uh *UpdateHooks) Hooks() workflow.Hooks {
 func (uh *UpdateHooks) preSiteUpdateHandler(evt *workflow.PreSiteUpdateEvent) (map[string]drush.UpdateHook, error) {
 	hooks := evt.Facts().UpdateHooks
 	uh.logger.Debug("update hooks", zap.Any("hooks", hooks))
-	if len(hooks) == 0 {
-		uh.logger.Debug("no update hooks found")
-		return hooks, nil
+	if len(hooks) > 0 {
+		uh.logger.Info("update hooks found", zap.String("site", evt.Site()), zap.Int("count", len(hooks)))
 	}
-	uh.logger.Info("update hooks found", zap.String("site", evt.Site()), zap.Int("count", len(hooks)))
-
 	return hooks, nil
 }

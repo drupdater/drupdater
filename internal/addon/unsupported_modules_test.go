@@ -47,13 +47,19 @@ func TestUnsupportedModulesReportsAModuleTwoSitesShareOnce(t *testing.T) {
 	assert.Equal(t, []drush.UnsupportedModule{shared}, reportSection(p, "unsupported_modules"))
 }
 
-func TestUnsupportedModulesFindsNothingWithoutModules(t *testing.T) {
-	um := NewUnsupportedModules(zap.NewNop())
+func TestUnsupportedModulesLogsOnlyASiteWithModules(t *testing.T) {
+	core, logs := observer.New(zapcore.InfoLevel)
+	um := NewUnsupportedModules(zap.New(core))
 
 	found, err := um.preSiteUpdateHandler(unsupportedEvent("default", drush.Facts{}))
-
 	require.NoError(t, err)
-	assert.Nil(t, found)
+	assert.Empty(t, found)
+	assert.Zero(t, logs.Len())
+
+	_, err = um.preSiteUpdateHandler(unsupportedEvent("second", drush.Facts{UnsupportedModules: []drush.UnsupportedModule{{Name: "module_a"}}}))
+	require.NoError(t, err)
+	require.Equal(t, 1, logs.Len())
+	assert.Equal(t, map[string]any{"site": "second", "count": int64(1)}, logs.All()[0].ContextMap())
 }
 
 // Best-effort: an unreachable update status service must not abort the run.

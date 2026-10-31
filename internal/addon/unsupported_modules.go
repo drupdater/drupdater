@@ -35,11 +35,8 @@ func (um *UnsupportedModules) preSiteUpdateHandler(evt *workflow.PreSiteUpdateEv
 		return nil, nil
 	}
 	modules := facts.UnsupportedModules
-	if len(modules) == 0 {
-		return nil, nil
+	if len(modules) > 0 {
+		um.logger.Info("unsupported modules found", zap.String("site", evt.Site()), zap.Int("count", len(modules)))
 	}
-
-	um.logger.Info("unsupported modules found", zap.String("site", evt.Site()), zap.Int("count", len(modules)))
-
 	return modules, nil
 }
