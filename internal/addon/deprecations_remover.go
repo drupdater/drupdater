@@ -27,9 +27,6 @@ type DeprecationsRemover struct {
 	projectRector Rector
 	bundledRector Rector
 	composer      DeprecationsComposer
-
-	// For the report. Written once from the single post-code-update event, read after the run.
-	fixes []DeprecationFix
 }
 
 // NewDeprecationsRemover runs projectRector when the project has drupal-rector, bundledRector
@@ -45,38 +42,37 @@ func NewDeprecationsRemover(logger *zap.Logger, projectRector Rector, bundledRec
 
 func (dr *DeprecationsRemover) Hooks() workflow.Hooks {
 	return workflow.Hooks{
-		PostCodeUpdate: workflow.On(workflow.Change, dr.postCodeUpdateHandler),
+		PostCodeUpdate: workflow.Produce(workflow.Change, dr.postCodeUpdateHandler),
 	}
 }
 
-func (dr *DeprecationsRemover) postCodeUpdateHandler(evt *workflow.PostCodeUpdateEvent) error {
+func (dr *DeprecationsRemover) postCodeUpdateHandler(evt *workflow.PostCodeUpdateEvent) (workflow.Result[[]DeprecationFix], error) {
 	dr.logger.Info("removing deprecations")
 
 	rector := dr.rectorFor(evt.Context(), evt.Path())
 	if rector == nil {
-		return nil
+		return workflow.Result[[]DeprecationFix]{}, nil
 	}
 
 	customCodeDirectories, err := dr.composer.GetCustomCodeDirectories(evt.Context(), evt.Path())
 	if err != nil {
-		return err
+		return workflow.Result[[]DeprecationFix]{}, err
 	}
 
 	deprecationRemovalResult, err := rector.Run(evt.Context(), evt.Path(), customCodeDirectories)
 	if err != nil {
-		return err
+		return workflow.Result[[]DeprecationFix]{}, err
 	}
 
 	if deprecationRemovalResult.Totals.ChangedFiles == 0 {
 		dr.logger.Debug("no deprecations to remove")
-		return nil
+		return workflow.Result[[]DeprecationFix]{}, nil
 	}
 
-	dr.recordFixes(deprecationRemovalResult)
-
-	dr.logger.Debug("committing deprecation removals")
-	_, err = evt.Commit("Remove deprecations", deprecationRemovalResult.ChangedFiles...)
-	return err
+	return workflow.Result[[]DeprecationFix]{
+		Commits: []workflow.Commit{{Message: "Remove deprecations", Paths: deprecationRemovalResult.ChangedFiles}},
+		Finding: deprecationFixes(deprecationRemovalResult),
+	}, nil
 }
 
 // rectorFor returns the Rector that can load the project's code, or nil when neither can.
@@ -92,8 +88,8 @@ func (dr *DeprecationsRemover) rectorFor(ctx context.Context, path string) Recto
 	return dr.bundledRector
 }
 
-// recordFixes captures which rules fired on which files, for the report.
-func (dr *DeprecationsRemover) recordFixes(result rector.ReturnOutput) {
+// deprecationFixes captures which rules fired on which files, for the report.
+func deprecationFixes(result rector.ReturnOutput) []DeprecationFix {
 	rectorsByFile := make(map[string][]string, len(result.FileDiffs))
 	for _, diff := range result.FileDiffs {
 		rectorsByFile[diff.File] = diff.AppliedRectors
@@ -108,5 +104,5 @@ func (dr *DeprecationsRemover) recordFixes(result rector.ReturnOutput) {
 	}
 	// Sorted so two runs over unchanged code produce byte-identical sections.
 	slices.SortFunc(fixes, func(a, b DeprecationFix) int { return cmp.Compare(a.File, b.File) })
-	dr.fixes = fixes
+	return fixes
 }

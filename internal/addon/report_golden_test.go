@@ -92,11 +92,11 @@ func reportingAddons() []workflow.Addon {
 				PatchDescription: "Adjust the form", NewVersion: "6.3.0",
 			}},
 		}),
-		&CodeBeautifier{fixedFiles: []string{"web/modules/custom/acme/acme.module", "web/modules/custom/acme/src/Controller/AcmeController.php"}, fixable: 3},
-		&DeprecationsRemover{fixes: []DeprecationFix{{
+		codeBeautifierFor(CodingStyleFixes{Files: []string{"web/modules/custom/acme/acme.module", "web/modules/custom/acme/src/Controller/AcmeController.php"}, Fixable: 3}),
+		deprecationsFor([]DeprecationFix{{
 			File:           "web/modules/custom/acme/src/Plugin/Block/AcmeBlock.php",
 			AppliedRectors: []string{"Drupal\\Rector\\Rector\\Deprecation\\DrupalSetMessageRector"},
-		}}},
+		}}),
 		translationsFor(map[string]TranslationResult{
 			"default": {Path: "translations", Updated: true},
 			"second":  {Skipped: "locale_deploy not enabled"},

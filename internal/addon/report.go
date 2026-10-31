@@ -170,15 +170,16 @@ type CodingStyleFixes struct {
 	Fixable int      `json:"fixable"`
 }
 
-// ReportKey implements report.Reporter.
+// ReportKey implements workflow.Reporter.
 func (cb *CodeBeautifier) ReportKey() string { return "code_beautifier" }
 
-// ReportData implements report.Reporter.
-func (cb *CodeBeautifier) ReportData() any {
-	if len(cb.fixedFiles) == 0 {
+// ReportData implements workflow.Reporter. Fixes whose commit was not made never reached the branch.
+func (cb *CodeBeautifier) ReportData(findings *workflow.Findings) any {
+	recorded, _ := workflow.Shared[CodingStyleFixes](findings, workflow.EventPostCodeUpdate)
+	if !slices.Contains(recorded.Committed, codingStylesCommitMessage) {
 		return nil
 	}
-	return CodingStyleFixes{Files: cb.fixedFiles, Fixable: cb.fixable}
+	return recorded.Finding
 }
 
 // --- deprecations_remover ---
@@ -190,15 +191,16 @@ type DeprecationFix struct {
 	AppliedRectors []string `json:"applied_rectors,omitempty"`
 }
 
-// ReportKey implements report.Reporter.
+// ReportKey implements workflow.Reporter.
 func (dr *DeprecationsRemover) ReportKey() string { return "deprecations_remover" }
 
-// ReportData implements report.Reporter.
-func (dr *DeprecationsRemover) ReportData() any {
-	if len(dr.fixes) == 0 {
+// ReportData implements workflow.Reporter.
+func (dr *DeprecationsRemover) ReportData(findings *workflow.Findings) any {
+	recorded, _ := workflow.Shared[[]DeprecationFix](findings, workflow.EventPostCodeUpdate)
+	if len(recorded.Finding) == 0 {
 		return nil
 	}
-	return dr.fixes
+	return recorded.Finding
 }
 
 // --- translations_updater ---

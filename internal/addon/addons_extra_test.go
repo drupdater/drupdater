@@ -103,7 +103,8 @@ func TestDeprecationsRemoverErrors(t *testing.T) {
 		composerService.EXPECT().GetCustomCodeDirectories(anyCtx, "/tmp").Return(nil, assert.AnError)
 
 		dr := NewDeprecationsRemover(zap.NewNop(), NewMockRector(t), NewMockRector(t), composerService)
-		require.Error(t, dr.postCodeUpdateHandler(workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", nil)))
+		_, err := dr.postCodeUpdateHandler(workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", nil))
+		require.Error(t, err)
 	})
 
 	t.Run("committing the removals fails", func(t *testing.T) {
@@ -119,7 +120,9 @@ func TestDeprecationsRemoverErrors(t *testing.T) {
 
 		committer := &fakeCommitter{err: assert.AnError}
 		dr := NewDeprecationsRemover(zap.NewNop(), runner, NewMockRector(t), composerService)
-		require.ErrorIs(t, dr.postCodeUpdateHandler(workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", committer)), assert.AnError)
+		p, err := firePostCodeUpdate(dr, workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", committer))
+		require.ErrorIs(t, err, assert.AnError)
+		assert.Nil(t, reportSection(p, "deprecations_remover"), "a run whose commit failed records nothing")
 	})
 }
 

@@ -9,7 +9,7 @@ import (
 	"pgregory.net/rapid"
 )
 
-// recordFixes must produce a byte-identical section for two runs over unchanged code, and
+// deprecationFixes must produce a byte-identical section for two runs over unchanged code, and
 // rector's output order is not this code's to control — hence a permutation property.
 
 func rectorOutputGen() *rapid.Generator[rector.ReturnOutput] {
@@ -37,7 +37,7 @@ func rectorOutputGen() *rapid.Generator[rector.ReturnOutput] {
 	})
 }
 
-func TestPropertyRecordFixesIgnoresRectorsOrdering(t *testing.T) {
+func TestPropertyDeprecationFixesIgnoresRectorsOrdering(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		output := rectorOutputGen().Draw(t, "output")
 		shuffled := rector.ReturnOutput{
@@ -46,29 +46,22 @@ func TestPropertyRecordFixesIgnoresRectorsOrdering(t *testing.T) {
 			FileDiffs:    rapid.Permutation(output.FileDiffs).Draw(t, "fileDiffs"),
 		}
 
-		original := &DeprecationsRemover{}
-		original.recordFixes(output)
-
-		reordered := &DeprecationsRemover{}
-		reordered.recordFixes(shuffled)
-
-		assert.Equal(t, original.fixes, reordered.fixes)
+		assert.Equal(t, deprecationFixes(output), deprecationFixes(shuffled))
 	})
 }
 
-func TestPropertyRecordFixesCoversEveryChangedFile(t *testing.T) {
+func TestPropertyDeprecationFixesCoversEveryChangedFile(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		output := rectorOutputGen().Draw(t, "output")
 
-		remover := &DeprecationsRemover{}
-		remover.recordFixes(output)
+		fixes := deprecationFixes(output)
 
 		// Every file accounted for, with its own rules, and both levels ordered.
-		assert.Len(t, remover.fixes, len(output.ChangedFiles))
-		for i, fix := range remover.fixes {
+		assert.Len(t, fixes, len(output.ChangedFiles))
+		for i, fix := range fixes {
 			assert.ElementsMatch(t, rulesFor(output, fix.File), fix.AppliedRectors, "rules for %q", fix.File)
 			if i > 0 {
-				assert.LessOrEqual(t, remover.fixes[i-1].File, fix.File, "files come out sorted")
+				assert.LessOrEqual(t, fixes[i-1].File, fix.File, "files come out sorted")
 			}
 			if len(fix.AppliedRectors) > 1 {
 				assert.IsIncreasing(t, fix.AppliedRectors, "the rules of %q come out sorted", fix.File)
@@ -77,7 +70,7 @@ func TestPropertyRecordFixesCoversEveryChangedFile(t *testing.T) {
 	})
 }
 
-func TestPropertyRecordFixesLeavesRectorsOutputAlone(t *testing.T) {
+func TestPropertyDeprecationFixesLeavesRectorsOutputAlone(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		output := rectorOutputGen().Draw(t, "output")
 
@@ -88,9 +81,9 @@ func TestPropertyRecordFixesLeavesRectorsOutputAlone(t *testing.T) {
 			before[i] = slices.Clone(diff.AppliedRectors)
 		}
 
-		(&DeprecationsRemover{}).recordFixes(output)
+		deprecationFixes(output)
 
-		// The caller still owns this value, so sorting in place reaches into data recordFixes
+		// The caller still owns this value, so sorting in place reaches into data deprecationFixes
 		// was only given to read.
 		for i, diff := range output.FileDiffs {
 			assert.Equal(t, before[i], diff.AppliedRectors, "AppliedRectors of %q was rewritten", diff.File)
@@ -99,7 +92,7 @@ func TestPropertyRecordFixesLeavesRectorsOutputAlone(t *testing.T) {
 }
 
 // rulesFor looks up a file's recorded rules, unsorted. Deliberately not a second implementation
-// of recordFixes: the property compares the two as sets and checks ordering separately.
+// of deprecationFixes: the property compares the two as sets and checks ordering separately.
 func rulesFor(output rector.ReturnOutput, file string) []string {
 	for _, diff := range output.FileDiffs {
 		if diff.File == file {

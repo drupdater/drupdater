@@ -94,10 +94,10 @@ type HTTPClient interface {
 }
 
 type ComposerPatches1 struct {
-	logger       *zap.Logger
-	composer     PatchesComposer
-	drupalOrg    DrupalOrg
-	drupalCode   DrupalCode
+	logger     *zap.Logger
+	composer   PatchesComposer
+	drupalOrg  DrupalOrg
+	drupalCode DrupalCode
 	httpClient HTTPClient
 	removeFile func(name string) error
 }

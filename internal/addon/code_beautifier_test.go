@@ -19,7 +19,6 @@ func TestCreatePHPCSConfig(t *testing.T) {
 
 	t.Run("Returns error when os.Create fails", func(t *testing.T) {
 		composer := NewMockBeautifierComposer(t)
-		committer := &fakeCommitter{}
 
 		// Use a path that cannot be written to (root-owned directory)
 		const badPath = "/proc/nonexistent"
@@ -28,30 +27,13 @@ func TestCreatePHPCSConfig(t *testing.T) {
 
 		cb := NewCodeBeautifier(logger, nil, nil, composer)
 
-		_, err := cb.CreatePHPCSConfig(context.Background(), badPath, committer)
+		_, err := cb.CreatePHPCSConfig(context.Background(), badPath)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to create phpcs.xml")
 	})
 
-	t.Run("Returns error when committing phpcs.xml fails", func(t *testing.T) {
-		composer := NewMockBeautifierComposer(t)
-		committer := &fakeCommitter{err: assert.AnError}
-		tmpDir := t.TempDir()
-
-		composer.EXPECT().GetInstalledPackageVersion(anyCtx, tmpDir, "drupal/core").Return("10.1.0", nil)
-		composer.EXPECT().GetCustomCodeDirectories(anyCtx, tmpDir).Return([]string{"web/modules/custom"}, nil)
-
-		cb := NewCodeBeautifier(logger, nil, nil, composer)
-
-		created, err := cb.CreatePHPCSConfig(context.Background(), tmpDir, committer)
-		require.Error(t, err)
-		assert.False(t, created)
-		require.ErrorIs(t, err, assert.AnError)
-	})
-
 	t.Run("Returns false and no error when no custom code directories found", func(t *testing.T) {
 		composer := NewMockBeautifierComposer(t)
-		committer := &fakeCommitter{}
 
 		tmpDir := t.TempDir()
 
@@ -60,10 +42,9 @@ func TestCreatePHPCSConfig(t *testing.T) {
 
 		cb := NewCodeBeautifier(logger, nil, nil, composer)
 
-		created, err := cb.CreatePHPCSConfig(context.Background(), tmpDir, committer)
+		created, err := cb.CreatePHPCSConfig(context.Background(), tmpDir)
 		require.NoError(t, err)
 		assert.False(t, created)
-		assert.Empty(t, committer.commits)
 
 		// No phpcs.xml may be left behind on this path. An empty one would be picked up by the
 		// next run as an existing config and fail hasPHPCSPathDefinitions with an XML error.
@@ -72,7 +53,6 @@ func TestCreatePHPCSConfig(t *testing.T) {
 
 	t.Run("Leaves no phpcs.xml behind when GetCustomCodeDirectories fails", func(t *testing.T) {
 		composer := NewMockBeautifierComposer(t)
-		committer := &fakeCommitter{}
 
 		tmpDir := t.TempDir()
 
@@ -81,14 +61,13 @@ func TestCreatePHPCSConfig(t *testing.T) {
 
 		cb := NewCodeBeautifier(logger, nil, nil, composer)
 
-		_, err := cb.CreatePHPCSConfig(context.Background(), tmpDir, committer)
+		_, err := cb.CreatePHPCSConfig(context.Background(), tmpDir)
 		require.Error(t, err)
 		assert.NoFileExists(t, filepath.Join(tmpDir, "phpcs.xml"))
 	})
 
-	t.Run("Creates phpcs.xml and commits when custom code directories found", func(t *testing.T) {
+	t.Run("Creates phpcs.xml when custom code directories found", func(t *testing.T) {
 		composer := NewMockBeautifierComposer(t)
-		committer := &fakeCommitter{}
 
 		tmpDir := t.TempDir()
 
@@ -97,15 +76,14 @@ func TestCreatePHPCSConfig(t *testing.T) {
 
 		cb := NewCodeBeautifier(logger, nil, nil, composer)
 
-		created, err := cb.CreatePHPCSConfig(context.Background(), tmpDir, committer)
+		created, err := cb.CreatePHPCSConfig(context.Background(), tmpDir)
 		require.NoError(t, err)
 		assert.True(t, created)
-		assert.Equal(t, []recordedCommit{{message: "Add PHPCS config", paths: []string{"phpcs.xml"}}}, committer.commits)
+		assert.FileExists(t, filepath.Join(tmpDir, "phpcs.xml"))
 	})
 
 	t.Run("Returns error when template parsing fails", func(t *testing.T) {
 		composer := NewMockBeautifierComposer(t)
-		committer := &fakeCommitter{}
 
 		tmpDir := t.TempDir()
 
@@ -115,14 +93,13 @@ func TestCreatePHPCSConfig(t *testing.T) {
 
 		cb := NewCodeBeautifier(logger, nil, nil, composer)
 
-		_, err := cb.CreatePHPCSConfig(context.Background(), tmpDir, committer)
+		_, err := cb.CreatePHPCSConfig(context.Background(), tmpDir)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to parse phpcs template")
 	})
 
 	t.Run("Returns error when template execution fails", func(t *testing.T) {
 		composer := NewMockBeautifierComposer(t)
-		committer := &fakeCommitter{}
 
 		tmpDir := t.TempDir()
 
@@ -136,7 +113,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 
 		cb := NewCodeBeautifier(logger, nil, nil, composer)
 
-		_, err := cb.CreatePHPCSConfig(context.Background(), tmpDir, committer)
+		_, err := cb.CreatePHPCSConfig(context.Background(), tmpDir)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to execute phpcs template")
 		// A failed render must not leave a partially written file for the next run to trip on.
@@ -149,7 +126,6 @@ func TestCreatePHPCSConfig(t *testing.T) {
 		}
 
 		composer := NewMockBeautifierComposer(t)
-		committer := &fakeCommitter{}
 
 		tmpDir := t.TempDir()
 
@@ -163,14 +139,13 @@ func TestCreatePHPCSConfig(t *testing.T) {
 
 		cb := NewCodeBeautifier(logger, nil, nil, composer)
 
-		_, err := cb.CreatePHPCSConfig(context.Background(), tmpDir, committer)
+		_, err := cb.CreatePHPCSConfig(context.Background(), tmpDir)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to write phpcs.xml")
 	})
 
 	t.Run("Returns error when GetCustomCodeDirectories fails", func(t *testing.T) {
 		composer := NewMockBeautifierComposer(t)
-		committer := &fakeCommitter{}
 
 		tmpDir := t.TempDir()
 
@@ -179,7 +154,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 
 		cb := NewCodeBeautifier(logger, nil, nil, composer)
 
-		_, err := cb.CreatePHPCSConfig(context.Background(), tmpDir, committer)
+		_, err := cb.CreatePHPCSConfig(context.Background(), tmpDir)
 		require.Error(t, err)
 		assert.Equal(t, assert.AnError, err)
 	})
@@ -295,7 +270,7 @@ func TestCodingStyles(t *testing.T) {
 		updateCodingStyles := NewCodeBeautifier(logger, runner, NewMockPHPCS(t), composer)
 		postCodeUpdate := workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", committer)
 
-		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
+		_, err := firePostCodeUpdate(updateCodingStyles, postCodeUpdate)
 		require.NoError(t, err)
 
 		runner.AssertExpectations(t)
@@ -319,7 +294,7 @@ func TestCodingStyles(t *testing.T) {
 		updateCodingStyles := NewCodeBeautifier(logger, runner, NewMockPHPCS(t), composer)
 		postCodeUpdate := workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", committer)
 
-		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
+		_, err := firePostCodeUpdate(updateCodingStyles, postCodeUpdate)
 		require.Error(t, err)
 	})
 
@@ -351,7 +326,7 @@ func TestCodingStyles(t *testing.T) {
 		postCodeUpdate := workflow.NewPostCodeUpdateEvent(context.Background(), "/tmp", committer)
 
 		// Execute and verify
-		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
+		_, err := firePostCodeUpdate(updateCodingStyles, postCodeUpdate)
 		require.NoError(t, err)
 
 		assert.Equal(t, []recordedCommit{{message: "Add PHPCS config", paths: []string{"phpcs.xml"}}}, committer.commits)
@@ -379,7 +354,8 @@ func TestCodingStyles(t *testing.T) {
 
 		committer := &fakeCommitter{}
 		cb := NewCodeBeautifier(logger, NewMockPHPCS(t), bundled, composer)
-		require.NoError(t, cb.postCodeUpdateHandler(workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", committer)))
+		_, err := firePostCodeUpdate(cb, workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", committer))
+		require.NoError(t, err)
 
 		assert.Equal(t, []recordedCommit{
 			{message: "Update coding styles", paths: []string{"web/modules/custom/a.module"}},
@@ -403,7 +379,8 @@ func TestCodingStyles(t *testing.T) {
 
 		committer := &fakeCommitter{}
 		cb := NewCodeBeautifier(logger, project, NewMockPHPCS(t), composer)
-		require.NoError(t, cb.postCodeUpdateHandler(workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", committer)))
+		_, err := firePostCodeUpdate(cb, workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", committer))
+		require.NoError(t, err)
 		assert.Empty(t, committer.commits)
 	})
 
@@ -431,7 +408,7 @@ func TestCodingStyles(t *testing.T) {
 		committer := &fakeCommitter{}
 		updateCodingStyles := NewCodeBeautifier(logger, runner, NewMockPHPCS(t), composer)
 		postCodeUpdate := workflow.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", committer)
-		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
+		_, err := firePostCodeUpdate(updateCodingStyles, postCodeUpdate)
 		require.NoError(t, err)
 		runner.AssertExpectations(t)
 		composer.AssertExpectations(t)
@@ -479,11 +456,11 @@ func TestCodingStyles(t *testing.T) {
 		committer := &fakeCommitter{}
 		updateCodingStyles := NewCodeBeautifier(logger, runner, NewMockPHPCS(t), composer)
 		postCodeUpdate := workflow.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", committer)
-		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
+		p, err := firePostCodeUpdate(updateCodingStyles, postCodeUpdate)
 
 		require.NoError(t, err)
 		assert.Equal(t, []recordedCommit{{message: "Update coding styles", paths: []string{"file1.php"}}}, committer.commits)
-		assert.Equal(t, []string{"file1.php"}, updateCodingStyles.fixedFiles)
+		assert.Equal(t, CodingStyleFixes{Files: []string{"file1.php"}, Fixable: 1}, reportSection(p, "code_beautifier"))
 		runner.AssertExpectations(t)
 		composer.AssertExpectations(t)
 	})
@@ -509,10 +486,10 @@ func TestCodingStyles(t *testing.T) {
 		committer := &fakeCommitter{unchanged: true}
 		updateCodingStyles := NewCodeBeautifier(logger, runner, NewMockPHPCS(t), composer)
 		postCodeUpdate := workflow.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", committer)
-		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
+		p, err := firePostCodeUpdate(updateCodingStyles, postCodeUpdate)
 
 		require.NoError(t, err)
-		assert.Empty(t, updateCodingStyles.fixedFiles, "phpcbf changed nothing, so nothing was fixed")
+		assert.Nil(t, reportSection(p, "code_beautifier"), "phpcbf changed nothing, so nothing was fixed")
 		runner.AssertExpectations(t)
 		composer.AssertExpectations(t)
 	})
@@ -558,9 +535,10 @@ func TestCodingStyles(t *testing.T) {
 		committer := &fakeCommitter{}
 		updateCodingStyles := NewCodeBeautifier(logger, runner, NewMockPHPCS(t), composer)
 		postCodeUpdate := workflow.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", committer)
-		err := updateCodingStyles.postCodeUpdateHandler(postCodeUpdate)
+		_, err := firePostCodeUpdate(updateCodingStyles, postCodeUpdate)
 
-		require.Error(t, err)
+		require.ErrorIs(t, err, assert.AnError)
+		assert.Contains(t, err.Error(), "failed to run phpcs")
 		runner.AssertExpectations(t)
 		composer.AssertExpectations(t)
 	})
@@ -585,8 +563,68 @@ func TestCodingStyleCommitFailureFailsTheHandler(t *testing.T) {
 	composer.EXPECT().IsPackageInstalled(anyCtx, "/path/to/repo", "drupal/coder").Return(true, nil)
 
 	cb := NewCodeBeautifier(zap.NewNop(), runner, NewMockPHPCS(t), composer)
-	err := cb.postCodeUpdateHandler(workflow.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", &fakeCommitter{err: assert.AnError}))
+	p, err := firePostCodeUpdate(cb, workflow.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", &fakeCommitter{err: assert.AnError}))
 
 	require.ErrorIs(t, err, assert.AnError)
-	assert.Empty(t, cb.fixedFiles, "fixes that never reached the branch are not reported")
+	assert.Nil(t, reportSection(p, "code_beautifier"), "fixes that never reached the branch are not reported")
+}
+
+func TestCodingStylesCommitTheCreatedConfigBeforeTheFixes(t *testing.T) {
+	fileExists = func(_ string) bool { return false }
+	tmpDir := t.TempDir()
+
+	runner := NewMockPHPCS(t)
+	runner.EXPECT().Run(anyCtx, tmpDir).Return(phpcs.ReturnOutput{
+		Totals: phpcs.ReturnOutputTotals{Warnings: 1, Fixable: 1},
+		Files: map[string]phpcs.ReturnOutputFile{
+			tmpDir + "/web/modules/custom/b.module":     {Warnings: 1},
+			tmpDir + "/web/modules/custom/a.module":     {Errors: 1},
+			tmpDir + "/web/modules/custom/clean.module": {},
+		},
+	}, nil)
+	runner.EXPECT().RunCBF(anyCtx, tmpDir).Return(assert.AnError)
+	composer := NewMockBeautifierComposer(t)
+	composer.EXPECT().GetInstalledPackageVersion(anyCtx, tmpDir, "drupal/core").Return("10.1.0", nil)
+	composer.EXPECT().GetCustomCodeDirectories(anyCtx, tmpDir).Return([]string{"web/modules/custom"}, nil)
+	composer.EXPECT().IsPackageInstalled(anyCtx, tmpDir, "drupal/coder").Return(true, nil)
+
+	committer := &fakeCommitter{}
+	_, err := firePostCodeUpdate(NewCodeBeautifier(zap.NewNop(), runner, NewMockPHPCS(t), composer), workflow.NewPostCodeUpdateEvent(t.Context(), tmpDir, committer))
+
+	require.NoError(t, err, "phpcbf exits non-zero whenever issues remain")
+	assert.Equal(t, []recordedCommit{
+		{message: "Add PHPCS config", paths: []string{"phpcs.xml"}},
+		{message: "Update coding styles", paths: []string{"web/modules/custom/a.module", "web/modules/custom/b.module"}},
+	}, committer.commits)
+}
+
+func TestCodingStylesFailWhenTheCreatedConfigCannotBeCommitted(t *testing.T) {
+	fileExists = func(_ string) bool { return false }
+	tmpDir := t.TempDir()
+
+	runner := NewMockPHPCS(t)
+	runner.EXPECT().Run(anyCtx, tmpDir).Return(phpcs.ReturnOutput{}, nil)
+	composer := NewMockBeautifierComposer(t)
+	composer.EXPECT().GetInstalledPackageVersion(anyCtx, tmpDir, "drupal/core").Return("10.1.0", nil)
+	composer.EXPECT().GetCustomCodeDirectories(anyCtx, tmpDir).Return([]string{"web/modules/custom"}, nil)
+	composer.EXPECT().IsPackageInstalled(anyCtx, tmpDir, "drupal/coder").Return(true, nil)
+
+	_, err := firePostCodeUpdate(NewCodeBeautifier(zap.NewNop(), runner, NewMockPHPCS(t), composer),
+		workflow.NewPostCodeUpdateEvent(t.Context(), tmpDir, &fakeCommitter{err: assert.AnError}))
+
+	require.ErrorIs(t, err, assert.AnError)
+}
+
+func TestCodingStylesFailWhenTheConfigCannotBeCreated(t *testing.T) {
+	fileExists = func(_ string) bool { return false }
+	composer := NewMockBeautifierComposer(t)
+	composer.EXPECT().GetInstalledPackageVersion(anyCtx, "/tmp", "drupal/core").Return("10.1.0", nil)
+	composer.EXPECT().GetCustomCodeDirectories(anyCtx, "/tmp").Return(nil, assert.AnError)
+
+	committer := &fakeCommitter{}
+	_, err := firePostCodeUpdate(NewCodeBeautifier(zap.NewNop(), NewMockPHPCS(t), NewMockPHPCS(t), composer),
+		workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", committer))
+
+	require.ErrorIs(t, err, assert.AnError)
+	assert.Empty(t, committer.commits)
 }

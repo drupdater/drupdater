@@ -22,6 +22,8 @@ var (
 	_ workflow.Reporter = (*UnsupportedModules)(nil)
 	_ workflow.Reporter = (*TranslationsUpdater)(nil)
 	_ workflow.Reporter = (*ComposerPatches1)(nil)
+	_ workflow.Reporter = (*CodeBeautifier)(nil)
+	_ workflow.Reporter = (*DeprecationsRemover)(nil)
 )
 
 func TestComposerAuditReportData(t *testing.T) {
@@ -224,22 +226,22 @@ func TestComposerAllowPluginsReportDataNilWithoutNewPlugins(t *testing.T) {
 }
 
 func TestCodeBeautifierReportData(t *testing.T) {
-	cb := &CodeBeautifier{}
+	fixes := CodingStyleFixes{Files: []string{"web/modules/custom/a/a.module", "web/modules/custom/b/b.module"}, Fixable: 7}
 
 	t.Run("nothing fixed reports nothing", func(t *testing.T) {
+		cb := &CodeBeautifier{}
 		assert.Equal(t, "code_beautifier", cb.ReportKey())
-		assert.Nil(t, cb.ReportData())
+		assert.Nil(t, cb.ReportData(&workflow.Findings{}))
 	})
 
 	t.Run("reports the files it committed and what was fixable", func(t *testing.T) {
-		cb := &CodeBeautifier{
-			fixedFiles: []string{"web/modules/custom/a/a.module", "web/modules/custom/b/b.module"},
-			fixable:    7,
-		}
-		assert.Equal(t, CodingStyleFixes{
-			Files:   []string{"web/modules/custom/a/a.module", "web/modules/custom/b/b.module"},
-			Fixable: 7,
-		}, cb.ReportData())
+		assert.Equal(t, fixes, codeBeautifierFor(fixes).ReportData())
+	})
+
+	t.Run("fixes whose commit was not made report nothing", func(t *testing.T) {
+		findings := &workflow.Findings{}
+		findings.Record(workflow.EventPostCodeUpdate, "", fixes, []string{"Add PHPCS config"})
+		assert.Nil(t, (&CodeBeautifier{}).ReportData(findings))
 	})
 }
 
@@ -247,19 +249,20 @@ func TestDeprecationsRemoverReportData(t *testing.T) {
 	t.Run("nothing rewritten reports nothing", func(t *testing.T) {
 		dr := &DeprecationsRemover{}
 		assert.Equal(t, "deprecations_remover", dr.ReportKey())
-		assert.Nil(t, dr.ReportData())
+		assert.Nil(t, dr.ReportData(&workflow.Findings{}))
+		assert.Nil(t, deprecationsFor(nil).ReportData())
+		assert.Nil(t, deprecationsFor([]DeprecationFix{}).ReportData(), "an empty list is omitted, not reported as []")
 	})
 
 	t.Run("records which rules fired on which file, sorted", func(t *testing.T) {
-		dr := &DeprecationsRemover{}
-		dr.recordFixes(rector.ReturnOutput{
+		dr := deprecationsFor(deprecationFixes(rector.ReturnOutput{
 			Totals:       rector.ReturnOutputTotals{ChangedFiles: 2},
 			ChangedFiles: []string{"web/modules/custom/z/z.php", "web/modules/custom/a/a.php"},
 			FileDiffs: []rector.ReturnOutputFillDiff{
 				{File: "web/modules/custom/a/a.php", AppliedRectors: []string{"SecondRector", "FirstRector"}},
 				{File: "web/modules/custom/z/z.php", AppliedRectors: []string{"OtherRector"}},
 			},
-		})
+		}))
 
 		// Files and rule names are both sorted, so two runs over unchanged code produce
 		// byte-identical sections and a consumer can diff reports directly.
@@ -270,11 +273,10 @@ func TestDeprecationsRemoverReportData(t *testing.T) {
 	})
 
 	t.Run("a changed file with no recorded rules still reports", func(t *testing.T) {
-		dr := &DeprecationsRemover{}
-		dr.recordFixes(rector.ReturnOutput{
+		dr := deprecationsFor(deprecationFixes(rector.ReturnOutput{
 			Totals:       rector.ReturnOutputTotals{ChangedFiles: 1},
 			ChangedFiles: []string{"a.php"},
-		})
+		}))
 		assert.Equal(t, []DeprecationFix{{File: "a.php"}}, dr.ReportData())
 	})
 }
@@ -360,6 +362,20 @@ func patchesFor(updates PatchUpdates) withFindings {
 	findings := &workflow.Findings{}
 	findings.Record(workflow.EventPreComposerUpdate, "", updates, nil)
 	return withFindings{&ComposerPatches1{}, findings}
+}
+
+// codeBeautifierFor builds code_beautifier with fixes its post-code-update hook committed.
+func codeBeautifierFor(fixes CodingStyleFixes) withFindings {
+	findings := &workflow.Findings{}
+	findings.Record(workflow.EventPostCodeUpdate, "", fixes, []string{codingStylesCommitMessage})
+	return withFindings{&CodeBeautifier{}, findings}
+}
+
+// deprecationsFor builds deprecations_remover with what its post-code-update hook returned.
+func deprecationsFor(fixes []DeprecationFix) withFindings {
+	findings := &workflow.Findings{}
+	findings.Record(workflow.EventPostCodeUpdate, "", fixes, nil)
+	return withFindings{&DeprecationsRemover{}, findings}
 }
 
 // reportSection is addon key's section as the pipeline's hooks left it.

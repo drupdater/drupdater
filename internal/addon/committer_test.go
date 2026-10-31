@@ -1,6 +1,10 @@
 package addon
 
-import "sync"
+import (
+	"sync"
+
+	"github.com/drupdater/drupdater/internal/workflow"
+)
 
 type recordedCommit struct {
 	message string
@@ -32,4 +36,11 @@ func recordRemovals(removed *[]string) func(string) error {
 		*removed = append(*removed, name)
 		return nil
 	}
+}
+
+// firePostCodeUpdate runs addon's post-code-update hook as a run does, its commits going to evt's
+// committer, and returns the pipeline holding what the hook found.
+func firePostCodeUpdate(a workflow.Addon, evt *workflow.PostCodeUpdateEvent) (*workflow.Pipeline, error) {
+	p := workflow.NewPipeline([]workflow.Addon{a})
+	return p, workflow.Fire(p, evt)
 }

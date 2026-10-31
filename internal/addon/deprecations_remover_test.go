@@ -14,8 +14,8 @@ import (
 	"go.uber.org/zap/zaptest/observer"
 )
 
-// recordFixes sorts each file's rules, which in place would reorder data the caller still owns.
-func TestRecordFixes_DoesNotSortRectorsOutputInPlace(t *testing.T) {
+// deprecationFixes sorts each file's rules, which in place would reorder data the caller still owns.
+func TestDeprecationFixes_DoesNotSortRectorsOutputInPlace(t *testing.T) {
 	output := rector.ReturnOutput{
 		ChangedFiles: []string{"web/modules/custom/a.php"},
 		FileDiffs: []rector.ReturnOutputFillDiff{
@@ -23,12 +23,11 @@ func TestRecordFixes_DoesNotSortRectorsOutputInPlace(t *testing.T) {
 		},
 	}
 
-	dr := &DeprecationsRemover{}
-	dr.recordFixes(output)
+	fixes := deprecationFixes(output)
 
 	assert.Equal(t, []string{"ZRector", "ARector"}, output.FileDiffs[0].AppliedRectors,
 		"rector's own output was reordered")
-	assert.Equal(t, []string{"ARector", "ZRector"}, dr.fixes[0].AppliedRectors,
+	assert.Equal(t, []string{"ARector", "ZRector"}, fixes[0].AppliedRectors,
 		"the report section is still sorted")
 }
 
@@ -48,7 +47,7 @@ func TestRemoveDeprecations(t *testing.T) {
 
 		committer := &fakeCommitter{}
 		dr := NewDeprecationsRemover(logger, project, NewMockRector(t), composer)
-		err := dr.postCodeUpdateHandler(workflow.NewPostCodeUpdateEvent(context.Background(), "/path/to/repo", committer))
+		_, err := firePostCodeUpdate(dr, workflow.NewPostCodeUpdateEvent(context.Background(), "/path/to/repo", committer))
 
 		require.NoError(t, err)
 		assert.Empty(t, committer.commits)
@@ -67,7 +66,7 @@ func TestRemoveDeprecations(t *testing.T) {
 
 		committer := &fakeCommitter{}
 		dr := NewDeprecationsRemover(logger, NewMockRector(t), bundled, composer)
-		err := dr.postCodeUpdateHandler(workflow.NewPostCodeUpdateEvent(context.Background(), "/path/to/repo", committer))
+		_, err := firePostCodeUpdate(dr, workflow.NewPostCodeUpdateEvent(context.Background(), "/path/to/repo", committer))
 
 		require.NoError(t, err)
 		assert.Equal(t, []recordedCommit{
@@ -84,7 +83,7 @@ func TestRemoveDeprecations(t *testing.T) {
 		bundled.EXPECT().Run(anyCtx, "/path/to/repo", []string{"web/modules/custom"}).Return(noChanges, nil)
 
 		dr := NewDeprecationsRemover(logger, NewMockRector(t), bundled, composer)
-		err := dr.postCodeUpdateHandler(workflow.NewPostCodeUpdateEvent(context.Background(), "/path/to/repo", &fakeCommitter{}))
+		_, err := firePostCodeUpdate(dr, workflow.NewPostCodeUpdateEvent(context.Background(), "/path/to/repo", &fakeCommitter{}))
 
 		require.NoError(t, err)
 	})
@@ -97,11 +96,11 @@ func TestRemoveDeprecations(t *testing.T) {
 
 		committer := &fakeCommitter{}
 		dr := NewDeprecationsRemover(zap.New(core), NewMockRector(t), NewMockRector(t), composer)
-		err := dr.postCodeUpdateHandler(workflow.NewPostCodeUpdateEvent(context.Background(), "/path/to/repo", committer))
+		p, err := firePostCodeUpdate(dr, workflow.NewPostCodeUpdateEvent(context.Background(), "/path/to/repo", committer))
 
 		require.NoError(t, err)
 		assert.Empty(t, committer.commits)
-		assert.Nil(t, dr.ReportData())
+		assert.Nil(t, reportSection(p, "deprecations_remover"))
 		require.Equal(t, 1, logs.Len())
 		assert.Contains(t, logs.All()[0].Message, "rector/rector but not palantirnet/drupal-rector")
 	})
@@ -132,12 +131,19 @@ func TestRemoveDeprecations(t *testing.T) {
 
 		committer := &fakeCommitter{}
 		dr := NewDeprecationsRemover(logger, runner, NewMockRector(t), composer)
-		err := dr.postCodeUpdateHandler(workflow.NewPostCodeUpdateEvent(context.Background(), "/path/to/repo", committer))
+		p, err := firePostCodeUpdate(dr, workflow.NewPostCodeUpdateEvent(context.Background(), "/path/to/repo", committer))
 
 		require.NoError(t, err)
 		assert.Equal(t, []recordedCommit{
 			{message: "Remove deprecations", paths: []string{"tests/Drupal/FunctionalJavascriptTests/ThunderOrgTestHomePageTest.php"}},
 		}, committer.commits)
+		assert.Equal(t, []DeprecationFix{{
+			File: "tests/Drupal/FunctionalJavascriptTests/ThunderOrgTestHomePageTest.php",
+			AppliedRectors: []string{
+				"DrupalRector\\Drupal8\\Rector\\Deprecation\\FunctionalTestDefaultThemePropertyRector",
+				"DrupalRector\\Drupal9\\Rector\\Property\\ProtectedStaticModulesPropertyRector",
+			},
+		}}, reportSection(p, "deprecations_remover"))
 	})
 
 	t.Run("a failing Rector fails the handler", func(t *testing.T) {
@@ -150,7 +156,7 @@ func TestRemoveDeprecations(t *testing.T) {
 
 		committer := &fakeCommitter{}
 		dr := NewDeprecationsRemover(logger, runner, NewMockRector(t), composer)
-		err := dr.postCodeUpdateHandler(workflow.NewPostCodeUpdateEvent(context.Background(), "/path/to/repo", committer))
+		_, err := firePostCodeUpdate(dr, workflow.NewPostCodeUpdateEvent(context.Background(), "/path/to/repo", committer))
 
 		require.ErrorIs(t, err, assert.AnError)
 		assert.Empty(t, committer.commits)
