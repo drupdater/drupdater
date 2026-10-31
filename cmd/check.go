@@ -70,7 +70,7 @@ func (a app) runCheck(cmd *cobra.Command, args []string, opts options) error {
 	redactor.Register(token)
 
 	ctx := cmd.Context()
-	gitSvc := repo.New(logger)
+	gitSvc := repo.New()
 	var resolveErr error
 	if !cfg.Clone {
 		resolveErr = resolveCheckoutSettings(ctx, gitSvc, &cfg)
@@ -231,7 +231,7 @@ type fullCheckDeps struct {
 func realFullCheckDeps(logger *zap.Logger) fullCheckDeps {
 	return fullCheckDeps{
 		clone: func(ctx context.Context, repositoryURL string, branch string, token string) (string, error) {
-			checkout, err := repo.New(logger).
+			checkout, err := repo.New().
 				CloneRepository(ctx, repositoryURL, branch, token, repo.Identity{})
 			return checkout.Path, err
 		},

@@ -15,7 +15,6 @@ import (
 	"strings"
 
 	"github.com/spf13/afero"
-	"go.uber.org/zap"
 )
 
 // Last-resort commit identity, when neither the platform nor the checkout supplies one.
@@ -76,15 +75,13 @@ type Checkout struct {
 
 // Git runs the git CLI.
 type Git struct {
-	logger     *zap.Logger
 	fs         afero.Fs
 	newCommand func(ctx context.Context, name string, args ...string) *exec.Cmd
 }
 
 // New returns a Git that runs on the host.
-func New(logger *zap.Logger) *Git {
+func New() *Git {
 	return &Git{
-		logger:     logger,
 		fs:         afero.NewOsFs(),
 		newCommand: exec.CommandContext,
 	}

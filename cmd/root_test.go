@@ -231,7 +231,7 @@ func TestAddonsCommand(t *testing.T) {
 }
 
 func TestResolveCheckoutBranch(t *testing.T) {
-	svc := repo.New(zap.NewNop())
+	svc := repo.New()
 
 	// initRepo creates a repo with one commit; detach leaves HEAD off any branch.
 	initRepo := func(t *testing.T, detach bool) string {

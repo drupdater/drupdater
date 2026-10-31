@@ -10,6 +10,23 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestMain runs the tests from a directory outside any repository. A git command that loses its
+// directory runs in the process's own, which would otherwise be this project's checkout.
+func TestMain(m *testing.M) {
+	dir, err := os.MkdirTemp("", "drupdater-repo-test-")
+	if err != nil {
+		panic(err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		panic(err)
+	}
+	// Nor may git look upwards from it for a repository to use.
+	os.Setenv("GIT_CEILING_DIRECTORIES", filepath.Dir(dir))
+	code := m.Run()
+	_ = os.RemoveAll(dir)
+	os.Exit(code)
+}
+
 // isolateGitConfig gives these tests a CI runner's identity-less environment, not the
 // developer's own ~/.gitconfig.
 func isolateGitConfig(t *testing.T) string {

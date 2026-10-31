@@ -222,7 +222,7 @@ func initCheckout(t *testing.T, originURL string) string {
 }
 
 func TestResolveCheckoutSettings(t *testing.T) {
-	svc := repo.New(zap.NewNop())
+	svc := repo.New()
 
 	t.Run("takes the URL and branch from the checkout", func(t *testing.T) {
 		dir := initCheckout(t, "https://token:secret@example.com/group/repo.git")

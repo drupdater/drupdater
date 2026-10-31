@@ -11,7 +11,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
 )
 
 // addWorktree returns a fresh source checkout on main and a worktree of it, removed again when
@@ -19,7 +18,7 @@ import (
 func addWorktree(t *testing.T, username, email string) (string, Checkout) {
 	t.Helper()
 	source := initRepoWithCommit(t)
-	service := New(zap.NewNop())
+	service := New()
 
 	checkout, err := service.AddWorktree(t.Context(), source, Identity{Name: username, Email: email})
 	require.NoError(t, err)
@@ -125,7 +124,7 @@ func TestSetAndRemoveBranchAreSeenByTheSourceCheckout(t *testing.T) {
 }
 
 func TestBranchExistsFailsOutsideARepository(t *testing.T) {
-	wc := &workingCopy{git: New(zap.NewNop()), dir: filepath.Join(t.TempDir(), "missing")}
+	wc := &workingCopy{git: New(), dir: filepath.Join(t.TempDir(), "missing")}
 
 	_, err := wc.BranchExists(t.Context(), "main")
 
@@ -143,9 +142,9 @@ func TestStage(t *testing.T) {
 		writeFile(t, source, "dir/gone.txt", "a")
 		gitOutput(t, source, "add", ".")
 		gitOutput(t, source, "commit", "--quiet", "-m", "init")
-		checkout, err := New(zap.NewNop()).AddWorktree(t.Context(), source, Identity{})
+		checkout, err := New().AddWorktree(t.Context(), source, Identity{})
 		require.NoError(t, err)
-		t.Cleanup(func() { _ = New(zap.NewNop()).RemoveWorktree(context.Background(), source, checkout.Path) })
+		t.Cleanup(func() { _ = New().RemoveWorktree(context.Background(), source, checkout.Path) })
 		return checkout
 	}
 
@@ -209,7 +208,7 @@ func TestStage(t *testing.T) {
 	})
 
 	t.Run("fails outside a repository", func(t *testing.T) {
-		wc := &workingCopy{git: New(zap.NewNop()), dir: t.TempDir()}
+		wc := &workingCopy{git: New(), dir: t.TempDir()}
 		writeFile(t, wc.dir, "a.txt", "a")
 
 		require.Error(t, wc.Stage(t.Context(), "a.txt"))
@@ -245,7 +244,7 @@ func TestStage(t *testing.T) {
 func TestRemoveWorktreeRemovesItsDirectoryAndRegistration(t *testing.T) {
 	isolateGitConfig(t)
 	source := initRepoWithCommit(t)
-	service := New(zap.NewNop())
+	service := New()
 	checkout, err := service.AddWorktree(t.Context(), source, Identity{})
 	require.NoError(t, err)
 	writeFile(t, checkout.Path, "dirty.txt", "x")
@@ -260,7 +259,7 @@ func TestRemoveWorktreeRemovesItsDirectoryAndRegistration(t *testing.T) {
 func TestRemoveWorktreePrunesAWorktreeWhoseDirectoryIsGone(t *testing.T) {
 	isolateGitConfig(t)
 	source := initRepoWithCommit(t)
-	service := New(zap.NewNop())
+	service := New()
 	checkout, err := service.AddWorktree(t.Context(), source, Identity{})
 	require.NoError(t, err)
 	require.NoError(t, os.RemoveAll(filepath.Dir(checkout.Path)))
@@ -271,7 +270,7 @@ func TestRemoveWorktreePrunesAWorktreeWhoseDirectoryIsGone(t *testing.T) {
 }
 
 func TestRemoveWorktreeFailsWhenGitCannotRunAtAll(t *testing.T) {
-	service := New(zap.NewNop())
+	service := New()
 	dir := t.TempDir()
 
 	err := service.RemoveWorktree(t.Context(), filepath.Join(dir, "missing"), filepath.Join(dir, "x", "checkout"))
@@ -281,7 +280,7 @@ func TestRemoveWorktreeFailsWhenGitCannotRunAtAll(t *testing.T) {
 
 func TestAddWorktreeErrors(t *testing.T) {
 	isolateGitConfig(t)
-	service := New(zap.NewNop())
+	service := New()
 
 	t.Run("not a repository", func(t *testing.T) {
 		_, err := service.AddWorktree(t.Context(), t.TempDir(), Identity{})
@@ -307,7 +306,7 @@ func TestAddWorktreeErrors(t *testing.T) {
 	t.Run("git reports success but leaves no worktree", func(t *testing.T) {
 		source := initRepoWithCommit(t)
 		var worktreeCalls [][]string
-		silent := &Git{logger: zap.NewNop(), newCommand: func(ctx context.Context, name string, arg ...string) *exec.Cmd {
+		silent := &Git{newCommand: func(ctx context.Context, name string, arg ...string) *exec.Cmd {
 			if slices.Contains(arg, "worktree") {
 				worktreeCalls = append(worktreeCalls, arg)
 				return exec.CommandContext(ctx, "true")
@@ -398,7 +397,7 @@ func TestAddWorktreeOfARepositoryOwnedByAnotherUser(t *testing.T) {
 		}
 		return root.Lchown(path, 65534, 65534)
 	}))
-	service := New(zap.NewNop())
+	service := New()
 
 	checkout, err := service.AddWorktree(t.Context(), source, Identity{})
 	require.NoError(t, err)

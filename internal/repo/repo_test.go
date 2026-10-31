@@ -12,7 +12,6 @@ import (
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
 )
 
 // cloneOf returns a working copy whose origin is a fresh repository with these branches.
@@ -23,7 +22,7 @@ func cloneOf(t *testing.T, branches ...string) (origin string, checkout Checkout
 	for _, b := range branches {
 		gitOutput(t, origin, "branch", b)
 	}
-	checkout, err := New(zap.NewNop()).CloneRepository(t.Context(), origin, "main", "", Identity{Name: "Bot", Email: "bot@example.com"})
+	checkout, err := New().CloneRepository(t.Context(), origin, "main", "", Identity{Name: "Bot", Email: "bot@example.com"})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = os.RemoveAll(checkout.Path) })
 	return origin, checkout
@@ -60,7 +59,7 @@ func TestRemoteBranchExists(t *testing.T) {
 	t.Run("no origin remote", func(t *testing.T) {
 		isolateGitConfig(t)
 		dir := initRepoWithCommit(t)
-		checkout := New(zap.NewNop()).checkout(t.Context(), dir, Identity{})
+		checkout := New().checkout(t.Context(), dir, Identity{})
 
 		_, err := checkout.Repository.RemoteBranchExists(t.Context(), "my-feature", "")
 		require.ErrorContains(t, err, "failed to get origin remote")
@@ -104,7 +103,7 @@ func TestPushFailsForABranchThatDoesNotExist(t *testing.T) {
 func TestTheTokenIsHandedToGitThroughTheCredentialHelper(t *testing.T) {
 	isolateGitConfig(t)
 	dir := initRepo(t)
-	rs := New(zap.NewNop())
+	rs := New()
 
 	cmd := rs.command(t.Context(), dir, "s3cret-token", "credential", "fill")
 	cmd.Stdin = strings.NewReader("protocol=https\nhost=example.com\n\n")
@@ -121,7 +120,7 @@ func TestWithoutATokenGitIsNeverAskedForCredentials(t *testing.T) {
 	isolateGitConfig(t)
 	dir := initRepo(t)
 
-	cmd := New(zap.NewNop()).command(t.Context(), dir, "", "credential", "fill")
+	cmd := New().command(t.Context(), dir, "", "credential", "fill")
 	cmd.Stdin = strings.NewReader("protocol=https\nhost=example.com\n\n")
 
 	require.Error(t, cmd.Run(), "with no helper and prompting off, git has no credential to give")
@@ -146,7 +145,7 @@ func TestGitCommandsOverrideTheUsersConfig(t *testing.T) {
 }
 
 func TestGetRemoteURL(t *testing.T) {
-	service := New(zap.NewNop())
+	service := New()
 
 	t.Run("returns origin URL with credentials stripped", func(t *testing.T) {
 		isolateGitConfig(t)
@@ -203,7 +202,7 @@ func TestGetRemoteURL(t *testing.T) {
 // origin" rather than matching on message text.
 func TestNonRepositoryPathsAreRejected(t *testing.T) {
 	isolateGitConfig(t)
-	service := New(zap.NewNop())
+	service := New()
 	sub := filepath.Join(initRepoWithCommit(t), "web")
 	require.NoError(t, os.Mkdir(sub, 0o755))
 
@@ -232,14 +231,14 @@ func TestARepositoryReachedThroughASymlinkIsItsRoot(t *testing.T) {
 	link := filepath.Join(t.TempDir(), "link")
 	require.NoError(t, os.Symlink(dir, link))
 
-	branch, err := New(zap.NewNop()).GetCurrentBranch(t.Context(), link)
+	branch, err := New().GetCurrentBranch(t.Context(), link)
 
 	require.NoError(t, err)
 	assert.Equal(t, "main", branch)
 }
 
 func TestGetCurrentBranch(t *testing.T) {
-	service := New(zap.NewNop())
+	service := New()
 
 	t.Run("returns the branch HEAD points to", func(t *testing.T) {
 		isolateGitConfig(t)
@@ -261,7 +260,7 @@ func TestGetCurrentBranch(t *testing.T) {
 }
 
 func TestCloneRepository(t *testing.T) {
-	service := New(zap.NewNop())
+	service := New()
 
 	t.Run("clones a branch and prepares the checkout", func(t *testing.T) {
 		isolateGitConfig(t)
@@ -322,7 +321,7 @@ func TestCloneRepository(t *testing.T) {
 	})
 
 	t.Run("returns the error when the project directory cannot be created", func(t *testing.T) {
-		roService := &Git{logger: zap.NewNop(), fs: afero.NewReadOnlyFs(afero.NewMemMapFs())}
+		roService := &Git{fs: afero.NewReadOnlyFs(afero.NewMemMapFs())}
 
 		_, err := roService.CloneRepository(t.Context(), "https://example.com/repo.git", "main", "", Identity{})
 		require.ErrorContains(t, err, "failed to create project directory")
@@ -332,7 +331,7 @@ func TestCloneRepository(t *testing.T) {
 func TestIsShallowClone(t *testing.T) {
 	isolateGitConfig(t)
 
-	shallow, err := New(zap.NewNop()).IsShallowClone(t.Context(), initRepoWithCommit(t))
+	shallow, err := New().IsShallowClone(t.Context(), initRepoWithCommit(t))
 
 	require.NoError(t, err)
 	assert.False(t, shallow, "a full checkout is not shallow")

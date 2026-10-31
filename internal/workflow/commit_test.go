@@ -11,7 +11,6 @@ import (
 	"github.com/drupdater/drupdater/internal/repo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
 )
 
 var testAuthor = repo.Identity{Name: "Drupdater Bot", Email: "bot@example.com"}
@@ -41,7 +40,7 @@ func newCommitRepo(t *testing.T, files map[string]string) (Worktree, string) {
 	gitIn(t, source, "add", "--all")
 	gitIn(t, source, "commit", "--quiet", "--allow-empty", "-m", "init")
 
-	service := repo.New(zap.NewNop())
+	service := repo.New()
 	checkout, err := service.AddWorktree(t.Context(), source, testAuthor)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = service.RemoveWorktree(context.Background(), source, checkout.Path) })
