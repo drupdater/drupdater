@@ -18,10 +18,10 @@ import (
 // If a signature drifts, this fails to compile.
 var (
 	_ report.Reporter   = (*ComposerAudit)(nil)
-	_ report.Reporter   = (*ComposerPatches1)(nil)
 	_ workflow.Reporter = (*UpdateHooks)(nil)
 	_ workflow.Reporter = (*UnsupportedModules)(nil)
 	_ workflow.Reporter = (*TranslationsUpdater)(nil)
+	_ workflow.Reporter = (*ComposerPatches1)(nil)
 )
 
 func TestComposerAuditReportData(t *testing.T) {
@@ -171,12 +171,10 @@ func TestUnsupportedModulesReportDataNilWhenEmpty(t *testing.T) {
 }
 
 func TestComposerPatchesReportData(t *testing.T) {
-	h := &ComposerPatches1{
-		patchUpdates: PatchUpdates{
-			Removed:   []RemovedPatch{{Package: "drupal/foo", Reason: "fixed upstream"}},
-			Conflicts: []ConflictPatch{{Package: "drupal/bar", NewVersion: "2.0.0"}},
-		},
-	}
+	h := patchesFor(PatchUpdates{
+		Removed:   []RemovedPatch{{Package: "drupal/foo", Reason: "fixed upstream"}},
+		Conflicts: []ConflictPatch{{Package: "drupal/bar", NewVersion: "2.0.0"}},
+	})
 
 	assert.Equal(t, "composer_patches", h.ReportKey())
 
@@ -190,7 +188,8 @@ func TestComposerPatchesReportData(t *testing.T) {
 }
 
 func TestComposerPatchesReportDataNilWhenNoPatchChanges(t *testing.T) {
-	assert.Nil(t, (&ComposerPatches1{}).ReportData())
+	assert.Nil(t, patchesFor(PatchUpdates{}).ReportData())
+	assert.Nil(t, (&ComposerPatches1{}).ReportData(&workflow.Findings{}), "a run that never got as far")
 }
 
 // Every field is mapped: the description renders composer_diff from this section alone.
@@ -354,6 +353,13 @@ func translationsFor(perSite map[string]TranslationResult) withFindings {
 		findings.Record(workflow.EventPostSiteUpdate, site, result, committed)
 	}
 	return withFindings{&TranslationsUpdater{}, findings}
+}
+
+// patchesFor builds composer_patches with what its pre-composer-update hook would have returned.
+func patchesFor(updates PatchUpdates) withFindings {
+	findings := &workflow.Findings{}
+	findings.Record(workflow.EventPreComposerUpdate, "", updates, nil)
+	return withFindings{&ComposerPatches1{}, findings}
 }
 
 // reportSection is addon key's section as the pipeline's hooks left it.

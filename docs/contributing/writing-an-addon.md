@@ -88,7 +88,7 @@ tests mock exactly that. Then add the interface to `addonComposer` or `addonDrus
 
 | Event | Use for |
 |---|---|
-| `pre-composer-update` | Influencing what the update touches: build the hook with `workflow.Propose` and return a plan |
+| `pre-composer-update` | Influencing what the update touches: build the hook with `workflow.Propose` and return a plan, or with `workflow.ProduceProposal` to return commits and a finding with it |
 | `post-composer-update` | Reacting to the new lock file and installed code, before it is committed |
 | `post-code-update` | Changing code — Rector, PHPCBF, and similar |
 | `pre-site-update` | Inspecting a site before its update hooks run |
@@ -163,7 +163,8 @@ func (a *YourAddon) ReportData(findings *workflow.Findings) any {
 `findings` is what the addon's hooks returned over the run. `workflow.Sites` reads a per-site
 event's findings, each with `Committed`, the messages of the hook's commits that were made —
 so a section can say whether a change really landed, as `translations_updater`'s `updated`
-does. An older addon whose hooks keep their findings implements `ReportData() any` instead.
+does. An event that is not per site has one finding, which `workflow.Shared` reads, as
+`composer_patches` does. An older addon whose hooks keep their findings implements `ReportData() any` instead.
 
 They live together in one file because collectively they *are* the report's `addons`
 schema, which is a published contract. Scattered across ten files, it is very easy to

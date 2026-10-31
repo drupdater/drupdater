@@ -191,3 +191,58 @@ func TestPipelineReportsBothKindsOfReporter(t *testing.T) {
 		"legacy":   "kept on the addon",
 	}, rec.Snapshot().Addons)
 }
+
+func TestProducedProposalIsCommittedRecordedAndMerged(t *testing.T) {
+	committer := NewMockCommitter(t)
+	committer.EXPECT().Commit("Update patches", []string{"composer.json"}).Return(true, nil)
+	pin := UpdatePlan{Keep: []Pin{pin("drupal/core", "10.2.0")}}
+	hook := ProduceProposal(Change, func(*PreComposerUpdateEvent) (Proposal[string], error) {
+		return Proposal[string]{Plan: pin, Commits: []Commit{{"Update patches", []string{"composer.json"}}}, Finding: "patched"}, nil
+	})
+	p := NewPipeline([]Addon{hookAddon{proposing(Prepare, UpdatePlan{}, nil)}, hookAddon{Hooks{PreComposerUpdate: hook}}})
+
+	plan, err := Settle(p, NewPreComposerUpdateEvent(t.Context(), "/p", committer, UpdatePlan{}))
+
+	require.NoError(t, err)
+	assert.Equal(t, Change, hook.Stage)
+	assert.Equal(t, pin, plan)
+	recorded, ok := Shared[string](p.findings[1], EventPreComposerUpdate)
+	require.True(t, ok)
+	assert.Equal(t, Recorded[string]{Finding: "patched", Committed: []string{"Update patches"}}, recorded)
+	_, ok = Shared[string](p.findings[0], EventPreComposerUpdate)
+	assert.False(t, ok, "a hook built with Propose records nothing")
+}
+
+func TestAFailedProposalCommitStopsTheSettle(t *testing.T) {
+	committer := NewMockCommitter(t)
+	committer.EXPECT().Commit("Update patches", []string{"composer.json"}).Return(false, assert.AnError)
+	p := NewPipeline([]Addon{hookAddon{Hooks{PreComposerUpdate: ProduceProposal(Change, func(*PreComposerUpdateEvent) (Proposal[string], error) {
+		return Proposal[string]{Plan: UpdatePlan{Only: []string{"drupal/core"}}, Commits: []Commit{{"Update patches", []string{"composer.json"}}}}, nil
+	})}}})
+
+	plan, err := Settle(p, NewPreComposerUpdateEvent(t.Context(), "/p", committer, UpdatePlan{}))
+
+	require.ErrorIs(t, err, assert.AnError)
+	assert.Contains(t, err.Error(), "pre-composer-update hook failed")
+	assert.Zero(t, plan)
+	_, ok := Shared[string](p.findings[0], EventPreComposerUpdate)
+	assert.False(t, ok)
+}
+
+func TestSharedIgnoresPerSiteFindings(t *testing.T) {
+	f := &Findings{}
+	f.Record(EventPreComposerUpdate, "default", "per site", nil)
+
+	_, ok := Shared[string](f, EventPreComposerUpdate)
+
+	assert.False(t, ok)
+}
+
+func TestSharedPanicsOnAFindingOfAnotherType(t *testing.T) {
+	f := &Findings{}
+	f.Record(EventPreComposerUpdate, "", 42, nil)
+
+	assert.PanicsWithValue(t, "pre-composer-update finding is a int, not a string", func() {
+		Shared[string](f, EventPreComposerUpdate)
+	})
+}

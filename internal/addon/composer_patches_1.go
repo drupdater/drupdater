@@ -98,9 +98,8 @@ type ComposerPatches1 struct {
 	composer     PatchesComposer
 	drupalOrg    DrupalOrg
 	drupalCode   DrupalCode
-	httpClient   HTTPClient
-	patchUpdates PatchUpdates
-	removeFile   func(name string) error
+	httpClient HTTPClient
+	removeFile func(name string) error
 }
 
 // NewComposerPatches1 takes a nil drupalCode without DRUPALCODE_ACCESS_TOKEN: a fix then stays
@@ -118,13 +117,13 @@ func NewComposerPatches1(logger *zap.Logger, composer PatchesComposer, drupalOrg
 
 func (h *ComposerPatches1) Hooks() workflow.Hooks {
 	return workflow.Hooks{
-		PreComposerUpdate: workflow.Propose(workflow.Change, h.preComposerUpdateHandler),
+		PreComposerUpdate: workflow.ProduceProposal(workflow.Change, h.preComposerUpdateHandler),
 	}
 }
 
 // preComposerUpdateHandler checks the patches against the update as earlier stages planned it,
 // and proposes pinning each package whose patch cannot be made to apply.
-func (h *ComposerPatches1) preComposerUpdateHandler(evt *workflow.PreComposerUpdateEvent) (workflow.UpdatePlan, error) {
+func (h *ComposerPatches1) preComposerUpdateHandler(evt *workflow.PreComposerUpdateEvent) (workflow.Proposal[PatchUpdates], error) {
 	ctx := evt.Context()
 	path := evt.Path()
 	plan := evt.Plan()
@@ -137,47 +136,45 @@ func (h *ComposerPatches1) preComposerUpdateHandler(evt *workflow.PreComposerUpd
 	}
 
 	if err := json.Unmarshal([]byte(patchesString), &patches); err != nil {
-		return workflow.UpdatePlan{}, fmt.Errorf("failed to unmarshal patches: %w", err)
+		return workflow.Proposal[PatchUpdates]{}, fmt.Errorf("failed to unmarshal patches: %w", err)
 	}
 
 	operations, err := h.composer.Update(ctx, path, plan.Only, plan.KeepConstraints(), plan.MinimalChanges, true)
 	if err != nil {
-		return workflow.UpdatePlan{}, fmt.Errorf("failed to get composer updates: %w", err)
+		return workflow.Proposal[PatchUpdates]{}, fmt.Errorf("failed to get composer updates: %w", err)
 	}
 
 	patchUpdates, newPatches := h.updatePatches(ctx, path, operations, patches)
-	h.patchUpdates = patchUpdates
 
-	if h.patchUpdates.Changes() {
-		h.logger.Info("patches changed",
-			zap.Int("removed", len(h.patchUpdates.Removed)),
-			zap.Int("updated", len(h.patchUpdates.Updated)),
-			zap.Int("conflicts", len(h.patchUpdates.Conflicts)),
-		)
-
-		jsonBytes, err := json.Marshal(newPatches)
-		if err != nil {
-			return workflow.UpdatePlan{}, fmt.Errorf("failed to marshal patches: %w", err)
-		}
-
-		if err := h.composer.SetConfig(ctx, path, "extra.patches", string(jsonBytes)); err != nil {
-			return workflow.UpdatePlan{}, fmt.Errorf("failed to set composer config: %w", err)
-		}
-
-		if err := h.composer.UpdateLockHash(ctx, path); err != nil {
-			return workflow.UpdatePlan{}, fmt.Errorf("failed to update composer lock hash: %w", err)
-		}
-
-		if _, err := evt.Commit("Update patches", h.patchUpdates.changedPaths("composer.json", "composer.lock")...); err != nil {
-			return workflow.UpdatePlan{}, fmt.Errorf("failed to commit patches: %w", err)
-		}
-	}
-
-	var proposal workflow.UpdatePlan
+	proposal := workflow.Proposal[PatchUpdates]{Finding: patchUpdates}
 	for _, patchUpdate := range patchUpdates.Conflicts {
-		proposal.Keep = append(proposal.Keep, workflow.Pin{Package: patchUpdate.Package, Version: patchUpdate.FixedVersion})
+		proposal.Plan.Keep = append(proposal.Plan.Keep, workflow.Pin{Package: patchUpdate.Package, Version: patchUpdate.FixedVersion})
 	}
 
+	if !patchUpdates.Changes() {
+		return proposal, nil
+	}
+
+	h.logger.Info("patches changed",
+		zap.Int("removed", len(patchUpdates.Removed)),
+		zap.Int("updated", len(patchUpdates.Updated)),
+		zap.Int("conflicts", len(patchUpdates.Conflicts)),
+	)
+
+	jsonBytes, err := json.Marshal(newPatches)
+	if err != nil {
+		return workflow.Proposal[PatchUpdates]{}, fmt.Errorf("failed to marshal patches: %w", err)
+	}
+
+	if err := h.composer.SetConfig(ctx, path, "extra.patches", string(jsonBytes)); err != nil {
+		return workflow.Proposal[PatchUpdates]{}, fmt.Errorf("failed to set composer config: %w", err)
+	}
+
+	if err := h.composer.UpdateLockHash(ctx, path); err != nil {
+		return workflow.Proposal[PatchUpdates]{}, fmt.Errorf("failed to update composer lock hash: %w", err)
+	}
+
+	proposal.Commits = []workflow.Commit{{Message: "Update patches", Paths: patchUpdates.changedPaths("composer.json", "composer.lock")}}
 	return proposal, nil
 }
 

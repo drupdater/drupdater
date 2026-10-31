@@ -59,12 +59,26 @@ func (h *Hook[E]) stage() Stage { return h.Stage }
 // which the zero UpdatePlan leaves unchanged.
 type PlanHook struct {
 	Stage Stage
-	Run   func(*PreComposerUpdateEvent) (UpdatePlan, error)
+	run   func(*PreComposerUpdateEvent) (Proposal[any], error)
+	// produces marks a hook built by ProduceProposal, whose finding the pipeline records.
+	produces bool
 }
 
 // Propose builds the pre-composer-update hook running fn at stage.
 func Propose(stage Stage, fn func(*PreComposerUpdateEvent) (UpdatePlan, error)) *PlanHook {
-	return &PlanHook{Stage: stage, Run: fn}
+	return &PlanHook{Stage: stage, run: func(e *PreComposerUpdateEvent) (Proposal[any], error) {
+		plan, err := fn(e)
+		return Proposal[any]{Plan: plan}, err
+	}}
+}
+
+// ProduceProposal builds the pre-composer-update hook running fn at stage. Like Produce, the
+// pipeline commits the Proposal's Commits and records its Finding.
+func ProduceProposal[F any](stage Stage, fn func(*PreComposerUpdateEvent) (Proposal[F], error)) *PlanHook {
+	return &PlanHook{Stage: stage, produces: true, run: func(e *PreComposerUpdateEvent) (Proposal[any], error) {
+		p, err := fn(e)
+		return Proposal[any]{Plan: p.Plan, Commits: p.Commits, Finding: p.Finding}, err
+	}}
 }
 
 func (h *PlanHook) stage() Stage { return h.Stage }
@@ -153,11 +167,18 @@ func Settle(p *Pipeline, e *PreComposerUpdateEvent) (UpdatePlan, error) {
 			settled = plan
 		}
 		e.plan = settled
-		proposal, err := h.hook.Run(e)
+		proposal, err := h.hook.run(e)
 		if err != nil {
 			return UpdatePlan{}, fmt.Errorf("%s hook failed: %w", e.name(), err)
 		}
-		if plan, err = plan.merge(proposal); err != nil {
+		committed, err := commitAll(e, proposal.Commits)
+		if err != nil {
+			return UpdatePlan{}, fmt.Errorf("%s hook failed: %w", e.name(), err)
+		}
+		if h.hook.produces {
+			p.findings[h.addon].Record(e.name(), "", proposal.Finding, committed)
+		}
+		if plan, err = plan.merge(proposal.Plan); err != nil {
 			// merge's errors carry no identity to unwrap, so %v here would read the same.
 			// mutator-disable-next-line expression/errorf-wrap
 			return UpdatePlan{}, fmt.Errorf("%s hooks disagree: %w", e.name(), err)

@@ -76,7 +76,7 @@ func reportingAddons() []workflow.Addon {
 				{Name: "legacy_feature", InstalledVersion: "1.2.0", RecommendedVersion: "None"},
 			},
 		}),
-		&ComposerPatches1{patchUpdates: PatchUpdates{
+		patchesFor(PatchUpdates{
 			Removed: []RemovedPatch{{
 				Package: "drupal/core", PatchDescription: "Fix the thing",
 				PatchPath: "https://www.drupal.org/files/issues/3001-12.patch", Reason: "fixed upstream in 10.4.0",
@@ -91,7 +91,7 @@ func reportingAddons() []workflow.Addon {
 				PatchPath:        "https://www.drupal.org/files/issues/3003-2.patch",
 				PatchDescription: "Adjust the form", NewVersion: "6.3.0",
 			}},
-		}},
+		}),
 		&CodeBeautifier{fixedFiles: []string{"web/modules/custom/acme/acme.module", "web/modules/custom/acme/src/Controller/AcmeController.php"}, fixable: 3},
 		&DeprecationsRemover{fixes: []DeprecationFix{{
 			File:           "web/modules/custom/acme/src/Plugin/Block/AcmeBlock.php",

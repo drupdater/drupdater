@@ -147,20 +147,18 @@ type Patches struct {
 	Conflicts []ConflictPatch `json:"conflicts"`
 }
 
-// ReportKey implements report.Reporter.
+// ReportKey implements workflow.Reporter.
 func (h *ComposerPatches1) ReportKey() string { return "composer_patches" }
 
-// ReportData implements report.Reporter.
-func (h *ComposerPatches1) ReportData() any {
-	if !h.patchUpdates.Changes() {
+// ReportData implements workflow.Reporter.
+func (h *ComposerPatches1) ReportData(findings *workflow.Findings) any {
+	recorded, _ := workflow.Shared[PatchUpdates](findings, workflow.EventPreComposerUpdate)
+	updates := recorded.Finding
+	if !updates.Changes() {
 		return nil
 	}
 
-	return Patches{
-		Removed:   h.patchUpdates.Removed,
-		Updated:   h.patchUpdates.Updated,
-		Conflicts: h.patchUpdates.Conflicts,
-	}
+	return Patches(updates)
 }
 
 // --- code_beautifier ---
