@@ -2057,7 +2057,7 @@ func TestUpdateSiteRestoresSettings(t *testing.T) {
 	})
 
 	t.Run("of every configured site after another failed to configure, naming each failure", func(t *testing.T) {
-		ws, installer, drush := newRunner(t)
+		ws, installer, drushMock := newRunner(t)
 		ws.config.Sites = []string{"site1", "site2"}
 		ws.config.Concurrency = 2
 		site2Configured := make(chan struct{})
@@ -2069,7 +2069,10 @@ func TestUpdateSiteRestoresSettings(t *testing.T) {
 			close(site2Configured)
 			return nil
 		})
-		drush.EXPECT().Facts(anyCtx, "/project", "site2").Return(syncFacts(""), context.Canceled).Maybe()
+		drushMock.EXPECT().Facts(anyCtx, "/project", "site2").RunAndReturn(func(ctx context.Context, _, _ string) (drush.Facts, error) {
+			<-ctx.Done()
+			return drush.Facts{}, ctx.Err()
+		})
 		installer.EXPECT().RestoreSettings(anyCtx, "/project", "site2").Return(errors.New("site2 unwritable")).Once()
 
 		err := ws.updateSites(t.Context())
