@@ -37,8 +37,7 @@ func (e *BasicAddonEvent) Path() string {
 	return e.path
 }
 
-// Commit records the addon's change to paths on the update branch; see Committer.
-func (e *BasicAddonEvent) Commit(message string, paths ...string) (bool, error) {
+func (e *BasicAddonEvent) commit(message string, paths ...string) (bool, error) {
 	return e.committer.Commit(message, paths...)
 }
 

@@ -70,8 +70,8 @@ func TestComposerDiffFailure(t *testing.T) {
 	composerService.EXPECT().Diff(anyCtx, "/tmp").Return(nil, assert.AnError)
 
 	cd := NewComposerDiff(zap.NewNop(), composerService)
-	err := cd.postComposerUpdateHandler(workflow.NewPostComposerUpdateEvent(t.Context(), "/tmp", nil))
-	require.Error(t, err)
+	_, err := cd.postComposerUpdateHandler(workflow.NewPostComposerUpdateEvent(t.Context(), "/tmp", nil))
+	require.ErrorIs(t, err, assert.AnError)
 	assert.Contains(t, err.Error(), "failed to get diff")
 }
 

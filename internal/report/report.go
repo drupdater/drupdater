@@ -89,8 +89,8 @@ type Report struct {
 	// measurable without separate instrumentation.
 	Phases []Phase `json:"phases"`
 
-	// Addons holds each reporting addon's structured section, keyed by its report key. Addons
-	// that do not implement report.Reporter are absent rather than present and empty.
+	// Addons holds each reporting addon's structured section, keyed by its report key. An addon
+	// with nothing to report is absent rather than present and empty.
 	Addons map[string]any `json:"addons,omitempty"`
 }
 
@@ -127,16 +127,6 @@ type Phase struct {
 	DurationSeconds float64   `json:"duration_seconds"`
 	OK              bool      `json:"ok"`
 	Error           string    `json:"error,omitempty"`
-}
-
-// Reporter is the optional interface an addon implements to contribute a section to the report.
-// Kept separate from workflow.Addon so adding it does not force every addon and mock to change.
-type Reporter interface {
-	// ReportKey is the stable key this addon's section appears under. It should match the
-	// addon's registry name so a report reads the same way as .drupdater.yaml.
-	ReportKey() string
-	// ReportData returns JSON-serialisable data describing what the addon did.
-	ReportData() any
 }
 
 // Recorder accumulates a report over a run. Concurrency-safe: sites update in parallel, so an
@@ -267,13 +257,6 @@ func (r *Recorder) AddSection(key string, data any) {
 		r.report.Addons = map[string]any{}
 	}
 	r.report.Addons[key] = data
-}
-
-// AddReporter records v's section when v implements Reporter, and is a no-op otherwise.
-func (r *Recorder) AddReporter(v any) {
-	if reporter, ok := v.(Reporter); ok {
-		r.AddSection(reporter.ReportKey(), reporter.ReportData())
-	}
 }
 
 // Snapshot returns the report as recorded so far, leaving it open. The addons map is copied, so a

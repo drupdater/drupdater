@@ -84,9 +84,7 @@ description](#rendering-the-request-description).
 Addons never touch git. A hook that changes files returns them as `Commits` in its
 `workflow.Result`, and the pipeline commits exactly those paths — files or directories,
 deletions included — under each message, in order, before the next hook runs. A later stage
-therefore sees an earlier stage's change already committed. (Addons not yet moved to
-`workflow.Produce` name their paths to the event's `Commit(message, paths...)` instead, with
-the same effect.)
+therefore sees an earlier stage's change already committed.
 
 Two rules make that safe without any addon knowing about the others:
 

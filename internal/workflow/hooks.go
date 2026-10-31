@@ -26,21 +26,27 @@ const (
 // Hook is one addon's handler for the event E, run at Stage.
 type Hook[E any] struct {
 	Stage Stage
-	run   func(E) (Result[any], error)
+	run   func(E, *Findings) (Result[any], error)
 	// produces marks a hook built by Produce, whose finding the pipeline records.
 	produces bool
 }
 
-// On builds the hook running fn at stage.
+// On builds a hook that only acts on the project: it commits nothing and finds nothing.
 func On[E any](stage Stage, fn func(E) error) *Hook[E] {
-	return &Hook[E]{Stage: stage, run: func(e E) (Result[any], error) { return Result[any]{}, fn(e) }}
+	return &Hook[E]{Stage: stage, run: func(e E, _ *Findings) (Result[any], error) { return Result[any]{}, fn(e) }}
 }
 
 // Produce builds the hook running fn at stage. The pipeline commits the Result's Commits in order
 // and records its Finding for the addon's ReportData.
 func Produce[E, F any](stage Stage, fn func(E) (Result[F], error)) *Hook[E] {
-	return &Hook[E]{Stage: stage, produces: true, run: func(e E) (Result[any], error) {
-		r, err := fn(e)
+	return ProduceFrom(stage, func(e E, _ *Findings) (Result[F], error) { return fn(e) })
+}
+
+// ProduceFrom is Produce for a hook that reads what its own addon's earlier hooks found, such as
+// a post-update hook undoing what the pre-update one did. It never sees another addon's.
+func ProduceFrom[E, F any](stage Stage, fn func(E, *Findings) (Result[F], error)) *Hook[E] {
+	return &Hook[E]{Stage: stage, produces: true, run: func(e E, earlier *Findings) (Result[any], error) {
+		r, err := fn(e, earlier)
 		return Result[any]{Commits: r.Commits, Finding: r.Finding}, err
 	}}
 }
@@ -60,22 +66,12 @@ func (h *Hook[E]) stage() Stage { return h.Stage }
 type PlanHook struct {
 	Stage Stage
 	run   func(*PreComposerUpdateEvent) (Proposal[any], error)
-	// produces marks a hook built by ProduceProposal, whose finding the pipeline records.
-	produces bool
-}
-
-// Propose builds the pre-composer-update hook running fn at stage.
-func Propose(stage Stage, fn func(*PreComposerUpdateEvent) (UpdatePlan, error)) *PlanHook {
-	return &PlanHook{Stage: stage, run: func(e *PreComposerUpdateEvent) (Proposal[any], error) {
-		plan, err := fn(e)
-		return Proposal[any]{Plan: plan}, err
-	}}
 }
 
 // ProduceProposal builds the pre-composer-update hook running fn at stage. Like Produce, the
 // pipeline commits the Proposal's Commits and records its Finding.
 func ProduceProposal[F any](stage Stage, fn func(*PreComposerUpdateEvent) (Proposal[F], error)) *PlanHook {
-	return &PlanHook{Stage: stage, produces: true, run: func(e *PreComposerUpdateEvent) (Proposal[any], error) {
+	return &PlanHook{Stage: stage, run: func(e *PreComposerUpdateEvent) (Proposal[any], error) {
 		p, err := fn(e)
 		return Proposal[any]{Plan: p.Plan, Commits: p.Commits, Finding: p.Finding}, err
 	}}
@@ -115,9 +111,7 @@ func (p *Pipeline) Report(rec *report.Recorder) {
 	for i, a := range p.addons {
 		if r, ok := a.(Reporter); ok {
 			rec.AddSection(r.ReportKey(), r.ReportData(p.findings[i]))
-			continue
 		}
-		rec.AddReporter(a)
 	}
 }
 
@@ -131,7 +125,7 @@ type staged interface {
 type event[H staged] interface {
 	name() string
 	hook(Hooks) H
-	Commit(message string, paths ...string) (bool, error)
+	commit(message string, paths ...string) (bool, error)
 }
 
 // Fire runs every addon's hook for e, by stage and within a stage in addon order.
@@ -141,7 +135,7 @@ func Fire[E event[*Hook[E]]](p *Pipeline, e E) error {
 		site = s.Site()
 	}
 	for _, h := range ordered(p, e.hook) {
-		result, err := h.hook.run(e)
+		result, err := h.hook.run(e, p.findings[h.addon])
 		if err != nil {
 			return fmt.Errorf("%s hook failed: %w", e.name(), err)
 		}
@@ -175,9 +169,7 @@ func Settle(p *Pipeline, e *PreComposerUpdateEvent) (UpdatePlan, error) {
 		if err != nil {
 			return UpdatePlan{}, fmt.Errorf("%s hook failed: %w", e.name(), err)
 		}
-		if h.hook.produces {
-			p.findings[h.addon].Record(e.name(), "", proposal.Finding, committed)
-		}
+		p.findings[h.addon].Record(e.name(), "", proposal.Finding, committed)
 		if plan, err = plan.merge(proposal.Plan); err != nil {
 			// merge's errors carry no identity to unwrap, so %v here would read the same.
 			// mutator-disable-next-line expression/errorf-wrap

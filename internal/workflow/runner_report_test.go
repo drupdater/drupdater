@@ -460,8 +460,8 @@ type reportingAddon struct {
 	data any
 }
 
-func (a *reportingAddon) ReportKey() string { return a.key }
-func (a *reportingAddon) ReportData() any   { return a.data }
+func (a *reportingAddon) ReportKey() string        { return a.key }
+func (a *reportingAddon) ReportData(*Findings) any { return a.data }
 
 func TestReportCollectsSectionsOnlyFromReporters(t *testing.T) {
 	h := newReportHarness(t, true)

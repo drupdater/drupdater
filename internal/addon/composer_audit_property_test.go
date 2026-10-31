@@ -9,7 +9,7 @@ import (
 	"pgregory.net/rapid"
 )
 
-// GetFixedAdvisories decides what a security merge request claims to have fixed, so the laws of
+// fixedAdvisories decides what a security merge request claims to have fixed, so the laws of
 // set difference are asserted rather than sampled.
 
 // advisoryGen covers the three states advisoryKey distinguishes. Free-text fields draw
@@ -31,33 +31,25 @@ func advisoriesGen() *rapid.Generator[[]composer.Advisory] {
 	return rapid.SliceOfNDistinct(advisoryGen(), 0, 6, advisoryKey)
 }
 
-func TestPropertyGetFixedAdvisoriesReportsNothingWhenNothingChanged(t *testing.T) {
+func TestPropertyFixedAdvisoriesReportsNothingWhenNothingChanged(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		advisories := advisoriesGen().Draw(t, "advisories")
 
-		audit := &ComposerAudit{
-			beforeAudit: composer.Audit{Advisories: advisories},
-			afterAudit:  composer.Audit{Advisories: advisories},
-		}
+		same := composer.Audit{Advisories: advisories}
 
-		assert.Empty(t, audit.GetFixedAdvisories())
+		assert.Empty(t, fixedAdvisories(same, same))
 	})
 }
 
-func TestPropertyGetFixedAdvisoriesReportsEverythingThatDisappeared(t *testing.T) {
+func TestPropertyFixedAdvisoriesReportsEverythingThatDisappeared(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		advisories := advisoriesGen().Draw(t, "advisories")
 
-		audit := &ComposerAudit{
-			beforeAudit: composer.Audit{Advisories: advisories},
-			afterAudit:  composer.Audit{},
-		}
-
-		assert.Equal(t, advisories, audit.GetFixedAdvisories())
+		assert.Equal(t, advisories, fixedAdvisories(composer.Audit{Advisories: advisories}, composer.Audit{}))
 	})
 }
 
-func TestPropertyGetFixedAdvisoriesIsASubsequenceOfBefore(t *testing.T) {
+func TestPropertyFixedAdvisoriesIsASubsequenceOfBefore(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		before := advisoriesGen().Draw(t, "before")
 		kept := rapid.SliceOfN(rapid.Bool(), len(before), len(before)).Draw(t, "kept")
@@ -74,13 +66,10 @@ func TestPropertyGetFixedAdvisoriesIsASubsequenceOfBefore(t *testing.T) {
 
 		// Order preserved and nothing invented: the fixed list is exactly the advisories that
 		// were there before and are not there now, in the order composer reported them.
-		audit := &ComposerAudit{
-			beforeAudit: composer.Audit{Advisories: before},
-			afterAudit:  composer.Audit{Advisories: after},
-		}
-		got := audit.GetFixedAdvisories()
+		beforeAudit, afterAudit := composer.Audit{Advisories: before}, composer.Audit{Advisories: after}
+		got := fixedAdvisories(beforeAudit, afterAudit)
 		assert.Equal(t, want, got)
-		assert.Equal(t, got, audit.GetFixedAdvisories(), "reading the result must not consume it")
+		assert.Equal(t, got, fixedAdvisories(beforeAudit, afterAudit), "reading the result must not consume it")
 	})
 }
 

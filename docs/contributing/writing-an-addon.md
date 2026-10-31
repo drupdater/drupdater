@@ -75,8 +75,12 @@ changes](../explanation/addon-architecture.md#committing-changes) — and hands 
 back to `ReportData`. A hook that only inspects is built with `workflow.Observe`, which returns a
 finding and no commits.
 
-Some older addons still use `workflow.On`, committing through `evt.Commit` and keeping their
-findings in fields. They are being moved over; write a new addon the `Produce` way.
+A later hook that has to undo or compare against what an earlier one of the same addon did —
+`composer_allow_plugins` removing the wildcard its pre-update hook added, `composer_audit`
+comparing the audits before and after — is built with `workflow.ProduceFrom`, which also hands
+it the addon's findings so far. It sees only its own addon's, never another's. A hook that only
+acts on the project, committing nothing and finding nothing, as `composer_normalizer`'s does, is
+built with `workflow.On`.
 
 Declare the interface for each tool your addon calls in its own file, listing only the methods
 it calls, as above. Its constructor then shows what the addon can do to the project, and its
@@ -88,7 +92,7 @@ tests mock exactly that. Then add the interface to `addonComposer` or `addonDrus
 
 | Event | Use for |
 |---|---|
-| `pre-composer-update` | Influencing what the update touches: build the hook with `workflow.Propose` and return a plan, or with `workflow.ProduceProposal` to return commits and a finding with it |
+| `pre-composer-update` | Influencing what the update touches: build the hook with `workflow.ProduceProposal` and return a plan, with any commits and finding |
 | `post-composer-update` | Reacting to the new lock file and installed code, before it is committed |
 | `post-code-update` | Changing code — Rector, PHPCBF, and similar |
 | `pre-site-update` | Inspecting a site before its update hooks run |
@@ -115,8 +119,8 @@ different goroutines. So a per-site hook returns what it finds, and the pipeline
 per site, under its own lock. `ReportData` reads every site's finding with
 `workflow.SiteFindings` and merges them — deduplicating, say, as `unsupported_modules` does.
 
-An addon with a per-site hook may not have a map, slice or mutex field at all:
-`TestPerSiteHooksKeepNoStateOfTheirOwn` fails if it does.
+No addon may have a map, slice or mutex field at all: `TestAddonsKeepNoStateOfTheirOwn` fails if
+it does.
 
 ## 2. Register it
 
@@ -164,7 +168,7 @@ func (a *YourAddon) ReportData(findings *workflow.Findings) any {
 event's findings, each with `Committed`, the messages of the hook's commits that were made —
 so a section can say whether a change really landed, as `translations_updater`'s `updated`
 does. An event that is not per site has one finding, which `workflow.Shared` reads, as
-`composer_patches` does. An older addon whose hooks keep their findings implements `ReportData() any` instead.
+`composer_patches` does.
 
 They live together in one file because collectively they *are* the report's `addons`
 schema, which is a published contract. Scattered across ten files, it is very easy to

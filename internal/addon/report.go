@@ -13,9 +13,8 @@ import (
 // Every addon's contribution to the --report document, together in one file because these
 // methods are a published contract and a rename spread over eight files is easy to miss.
 //
-// Addons satisfy report.Reporter structurally, so none of them imports the report package; one
-// whose hooks return their findings implements workflow.Reporter instead. Keys match
-// .drupdater.yaml's addon names.
+// Each implements workflow.Reporter, reading what its hooks returned from the pipeline's
+// findings. Keys match .drupdater.yaml's addon names.
 //
 // composer_normalizer contributes nothing: what it changes is formatting, not a finding.
 
@@ -29,14 +28,16 @@ type SecurityAdvisories struct {
 	Abandoned []composer.AbandonedPackage `json:"abandoned"`
 }
 
-// ReportKey implements report.Reporter.
+// ReportKey implements workflow.Reporter.
 func (ca *ComposerAudit) ReportKey() string { return "composer_audit" }
 
-// ReportData implements report.Reporter. Both lists arrive sorted, so this stays stable.
-func (ca *ComposerAudit) ReportData() any {
-	fixed := ca.GetFixedAdvisories()
-	remaining := ca.afterAudit.Advisories
-	abandoned := ca.GetAbandonedPackages()
+// ReportData implements workflow.Reporter. Both lists arrive sorted, so this stays stable.
+func (ca *ComposerAudit) ReportData(findings *workflow.Findings) any {
+	before, _ := workflow.Shared[composer.Audit](findings, workflow.EventPreComposerUpdate)
+	after, _ := workflow.Shared[composer.Audit](findings, workflow.EventPostCodeUpdate)
+	fixed := fixedAdvisories(before.Finding, after.Finding)
+	remaining := after.Finding.Advisories
+	abandoned := abandonedPackages(after.Finding)
 	if len(fixed) == 0 && len(remaining) == 0 && len(abandoned) == 0 {
 		return nil
 	}
@@ -60,17 +61,19 @@ type DependencyChange struct {
 	ProjectURL string `json:"project_url,omitempty"`
 }
 
-// ReportKey implements report.Reporter.
+// ReportKey implements workflow.Reporter.
 func (cd *ComposerDiff) ReportKey() string { return "composer_diff" }
 
-// ReportData implements report.Reporter.
-func (cd *ComposerDiff) ReportData() any {
-	if len(cd.entries) == 0 {
+// ReportData implements workflow.Reporter.
+func (cd *ComposerDiff) ReportData(findings *workflow.Findings) any {
+	recorded, _ := workflow.Shared[[]composer.DiffEntry](findings, workflow.EventPostComposerUpdate)
+	entries := recorded.Finding
+	if len(entries) == 0 {
 		return nil
 	}
 
-	changes := make([]DependencyChange, 0, len(cd.entries))
-	for _, e := range cd.entries {
+	changes := make([]DependencyChange, 0, len(entries))
+	for _, e := range entries {
 		changes = append(changes, DependencyChange{
 			Package: e.Package, Operation: e.Operation, From: e.From, To: e.To,
 			Dev: e.Dev, Direct: e.Direct, CompareURL: e.CompareURL, ProjectURL: e.ProjectURL,
@@ -87,15 +90,16 @@ type PluginAllowlist struct {
 	Added []string `json:"added"`
 }
 
-// ReportKey implements report.Reporter.
+// ReportKey implements workflow.Reporter.
 func (ap *ComposerAllowPlugins) ReportKey() string { return "composer_allow_plugins" }
 
-// ReportData implements report.Reporter. Sorted: the plugins are found by ranging over a map.
-func (ap *ComposerAllowPlugins) ReportData() any {
-	if len(ap.newAllowPlugins) == 0 {
+// ReportData implements workflow.Reporter. Sorted: the plugins are found by ranging over a map.
+func (ap *ComposerAllowPlugins) ReportData(findings *workflow.Findings) any {
+	recorded, _ := workflow.Shared[[]string](findings, workflow.EventPostComposerUpdate)
+	if len(recorded.Finding) == 0 {
 		return nil
 	}
-	return PluginAllowlist{Added: slices.Sorted(slices.Values(ap.newAllowPlugins))}
+	return PluginAllowlist{Added: slices.Sorted(slices.Values(recorded.Finding))}
 }
 
 // --- update_hooks ---

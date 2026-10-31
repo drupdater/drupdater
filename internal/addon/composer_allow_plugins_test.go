@@ -22,16 +22,25 @@ func TestNewDefaultAllowPlugins(t *testing.T) {
 	assert.Equal(t, composerRunner, ap.composer)
 }
 
-func preUpdate(t *testing.T, ap *ComposerAllowPlugins) error {
+// preUpdate runs the pre-update hook and returns its finding as the post-update hook reads it.
+func preUpdate(t *testing.T, ap *ComposerAllowPlugins) (*workflow.Findings, error) {
 	t.Helper()
-	plan, err := ap.preComposerUpdateHandler(workflow.NewPreComposerUpdateEvent(t.Context(), "/p", nil, workflow.UpdatePlan{}))
-	assert.Zero(t, plan, "allowing plugins never changes what the update touches")
-	return err
+	proposal, err := ap.preComposerUpdateHandler(workflow.NewPreComposerUpdateEvent(t.Context(), "/p", nil, workflow.UpdatePlan{}))
+	assert.Zero(t, proposal.Plan, "allowing plugins never changes what the update touches")
+	return earlierAllowPlugins(proposal.Finding), err
 }
 
-func postUpdate(t *testing.T, ap *ComposerAllowPlugins) error {
+func earlierAllowPlugins(before allowPluginsBefore) *workflow.Findings {
+	earlier := &workflow.Findings{}
+	earlier.Record(workflow.EventPreComposerUpdate, "", before, nil)
+	return earlier
+}
+
+// postUpdate runs the post-update hook after earlier and returns the plugins it denied.
+func postUpdate(t *testing.T, ap *ComposerAllowPlugins, earlier *workflow.Findings) ([]string, error) {
 	t.Helper()
-	return ap.postComposerUpdateHandler(workflow.NewPostComposerUpdateEvent(t.Context(), "/p", nil))
+	result, err := ap.postComposerUpdateHandler(workflow.NewPostComposerUpdateEvent(t.Context(), "/p", nil), earlier)
+	return result.Finding, err
 }
 
 func plugins(names ...string) map[string]any {
@@ -51,7 +60,8 @@ func TestAllowPluginsWithRulesAddsAndRemovesATrailingWildcard(t *testing.T) {
 	c.EXPECT().SetConfig(anyCtx, "/p", "allow-plugins.*", "true").Return(nil).Once()
 	ap := NewComposerAllowPlugins(zap.NewNop(), c)
 
-	require.NoError(t, preUpdate(t, ap))
+	earlier, err := preUpdate(t, ap)
+	require.NoError(t, err)
 
 	c.EXPECT().UnsetConfig(anyCtx, "/p", "allow-plugins.*").Return(nil).Once()
 	c.EXPECT().GetInstalledPlugins(anyCtx, "/p").Return(plugins(
@@ -63,10 +73,10 @@ func TestAllowPluginsWithRulesAddsAndRemovesATrailingWildcard(t *testing.T) {
 		return nil
 	})
 
-	require.NoError(t, postUpdate(t, ap))
+	added, err := postUpdate(t, ap, earlier)
+	require.NoError(t, err)
 	assert.Equal(t, []string{"allow-plugins.php-http/discovery", "allow-plugins.tbachert/spi"}, denied)
-	assert.Equal(t, []string{"php-http/discovery", "tbachert/spi"}, ap.newAllowPlugins)
-	assert.False(t, ap.wildcard)
+	assert.Equal(t, []string{"php-http/discovery", "tbachert/spi"}, added)
 }
 
 // A boolean decides every plugin already, and the project's own "*" rule is the project's call.
@@ -83,10 +93,12 @@ func TestAllowPluginsLeavesASettingThatDecidesEverythingAlone(t *testing.T) {
 			c.EXPECT().GetInstalledPlugins(anyCtx, "/p").Return(plugins("drupal/core-composer-scaffold", "tbachert/spi"), nil)
 			ap := NewComposerAllowPlugins(zap.NewNop(), c)
 
-			require.NoError(t, preUpdate(t, ap))
-			require.NoError(t, postUpdate(t, ap))
+			earlier, err := preUpdate(t, ap)
+			require.NoError(t, err)
+			added, err := postUpdate(t, ap, earlier)
+			require.NoError(t, err)
 
-			assert.Empty(t, ap.newAllowPlugins)
+			assert.Empty(t, added)
 		})
 	}
 }
@@ -101,8 +113,10 @@ func TestAllowPluginsWithoutASettingRestoresItsAbsence(t *testing.T) {
 	c.EXPECT().UnsetConfig(anyCtx, "/p", "allow-plugins").Return(nil)
 	ap := NewComposerAllowPlugins(zap.NewNop(), c)
 
-	require.NoError(t, preUpdate(t, ap))
-	require.NoError(t, postUpdate(t, ap))
+	earlier, err := preUpdate(t, ap)
+	require.NoError(t, err)
+	_, err = postUpdate(t, ap, earlier)
+	require.NoError(t, err)
 }
 
 func TestAllowPluginsWithoutASettingKeepsTheNewDenials(t *testing.T) {
@@ -114,9 +128,11 @@ func TestAllowPluginsWithoutASettingKeepsTheNewDenials(t *testing.T) {
 	c.EXPECT().SetConfig(anyCtx, "/p", "allow-plugins.tbachert/spi", "false").Return(nil)
 	ap := NewComposerAllowPlugins(zap.NewNop(), c)
 
-	require.NoError(t, preUpdate(t, ap))
-	require.NoError(t, postUpdate(t, ap))
-	assert.Equal(t, []string{"tbachert/spi"}, ap.newAllowPlugins)
+	earlier, err := preUpdate(t, ap)
+	require.NoError(t, err)
+	added, err := postUpdate(t, ap, earlier)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"tbachert/spi"}, added)
 }
 
 // An empty object is a setting: it is left as {} rather than removed.
@@ -128,8 +144,10 @@ func TestAllowPluginsKeepsAnEmptyObject(t *testing.T) {
 	c.EXPECT().GetInstalledPlugins(anyCtx, "/p").Return(plugins(), nil)
 	ap := NewComposerAllowPlugins(zap.NewNop(), c)
 
-	require.NoError(t, preUpdate(t, ap))
-	require.NoError(t, postUpdate(t, ap))
+	earlier, err := preUpdate(t, ap)
+	require.NoError(t, err)
+	_, err = postUpdate(t, ap, earlier)
+	require.NoError(t, err)
 }
 
 func TestAllowPluginsErrors(t *testing.T) {
@@ -137,7 +155,7 @@ func TestAllowPluginsErrors(t *testing.T) {
 		c := NewMockAllowPluginsComposer(t)
 		c.EXPECT().GetAllowPlugins("/p").Return(composer.AllowPlugins{}, assert.AnError)
 
-		err := preUpdate(t, NewComposerAllowPlugins(zap.NewNop(), c))
+		_, err := preUpdate(t, NewComposerAllowPlugins(zap.NewNop(), c))
 
 		require.ErrorIs(t, err, assert.AnError)
 		require.ErrorContains(t, err, "failed to get composer allow plugins")
@@ -149,11 +167,11 @@ func TestAllowPluginsErrors(t *testing.T) {
 		c.EXPECT().SetConfig(anyCtx, "/p", "allow-plugins.*", "true").Return(assert.AnError)
 		ap := NewComposerAllowPlugins(zap.NewNop(), c)
 
-		err := preUpdate(t, ap)
+		proposal, err := ap.preComposerUpdateHandler(workflow.NewPreComposerUpdateEvent(t.Context(), "/p", nil, workflow.UpdatePlan{}))
 
 		require.ErrorIs(t, err, assert.AnError)
 		require.ErrorContains(t, err, "failed to allow plugins for the update")
-		assert.False(t, ap.wildcard, "a wildcard that was never written is not removed later")
+		assert.False(t, proposal.Finding.wildcard, "a wildcard that was never written is not removed later")
 	})
 
 	t.Run("removing the wildcard fails", func(t *testing.T) {
@@ -161,9 +179,8 @@ func TestAllowPluginsErrors(t *testing.T) {
 		c.EXPECT().GetInstalledPlugins(anyCtx, "/p").Return(plugins(), nil)
 		c.EXPECT().UnsetConfig(anyCtx, "/p", "allow-plugins.*").Return(assert.AnError)
 		ap := NewComposerAllowPlugins(zap.NewNop(), c)
-		ap.wildcard = true
 
-		err := postUpdate(t, ap)
+		_, err := postUpdate(t, ap, earlierAllowPlugins(allowPluginsBefore{wildcard: true}))
 
 		require.ErrorIs(t, err, assert.AnError)
 		require.ErrorContains(t, err, "failed to remove the temporary plugin rule")
@@ -173,14 +190,16 @@ func TestAllowPluginsErrors(t *testing.T) {
 		c := NewMockAllowPluginsComposer(t)
 		c.EXPECT().GetInstalledPlugins(anyCtx, "/p").Return(plugins(), nil)
 
-		require.NoError(t, postUpdate(t, NewComposerAllowPlugins(zap.NewNop(), c)))
+		_, err := postUpdate(t, NewComposerAllowPlugins(zap.NewNop(), c), &workflow.Findings{})
+		require.NoError(t, err)
 	})
 
 	t.Run("listing installed plugins fails", func(t *testing.T) {
 		c := NewMockAllowPluginsComposer(t)
 		c.EXPECT().GetInstalledPlugins(anyCtx, "/p").Return(nil, assert.AnError)
 
-		require.ErrorIs(t, postUpdate(t, NewComposerAllowPlugins(zap.NewNop(), c)), assert.AnError)
+		_, err := postUpdate(t, NewComposerAllowPlugins(zap.NewNop(), c), &workflow.Findings{})
+		require.ErrorIs(t, err, assert.AnError)
 	})
 
 	t.Run("denying a new plugin fails", func(t *testing.T) {
@@ -188,7 +207,7 @@ func TestAllowPluginsErrors(t *testing.T) {
 		c.EXPECT().GetInstalledPlugins(anyCtx, "/p").Return(plugins("tbachert/spi"), nil)
 		c.EXPECT().SetConfig(anyCtx, "/p", "allow-plugins.tbachert/spi", "false").Return(assert.AnError)
 
-		err := postUpdate(t, NewComposerAllowPlugins(zap.NewNop(), c))
+		_, err := postUpdate(t, NewComposerAllowPlugins(zap.NewNop(), c), &workflow.Findings{})
 
 		require.ErrorIs(t, err, assert.AnError)
 		require.ErrorContains(t, err, "failed to deny new plugin tbachert/spi")
@@ -200,9 +219,8 @@ func TestAllowPluginsErrors(t *testing.T) {
 		c.EXPECT().GetInstalledPlugins(anyCtx, "/p").Return(plugins(), nil)
 		c.EXPECT().UnsetConfig(anyCtx, "/p", "allow-plugins").Return(assert.AnError)
 		ap := NewComposerAllowPlugins(zap.NewNop(), c)
-		ap.wildcard = true
 
-		err := postUpdate(t, ap)
+		_, err := postUpdate(t, ap, earlierAllowPlugins(allowPluginsBefore{wildcard: true}))
 
 		require.ErrorIs(t, err, assert.AnError)
 		require.ErrorContains(t, err, "failed to remove the temporary plugin config")
@@ -228,9 +246,26 @@ func TestAllowPluginsRemovesTheWildcardLast(t *testing.T) {
 		return nil
 	})
 	ap := NewComposerAllowPlugins(zap.NewNop(), c)
-	ap.original = composer.AllowPlugins{Set: true, Rules: map[string]bool{}}
-	ap.wildcard = true
+	earlier := earlierAllowPlugins(allowPluginsBefore{original: composer.AllowPlugins{Set: true, Rules: map[string]bool{}}, wildcard: true})
 
-	require.NoError(t, postUpdate(t, ap))
+	_, err := postUpdate(t, ap, earlier)
+	require.NoError(t, err)
 	assert.Equal(t, []string{"list", "deny", "unset wildcard"}, calls)
+}
+
+// The post-update hook undoes what its own pre-update hook did, read from the pipeline's findings.
+func TestAllowPluginsUndoesItsWildcardThroughThePipeline(t *testing.T) {
+	c := NewMockAllowPluginsComposer(t)
+	c.EXPECT().GetAllowPlugins("/p").Return(composer.AllowPlugins{Set: true, Rules: map[string]bool{"drupal/*": true}}, nil)
+	c.EXPECT().SetConfig(anyCtx, "/p", "allow-plugins.*", "true").Return(nil)
+	c.EXPECT().GetInstalledPlugins(anyCtx, "/p").Return(plugins("drupal/core-composer-scaffold", "tbachert/spi"), nil)
+	c.EXPECT().SetConfig(anyCtx, "/p", "allow-plugins.tbachert/spi", "false").Return(nil)
+	c.EXPECT().UnsetConfig(anyCtx, "/p", "allow-plugins.*").Return(nil)
+	p := workflow.NewPipeline([]workflow.Addon{NewComposerAllowPlugins(zap.NewNop(), c)})
+
+	_, err := workflow.Settle(p, workflow.NewPreComposerUpdateEvent(t.Context(), "/p", nil, workflow.UpdatePlan{}))
+	require.NoError(t, err)
+	require.NoError(t, workflow.Fire(p, workflow.NewPostComposerUpdateEvent(t.Context(), "/p", nil)))
+
+	assert.Equal(t, PluginAllowlist{Added: []string{"tbachert/spi"}}, reportSection(p, "composer_allow_plugins"))
 }

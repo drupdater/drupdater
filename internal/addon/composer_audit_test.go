@@ -9,6 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 // TestNewComposerAudit tests the constructor
@@ -53,14 +55,14 @@ func TestComposerAudit_PreComposerUpdateHandler_WithAdvisories(t *testing.T) {
 
 	mockComposer.EXPECT().Audit(ctx, path).Return(mockAudit, nil)
 
-	plan, err := audit.preComposerUpdateHandler(mockEvent)
+	proposal, err := audit.preComposerUpdateHandler(mockEvent)
 
 	require.NoError(t, err)
-	assert.Equal(t, mockAudit, audit.beforeAudit)
+	assert.Equal(t, mockAudit, proposal.Finding)
 	assert.Equal(t, workflow.UpdatePlan{
 		Only:           []string{"drupal/core", "other/package", "drupal/core-recommended", "drupal/core-composer-scaffold"},
 		MinimalChanges: true,
-	}, plan)
+	}, proposal.Plan)
 }
 
 // TestComposerAudit_PreComposerUpdateHandler_NoAdvisories tests when no security advisories are found
@@ -81,12 +83,11 @@ func TestComposerAudit_PreComposerUpdateHandler_NoAdvisories(t *testing.T) {
 
 	mockComposer.EXPECT().Audit(ctx, path).Return(mockAudit, nil)
 
-	plan, err := audit.preComposerUpdateHandler(mockEvent)
+	proposal, err := audit.preComposerUpdateHandler(mockEvent)
 
 	require.ErrorAs(t, err, &workflow.AbortError{})
 	assert.Equal(t, "No security advisories found", err.Error())
-	assert.Equal(t, mockAudit, audit.beforeAudit)
-	assert.Zero(t, plan)
+	assert.Zero(t, proposal, "an abort records nothing")
 }
 
 // TestComposerAudit_PostCodeUpdateHandler tests the post-code-update handler
@@ -113,10 +114,10 @@ func TestComposerAudit_PostCodeUpdateHandler(t *testing.T) {
 
 	mockComposer.EXPECT().Audit(ctx, path).Return(mockAudit, nil)
 
-	err := audit.postCodeUpdateHandler(mockEvent)
+	result, err := audit.postCodeUpdateHandler(mockEvent, &workflow.Findings{})
 
 	require.NoError(t, err)
-	assert.Equal(t, mockAudit, audit.afterAudit)
+	assert.Equal(t, mockAudit, result.Finding)
 }
 
 func TestAdvisoryKey(t *testing.T) {
@@ -135,27 +136,23 @@ func TestAdvisoryKey_SeparatorInTitle(t *testing.T) {
 	assert.NotEqual(t, advisoryKey(split), advisoryKey(other))
 }
 
-func TestComposerAudit_GetFixedAdvisories_NoCVEAdvisoriesDoNotCollide(t *testing.T) {
+func TestFixedAdvisories_NoCVEAdvisoriesDoNotCollide(t *testing.T) {
 	// Two advisories without a CVE must be treated as distinct: one fixed, one remaining.
-	audit := &ComposerAudit{logger: zap.NewNop()}
-	audit.beforeAudit = composer.Audit{Advisories: []composer.Advisory{
+	before := composer.Audit{Advisories: []composer.Advisory{
 		{AdvisoryID: "A1", PackageName: "drupal/foo", Title: "foo"},
 		{AdvisoryID: "A2", PackageName: "drupal/bar", Title: "bar"},
 	}}
-	audit.afterAudit = composer.Audit{Advisories: []composer.Advisory{
+	after := composer.Audit{Advisories: []composer.Advisory{
 		{AdvisoryID: "A2", PackageName: "drupal/bar", Title: "bar"},
 	}}
 
-	fixed := audit.GetFixedAdvisories()
+	fixed := fixedAdvisories(before, after)
 	require.Len(t, fixed, 1)
 	assert.Equal(t, "A1", fixed[0].AdvisoryID)
 }
 
-// TestComposerAudit_GetFixedAdvisories tests the method that compares before/after advisories
-func TestComposerAudit_GetFixedAdvisories(t *testing.T) {
-	audit := &ComposerAudit{}
-
-	audit.beforeAudit = composer.Audit{
+func TestFixedAdvisoriesAreTheOnesGoneAfterTheUpdate(t *testing.T) {
+	before := composer.Audit{
 		Advisories: []composer.Advisory{
 			{
 				PackageName: "drupal/core",
@@ -170,7 +167,7 @@ func TestComposerAudit_GetFixedAdvisories(t *testing.T) {
 		},
 	}
 
-	audit.afterAudit = composer.Audit{
+	after := composer.Audit{
 		Advisories: []composer.Advisory{
 			{
 				PackageName: "other/package",
@@ -180,7 +177,7 @@ func TestComposerAudit_GetFixedAdvisories(t *testing.T) {
 		},
 	}
 
-	fixed := audit.GetFixedAdvisories()
+	fixed := fixedAdvisories(before, after)
 
 	assert.Len(t, fixed, 1)
 	assert.Equal(t, "CVE-2023-1234", fixed[0].CVE)
@@ -188,9 +185,8 @@ func TestComposerAudit_GetFixedAdvisories(t *testing.T) {
 }
 
 // drupal/* is left to unsupported_modules, so one module is not reported twice.
-func TestComposerAudit_GetAbandonedPackages_FiltersDrupalPackages(t *testing.T) {
-	audit := NewComposerAudit(zap.NewNop(), NewMockAuditComposer(t), true)
-	audit.afterAudit = composer.Audit{
+func TestAbandonedPackages_FiltersDrupalPackages(t *testing.T) {
+	after := composer.Audit{
 		Abandoned: []composer.AbandonedPackage{
 			{PackageName: "drupal/token", Replacement: "drupal/core"},
 			{PackageName: "drupalfinder/drupal-finder", Replacement: "webflo/drupal-finder"},
@@ -203,21 +199,39 @@ func TestComposerAudit_GetAbandonedPackages_FiltersDrupalPackages(t *testing.T) 
 	assert.Equal(t, []composer.AbandonedPackage{
 		{PackageName: "drupalfinder/drupal-finder", Replacement: "webflo/drupal-finder"},
 		{PackageName: "swiftmailer/swiftmailer", Replacement: "symfony/mailer"},
-	}, audit.GetAbandonedPackages())
+	}, abandonedPackages(after))
 }
 
-// TestComposerAudit_GetAbandonedPackages_UsesTheAuditAfterTheUpdate checks the list describes
-// the code the merge request contains, not the code it started from.
-func TestComposerAudit_GetAbandonedPackages_UsesTheAuditAfterTheUpdate(t *testing.T) {
-	audit := NewComposerAudit(zap.NewNop(), NewMockAuditComposer(t), true)
-	audit.beforeAudit = composer.Audit{
-		Abandoned: []composer.AbandonedPackage{{PackageName: "gone/away"}},
-	}
-	audit.afterAudit = composer.Audit{
-		Abandoned: []composer.AbandonedPackage{{PackageName: "still/here"}},
-	}
+// The abandoned list describes the code the merge request contains, not the code it started from.
+func TestComposerAuditReportsTheAbandonedPackagesAfterTheUpdate(t *testing.T) {
+	ca := auditFor(auditPair{
+		before: composer.Audit{Abandoned: []composer.AbandonedPackage{{PackageName: "gone/away"}}},
+		after:  composer.Audit{Abandoned: []composer.AbandonedPackage{{PackageName: "still/here"}}},
+	})
 
-	assert.Equal(t, []composer.AbandonedPackage{{PackageName: "still/here"}}, audit.GetAbandonedPackages())
+	data, ok := ca.ReportData().(SecurityAdvisories)
+	require.True(t, ok)
+	assert.Equal(t, []composer.AbandonedPackage{{PackageName: "still/here"}}, data.Abandoned)
+}
+
+func TestComposerAuditComparesTheTwoAuditsThroughThePipeline(t *testing.T) {
+	fixed := composer.Advisory{CVE: "CVE-1", PackageName: "drupal/core"}
+	open := composer.Advisory{CVE: "CVE-2", PackageName: "drupal/token"}
+	mockComposer := NewMockAuditComposer(t)
+	mockComposer.EXPECT().Audit(anyCtx, "/p").Return(composer.Audit{Advisories: []composer.Advisory{fixed, open}}, nil).Once()
+	mockComposer.EXPECT().Audit(anyCtx, "/p").Return(composer.Audit{Advisories: []composer.Advisory{open}}, nil).Once()
+	core, logs := observer.New(zapcore.InfoLevel)
+	p := workflow.NewPipeline([]workflow.Addon{NewComposerAudit(zap.New(core), mockComposer, false)})
+
+	_, err := workflow.Settle(p, workflow.NewPreComposerUpdateEvent(t.Context(), "/p", nil, workflow.UpdatePlan{}))
+	require.NoError(t, err)
+	require.NoError(t, workflow.Fire(p, workflow.NewPostCodeUpdateEvent(t.Context(), "/p", nil)))
+
+	assert.Equal(t, SecurityAdvisories{
+		Fixed: []composer.Advisory{fixed}, Remaining: []composer.Advisory{open}, Abandoned: []composer.AbandonedPackage{},
+	}, reportSection(p, "composer_audit"))
+	require.Equal(t, 1, logs.Len())
+	assert.Equal(t, map[string]any{"fixed": int64(1), "unresolved": int64(1), "abandoned": int64(0)}, logs.All()[0].ContextMap())
 }
 
 // A normal run audits without taking over: narrowing or aborting here would turn every normal
@@ -236,10 +250,10 @@ func TestComposerAudit_PreComposerUpdateHandler_NormalMode(t *testing.T) {
 
 	mockEvent := workflow.NewPreComposerUpdateEvent(ctx, path, committer, workflow.UpdatePlan{})
 
-	plan, err := audit.preComposerUpdateHandler(mockEvent)
+	proposal, err := audit.preComposerUpdateHandler(mockEvent)
 	require.NoError(t, err)
-	assert.Equal(t, mockAudit, audit.beforeAudit, "the audit still runs: it is what the security report is built from")
-	assert.Zero(t, plan, "a normal run is not narrowed")
+	assert.Equal(t, mockAudit, proposal.Finding, "the audit still runs: it is what the security report is built from")
+	assert.Zero(t, proposal.Plan, "a normal run is not narrowed")
 }
 
 // TestComposerAudit_PreComposerUpdateHandler_NormalModeNoAdvisories checks the abort path is
@@ -255,9 +269,9 @@ func TestComposerAudit_PreComposerUpdateHandler_NormalModeNoAdvisories(t *testin
 
 	mockEvent := workflow.NewPreComposerUpdateEvent(ctx, path, committer, workflow.UpdatePlan{})
 
-	plan, err := audit.preComposerUpdateHandler(mockEvent)
+	proposal, err := audit.preComposerUpdateHandler(mockEvent)
 	require.NoError(t, err)
-	assert.Zero(t, plan)
+	assert.Zero(t, proposal.Plan)
 }
 
 // A swallowed audit failure would let a security run continue with an empty advisory list,
@@ -271,13 +285,13 @@ func TestComposerAudit_AuditFailures(t *testing.T) {
 		mockComposer.EXPECT().Audit(anyCtx, path).Return(composer.Audit{}, assert.AnError)
 
 		evt := workflow.NewPreComposerUpdateEvent(context.Background(), path, &fakeCommitter{}, workflow.UpdatePlan{})
-		plan, err := audit.preComposerUpdateHandler(evt)
+		proposal, err := audit.preComposerUpdateHandler(evt)
 
 		require.ErrorIs(t, err, assert.AnError)
 		assert.Contains(t, err.Error(), "failed to run composer audit")
 		// Not an abort: aborting reads as "nothing to do here" and exits 0.
 		assert.NotErrorAs(t, err, &workflow.AbortError{})
-		assert.Zero(t, plan)
+		assert.Zero(t, proposal)
 	})
 
 	t.Run("after the update", func(t *testing.T) {
@@ -286,9 +300,9 @@ func TestComposerAudit_AuditFailures(t *testing.T) {
 		mockComposer.EXPECT().Audit(anyCtx, path).Return(composer.Audit{}, assert.AnError)
 
 		evt := workflow.NewPostCodeUpdateEvent(context.Background(), path, &fakeCommitter{})
-		err := audit.postCodeUpdateHandler(evt)
+		_, err := audit.postCodeUpdateHandler(evt, &workflow.Findings{})
 
-		require.Error(t, err)
+		require.ErrorIs(t, err, assert.AnError)
 		assert.Contains(t, err.Error(), "failed to run composer audit after update")
 	})
 }

@@ -13,11 +13,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Every addon contributing to the report must satisfy report.Reporter structurally, without
-// importing the report package itself, or workflow.Reporter when its hooks return their findings.
-// If a signature drifts, this fails to compile.
+// Every addon contributing to the report must satisfy workflow.Reporter. If a signature drifts,
+// this fails to compile.
 var (
-	_ report.Reporter   = (*ComposerAudit)(nil)
+	_ workflow.Reporter = (*ComposerAudit)(nil)
+	_ workflow.Reporter = (*ComposerDiff)(nil)
+	_ workflow.Reporter = (*ComposerAllowPlugins)(nil)
 	_ workflow.Reporter = (*UpdateHooks)(nil)
 	_ workflow.Reporter = (*UnsupportedModules)(nil)
 	_ workflow.Reporter = (*TranslationsUpdater)(nil)
@@ -30,16 +31,16 @@ func TestComposerAuditReportData(t *testing.T) {
 	before := composer.Advisory{CVE: "CVE-1", PackageName: "drupal/foo"}
 	stillOpen := composer.Advisory{CVE: "CVE-2", PackageName: "drupal/bar"}
 
-	ca := &ComposerAudit{
-		beforeAudit: composer.Audit{Advisories: []composer.Advisory{before, stillOpen}},
-		afterAudit: composer.Audit{
+	ca := auditFor(auditPair{
+		before: composer.Audit{Advisories: []composer.Advisory{before, stillOpen}},
+		after: composer.Audit{
 			Advisories: []composer.Advisory{stillOpen},
 			Abandoned: []composer.AbandonedPackage{
 				{PackageName: "drupal/token"},
 				{PackageName: "swiftmailer/swiftmailer", Replacement: "symfony/mailer"},
 			},
 		},
-	}
+	})
 
 	assert.Equal(t, "composer_audit", ca.ReportKey())
 
@@ -58,11 +59,11 @@ func TestComposerAuditReportData(t *testing.T) {
 // An update that resolved every advisory still emits the section: abandoned packages are a
 // standing finding no update clears.
 func TestComposerAuditReportDataOnAbandonedAlone(t *testing.T) {
-	ca := &ComposerAudit{
-		afterAudit: composer.Audit{
+	ca := auditFor(auditPair{
+		after: composer.Audit{
 			Abandoned: []composer.AbandonedPackage{{PackageName: "patchwork/jsqueeze"}},
 		},
-	}
+	})
 
 	data, ok := ca.ReportData().(SecurityAdvisories)
 	require.True(t, ok, "an abandoned package alone must still produce a section")
@@ -75,17 +76,17 @@ func TestComposerAuditReportDataOnAbandonedAlone(t *testing.T) {
 // The drupal/* filter applies before the "nothing to report" check, so a finding that belongs
 // to unsupported_modules adds no empty composer_audit section.
 func TestComposerAuditReportDataNilWhenOnlyDrupalPackagesAreAbandoned(t *testing.T) {
-	ca := &ComposerAudit{
-		afterAudit: composer.Audit{
+	ca := auditFor(auditPair{
+		after: composer.Audit{
 			Abandoned: []composer.AbandonedPackage{{PackageName: "drupal/token"}},
 		},
-	}
+	})
 
 	assert.Nil(t, ca.ReportData())
 }
 
 func TestComposerAuditReportDataNilWhenNothingToReport(t *testing.T) {
-	ca := &ComposerAudit{}
+	ca := auditFor(auditPair{})
 	assert.Nil(t, ca.ReportData(), "an addon with nothing to say must not add an empty section")
 }
 
@@ -95,10 +96,10 @@ func TestComposerAuditReportDataOnEitherHalfAlone(t *testing.T) {
 	t.Run("only fixed advisories", func(t *testing.T) {
 		// The update closed the advisory: worth reporting on its own, since it is the evidence
 		// the update was security-relevant.
-		ca := &ComposerAudit{
-			beforeAudit: composer.Audit{Advisories: []composer.Advisory{advisory}},
-			afterAudit:  composer.Audit{},
-		}
+		ca := auditFor(auditPair{
+			before: composer.Audit{Advisories: []composer.Advisory{advisory}},
+			after:  composer.Audit{},
+		})
 		data, ok := ca.ReportData().(SecurityAdvisories)
 		require.True(t, ok, "a fixed advisory alone must still produce a section")
 		require.Len(t, data.Fixed, 1)
@@ -109,10 +110,10 @@ func TestComposerAuditReportDataOnEitherHalfAlone(t *testing.T) {
 	t.Run("only remaining advisories", func(t *testing.T) {
 		// Nothing was fixed but something is still open: reporting this is the whole point of
 		// the audit, and suppressing it would hide a live vulnerability from the reviewer.
-		ca := &ComposerAudit{
-			beforeAudit: composer.Audit{Advisories: []composer.Advisory{advisory}},
-			afterAudit:  composer.Audit{Advisories: []composer.Advisory{advisory}},
-		}
+		ca := auditFor(auditPair{
+			before: composer.Audit{Advisories: []composer.Advisory{advisory}},
+			after:  composer.Audit{Advisories: []composer.Advisory{advisory}},
+		})
 		data, ok := ca.ReportData().(SecurityAdvisories)
 		require.True(t, ok, "a remaining advisory alone must still produce a section")
 		assert.Empty(t, data.Fixed)
@@ -196,10 +197,10 @@ func TestComposerPatchesReportDataNilWhenNoPatchChanges(t *testing.T) {
 
 // Every field is mapped: the description renders composer_diff from this section alone.
 func TestComposerDiffReportData(t *testing.T) {
-	cd := &ComposerDiff{entries: []composer.DiffEntry{{
+	cd := diffFor([]composer.DiffEntry{{
 		Package: "drupal/core", Operation: "upgrade", From: "10.3.8", To: "10.3.9", Dev: true, Direct: true,
 		CompareURL: "https://example.com/compare", ProjectURL: "https://example.com/core",
-	}}}
+	}})
 
 	assert.Equal(t, "composer_diff", cd.ReportKey())
 	assert.Equal(t, []DependencyChange{{
@@ -209,20 +210,21 @@ func TestComposerDiffReportData(t *testing.T) {
 }
 
 func TestComposerDiffReportDataNilWithoutChanges(t *testing.T) {
-	assert.Nil(t, (&ComposerDiff{}).ReportData())
+	assert.Nil(t, diffFor(nil).ReportData())
 }
 
 // The plugins are collected by ranging over a map, so only the sort keeps the report stable.
 func TestComposerAllowPluginsReportDataIsSorted(t *testing.T) {
-	ap := &ComposerAllowPlugins{newAllowPlugins: []string{"zeta/plugin", "acme/plugin"}}
+	added := []string{"zeta/plugin", "acme/plugin"}
+	ap := allowPluginsFor(added)
 
 	assert.Equal(t, "composer_allow_plugins", ap.ReportKey())
 	assert.Equal(t, PluginAllowlist{Added: []string{"acme/plugin", "zeta/plugin"}}, ap.ReportData())
-	assert.Equal(t, []string{"zeta/plugin", "acme/plugin"}, ap.newAllowPlugins, "the addon's own state is left as found")
+	assert.Equal(t, []string{"zeta/plugin", "acme/plugin"}, added, "the recorded finding is left as found")
 }
 
 func TestComposerAllowPluginsReportDataNilWithoutNewPlugins(t *testing.T) {
-	assert.Nil(t, (&ComposerAllowPlugins{}).ReportData())
+	assert.Nil(t, allowPluginsFor(nil).ReportData())
 }
 
 func TestCodeBeautifierReportData(t *testing.T) {
@@ -309,17 +311,11 @@ func TestTranslationsUpdaterReportData(t *testing.T) {
 	})
 }
 
-// withFindings is a reporting addon holding what the pipeline recorded from its hooks, so it reads
-// as a report.Reporter the way the golden report and these tests add every other addon.
+// withFindings is a reporting addon holding what the pipeline would have recorded from its hooks.
 type withFindings struct {
-	addon interface {
-		workflow.Addon
-		workflow.Reporter
-	}
+	addon    workflow.Reporter
 	findings *workflow.Findings
 }
-
-func (w withFindings) Hooks() workflow.Hooks { return w.addon.Hooks() }
 
 func (w withFindings) ReportKey() string { return w.addon.ReportKey() }
 
@@ -362,6 +358,30 @@ func patchesFor(updates PatchUpdates) withFindings {
 	findings := &workflow.Findings{}
 	findings.Record(workflow.EventPreComposerUpdate, "", updates, nil)
 	return withFindings{&ComposerPatches1{}, findings}
+}
+
+type auditPair struct{ before, after composer.Audit }
+
+// auditFor builds composer_audit with the audits its two hooks would have returned.
+func auditFor(audits auditPair) withFindings {
+	findings := &workflow.Findings{}
+	findings.Record(workflow.EventPreComposerUpdate, "", audits.before, nil)
+	findings.Record(workflow.EventPostCodeUpdate, "", audits.after, nil)
+	return withFindings{&ComposerAudit{}, findings}
+}
+
+// diffFor builds composer_diff with the entries its post-composer-update hook would have returned.
+func diffFor(entries []composer.DiffEntry) withFindings {
+	findings := &workflow.Findings{}
+	findings.Record(workflow.EventPostComposerUpdate, "", entries, nil)
+	return withFindings{&ComposerDiff{}, findings}
+}
+
+// allowPluginsFor builds composer_allow_plugins with the plugins its post-update hook denied.
+func allowPluginsFor(added []string) withFindings {
+	findings := &workflow.Findings{}
+	findings.Record(workflow.EventPostComposerUpdate, "", added, nil)
+	return withFindings{&ComposerAllowPlugins{}, findings}
 }
 
 // codeBeautifierFor builds code_beautifier with fixes its post-code-update hook committed.

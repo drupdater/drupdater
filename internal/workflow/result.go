@@ -89,8 +89,8 @@ func typed[F any](r Recorded[any], what string) Recorded[F] {
 	return Recorded[F]{Finding: finding, Committed: slices.Clone(r.Committed)}
 }
 
-// Reporter is report.Reporter for an addon whose hooks return their findings: its section is
-// built from what the pipeline recorded, not from state the addon kept.
+// Reporter is an addon contributing a section to the run report, built from what the pipeline
+// recorded of its hooks rather than from state the addon kept. Key it by the addon's name.
 type Reporter interface {
 	ReportKey() string
 	ReportData(findings *Findings) any
@@ -106,11 +106,11 @@ func SiteFindings[F any](f *Findings, event string) map[string]F {
 }
 
 func commitAll(e interface {
-	Commit(string, ...string) (bool, error)
+	commit(string, ...string) (bool, error)
 }, commits []Commit) ([]string, error) {
 	var committed []string
 	for _, c := range commits {
-		made, err := e.Commit(c.Message, c.Paths...)
+		made, err := e.commit(c.Message, c.Paths...)
 		if err != nil {
 			return nil, err
 		}

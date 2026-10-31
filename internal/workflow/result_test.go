@@ -169,27 +169,17 @@ func (findingsAddon) ReportKey() string { return "findings" }
 
 func (findingsAddon) ReportData(f *Findings) any { return SiteFindings[string](f, EventPreSiteUpdate) }
 
-type legacyAddon struct{ hookAddon }
-
-func (legacyAddon) ReportKey() string { return "legacy" }
-
-func (legacyAddon) ReportData() any { return "kept on the addon" }
-
-func TestPipelineReportsBothKindsOfReporter(t *testing.T) {
+func TestPipelineReportsOnlyReporters(t *testing.T) {
 	p := NewPipeline([]Addon{
 		findingsAddon{hookAddon{Hooks{PreSiteUpdate: Observe(func(*PreSiteUpdateEvent) (string, error) { return "found", nil })}}},
-		legacyAddon{},
-		hookAddon{},
+		hookAddon{Hooks{PreSiteUpdate: Observe(func(*PreSiteUpdateEvent) (string, error) { return "unreported", nil })}},
 	})
 	require.NoError(t, Fire(p, NewPreSiteUpdateEvent(t.Context(), "/project", nil, "default", drush.Facts{})))
 
 	rec := report.NewRecorder("dev", report.ModeNormal, false, "", "", nil)
 	p.Report(rec)
 
-	assert.Equal(t, map[string]any{
-		"findings": map[string]string{"default": "found"},
-		"legacy":   "kept on the addon",
-	}, rec.Snapshot().Addons)
+	assert.Equal(t, map[string]any{"findings": map[string]string{"default": "found"}}, rec.Snapshot().Addons)
 }
 
 func TestProducedProposalIsCommittedRecordedAndMerged(t *testing.T) {
@@ -209,8 +199,8 @@ func TestProducedProposalIsCommittedRecordedAndMerged(t *testing.T) {
 	recorded, ok := Shared[string](p.findings[1], EventPreComposerUpdate)
 	require.True(t, ok)
 	assert.Equal(t, Recorded[string]{Finding: "patched", Committed: []string{"Update patches"}}, recorded)
-	_, ok = Shared[string](p.findings[0], EventPreComposerUpdate)
-	assert.False(t, ok, "a hook built with Propose records nothing")
+	_, ok = Shared[struct{}](p.findings[0], EventPreComposerUpdate)
+	assert.True(t, ok, "every pre-composer-update hook records its finding, even an empty one")
 }
 
 func TestAFailedProposalCommitStopsTheSettle(t *testing.T) {
@@ -245,4 +235,33 @@ func TestSharedPanicsOnAFindingOfAnotherType(t *testing.T) {
 	assert.PanicsWithValue(t, "pre-composer-update finding is a int, not a string", func() {
 		Shared[string](f, EventPreComposerUpdate)
 	})
+}
+
+func TestProduceFromReadsOnlyItsOwnAddonsEarlierFindings(t *testing.T) {
+	var sawOwn, sawOther bool
+	p := NewPipeline([]Addon{
+		hookAddon{Hooks{PreComposerUpdate: ProduceProposal(Prepare, func(*PreComposerUpdateEvent) (Proposal[string], error) {
+			return Proposal[string]{Finding: "other addon's"}, nil
+		})}},
+		hookAddon{Hooks{
+			PreComposerUpdate: ProduceProposal(Change, func(*PreComposerUpdateEvent) (Proposal[string], error) {
+				return Proposal[string]{Finding: "own"}, nil
+			}),
+			PostComposerUpdate: ProduceFrom(Change, func(_ *PostComposerUpdateEvent, earlier *Findings) (Result[string], error) {
+				own, _ := Shared[string](earlier, EventPreComposerUpdate)
+				sawOwn = own.Finding == "own"
+				sawOther = own.Finding == "other addon's"
+				return Result[string]{Finding: "after"}, nil
+			}),
+		}},
+	})
+
+	_, err := Settle(p, NewPreComposerUpdateEvent(t.Context(), "/p", nil, UpdatePlan{}))
+	require.NoError(t, err)
+	require.NoError(t, Fire(p, NewPostComposerUpdateEvent(t.Context(), "/p", nil)))
+
+	assert.True(t, sawOwn)
+	assert.False(t, sawOther)
+	after, _ := Shared[string](p.findings[1], EventPostComposerUpdate)
+	assert.Equal(t, "after", after.Finding)
 }

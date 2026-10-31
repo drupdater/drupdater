@@ -9,7 +9,6 @@ import (
 	"github.com/drupdater/drupdater/internal/drush"
 	"github.com/drupdater/drupdater/internal/golden"
 	"github.com/drupdater/drupdater/internal/report"
-	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/stretchr/testify/require"
 )
 
@@ -28,7 +27,7 @@ var fixedTime = time.Date(2026, 3, 14, 9, 30, 0, 0, time.UTC)
 
 // reportingAddons builds one of every addon that contributes a section, populated so no field is
 // left at its zero value — an omitempty field that is never set cannot be pinned.
-func reportingAddons() []workflow.Addon {
+func reportingAddons() []withFindings {
 	beforeAudit := composer.Audit{
 		Advisories: []composer.Advisory{
 			{
@@ -52,9 +51,9 @@ func reportingAddons() []workflow.Addon {
 		},
 	}
 
-	return []workflow.Addon{
-		&ComposerAllowPlugins{newAllowPlugins: []string{"tbachert/spi", "php-http/discovery"}},
-		&ComposerDiff{entries: []composer.DiffEntry{
+	return []withFindings{
+		allowPluginsFor([]string{"tbachert/spi", "php-http/discovery"}),
+		diffFor([]composer.DiffEntry{
 			{
 				Package: "drupal/core", Operation: "upgrade", From: "10.3.8", To: "10.3.9", Direct: true,
 				CompareURL: "https://github.com/drupal/core/compare/10.3.8...10.3.9", ProjectURL: "https://github.com/drupal/core",
@@ -63,8 +62,8 @@ func reportingAddons() []workflow.Addon {
 			{Package: "drupal/legacy_feature", Operation: "remove", From: "1.2.0", Direct: true},
 			{Package: "phpunit/phpunit", Operation: "upgrade", From: "10.5.30", To: "10.5.31", Dev: true,
 				CompareURL: "https://github.com/sebastianbergmann/phpunit/compare/10.5.30...10.5.31"},
-		}},
-		&ComposerAudit{beforeAudit: beforeAudit, afterAudit: afterAudit},
+		}),
+		auditFor(auditPair{before: beforeAudit, after: afterAudit}),
 		updateHooksFor(map[string]map[string]drush.UpdateHook{
 			"default": {"token_update_8002": {Module: "token", UpdateID: 8002, Description: "Rebuild the token cache", Type: "hook_update_n"}},
 			"second":  {"node_post_update_index": {Module: "node", UpdateID: "index", Description: "Reindex nodes", Type: "post_update"}},
@@ -117,8 +116,8 @@ func normaliseTimes(rep *report.Report) {
 }
 
 func TestRunReportMatchesItsGoldenFile(t *testing.T) {
-	// The real recorder rather than a hand-built struct, so the golden also pins how AddReporter
-	// keys the sections and what Finish fills in.
+	// The real recorder rather than a hand-built struct, so the golden also pins how the sections
+	// are keyed and what Finish fills in.
 	rec := report.NewRecorder("v1.4.0", report.ModeSecurity, false,
 		"https://oauth2:token@github.com/org/site.git", "main", []string{"default", "second"})
 
@@ -136,7 +135,7 @@ func TestRunReportMatchesItsGoldenFile(t *testing.T) {
 	rec.SetMergeRequest("https://github.com/org/site/pull/42")
 	rec.SetAutoMerge(nil)
 	for _, a := range reportingAddons() {
-		rec.AddReporter(a)
+		rec.AddSection(a.ReportKey(), a.ReportData())
 	}
 
 	rep := rec.Finish()
@@ -154,7 +153,7 @@ func TestRunReportGoldenCarriesNoCredential(t *testing.T) {
 	rec := report.NewRecorder("v1.4.0", report.ModeSecurity, false,
 		"https://oauth2:token@github.com/org/site.git", "main", []string{"default"})
 	for _, a := range reportingAddons() {
-		rec.AddReporter(a)
+		rec.AddSection(a.ReportKey(), a.ReportData())
 	}
 
 	encoded, err := json.Marshal(rec.Finish())

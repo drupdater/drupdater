@@ -157,8 +157,8 @@ renaming `fixable` to `fixable_count` and `remaining` to `still_open` broke **no
 `.github/assert-report.jq` does check field names, but only in the label-triggered integration
 run — never on a pull request.
 
-The golden is built through the real `report.Recorder`, so it also pins how `AddReporter` keys each
-section. Everything a clock produced is overwritten with fixed values first — otherwise the file
+The golden is built through the real `report.Recorder`, so it also pins how each section is
+keyed. Everything a clock produced is overwritten with fixed values first — otherwise the file
 would differ on every run — which is the one thing the golden deliberately does not check.
 
 ### When not to write one
@@ -174,8 +174,7 @@ contract, not when it is merely large.
 Drupdater runs the per-site phases concurrently — an `errgroup` bounded by `--concurrency`, one
 goroutine per site — and what the per-site hooks find is gathered across those goroutines. The
 hooks return it and the pipeline records it in a `workflow.Findings`, which does the locking;
-`TestPerSiteHooksKeepNoStateOfTheirOwn` rejects an addon with a per-site hook that keeps a map,
-slice or mutex of its own. The race detector checks the rest: coverage proves a line ran,
+`TestAddonsKeepNoStateOfTheirOwn` rejects an addon that keeps a map, slice or mutex of its own. The race detector checks the rest: coverage proves a line ran,
 mutation testing proves a test would notice a *changed* line, and both are blind to two
 goroutines touching the same memory.
 
