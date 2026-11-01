@@ -131,7 +131,7 @@ func (h *ComposerPatches1) preComposerUpdateHandler(evt *workflow.PreComposerUpd
 	if err != nil {
 		return workflow.Proposal[PatchUpdates]{}, err
 	}
-	patches := declaredPatches{sets: map[string][]patchEntry{}}
+	var patches declaredPatches
 	if project.Patches != nil {
 		if err := json.Unmarshal(project.Patches, &patches); err != nil {
 			return workflow.Proposal[PatchUpdates]{}, fmt.Errorf("failed to unmarshal patches: %w", err)

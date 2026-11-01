@@ -130,3 +130,19 @@ func TestDeclaredPatchesSetPathAndRemove(t *testing.T) {
 	assert.Equal(t, []string{"q"}, d.packages, "a package with no patches left goes")
 	assert.NotContains(t, d.sets, "p")
 }
+
+func TestDeclaredPatchesRefuseAnObjectClosedByTheWrongBracket(t *testing.T) {
+	for _, raw := range []string{`["drupal/core", {}]`, `{"drupal/core": {}]`} {
+		var d declaredPatches
+		require.Error(t, json.Unmarshal([]byte(raw), &d), raw)
+	}
+}
+
+func TestDeclaredPatchesNameThePackageWhosePatchesAreBroken(t *testing.T) {
+	var d declaredPatches
+	err := json.Unmarshal([]byte(`{"drupal/core":{"a":1}}`), &d)
+
+	var typeErr *json.UnmarshalTypeError
+	require.ErrorAs(t, err, &typeErr)
+	assert.ErrorContains(t, err, "patches of drupal/core")
+}

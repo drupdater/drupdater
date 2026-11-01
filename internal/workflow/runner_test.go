@@ -2359,12 +2359,13 @@ func TestStageScaffoldChanges(t *testing.T) {
 		worktree.EXPECT().Unstaged(anyCtx).Return([]string{"web/robots.txt"}, nil)
 
 		composerCLI := NewMockComposer(t)
-		composerCLI.EXPECT().Project(anyCtx, "/project").Return(composer.Project{}, errors.New("no web root"))
+		noWebRoot := errors.New("no web root")
+		composerCLI.EXPECT().Project(anyCtx, "/project").Return(composer.Project{WebRoot: "web"}, noWebRoot)
 
 		ws := testRun(services{logger: logger, composer: composerCLI}, repo.Checkout{Worktree: worktree, Path: "/project"})
 
 		err := ws.stageScaffoldChanges(context.Background())
-		require.Error(t, err)
+		require.ErrorIs(t, err, noWebRoot, "a failed read is not mistaken for the web root it happened to return")
 		assert.Contains(t, err.Error(), "failed to determine web root")
 	})
 

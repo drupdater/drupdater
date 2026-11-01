@@ -96,3 +96,37 @@ func TestARenameThatWouldCollideKeepsTheOriginalDescription(t *testing.T) {
 func upgradeToken() []composer.PackageChange {
 	return []composer.PackageChange{{Action: "Upgrade", Package: "drupal/token", From: "1.14.0", To: "1.15.0"}}
 }
+
+func TestRemovalsAreReportedInFullAndInDeclarationOrder(t *testing.T) {
+	var removed []string
+	h := &ComposerPatches1{logger: zap.NewNop(), removeFile: recordRemovals(&removed)}
+	declared := func() *declaredPatches {
+		return &declaredPatches{packages: []string{"drupal/gone", "drupal/kept"}, sets: map[string][]patchEntry{
+			"drupal/gone": {{"z fix", "patches/z.patch"}, {"a fix", "https://example.com/a.patch"}},
+			"drupal/kept": {{"dup", "https://example.com/dup.patch"}, {"own", "https://example.com/own.patch"}},
+		}}
+	}
+
+	patches := declared()
+	assert.Equal(t, []RemovedPatch{
+		{Package: "drupal/gone", PatchDescription: "z fix", PatchPath: "patches/z.patch", Reason: "drupal/gone is not installed in the project"},
+		{Package: "drupal/gone", PatchDescription: "a fix", PatchPath: "https://example.com/a.patch", Reason: "drupal/gone is not installed in the project"},
+	}, h.removeUninstalledPackagePatches("/p", lockedProject("drupal/kept"), patches))
+	assert.Equal(t, []string{"drupal/kept"}, patches.packages)
+	assert.Equal(t, []string{"/p/patches/z.patch"}, removed, "a URL has no file to remove")
+
+	patches = declared()
+	project := lockedProject("drupal/gone", "drupal/kept")
+	project.DependencyPatches = map[string][]string{"drupal/kept": {"https://example.com/dup.patch"}}
+	assert.Equal(t, []RemovedPatch{
+		{Package: "drupal/kept", PatchDescription: "dup", PatchPath: "https://example.com/dup.patch", Reason: "Patch is already applied by a dependency of drupal/kept"},
+	}, h.removeDependencyProvidedPatches(project, patches))
+	assert.Equal(t, []patchEntry{{"own", "https://example.com/own.patch"}}, patches.sets["drupal/kept"])
+
+	patches = declared()
+	assert.Equal(t, []RemovedPatch{
+		{Package: "drupal/gone", PatchDescription: "z fix", PatchPath: "patches/z.patch", Reason: "drupal/gone is no longer installed"},
+		{Package: "drupal/gone", PatchDescription: "a fix", PatchPath: "https://example.com/a.patch", Reason: "drupal/gone is no longer installed"},
+	}, h.removePackagePatches("/p", composer.PackageChange{Action: "Remove", Package: "drupal/gone"}, patches))
+	assert.Equal(t, []string{"drupal/kept"}, patches.packages)
+}
