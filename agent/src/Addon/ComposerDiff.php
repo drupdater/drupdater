@@ -6,6 +6,7 @@ namespace Drupdater\Agent\Addon;
 
 use Composer\Composer;
 use Drupdater\Agent\Failure;
+use Drupdater\Agent\Log;
 use IonBazan\ComposerDiff\Diff\DiffEntry;
 use IonBazan\ComposerDiff\PackageDiff;
 use IonBazan\ComposerDiff\Url\GeneratorContainer;
@@ -16,17 +17,30 @@ use IonBazan\ComposerDiff\Url\GeneratorContainer;
  */
 final class ComposerDiff implements Addon
 {
-    public const NAME = 'composer_diff';
-
-    public function handle(array $event, Composer $composer): HookResult
+    public function __construct(private readonly Log $log, private readonly Composer $composer)
     {
-        if (($event['name'] ?? null) !== 'post-composer-update') {
-            throw new Failure(Failure::INVALID_REQUEST, sprintf('%s has no hook for %s', self::NAME, json_encode($event['name'] ?? null)));
-        }
-        $base = $event['base_lock'] ?? null;
-        if (!is_array($base)) {
-            throw new Failure(Failure::INVALID_REQUEST, 'base_lock must be the composer.lock the update started from');
-        }
+    }
+
+    public static function name(): string
+    {
+        return 'composer_diff';
+    }
+
+    /** Inspect: every other post-composer-update hook has finished with the lock by then. */
+    public static function hooks(): array
+    {
+        return [EventName::PostComposerUpdate->value => Stage::Inspect];
+    }
+
+    public static function create(Services $services): static
+    {
+        return new self($services->log, $services->composer());
+    }
+
+    public function handle(Event $event): HookResult
+    {
+        $base = $event->baseLock();
+        $composer = $this->composer;
         $locker = $composer->getLocker();
         if (!$locker->isLocked()) {
             throw new Failure(Failure::FAILED, 'the project has no composer.lock');
@@ -47,7 +61,17 @@ final class ComposerDiff implements Addon
             $rows = [...$rows, ...$section];
         }
 
-        return new HookResult(finding: $rows, log: $rows === [] ? [] : ["dependency diff\n" . self::plain($rows)]);
+        if ($rows !== []) {
+            $this->log->info("dependency diff\n" . self::plain($rows));
+        }
+        return new HookResult($rows);
+    }
+
+    /** The rows as found: production packages first, each half by name. */
+    public static function report(Findings $findings): mixed
+    {
+        $rows = $findings->shared(EventName::PostComposerUpdate)?->finding();
+        return is_array($rows) && $rows !== [] ? $rows : null;
     }
 
     /**

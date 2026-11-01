@@ -2,15 +2,20 @@ package workflow
 
 import (
 	"context"
+	"encoding/json"
+	"slices"
+	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/mock"
+	"go.uber.org/zap"
+
+	"github.com/drupdater/drupdater/internal/agent"
 	"github.com/drupdater/drupdater/internal/codehosting"
 	"github.com/drupdater/drupdater/internal/composer"
 	"github.com/drupdater/drupdater/internal/config"
 	"github.com/drupdater/drupdater/internal/repo"
 	"github.com/drupdater/drupdater/internal/report"
-	"github.com/stretchr/testify/mock"
-	"go.uber.org/zap"
 )
 
 // runHarness wires up the mocks a Run needs. A test declares its own expectations for the
@@ -29,6 +34,8 @@ type runHarness struct {
 	composer    *MockComposer
 	drush       *MockDrush
 	worktree    *MockWorktree
+	// hooks answers the hooks withHook scripted.
+	hooks *scriptedAgent
 
 	// path is where the working copy is checked out.
 	path string
@@ -90,6 +97,31 @@ func (h *runHarness) expectPublish() { h.update, h.fullRun, h.publish = true, tr
 
 func (h *runHarness) withAddons(addons ...Addon) { h.addons = addons }
 
+// withHook runs an addon whose pre-composer-update hook, at stage, is hook.
+func (h *runHarness) withHook(name string, stage Stage, hook func(agent.HookRequest) (agent.HookReply, error)) {
+	h.addons = append(h.addons, addon(name, map[string]Stage{EventPreComposerUpdate: stage}))
+	if h.hooks == nil {
+		h.hooks = &scriptedAgent{hooks: map[string]func(agent.HookRequest) (agent.HookReply, error){}}
+		h.hooks.serve(h.composer)
+	}
+	h.hooks.hooks[name] = hook
+}
+
+// withSections runs an addon per section, whose hook finds something on pre-composer-update, and
+// an agent that builds each section from it as given, raw JSON.
+func (h *runHarness) withSections(sections map[string]string) {
+	reply := agent.ReportReply{Sections: map[string]json.RawMessage{}}
+	for name, section := range sections {
+		h.addons = append(h.addons, addon(name, map[string]Stage{EventPreComposerUpdate: Inspect}))
+		reply.Sections[name] = json.RawMessage(section)
+	}
+	slices.SortFunc(h.addons, func(a, b Addon) int { return strings.Compare(a.Name, b.Name) })
+	(&scriptedAgent{
+		hooks:  map[string]func(agent.HookRequest) (agent.HookReply, error){},
+		report: func(agent.ReportRequest) (agent.ReportReply, error) { return reply, nil },
+	}).serve(h.composer)
+}
+
 func (h *runHarness) identity() repo.Identity {
 	if h.withoutPlatform {
 		return repo.Identity{}
@@ -117,7 +149,7 @@ func (h *runHarness) expectDefaults() {
 	h.composer.EXPECT().Install(anyCtx, h.path).Return(nil).Maybe()
 
 	if h.update {
-		h.composer.EXPECT().Update(anyCtx, h.path, mock.Anything, mock.Anything, false, false).
+		h.composer.EXPECT().Update(anyCtx, h.path, mock.Anything, mock.Anything, false).
 			Return([]composer.PackageChange{{Action: "Upgrade", Package: "drupal/core", From: "9.0.0", To: "9.1.0"}}, nil).Maybe()
 		h.composer.EXPECT().Project(anyCtx, h.path).Return(composer.Project{WebRoot: "web", LockHash: "dummy-hash"}, nil).Maybe()
 		h.worktree.EXPECT().Committed(anyCtx, "composer.lock").Return([]byte(testBaseLock), nil).Maybe()

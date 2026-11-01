@@ -10,13 +10,14 @@ import (
 
 	"github.com/drupdater/drupdater/internal/composer"
 
-	"github.com/drupdater/drupdater/internal/config"
-	"github.com/drupdater/drupdater/internal/logging"
-	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+
+	"github.com/drupdater/drupdater/internal/config"
+	"github.com/drupdater/drupdater/internal/logging"
+	"github.com/drupdater/drupdater/internal/workflow"
 )
 
 func TestCheckToken(t *testing.T) {
@@ -39,7 +40,7 @@ func TestCheckToken(t *testing.T) {
 func TestCheckConfigAndAddons(t *testing.T) {
 	t.Run("a missing file applies the defaults and passes", func(t *testing.T) {
 		cfg := config.Config{}
-		results := checkConfigAndAddons(builtinAddons(), filepath.Join(t.TempDir(), ".drupdater.yaml"), &cfg)
+		results := checkConfigAndAddons(agentCatalog, nil, filepath.Join(t.TempDir(), ".drupdater.yaml"), &cfg)
 
 		require.Len(t, results, 2)
 		assert.True(t, results[0].OK)
@@ -53,11 +54,21 @@ func TestCheckConfigAndAddons(t *testing.T) {
 		require.NoError(t, os.WriteFile(path, []byte("timeout: nope\n"), 0o600))
 
 		cfg := config.Config{}
-		results := checkConfigAndAddons(builtinAddons(), path, &cfg)
+		results := checkConfigAndAddons(agentCatalog, nil, path, &cfg)
 
 		require.Len(t, results, 1)
 		assert.False(t, results[0].OK)
 		assert.Equal(t, ".drupdater.yaml valid", results[0].Name)
+	})
+
+	t.Run("a catalogue that cannot be read fails the second check", func(t *testing.T) {
+		cfg := config.Config{}
+		results := checkConfigAndAddons(addonCatalog{}, assert.AnError, filepath.Join(t.TempDir(), ".drupdater.yaml"), &cfg)
+
+		require.Len(t, results, 2)
+		assert.True(t, results[0].OK)
+		assert.False(t, results[1].OK)
+		assert.Equal(t, assert.AnError.Error(), results[1].Detail)
 	})
 
 	t.Run("an unknown addon name fails the second check only", func(t *testing.T) {
@@ -65,7 +76,7 @@ func TestCheckConfigAndAddons(t *testing.T) {
 		require.NoError(t, os.WriteFile(path, []byte("run_types:\n  normal:\n    addons: [no_such_addon]\n"), 0o600))
 
 		cfg := config.Config{}
-		results := checkConfigAndAddons(builtinAddons(), path, &cfg)
+		results := checkConfigAndAddons(agentCatalog, nil, path, &cfg)
 
 		require.Len(t, results, 2)
 		assert.True(t, results[0].OK)

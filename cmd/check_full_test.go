@@ -9,10 +9,11 @@ import (
 
 	"github.com/drupdater/drupdater/internal/composer"
 
-	"github.com/drupdater/drupdater/internal/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+
+	"github.com/drupdater/drupdater/internal/config"
 )
 
 // fakeComposer records what the --full tier asked of composer.

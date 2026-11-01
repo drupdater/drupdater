@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+
+	"github.com/drupdater/drupdater/internal/agent"
 )
 
 // UpdatePlan is what `composer update` is asked to do. A pre-composer-update hook reads the plan
@@ -91,7 +93,28 @@ func sortedSet(s []string) []string {
 	return slices.Compact(slices.Sorted(slices.Values(s)))
 }
 
-// clone keeps a hook from editing the plan its stage-mates read through their own Plan().
+// clone keeps the plan a stage settled apart from the one later proposals merge into.
 func (p UpdatePlan) clone() UpdatePlan {
 	return UpdatePlan{Only: slices.Clone(p.Only), Keep: slices.Clone(p.Keep), MinimalChanges: p.MinimalChanges}
+}
+
+// toAgent is the plan as a pre-composer-update hook reads it, every list a list.
+func (p UpdatePlan) toAgent() *agent.Plan {
+	plan := &agent.Plan{Only: slices.Clone(p.Only), Keep: []agent.Pin{}, MinimalChanges: p.MinimalChanges}
+	if plan.Only == nil {
+		plan.Only = []string{}
+	}
+	for _, pin := range p.Keep {
+		plan.Keep = append(plan.Keep, agent.Pin{Package: pin.Package, Version: pin.Version})
+	}
+	return plan
+}
+
+// fromAgent is a hook's proposal as the pipeline merges it.
+func fromAgent(proposal agent.Plan) UpdatePlan {
+	plan := UpdatePlan{Only: slices.Clone(proposal.Only), MinimalChanges: proposal.MinimalChanges}
+	for _, pin := range proposal.Keep {
+		plan.Keep = append(plan.Keep, Pin{Package: pin.Package, Version: pin.Version})
+	}
+	return plan
 }

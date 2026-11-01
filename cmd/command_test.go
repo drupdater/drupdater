@@ -10,11 +10,12 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/drupdater/drupdater/internal/config"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+
+	"github.com/drupdater/drupdater/internal/config"
 )
 
 // executeTree runs a fresh command tree of a's with args, returning everything it printed.
@@ -190,20 +191,7 @@ func TestProductionAppWiresEveryDependency(t *testing.T) {
 	assert.NotNil(t, a.newPlatform)
 	assert.NotNil(t, a.newFullCheckDeps)
 	assert.NotNil(t, a.trustCheckout)
-	assert.Equal(t, builtinAddons().configurable(), a.addons.configurable())
-	assert.Equal(t, builtinAddons().mandatory, a.addons.mandatory)
-}
-
-func TestEveryBuiltinAddonBuildsUnderItsOwnName(t *testing.T) {
-	deps := addonDeps{logger: zap.NewNop()}
-	for name, factory := range builtinAddons().factories {
-		built := factory(deps)
-		require.NotNil(t, built, "%s builds nothing", name)
-		// A report reads the way the project is configured only when the keys are the names.
-		if reporter, ok := built.(interface{ ReportKey() string }); ok {
-			assert.Equal(t, name, reporter.ReportKey())
-		}
-	}
+	assert.NotNil(t, a.addonCatalog)
 }
 
 func TestRootCommandTakesAtMostOneArgument(t *testing.T) {

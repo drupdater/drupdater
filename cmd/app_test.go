@@ -10,5 +10,6 @@ import (
 func testApp() app {
 	a := productionApp()
 	a.trustCheckout = func(context.Context, *zap.Logger, string) {}
+	a.addonCatalog = func(context.Context, *zap.Logger) (addonCatalog, error) { return agentCatalog, nil }
 	return a
 }

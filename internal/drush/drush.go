@@ -2,11 +2,10 @@ package drush
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"maps"
 	"os/exec"
 	"path/filepath"
-	"slices"
 
 	"github.com/drupdater/drupdater/internal/php"
 
@@ -89,39 +88,13 @@ func (e *CLI) ConfigResave(ctx context.Context, dir string, site string) error {
 	return err
 }
 
-func (e *CLI) LocalizeTranslations(ctx context.Context, dir string, site string) error {
-	_, err := e.execDrush(ctx, dir, site, "locale-deploy:localize-translations")
-	return err
-}
-
-type UpdateHook struct {
-	Module      string `json:"module"`
-	UpdateID    any    `json:"update_id"`
-	Description string `json:"description"`
-	Type        string `json:"type"`
-}
-
-// UnsupportedModule is an installed module with no supported release: no further fixes coming.
-type UnsupportedModule struct {
-	Name               string `json:"name"`
-	InstalledVersion   string `json:"installed_version"`
-	RecommendedVersion string `json:"recommended_version"`
-}
-
-// Facts is what drupdater reads from a site, in one bootstrap. Paths are absolute and may not
+// Facts is what drupdater reads from a site, in one bootstrap: the config sync directory it
+// exports to, and the rest as drush printed it, for the addons. Paths are absolute and may not
 // exist yet.
 type Facts struct {
-	ConfigSyncDirectory string                `json:"config_sync_directory"`
-	TranslationPath     string                `json:"translation_path"`
-	Modules             []string              `json:"modules"`
-	UpdateHooks         map[string]UpdateHook `json:"update_hooks"`
-	UnsupportedModules  []UnsupportedModule   `json:"unsupported_modules"`
-	// UnsupportedModulesError is why the update status service could not be asked, if it could not.
-	UnsupportedModulesError string `json:"unsupported_modules_error"`
-}
-
-func (f Facts) ModuleEnabled(module string) bool {
-	return slices.Contains(f.Modules, module)
+	ConfigSyncDirectory string `json:"config_sync_directory"`
+	// Raw is drupdater:facts' whole answer, handed to the addons byte for byte.
+	Raw json.RawMessage `json:"-"`
 }
 
 // Facts runs drupdater:facts, which reads the site under drush's update kernel: the code is
@@ -137,17 +110,14 @@ func (e *CLI) LocalFacts(ctx context.Context, dir string, site string) (Facts, e
 
 func (e *CLI) facts(ctx context.Context, dir string, site string, options ...string) (Facts, error) {
 	args := append([]string{"--include=" + e.include, "drupdater:facts"}, options...)
-	facts, err := php.JSON[Facts](ctx, e.command(dir, site), drushArgs(args)...)
+	raw, err := php.JSON[json.RawMessage](ctx, e.command(dir, site), drushArgs(args)...)
 	if err != nil {
 		return Facts{}, fmt.Errorf("failed to read the facts of site %s: %w", site, err)
 	}
+	var facts Facts
+	if err := json.Unmarshal(raw, &facts); err != nil {
+		return Facts{}, fmt.Errorf("failed to read the facts of site %s: %w", site, err)
+	}
+	facts.Raw = raw
 	return facts, nil
-}
-
-// Clone copies the slices and the map, so no holder can change another's facts.
-func (f Facts) Clone() Facts {
-	f.Modules = slices.Clone(f.Modules)
-	f.UpdateHooks = maps.Clone(f.UpdateHooks)
-	f.UnsupportedModules = slices.Clone(f.UnsupportedModules)
-	return f
 }

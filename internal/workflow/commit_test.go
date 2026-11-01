@@ -7,9 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/drupdater/drupdater/internal/repo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/drupdater/drupdater/internal/repo"
 )
 
 var testAuthor = repo.Identity{Name: "Drupdater Bot", Email: "bot@example.com"}

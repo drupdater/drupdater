@@ -20,7 +20,7 @@ import (
 // fileConfigGen generates a config with every key set, so a round-trip covers each of them
 // rather than the ones an example filled in.
 func fileConfigGen() *rapid.Generator[fileConfig] {
-	addonsGen := rapid.SliceOfNDistinct(rapid.SampledFrom(defaultNormalAddons), 0, len(defaultNormalAddons), rapid.ID)
+	addonsGen := rapid.SliceOfNDistinct(rapid.StringMatching(`[a-z][a-z_]{0,15}`), 0, 4, rapid.ID)
 
 	return rapid.Custom(func(t *rapid.T) fileConfig {
 		return fileConfig{

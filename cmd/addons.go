@@ -1,129 +1,84 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
-	"maps"
-	"net/http"
-	"os"
 	"slices"
 
-	"github.com/drupdater/drupdater/internal/addon"
+	"github.com/drupdater/drupdater/internal/agent"
+	"github.com/drupdater/drupdater/internal/composer"
 	"github.com/drupdater/drupdater/internal/config"
-	"github.com/drupdater/drupdater/internal/drupalorg"
-	"github.com/drupdater/drupdater/internal/phpcs"
-	"github.com/drupdater/drupdater/internal/rector"
 	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
 
-// addonComposer is every builtin addon's composer interface at once; each addon sees only its own.
-type addonComposer interface {
-	addon.AllowPluginsComposer
-	addon.AuditComposer
-	addon.BeautifierComposer
-	addon.DeprecationsComposer
-	addon.DiffAgent
-	addon.NormalizerComposer
-	addon.PatchesComposer
-}
-
-// addonDrush is every builtin addon's drush interface at once.
-type addonDrush interface {
-	addon.TranslationsDrush
-}
-
-// addonDeps carries everything the addon constructors need.
-type addonDeps struct {
-	logger    *zap.Logger
-	drush     addonDrush
-	composer  addonComposer
-	drupalOrg addon.DrupalOrg
-	// drupalCode is nil without DRUPALCODE_ACCESS_TOKEN.
-	drupalCode addon.DrupalCode
-	// security marks a --security run. Only composer_audit reads it.
-	security bool
-	// rectorConfig is drupdater's Rector config, extracted from the binary.
-	rectorConfig string
-}
-
-// newAddonDeps adds the drupalcode client only when DRUPALCODE_ACCESS_TOKEN is set.
-func newAddonDeps(logger *zap.Logger, drush addonDrush, composer addonComposer, drupalOrg addon.DrupalOrg, rectorConfig string) addonDeps {
-	deps := addonDeps{logger: logger, drush: drush, composer: composer, drupalOrg: drupalOrg, rectorConfig: rectorConfig}
-	if token := os.Getenv("DRUPALCODE_ACCESS_TOKEN"); token != "" {
-		deps.drupalCode = drupalorg.NewDrupalCode(token)
-	}
-	return deps
-}
-
-// bundledToolsBin is where the image installs tools/, so addons install nothing into the project.
-const bundledToolsBin = "/opt/drupdater/tools/vendor/bin"
-
-// addonCatalog is every addon by the name .drupdater.yaml uses, and which of them always run.
+// addonCatalog is the agent's catalogue: every addon by the name .drupdater.yaml uses, in the
+// order hooks sharing a stage run in.
 type addonCatalog struct {
-	factories map[string]func(addonDeps) workflow.Addon
+	addons []workflow.Addon
+	// mandatory addons run on every run; defaults are what a normal run gets when it names none.
 	mandatory []string
+	defaults  []string
 }
 
-// builtinAddons is the catalog drupdater ships. A function, so nothing can change the one in use.
-func builtinAddons() addonCatalog {
-	return addonCatalog{
-		factories: map[string]func(addonDeps) workflow.Addon{
-			"composer_audit": func(d addonDeps) workflow.Addon {
-				return addon.NewComposerAudit(d.logger, d.composer, d.security)
-			},
-			"code_beautifier": func(d addonDeps) workflow.Addon {
-				return addon.NewCodeBeautifier(d.logger, phpcs.NewCLI(d.logger), phpcs.NewBundledCLI(d.logger, bundledToolsBin), d.composer)
-			},
-			"deprecations_remover": func(d addonDeps) workflow.Addon {
-				return addon.NewDeprecationsRemover(d.logger, rector.NewCLI(d.logger, d.rectorConfig), rector.NewBundledCLI(d.logger, bundledToolsBin, d.rectorConfig), d.composer)
-			},
-			"translations_updater":   func(d addonDeps) workflow.Addon { return addon.NewTranslationsUpdater(d.logger, d.drush) },
-			"composer_allow_plugins": func(d addonDeps) workflow.Addon { return addon.NewComposerAllowPlugins(d.logger, d.composer) },
-			"composer_normalizer":    func(d addonDeps) workflow.Addon { return addon.NewComposerNormalizer(d.logger, d.composer) },
-			"composer_patches": func(d addonDeps) workflow.Addon {
-				return addon.NewComposerPatches1(d.logger, d.composer, d.drupalOrg, d.drupalCode, http.DefaultClient)
-			},
-			"composer_diff":       func(d addonDeps) workflow.Addon { return addon.NewComposerDiff(d.logger, d.composer) },
-			"update_hooks":        func(d addonDeps) workflow.Addon { return addon.NewUpdateHooks(d.logger) },
-			"unsupported_modules": func(d addonDeps) workflow.Addon { return addon.NewUnsupportedModules(d.logger) },
-		},
-		// The description joins composer_audit's and unsupported_modules' findings into one
-		// end-of-life list, so both always run.
-		mandatory: []string{
-			"composer_allow_plugins",
-			"composer_patches",
-			"composer_diff",
-			"update_hooks",
-			"composer_audit",
-			"unsupported_modules",
-		},
+// agentAddonCatalog asks the agent installed in Composer for its catalogue.
+func agentAddonCatalog(ctx context.Context, logger *zap.Logger) (addonCatalog, error) {
+	addons, err := composer.NewCLI(logger).Addons(ctx)
+	if err != nil {
+		return addonCatalog{}, err
 	}
+	return newAddonCatalog(addons)
 }
 
-// create builds the mandatory addons plus the ones the active run type lists.
-func (c addonCatalog) create(cfg config.Config, deps addonDeps) ([]workflow.Addon, error) {
-	deps.security = cfg.Security
+// newAddonCatalog refuses a catalogue the pipeline could not run: an unknown event or stage, or
+// two addons of one name.
+func newAddonCatalog(addons []agent.Addon) (addonCatalog, error) {
+	var c addonCatalog
+	for _, a := range addons {
+		if slices.ContainsFunc(c.addons, func(known workflow.Addon) bool { return known.Name == a.Name }) {
+			return addonCatalog{}, fmt.Errorf("the agent's catalogue lists %q twice", a.Name)
+		}
+		hooks := make(map[string]workflow.Stage, len(a.Hooks))
+		for event, stageName := range a.Hooks {
+			if !slices.Contains(workflow.Events, event) {
+				return addonCatalog{}, fmt.Errorf("addon %q hooks the unknown event %q", a.Name, event)
+			}
+			stage, err := workflow.ParseStage(stageName)
+			if err != nil {
+				return addonCatalog{}, fmt.Errorf("addon %q hooks %s: %w", a.Name, event, err)
+			}
+			hooks[event] = stage
+		}
+		c.addons = append(c.addons, workflow.Addon{Name: a.Name, Hooks: hooks})
+		switch {
+		case a.Mandatory:
+			c.mandatory = append(c.mandatory, a.Name)
+		case a.Default:
+			c.defaults = append(c.defaults, a.Name)
+		}
+	}
+	return c, nil
+}
+
+// create returns the mandatory addons, then the ones the active run type configures. A normal run
+// that configures none gets the catalogue's defaults; a security run stays a focused fix.
+func (c addonCatalog) create(cfg config.Config) ([]workflow.Addon, error) {
+	configured := cfg.ActiveRunType().Addons
+	if configured == nil && !cfg.Security {
+		configured = c.defaults
+	}
 
 	var addons []workflow.Addon
-	added := map[string]bool{}
-	build := func(name string) error {
-		if added[name] {
-			return nil
+	for _, name := range slices.Concat(c.mandatory, configured) {
+		if slices.ContainsFunc(addons, func(a workflow.Addon) bool { return a.Name == name }) {
+			continue
 		}
-		factory, ok := c.factories[name]
-		if !ok {
-			return fmt.Errorf("unknown addon %q", name)
+		i := slices.IndexFunc(c.addons, func(a workflow.Addon) bool { return a.Name == name })
+		if i < 0 {
+			return nil, fmt.Errorf("unknown addon %q", name)
 		}
-		addons = append(addons, factory(deps))
-		added[name] = true
-		return nil
-	}
-
-	for _, name := range slices.Concat(c.mandatory, cfg.ActiveRunType().Addons) {
-		if err := build(name); err != nil {
-			return nil, err
-		}
+		addons = append(addons, c.addons[i])
 	}
 	return addons, nil
 }
@@ -131,7 +86,7 @@ func (c addonCatalog) create(cfg config.Config, deps addonDeps) ([]workflow.Addo
 // validate checks both run types, so a typo under run_types.security fails a normal run too.
 func (c addonCatalog) validate(cfg config.Config) error {
 	for _, name := range slices.Concat(cfg.RunTypes.Normal.Addons, cfg.RunTypes.Security.Addons) {
-		if _, ok := c.factories[name]; !ok {
+		if !slices.ContainsFunc(c.addons, func(a workflow.Addon) bool { return a.Name == name }) {
 			return fmt.Errorf("unknown addon %q (run \"drupdater addons\" to list valid names)", name)
 		}
 	}
@@ -140,8 +95,14 @@ func (c addonCatalog) validate(cfg config.Config) error {
 
 // configurable returns the sorted addon names, minus the mandatory ones.
 func (c addonCatalog) configurable() []string {
-	names := slices.Sorted(maps.Keys(c.factories))
-	return slices.DeleteFunc(names, func(n string) bool { return slices.Contains(c.mandatory, n) })
+	var names []string
+	for _, a := range c.addons {
+		if !slices.Contains(c.mandatory, a.Name) {
+			names = append(names, a.Name)
+		}
+	}
+	slices.Sort(names)
+	return names
 }
 
 // newAddonsCmd lists the addon names that can be set in .drupdater.yaml.
@@ -149,12 +110,23 @@ func (a app) newAddonsCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "addons",
 		Short: "List the addon names that can be set in .drupdater.yaml",
-		Run: func(cmd *cobra.Command, _ []string) {
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			cmd.SilenceUsage = true
+			catalog, err := a.addonCatalog(cmd.Context(), zap.NewNop())
+			if err != nil {
+				return err
+			}
 			out := cmd.OutOrStdout()
-			fmt.Fprintln(out, "Addons you can set under run_types.normal.addons / run_types.security.addons in .drupdater.yaml:")
-			for _, n := range a.addons.configurable() {
+			fmt.Fprintln(out, "Addons you can set under run_types.normal.addons / run_types.security.addons in .drupdater.yaml")
+			fmt.Fprintln(out, "(a normal run that sets none gets the ones marked default):")
+			for _, n := range catalog.configurable() {
+				if slices.Contains(catalog.defaults, n) {
+					fmt.Fprintf(out, "  %s (default)\n", n)
+					continue
+				}
 				fmt.Fprintf(out, "  %s\n", n)
 			}
+			return nil
 		},
 	}
 }

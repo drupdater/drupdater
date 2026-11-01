@@ -1,0 +1,91 @@
+{
+  "protocol": 3,
+  "command": "drupdater:addons",
+  "ok": true,
+  "result": {
+    "addons": [
+      {
+        "name": "composer_allow_plugins",
+        "mandatory": true,
+        "default": false,
+        "hooks": {
+          "pre-composer-update": "change",
+          "post-composer-update": "change"
+        }
+      },
+      {
+        "name": "composer_patches",
+        "mandatory": true,
+        "default": false,
+        "hooks": {
+          "pre-composer-update": "change"
+        }
+      },
+      {
+        "name": "composer_diff",
+        "mandatory": true,
+        "default": false,
+        "hooks": {
+          "post-composer-update": "inspect"
+        }
+      },
+      {
+        "name": "update_hooks",
+        "mandatory": true,
+        "default": false,
+        "hooks": {
+          "pre-site-update": "inspect"
+        }
+      },
+      {
+        "name": "composer_audit",
+        "mandatory": true,
+        "default": false,
+        "hooks": {
+          "pre-composer-update": "prepare",
+          "post-code-update": "inspect"
+        }
+      },
+      {
+        "name": "unsupported_modules",
+        "mandatory": true,
+        "default": false,
+        "hooks": {
+          "pre-site-update": "inspect"
+        }
+      },
+      {
+        "name": "code_beautifier",
+        "mandatory": false,
+        "default": true,
+        "hooks": {
+          "post-code-update": "format"
+        }
+      },
+      {
+        "name": "deprecations_remover",
+        "mandatory": false,
+        "default": true,
+        "hooks": {
+          "post-code-update": "change"
+        }
+      },
+      {
+        "name": "translations_updater",
+        "mandatory": false,
+        "default": true,
+        "hooks": {
+          "post-site-update": "change"
+        }
+      },
+      {
+        "name": "composer_normalizer",
+        "mandatory": false,
+        "default": true,
+        "hooks": {
+          "post-composer-update": "format"
+        }
+      }
+    ]
+  }
+}

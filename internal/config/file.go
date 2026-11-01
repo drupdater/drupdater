@@ -11,15 +11,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// defaultNormalAddons is the configurable addon set for a normal update. Security mode defaults
-// to none of these: it should be a minimal, focused fix.
-var defaultNormalAddons = []string{
-	"code_beautifier",
-	"deprecations_remover",
-	"translations_updater",
-	"composer_normalizer",
-}
-
 // flexTimeout takes `timeout` as a raw scalar so both "30m" and a bare 0 decode; a string field
 // would reject `timeout: 0`, the documented way to disable it.
 type flexTimeout string
@@ -49,11 +40,8 @@ func defaultFileConfig() fileConfig {
 	return fileConfig{
 		Sites:   []string{"default"},
 		Timeout: "30m",
-		RunTypes: RunTypesConfig{
-			Normal: RunTypeConfig{Addons: defaultNormalAddons},
-			// Mandatory addons only, so a security update stays a focused fix.
-			Security: RunTypeConfig{},
-		},
+		// No addons named: the agent's catalogue says which a normal run gets by default.
+		RunTypes: RunTypesConfig{},
 	}
 }
 

@@ -1,5 +1,5 @@
 {
-  "protocol": 2,
+  "protocol": 3,
   "command": "drupdater:handshake",
   "ok": true,
   "result": {}

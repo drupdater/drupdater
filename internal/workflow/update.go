@@ -54,12 +54,12 @@ func (r *run) stageScaffoldChanges(ctx context.Context) error {
 func (r *run) resolveUpdate(ctx context.Context) (string, error) {
 	r.logger.Info("resolving dependency updates")
 
-	plan, err := Settle(r.hooks, NewPreComposerUpdateEvent(ctx, r.path, r.committer, UpdatePlan{}))
+	plan, err := r.pipeline.fire(ctx, r.path, r.committer, preComposerUpdate(UpdatePlan{}))
 	if err != nil {
 		return "", err
 	}
 
-	changes, err := r.composer.Update(ctx, r.path, plan.Only, plan.KeepConstraints(), plan.MinimalChanges, false)
+	changes, err := r.composer.Update(ctx, r.path, plan.Only, plan.KeepConstraints(), plan.MinimalChanges)
 	if err != nil {
 		return "", fmt.Errorf("failed to update dependencies: %w", err)
 	}
@@ -109,8 +109,7 @@ func (r *run) updateSharedCode(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to read the committed composer.lock: %w", err)
 	}
-	postComposerUpdateEvent := NewPostComposerUpdateEvent(ctx, r.path, r.committer, baseLock)
-	if err := Fire(r.hooks, postComposerUpdateEvent); err != nil {
+	if _, err := r.pipeline.fire(ctx, r.path, r.committer, postComposerUpdate(baseLock)); err != nil {
 		return err
 	}
 
@@ -124,8 +123,7 @@ func (r *run) updateSharedCode(ctx context.Context) error {
 		return fmt.Errorf("failed to commit composer.json and composer.lock: %w", err)
 	}
 
-	postCodeUpdateEvent := NewPostCodeUpdateEvent(ctx, r.path, r.committer)
-	if err := Fire(r.hooks, postCodeUpdateEvent); err != nil {
+	if _, err := r.pipeline.fire(ctx, r.path, r.committer, postCodeUpdate()); err != nil {
 		return err
 	}
 

@@ -1,5 +1,5 @@
-// Package scripts embeds the PHP drupdater runs inside a project: Rector's config and the
-// drush commands loaded with --include.
+// Package scripts embeds the PHP drupdater runs inside a project: the drush commands loaded
+// with --include.
 package scripts
 
 import (
@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 )
 
-//go:embed *.php drush/Commands/*.php
+//go:embed drush/Commands/*.php
 var files embed.FS
 
 // Extract writes the embedded files into a new temporary directory, which the caller removes.
@@ -27,11 +27,6 @@ func extract(fsys fs.FS) (string, error) {
 		return "", err
 	}
 	return dir, nil
-}
-
-// RectorConfig is the Rector config inside a directory Extract wrote.
-func RectorConfig(dir string) string {
-	return filepath.Join(dir, "rector.php")
 }
 
 // DrushInclude is the directory to pass to `drush --include`.

@@ -30,7 +30,9 @@ type RunTypesConfig struct {
 
 // RunTypeConfig is what a single run type configures.
 type RunTypeConfig struct {
-	// Addons lists the configurable addons. The mandatory ones are not listed here.
+	// Addons lists the configurable addons; the mandatory ones always run. Nil when the file names
+	// none, which on a normal run means the catalogue's defaults, and on a security run none.
+	// An empty list names none on purpose.
 	Addons []string `yaml:"addons"`
 
 	// AutoMerge asks the platform to merge the MR/PR once its pipeline passes.

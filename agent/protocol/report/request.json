@@ -1,0 +1,320 @@
+{
+  "protocol": 3,
+  "request": {
+    "addons": [
+      {
+        "addon": "composer_allow_plugins",
+        "findings": [
+          {
+            "event": "pre-composer-update",
+            "site": "",
+            "finding": {
+              "original": null,
+              "opened": true
+            },
+            "committed": []
+          },
+          {
+            "event": "post-composer-update",
+            "site": "",
+            "finding": [
+              "tbachert/spi",
+              "php-http/discovery"
+            ],
+            "committed": []
+          }
+        ]
+      },
+      {
+        "addon": "composer_patches",
+        "findings": [
+          {
+            "event": "pre-composer-update",
+            "site": "",
+            "finding": {
+              "removed": [
+                {
+                  "package": "drupal/core",
+                  "patch_description": "Fix the thing",
+                  "patch_path": "https://www.drupal.org/files/issues/3001-12.patch",
+                  "reason": "fixed upstream in 10.4.0"
+                }
+              ],
+              "updated": [
+                {
+                  "package": "drupal/paragraphs",
+                  "patch_description": "Support the other thing",
+                  "previous_patch_path": "https://www.drupal.org/files/issues/3002-4.patch",
+                  "new_patch_path": "https://www.drupal.org/files/issues/3002-9.patch"
+                }
+              ],
+              "conflicts": [
+                {
+                  "package": "drupal/webform",
+                  "fixed_version": "6.2.7",
+                  "patch_path": "https://www.drupal.org/files/issues/3003-2.patch",
+                  "patch_description": "Adjust the form",
+                  "new_version": "6.3.0"
+                }
+              ]
+            },
+            "committed": [
+              "Update patches"
+            ]
+          }
+        ]
+      },
+      {
+        "addon": "composer_diff",
+        "findings": [
+          {
+            "event": "post-composer-update",
+            "site": "",
+            "finding": [
+              {
+                "package": "drupal/core",
+                "operation": "upgrade",
+                "from": "10.3.8",
+                "to": "10.3.9",
+                "dev": false,
+                "direct": true,
+                "compare_url": "https://github.com/drupal/core/compare/10.3.8...10.3.9",
+                "project_url": "https://github.com/drupal/core"
+              },
+              {
+                "package": "drupal/redirect",
+                "operation": "install",
+                "to": "1.10.0",
+                "dev": false,
+                "direct": true,
+                "project_url": "https://www.drupal.org/project/redirect"
+              },
+              {
+                "package": "drupal/legacy_feature",
+                "operation": "remove",
+                "from": "1.2.0",
+                "dev": false,
+                "direct": true
+              },
+              {
+                "package": "phpunit/phpunit",
+                "operation": "upgrade",
+                "from": "10.5.30",
+                "to": "10.5.31",
+                "dev": true,
+                "direct": false,
+                "compare_url": "https://github.com/sebastianbergmann/phpunit/compare/10.5.30...10.5.31"
+              }
+            ],
+            "committed": []
+          }
+        ]
+      },
+      {
+        "addon": "update_hooks",
+        "findings": [
+          {
+            "event": "pre-site-update",
+            "site": "default",
+            "finding": {
+              "token_update_8002": {
+                "module": "token",
+                "update_id": 8002,
+                "description": "Rebuild the token cache",
+                "type": "hook_update_n"
+              }
+            },
+            "committed": []
+          },
+          {
+            "event": "pre-site-update",
+            "site": "second",
+            "finding": {
+              "node_post_update_index": {
+                "module": "node",
+                "update_id": "index",
+                "description": "Reindex nodes",
+                "type": "post_update"
+              }
+            },
+            "committed": []
+          }
+        ]
+      },
+      {
+        "addon": "composer_audit",
+        "findings": [
+          {
+            "event": "pre-composer-update",
+            "site": "",
+            "finding": {
+              "advisories": [
+                {
+                  "reportedAt": "2026-02-01T00:00:00+00:00",
+                  "severity": "critical",
+                  "advisoryId": "PKSA-2026-0001",
+                  "cve": "CVE-2026-1111",
+                  "sources": [],
+                  "link": "https://www.drupal.org/sa-core-2026-001",
+                  "packageName": "drupal/core",
+                  "affectedVersions": ">=10.3.0,<10.3.9",
+                  "title": "Cross site scripting in the render pipeline"
+                },
+                {
+                  "reportedAt": "2026-02-10T00:00:00+00:00",
+                  "severity": "moderate",
+                  "advisoryId": "PKSA-2026-0002",
+                  "cve": "CVE-2026-2222",
+                  "sources": [],
+                  "link": "https://www.drupal.org/sa-contrib-2026-002",
+                  "packageName": "drupal/token",
+                  "affectedVersions": "<1.15.0",
+                  "title": "Access bypass"
+                }
+              ],
+              "abandoned": []
+            },
+            "committed": []
+          },
+          {
+            "event": "post-code-update",
+            "site": "",
+            "finding": {
+              "advisories": [
+                {
+                  "reportedAt": "2026-02-10T00:00:00+00:00",
+                  "severity": "moderate",
+                  "advisoryId": "PKSA-2026-0002",
+                  "cve": "CVE-2026-2222",
+                  "sources": [],
+                  "link": "https://www.drupal.org/sa-contrib-2026-002",
+                  "packageName": "drupal/token",
+                  "affectedVersions": "<1.15.0",
+                  "title": "Access bypass"
+                }
+              ],
+              "abandoned": [
+                {
+                  "packageName": "swiftmailer/swiftmailer",
+                  "replacement": "symfony/mailer"
+                },
+                {
+                  "packageName": "patchwork/jsqueeze",
+                  "replacement": ""
+                }
+              ]
+            },
+            "committed": []
+          }
+        ]
+      },
+      {
+        "addon": "unsupported_modules",
+        "findings": [
+          {
+            "event": "pre-site-update",
+            "site": "default",
+            "finding": [
+              {
+                "name": "legacy_feature",
+                "installed_version": "1.2.0",
+                "recommended_version": "None"
+              }
+            ],
+            "committed": []
+          },
+          {
+            "event": "pre-site-update",
+            "site": "second",
+            "finding": [
+              {
+                "name": "old_widget",
+                "installed_version": "2.0.0",
+                "recommended_version": "3.1.0"
+              },
+              {
+                "name": "legacy_feature",
+                "installed_version": "1.2.0",
+                "recommended_version": "None"
+              }
+            ],
+            "committed": []
+          }
+        ]
+      },
+      {
+        "addon": "code_beautifier",
+        "findings": [
+          {
+            "event": "post-code-update",
+            "site": "",
+            "finding": {
+              "files": [
+                "web/modules/custom/acme/acme.module",
+                "web/modules/custom/acme/src/Controller/AcmeController.php"
+              ],
+              "fixable": 3
+            },
+            "committed": [
+              "Update coding styles"
+            ]
+          }
+        ]
+      },
+      {
+        "addon": "deprecations_remover",
+        "findings": [
+          {
+            "event": "post-code-update",
+            "site": "",
+            "finding": [
+              {
+                "file": "web/modules/custom/acme/src/Plugin/Block/AcmeBlock.php",
+                "applied_rectors": [
+                  "Drupal\\Rector\\Rector\\Deprecation\\DrupalSetMessageRector"
+                ]
+              }
+            ],
+            "committed": [
+              "Remove deprecations"
+            ]
+          }
+        ]
+      },
+      {
+        "addon": "translations_updater",
+        "findings": [
+          {
+            "event": "post-site-update",
+            "site": "default",
+            "finding": {
+              "path": "translations"
+            },
+            "committed": [
+              "Update translations"
+            ]
+          },
+          {
+            "event": "post-site-update",
+            "site": "second",
+            "finding": {
+              "skipped": "locale_deploy not enabled"
+            },
+            "committed": []
+          }
+        ]
+      },
+      {
+        "addon": "composer_normalizer",
+        "findings": [
+          {
+            "event": "post-composer-update",
+            "site": "",
+            "finding": null,
+            "committed": []
+          }
+        ]
+      }
+    ]
+  }
+}

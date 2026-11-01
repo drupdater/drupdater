@@ -26,8 +26,8 @@ func TestLoadFile(t *testing.T) {
 
 		assert.Equal(t, []string{"default"}, c.Sites)
 		assert.Equal(t, 30*time.Minute, c.Timeout)
-		assert.Equal(t, defaultNormalAddons, c.RunTypes.Normal.Addons)
-		assert.Empty(t, c.RunTypes.Security.Addons) // security is minimal by default
+		assert.Nil(t, c.RunTypes.Normal.Addons, "the agent's catalogue says what a normal run gets")
+		assert.Nil(t, c.RunTypes.Security.Addons)
 	})
 
 	t.Run("partial file keeps defaults for absent keys", func(t *testing.T) {
@@ -40,6 +40,16 @@ func TestLoadFile(t *testing.T) {
 		assert.Empty(t, c.RunTypes.Security.Addons)                            // default kept (minimal)
 		assert.Equal(t, []string{"default"}, c.Sites)                          // default kept
 		assert.Equal(t, 30*time.Minute, c.Timeout)                             // default kept
+	})
+
+	t.Run("an empty addon list names none, where an absent one leaves it to the catalogue", func(t *testing.T) {
+		var c Config
+		_, err := LoadFile(writeConfig(t, "run_types:\n  normal:\n    addons: []\n"), &c)
+		require.NoError(t, err)
+
+		assert.NotNil(t, c.RunTypes.Normal.Addons)
+		assert.Empty(t, c.RunTypes.Normal.Addons)
+		assert.Nil(t, c.RunTypes.Security.Addons)
 	})
 
 	t.Run("timeout string parses into a duration", func(t *testing.T) {
@@ -78,7 +88,7 @@ func TestLoadFile(t *testing.T) {
 		assert.True(t, found)
 		assert.Equal(t, []string{"default"}, c.Sites)
 		assert.Equal(t, 30*time.Minute, c.Timeout)
-		assert.Equal(t, defaultNormalAddons, c.RunTypes.Normal.Addons)
+		assert.Nil(t, c.RunTypes.Normal.Addons)
 	})
 
 	t.Run("a comments-only file applies defaults", func(t *testing.T) {

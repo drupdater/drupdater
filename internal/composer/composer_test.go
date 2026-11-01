@@ -145,22 +145,6 @@ func TestInstall(t *testing.T) {
 	})
 }
 
-func TestNormalize(t *testing.T) {
-	service := &CLI{logger: zap.NewNop()}
-
-	service.newCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
-		cs := []string{"-test.run=TestHelperProcess", "--", "normalized"}
-		cs = append(cs, arg...)
-		cmd := exec.CommandContext(ctx, os.Args[0], cs...)
-		cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
-		return cmd
-	}
-
-	out, err := service.Normalize(t.Context(), "/tmp")
-	require.NoError(t, err)
-	assert.Equal(t, "normalized", out)
-}
-
 func TestHelperProcess(*testing.T) {
 	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
 		return

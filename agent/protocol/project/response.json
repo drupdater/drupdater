@@ -1,31 +1,9 @@
 {
-  "protocol": 2,
+  "protocol": 3,
   "command": "drupdater:project",
   "ok": true,
   "result": {
     "web_root": "web",
-    "custom_code_directories": ["web/modules/custom", "web/themes/custom"],
-    "lock_hash": "4b2f0e1c9a7d3e5f6a8b0c1d2e3f4a5b",
-    "packages": {
-      "cweagans/composer-patches": {"version": "1.7.3"},
-      "dealerdirect/phpcodesniffer-composer-installer": {"version": "v1.0.0"},
-      "drupal/core": {"version": "10.3.1"},
-      "drupal/devel": {"version": "dev-5.x"},
-      "drupal/recipe_kit": {"version": "1.0.0"},
-      "drupal/token": {"version": "1.15.0"}
-    },
-    "dependency_patches": {
-      "drupal/core": [
-        "https://www.drupal.org/files/issues/3100000-1.patch",
-        "https://www.drupal.org/files/issues/3100001-2.patch"
-      ]
-    },
-    "patches": {
-      "drupal/token": {
-        "Issue #3123456: [Token fix](https://www.drupal.org/i/3123456)": "patches/token/3123456-local.patch",
-        "Remote fix": "https://www.drupal.org/files/issues/3200000-8.patch"
-      },
-      "drupal/empty": {}
-    }
+    "lock_hash": "4b2f0e1c9a7d3e5f6a8b0c1d2e3f4a5b"
   }
 }

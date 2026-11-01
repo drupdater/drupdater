@@ -9,14 +9,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
+
+	"go.uber.org/zap"
 
 	"github.com/drupdater/drupdater/internal/php"
 )
 
 // Protocol is the envelope version this binary speaks. Bump it, here and in agent/src/Protocol.php,
 // whenever a request or result changes shape.
-const Protocol = 2
+const Protocol = 3
 
 // Kind classifies a failure the agent reported. The agent decides it, from the exception it
 // caught, so no caller ever reads Composer's console wording.
@@ -76,6 +80,15 @@ type envelope struct {
 		Reason  string `json:"reason"`
 		Message string `json:"message"`
 	} `json:"error"`
+	// Log is what the command logged, on success and failure alike.
+	Log []LogEntry `json:"log"`
+}
+
+// LogEntry is one line the agent logged, for drupdater to log at the same level.
+type LogEntry struct {
+	Level   string         `json:"level"`
+	Message string         `json:"message"`
+	Context map[string]any `json:"context"`
 }
 
 // Call runs `composer <command>` in c's directory with req as its request, and decodes the
@@ -96,6 +109,7 @@ func Call[Resp any](ctx context.Context, c php.Command, command string, req any)
 		// No envelope at all: composer itself failed, or the agent is not installed.
 		return result, fmt.Errorf("%s did not answer: %w, output: %s", command, errors.Join(runErr, errNoEnvelope), stderr)
 	}
+	logEntries(c.Logger, reply.Log)
 	if reply.Protocol != Protocol {
 		return result, &Error{
 			Command: command,
@@ -132,16 +146,22 @@ func lastEnvelope(stdout string, command string) (envelope, bool) {
 	return reply, true
 }
 
-// HookCommit is one commit an addon hook running in the agent asks for.
-type HookCommit struct {
-	Message string   `json:"message"`
-	Paths   []string `json:"paths"`
-}
-
-// HookReply is drupdater:addon's result: what one addon hook running in the agent returned.
-type HookReply struct {
-	Commits []HookCommit `json:"commits"`
-	// Finding is the addon's own, for its ReportData to read.
-	Finding json.RawMessage `json:"finding"`
-	Log     []string        `json:"log"`
+// logEntries logs each entry at its level, its context as fields in name order.
+func logEntries(logger *zap.Logger, entries []LogEntry) {
+	for _, entry := range entries {
+		fields := make([]zap.Field, 0, len(entry.Context))
+		for _, key := range slices.Sorted(maps.Keys(entry.Context)) {
+			fields = append(fields, zap.Any(key, entry.Context[key]))
+		}
+		switch entry.Level {
+		case "debug":
+			logger.Debug(entry.Message, fields...)
+		case "warning":
+			logger.Warn(entry.Message, fields...)
+		case "error":
+			logger.Error(entry.Message, fields...)
+		default:
+			logger.Info(entry.Message, fields...)
+		}
+	}
 }

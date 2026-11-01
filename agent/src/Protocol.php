@@ -9,7 +9,7 @@ namespace Drupdater\Agent;
  */
 final class Protocol
 {
-    public const VERSION = 2;
+    public const VERSION = 3;
 
     /**
      * @return array<string, mixed>
@@ -36,20 +36,41 @@ final class Protocol
 
     /**
      * @param array<string, mixed> $result
+     * @param list<array{level: string, message: string, context: array<string, mixed>}> $log
      */
-    public static function success(string $command, array $result): string
+    public static function success(string $command, array $result, array $log = []): string
     {
-        return self::encode(['protocol' => self::VERSION, 'command' => $command, 'ok' => true, 'result' => (object) $result]);
+        return self::encode(['protocol' => self::VERSION, 'command' => $command, 'ok' => true, 'result' => (object) $result] + self::log($log));
     }
 
-    public static function failure(string $command, Failure $failure): string
+    /**
+     * @param list<array{level: string, message: string, context: array<string, mixed>}> $log
+     */
+    public static function failure(string $command, Failure $failure, array $log = []): string
     {
         return self::encode([
             'protocol' => self::VERSION,
             'command' => $command,
             'ok' => false,
             'error' => ['kind' => $failure->kind, 'reason' => $failure->reason, 'message' => $failure->getMessage()],
-        ]);
+        ] + self::log($log));
+    }
+
+    /**
+     * Left out when empty, so a command that logs nothing answers as it always has.
+     *
+     * @param list<array{level: string, message: string, context: array<string, mixed>}> $log
+     * @return array{log?: list<array{level: string, message: string, context: \stdClass}>}
+     */
+    private static function log(array $log): array
+    {
+        if ($log === []) {
+            return [];
+        }
+        return ['log' => array_map(
+            static fn (array $entry): array => ['level' => $entry['level'], 'message' => $entry['message'], 'context' => (object) $entry['context']],
+            $log,
+        )];
     }
 
     /**
@@ -57,7 +78,8 @@ final class Protocol
      */
     private static function encode(array $envelope): string
     {
-        // One line: internal/agent reads the last line of stdout.
-        return json_encode($envelope, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
+        // One line: internal/agent reads the last line of stdout. Unescaped as Go writes JSON, so a
+        // report section drupdater passes through reads as if Go had encoded it.
+        return json_encode($envelope, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
     }
 }

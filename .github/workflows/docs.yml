@@ -10,7 +10,7 @@ on:
       - "mkdocs.yml"
       - "requirements-docs.txt"
       # Embedded into pages verbatim, so a change here changes the published site.
-      - "internal/addon/testdata/**"
+      - "internal/report/testdata/**"
       - ".github/assert-report.jq"
       - ".github/assert-lock-matches-report.jq"
       - ".github/workflows/docs.yml"

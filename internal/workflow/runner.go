@@ -17,6 +17,9 @@ import (
 	"go.uber.org/zap"
 )
 
+// reportTimeout bounds building the addons' report sections once the run is over.
+const reportTimeout = time.Minute
+
 // Runner updates a project. It holds only what all its runs share, so it can run again.
 type Runner struct {
 	services
@@ -40,8 +43,8 @@ type services struct {
 // run is one call to Run from its working copy on. Everything in it is fixed by newRun.
 type run struct {
 	services
-	hooks *Pipeline
-	rec   *report.Recorder
+	pipeline *Pipeline
+	rec      *report.Recorder
 
 	repository GitRepository
 	worktree   Worktree
@@ -51,10 +54,10 @@ type run struct {
 	committer Committer
 }
 
-func newRun(s services, checkout repo.Checkout, hooks *Pipeline, rec *report.Recorder) *run {
+func newRun(s services, checkout repo.Checkout, pipeline *Pipeline, rec *report.Recorder) *run {
 	return &run{
 		services:   s,
-		hooks:      hooks,
+		pipeline:   pipeline,
 		rec:        rec,
 		repository: checkout.Repository,
 		worktree:   checkout.Worktree,
@@ -108,7 +111,7 @@ func (r *Runner) Run(ctx context.Context, addons []Addon) (err error) {
 		mode = report.ModeSecurity
 	}
 	rec := report.NewRecorder(buildinfo.Version, mode, r.config.DryRun, r.config.RepositoryURL, r.config.Branch, r.config.Sites)
-	hooks := NewPipeline(addons)
+	pipeline := NewPipeline(addons, r.composer, r.config.Security)
 
 	// Registered first, so it runs last and covers every exit path. An AbortError means there
 	// was nothing to do, not that the run failed.
@@ -119,7 +122,12 @@ func (r *Runner) Run(ctx context.Context, addons []Addon) (err error) {
 		if _, ok := errors.AsType[AbortError](err); ok {
 			rec.SetNoChanges()
 		}
-		hooks.Report(rec)
+		// Bounded on its own: the run's own deadline may be what ended it.
+		reportCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), reportTimeout)
+		defer cancel()
+		if reportErr := pipeline.Report(reportCtx, rec); reportErr != nil {
+			r.logger.Warn("the report lacks the addons' sections", zap.Error(reportErr))
+		}
 		r.reportSink(rec.Finish())
 	}()
 
@@ -156,7 +164,7 @@ func (r *Runner) Run(ctx context.Context, addons []Addon) (err error) {
 		r.cleanup(context.WithoutCancel(ctx), checkout.Path)
 	}()
 
-	branch, err := newRun(r.services, checkout, hooks, rec).execute(ctx)
+	branch, err := newRun(r.services, checkout, pipeline, rec).execute(ctx)
 	if err != nil {
 		r.removeUpdateBranch(context.WithoutCancel(ctx), checkout.Repository, branch)
 	}
@@ -231,7 +239,7 @@ func (r *run) execute(ctx context.Context) (branch string, err error) {
 	var mrTitle, mrDescription string
 	if err := r.rec.Run("render merge request", func() error {
 		var renderErr error
-		mrTitle, mrDescription, renderErr = r.renderMergeRequest()
+		mrTitle, mrDescription, renderErr = r.renderMergeRequest(ctx)
 		return renderErr
 	}); err != nil {
 		return branch, err

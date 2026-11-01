@@ -81,7 +81,7 @@ func (r *run) updateDatabase(ctx context.Context, site string) (drush.Facts, err
 		return drush.Facts{}, err
 	}
 
-	if err := Fire(r.hooks, NewPreSiteUpdateEvent(ctx, r.path, r.committer, site, facts)); err != nil {
+	if _, err := r.pipeline.fire(ctx, r.path, r.committer, preSiteUpdate(site, facts)); err != nil {
 		return drush.Facts{}, err
 	}
 
@@ -98,8 +98,7 @@ func (r *run) updateDatabase(ctx context.Context, site string) (drush.Facts, err
 }
 
 func (r *run) commitSiteChanges(ctx context.Context, site string, facts drush.Facts) error {
-	postSiteUpdateEvent := NewPostSiteUpdateEvent(ctx, r.path, r.committer, site, facts)
-	if err := Fire(r.hooks, postSiteUpdateEvent); err != nil {
+	if _, err := r.pipeline.fire(ctx, r.path, r.committer, postSiteUpdate(site, facts)); err != nil {
 		return err
 	}
 

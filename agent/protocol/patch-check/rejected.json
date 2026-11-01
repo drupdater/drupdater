@@ -1,9 +1,0 @@
-{
-  "protocol": 2,
-  "command": "drupdater:patch-check",
-  "ok": true,
-  "result": {
-    "outcome": "rejected",
-    "patch": "https://www.drupal.org/files/issues/3200000-8.patch"
-  }
-}

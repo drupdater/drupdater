@@ -10,8 +10,7 @@ use Composer\Package\PackageInterface;
 use Drupdater\Agent\Failure;
 
 /**
- * What drupdater reads about a project: composer.json as written, and the lock as Composer
- * reads it. A snapshot: drupdater asks again whenever the files may have changed.
+ * Reads a project: composer.json as written, and the lock as Composer reads it.
  */
 final class ProjectFacts
 {
@@ -21,33 +20,20 @@ final class ProjectFacts
     {
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    public function toArray(): array
+    public function project(): Project
     {
         $manifest = $this->manifest();
         $webRoot = $manifest->extra->{'drupal-scaffold'}->locations->{'web-root'} ?? null;
         // A single trailing slash only, as drupal-scaffold itself joins paths.
-        $webRoot = is_string($webRoot) && $webRoot !== '' ? preg_replace('{/$}', '', $webRoot) : null;
-
-        $facts = [
-            'web_root' => $webRoot,
-            'custom_code_directories' => $webRoot === null ? [] : $this->customCodeDirectories($webRoot),
-            'lock_hash' => null,
-            'packages' => new \stdClass(),
-            'dependency_patches' => new \stdClass(),
-        ];
-        // As written, keys and nesting intact: drupdater rewrites them.
-        if (isset($manifest->extra->patches)) {
-            $facts['patches'] = $manifest->extra->patches;
-        }
+        $webRoot = is_string($webRoot) && $webRoot !== '' ? (string) preg_replace('{/$}', '', $webRoot) : null;
+        $customCode = $webRoot === null ? [] : $this->customCodeDirectories($webRoot);
+        // As written, keys and nesting intact: composer_patches rewrites them.
+        $patches = $manifest->extra->patches ?? null;
 
         $locker = $this->composer->getLocker();
         if (!$locker->isLocked()) {
-            return $facts;
+            return new Project($webRoot, $customCode, patches: $patches);
         }
-        $facts['lock_hash'] = $locker->getLockData()['content-hash'] ?? null;
 
         $packages = [];
         $dependencyPatches = [];
@@ -55,19 +41,22 @@ final class ProjectFacts
             if ($package instanceof AliasPackage) {
                 continue;
             }
-            $packages[$package->getName()] = ['version' => $package->getPrettyVersion()];
+            $packages[$package->getName()] = $package->getPrettyVersion();
             foreach (self::declaredPatches($package) as $target => $files) {
                 $dependencyPatches[$target] = [...($dependencyPatches[$target] ?? []), ...$files];
             }
         }
         ksort($packages);
         ksort($dependencyPatches);
-        $facts['packages'] = (object) $packages;
-        $facts['dependency_patches'] = (object) array_map(
-            static fn (array $files): array => array_values(array_unique($files)),
-            $dependencyPatches,
+        $hash = $locker->getLockData()['content-hash'] ?? null;
+        return new Project(
+            $webRoot,
+            $customCode,
+            $packages,
+            $patches,
+            array_map(static fn (array $files): array => array_values(array_unique($files)), $dependencyPatches),
+            is_string($hash) ? $hash : null,
         );
-        return $facts;
     }
 
     private function manifest(): \stdClass

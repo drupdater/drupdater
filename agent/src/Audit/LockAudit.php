@@ -8,10 +8,12 @@ use Composer\Advisory\Auditor;
 use Composer\Advisory\PartialSecurityAdvisory;
 use Composer\Advisory\SecurityAdvisory;
 use Composer\Composer;
+use Composer\Downloader\TransportException;
 use Composer\Package\CompletePackageInterface;
 use Composer\Policy\ListPolicyConfig;
 use Composer\Policy\PolicyConfig;
 use Composer\Repository\RepositorySet;
+use Drupdater\Agent\Failure;
 
 /**
  * The audit of composer.lock, with Composer's Auditor deciding what is ignored.
@@ -27,18 +29,29 @@ final class LockAudit
      * a null replacement when the maintainers named no successor.
      *
      * @return array{advisories: list<array<string, mixed>>, abandoned: list<array{package: string, replacement: string|null}>}
+     *
+     * @throws Failure when there is no lock, or a repository's advisories cannot be fetched
      */
     public function toArray(): array
     {
-        $packages = $this->composer->getLocker()->getLockedRepository(true)->getPackages();
+        $locker = $this->composer->getLocker();
+        if (!$locker->isLocked()) {
+            throw new Failure(Failure::FAILED, 'the project has no composer.lock');
+        }
+        $packages = $locker->getLockedRepository(true)->getPackages();
         if ($packages === []) {
             return ['advisories' => [], 'abandoned' => []];
         }
         $auditor = new Auditor();
-        return [
-            'advisories' => $this->advisories($auditor, $packages),
-            'abandoned' => $this->abandoned($auditor, $packages),
-        ];
+        try {
+            return [
+                'advisories' => $this->advisories($auditor, $packages),
+                'abandoned' => $this->abandoned($auditor, $packages),
+            ];
+        }
+        catch (TransportException $e) {
+            throw new Failure(Failure::UNOBTAINABLE, 'the security advisories could not be fetched', $e->getMessage(), $e);
+        }
     }
 
     /**

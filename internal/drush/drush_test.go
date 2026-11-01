@@ -191,33 +191,6 @@ func TestConfigResave(t *testing.T) {
 	})
 }
 
-func TestLocalizeTranslations(t *testing.T) {
-	logger := zap.NewNop()
-	cli := NewCLI(logger, "/opt/include")
-
-	t.Run("success", func(t *testing.T) {
-		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
-		t.Setenv("GO_HELPER_PROCESS_RAW", "1")
-		cli.newCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
-			cs := []string{"-test.run=TestHelperProcess", "--", "ok"}
-			cs = append(cs, arg...)
-			return exec.CommandContext(ctx, os.Args[0], cs...)
-		}
-		require.NoError(t, cli.LocalizeTranslations(t.Context(), "/tmp", "site1"))
-	})
-
-	t.Run("error", func(t *testing.T) {
-		t.Setenv("GO_WANT_HELPER_PROCESS", "1")
-		t.Setenv("GO_HELPER_PROCESS_ERROR", "1")
-		cli.newCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
-			cs := []string{"-test.run=TestHelperProcess", "--"}
-			cs = append(cs, arg...)
-			return exec.CommandContext(ctx, os.Args[0], cs...)
-		}
-		require.Error(t, cli.LocalizeTranslations(t.Context(), "/tmp", "site1"))
-	})
-}
-
 func TestHelperProcess(*testing.T) {
 	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
 		return
@@ -266,17 +239,15 @@ func TestFactsDecodesTheIncludedCommandsOutput(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, []string{"composer", "exec", "--", "drush", "--include=/opt/include", "drupdater:facts"}, *args)
-	assert.Equal(t, Facts{
-		ConfigSyncDirectory: "/project/config/sync",
-		TranslationPath:     "/project/web/sites/default/files/translations",
-		Modules:             []string{"locale_deploy", "system"},
-		UpdateHooks: map[string]UpdateHook{
-			"system_update_10600": {Module: "system", UpdateID: float64(10600), Description: "Equivalent update.", Type: "hook_update_n"},
-		},
-		UnsupportedModules: []UnsupportedModule{{Name: "old", InstalledVersion: "1.0.0", RecommendedVersion: "None"}},
-	}, facts)
-	assert.True(t, facts.ModuleEnabled("locale_deploy"))
-	assert.False(t, facts.ModuleEnabled("locale"))
+	assert.Equal(t, "/project/config/sync", facts.ConfigSyncDirectory)
+	assert.JSONEq(t, `{
+		"config_sync_directory": "/project/config/sync",
+		"translation_path": "/project/web/sites/default/files/translations",
+		"modules": ["locale_deploy", "system"],
+		"update_hooks": {"system_update_10600": {"module": "system", "update_id": 10600, "description": "Equivalent update.", "type": "hook_update_n"}},
+		"unsupported_modules": [{"name": "old", "installed_version": "1.0.0", "recommended_version": "None"}],
+		"unsupported_modules_error": ""
+	}`, string(facts.Raw), "the addons get the facts as drush printed them")
 }
 
 func TestLocalFactsSkipsTheUpdateStatusRequest(t *testing.T) {
@@ -298,7 +269,7 @@ func TestFactsKeepsStderrOutOfThePayload(t *testing.T) {
 	facts, err := cli.Facts(t.Context(), "/tmp", "site1")
 
 	require.NoError(t, err)
-	assert.Equal(t, []string{"system"}, facts.Modules)
+	assert.JSONEq(t, `{"modules": ["system"]}`, string(facts.Raw))
 }
 
 func TestFactsFailures(t *testing.T) {
@@ -322,23 +293,15 @@ func TestFactsFailures(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to decode the JSON output")
 	})
-}
 
-func TestFactsCloneSharesNothing(t *testing.T) {
-	facts := Facts{
-		Modules:            []string{"system"},
-		UpdateHooks:        map[string]UpdateHook{"a": {Module: "a"}},
-		UnsupportedModules: []UnsupportedModule{{Name: "old"}},
-	}
+	t.Run("output is JSON but no object", func(t *testing.T) {
+		cli := NewCLI(zap.NewNop(), "/opt/include")
+		fakeDrush(t, cli, `["system"]`)
 
-	clone := facts.Clone()
-	clone.Modules[0] = "changed"
-	clone.UpdateHooks["b"] = UpdateHook{}
-	clone.UnsupportedModules[0].Name = "changed"
+		_, err := cli.Facts(t.Context(), "/tmp", "site1")
 
-	assert.Equal(t, []string{"system"}, facts.Modules)
-	assert.Len(t, facts.UpdateHooks, 1)
-	assert.Equal(t, "old", facts.UnsupportedModules[0].Name)
+		require.ErrorContains(t, err, "failed to read the facts of site site1")
+	})
 }
 
 func TestGetConfigSyncDir(t *testing.T) {
