@@ -131,5 +131,7 @@ func TestParseAllowPluginsReadsEveryShape(t *testing.T) {
 func TestParseAllowPluginsRejectsARuleThatIsNotABoolean(t *testing.T) {
 	_, err := ParseAllowPlugins(json.RawMessage(`{"a/b": "yes"}`))
 
+	var typeErr *json.UnmarshalTypeError
+	require.ErrorAs(t, err, &typeErr)
 	require.ErrorContains(t, err, `failed to parse composer allow-plugins config {"a/b": "yes"}`)
 }

@@ -2271,7 +2271,7 @@ func TestStageScaffoldChanges(t *testing.T) {
 
 	newComposer := func(webroot string) *MockComposer {
 		c := NewMockComposer(t)
-		c.EXPECT().Project(mock.Anything, "/project").Return(composer.Project{WebRoot: webroot}, nil).Maybe()
+		c.EXPECT().Project(anyCtx, "/project").Return(composer.Project{WebRoot: webroot}, nil).Maybe()
 		return c
 	}
 
@@ -2344,12 +2344,22 @@ func TestStageScaffoldChanges(t *testing.T) {
 		assert.Contains(t, err.Error(), "failed to read worktree status")
 	})
 
+	t.Run("refuses a project without a web root", func(t *testing.T) {
+		worktree := NewMockWorktree(t)
+		worktree.EXPECT().Unstaged(anyCtx).Return([]string{"web/robots.txt"}, nil)
+
+		ws := testRun(services{logger: logger, composer: newComposer("")}, repo.Checkout{Worktree: worktree, Path: "/project"})
+
+		err := ws.stageScaffoldChanges(context.Background())
+		require.EqualError(t, err, "failed to determine web root: extra.drupal-scaffold.locations.web-root is not defined")
+	})
+
 	t.Run("propagates a web root failure", func(t *testing.T) {
 		worktree := NewMockWorktree(t)
 		worktree.EXPECT().Unstaged(anyCtx).Return([]string{"web/robots.txt"}, nil)
 
 		composerCLI := NewMockComposer(t)
-		composerCLI.EXPECT().Project(mock.Anything, "/project").Return(composer.Project{}, errors.New("no web root"))
+		composerCLI.EXPECT().Project(anyCtx, "/project").Return(composer.Project{}, errors.New("no web root"))
 
 		ws := testRun(services{logger: logger, composer: composerCLI}, repo.Checkout{Worktree: worktree, Path: "/project"})
 
