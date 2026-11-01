@@ -28,6 +28,15 @@ updates:
     labels:
       - "dependencies"
 
+  # The agent's test dependencies; its composer/composer stays on the Dockerfile's minor.
+  - package-ecosystem: "composer"
+    directory: "/agent"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

@@ -92,7 +92,25 @@ Built on `php:<version>-cli-trixie`, with:
   pre-allow-listed.
 - **Helper scripts** at `/opt/drupdater/` — the Rector configuration, the unsupported
   modules query, and the configuration resave script.
+- **The Drupdater agent** at `/opt/drupdater/agent/`, a third global plugin — see below.
 - **Bundled tools** at `/opt/drupdater/tools/` — see below.
+
+### Drupdater agent
+
+`drupdater/agent`, built from `agent/` in the Drupdater repository, is a Composer plugin
+installed globally. It adds hidden `composer drupdater:*` commands that answer Drupdater's
+questions about a project from inside that project's own Composer — its repositories, its
+credentials, its configuration — without installing anything into it.
+
+| Command | Used by |
+|---|---|
+| `drupdater:handshake` | The [`drupdater agent installed in Composer`](preflight-checks.md#drupdater-agent-installed-in-composer) preflight check |
+| `drupdater:patch-check` | [`composer_patches`](addons/composer-patches.md#how-a-patch-is-tested), to test whether patches still apply |
+
+Each command reads one JSON request on stdin and prints one JSON reply on stdout, versioned
+by a `protocol` number the binary and the agent must agree on. The agent ships in the same
+image as the binary, so they always do; the preflight check catches a binary run anywhere
+else.
 
 ### Bundled tools
 

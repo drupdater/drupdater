@@ -8,7 +8,7 @@ drupdater check [token] [flags]
 ```
 
 By default only cheap, near-instant checks run: `.drupdater.yaml` and its addon names,
-git history, PHP platform requirements, each site's `settings.php`, and — if a token is
+git history, PHP platform requirements, the Drupdater agent, each site's `settings.php`, and — if a token is
 given — that it authenticates. Pass `--full` to additionally clone the repository and
 prove each site installs from its exported configuration.
 
@@ -41,9 +41,10 @@ In short:
 2. `addon names resolve`
 3. `git history complete (not a shallow clone)`
 4. `PHP platform requirements satisfied`
-5. `site "<name>": settings.php` — once per configured site
-6. `repository host recognized (GitHub/GitLab)`
-7. `token authenticates` — only when a token was given
+5. `drupdater agent installed in Composer`
+6. `site "<name>": settings.php` — once per configured site
+7. `repository host recognized (GitHub/GitLab)`
+8. `token authenticates` — only when a token was given
 
 With `--full`, three more are appended: `clone for full check`, `composer install`, and
 `site "<name>" installs from configuration` per site.
@@ -63,6 +64,7 @@ Results are printed one per line, with failures detailed:
 ✓ addon names resolve
 ✓ git history complete (not a shallow clone)
 ✓ PHP platform requirements satisfied
+✓ drupdater agent installed in Composer
 ✗ site "default": settings.php: not found at web/sites/default/settings.php
 ✓ repository host recognized (GitHub/GitLab)
 ```

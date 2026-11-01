@@ -83,6 +83,7 @@ func (h *reportHarness) expectDefaults() {
 		Return(repo.Checkout{Repository: h.repository, Worktree: h.worktree, Path: testCheckout, Author: testAuthor}, nil).Maybe()
 	h.repoSvc.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil).Maybe()
 	h.composer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil).Maybe()
+	h.composer.EXPECT().CheckAgent(anyCtx, testCheckout).Return(nil).Maybe()
 	h.composer.EXPECT().Install(anyCtx, testCheckout).Return(nil).Maybe()
 }
 

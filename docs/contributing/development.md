@@ -5,6 +5,7 @@
 - **Go 1.27.1+** — the version in `go.mod`.
 - **`make`**.
 - **Docker** — for `make mock`, the hadolint half of `make lint`, and building images.
+- **PHP 8.2+ and Composer** — for the agent's tests, and for running Drupdater outside its image.
 
 ```bash
 git clone https://github.com/drupdater/drupdater.git
@@ -18,6 +19,7 @@ make build
 make build          # build the binary (injects the version via -ldflags)
 make test           # go test -v ./...
 make test-race      # the suite under the race detector
+make test-agent     # the agent's PHPUnit suite (agent/; needs PHP and Composer)
 make test-property  # only the property tests, with far more generated cases
 make fuzz           # fuzz every target (FUZZTIME=30s each by default)
 make mutate         # mutation testing over the whole module (mutago)
@@ -81,6 +83,18 @@ variables](../reference/environment-variables.md#set-by-drupdater).
 What the image does give you is a known-good PHP with the required extensions and the
 helper plugins installed globally. If a run fails locally in a way it does not in CI,
 check that first.
+
+The one plugin a run cannot do without is the [agent](#the-agent): the `preflight` phase
+refuses to start without it. Install it globally from your checkout, as the Dockerfile does:
+
+```bash
+composer global config repositories.drupdater-agent \
+  '{"type": "path", "url": "'"$PWD"'/agent", "options": {"versions": {"drupdater/agent": "1.0.0"}}}'
+composer global config allow-plugins.drupdater/agent true
+composer global require drupdater/agent:1.0.0
+```
+
+The path repository symlinks the package, so an edit under `agent/src` takes effect at once.
 
 ## Enforced on commit
 
@@ -548,6 +562,40 @@ make mock
 mockery's `testify` template emits one consolidated `mocks_test.go` per package, in the
 package it mocks. Do not edit those files by hand.
 
+## The agent
+
+`agent/` is the PHP half of Drupdater: `drupdater/agent`, a Composer plugin the image installs
+globally. It adds `composer drupdater:*` commands that answer what Drupdater can only learn
+from inside the project's own Composer. Today that is
+[`drupdater:patch-check`](../reference/addons/composer-patches.md#how-a-patch-is-tested); the
+Go side calls it through `internal/agent`.
+
+Each command reads one JSON request on stdin and prints one JSON envelope on stdout:
+
+```json
+{"protocol": 1, "command": "drupdater:patch-check", "ok": true, "result": {"outcome": "applies"}}
+```
+
+A failure carries an `error` with a closed `kind` — `unobtainable`, `invalid_request`,
+`protocol_mismatch`, `internal` — decided in PHP from the exception it caught, so Go never
+reads Composer's console wording. Go matches on `*agent.Error`'s `Kind`.
+
+`agent/protocol/` holds one example of every request and reply. **Both sides test against
+it**: PHPUnit asserts the agent produces each reply, `internal/agent` and
+`internal/composer` assert Go sends each request and decodes each reply. A shape changed on
+one side alone fails the other's suite. A breaking change bumps `protocol`, in
+`agent/src/Protocol.php` and `internal/agent/agent.go` together.
+
+```bash
+make test-agent
+```
+
+The suite includes an end-to-end test that installs the agent as a global plugin into a
+throwaway `COMPOSER_HOME`, as the image does, and runs the commands through a real Composer.
+`agent.yml` runs it on the lowest and highest published PHP. `composer/composer` in its
+`require-dev` stays on the Dockerfile's minor, so the tests exercise the Composer the image
+ships.
+
 ## Code layout
 
 | Path | Contains |
@@ -561,6 +609,7 @@ package it mocks. Do not edit those files by hand.
 | `internal/composer/`, `drush/`, `repo/`, `phpcs/`, `rector/`, `drupalorg/`, `php/` | Thin wrappers around external tools |
 | `internal/drupal/`, `internal/siteinstall/` | Where a Drupal project keeps things; installing a throwaway site |
 | `scripts/` | PHP embedded in the binary and extracted per run: Rector's config and drupdater's Drush commands |
+| `agent/`, `internal/agent/` | [The agent](#the-agent): drupdater's Composer plugin, and the Go client for it |
 
 The wrappers take one external tool per directory: `composer`, `drush`, `repo` (the git CLI),
 `phpcs`, `rector` and `drupalorg` (Drupal.org issues, and the git.drupalcode.org GitLab).

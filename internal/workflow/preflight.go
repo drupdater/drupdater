@@ -64,6 +64,22 @@ func CheckPlatformRequirements(ctx context.Context, composer PlatformReqsChecker
 	return CheckOK(name)
 }
 
+// AgentChecker is narrow for the same reason as ShallowCloneChecker.
+type AgentChecker interface {
+	CheckAgent(ctx context.Context, dir string) error
+}
+
+// CheckComposerAgent reports whether composer has drupdater's agent, without which no patch can
+// be tested and composer_patches would leave every patched package unpinned.
+func CheckComposerAgent(ctx context.Context, composer AgentChecker, workingDir string) CheckResult {
+	const name = "drupdater agent installed in Composer"
+
+	if err := composer.CheckAgent(ctx, workingDir); err != nil {
+		return CheckFailed(name, fmt.Sprintf("%s (run drupdater from its Docker image, which installs the agent)", err))
+	}
+	return CheckOK(name)
+}
+
 // ComposerConfigGetter is narrow for the same reason as ShallowCloneChecker.
 type ComposerConfigGetter interface {
 	GetConfig(ctx context.Context, dir string, key string) (string, error)

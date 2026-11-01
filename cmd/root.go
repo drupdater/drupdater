@@ -163,8 +163,6 @@ func (a app) runUpdate(cmd *cobra.Command, args []string, opts options) error {
 
 	drush := drush.NewCLI(logger, scripts.DrushInclude(scriptsDir))
 	composer := composer.NewCLI(logger, composerOptions(cfg)...)
-	// Patch checks leave a scratch project with a full vendor tree behind otherwise.
-	defer composer.Cleanup()
 	drupalOrg := drupalorg.NewHTTPClient(logger)
 	siteData, err := os.MkdirTemp("", "drupdater-sites-")
 	if err != nil {

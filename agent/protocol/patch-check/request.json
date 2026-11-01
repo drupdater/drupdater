@@ -1,0 +1,12 @@
+{
+  "protocol": 1,
+  "request": {
+    "package": "drupal/token",
+    "version": "1.15.0",
+    "reference": "",
+    "patches": [
+      "/project/patches/token/3123456-local.patch",
+      "https://www.drupal.org/files/issues/3200000-8.patch"
+    ]
+  }
+}

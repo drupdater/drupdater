@@ -164,6 +164,11 @@ type fakeCheapChecksComposer struct {
 	platformReqsErr error
 	webRoot         string
 	webRootErr      error
+	agentErr        error
+}
+
+func (f fakeCheapChecksComposer) CheckAgent(context.Context, string) error {
+	return f.agentErr
 }
 
 func (f fakeCheapChecksComposer) CheckPlatformReqs(context.Context, string) (string, error) {
@@ -195,8 +200,8 @@ func TestRunCheapChecks(t *testing.T) {
 		results := testApp().runCheapChecks(ctx, logger, filepath.Join(t.TempDir(), ".drupdater.yaml"), cfg, repository, composerSvc, newFS(t, "/project", "default"), "", nil)
 
 		require.False(t, anyCheckFailed(results))
-		// config valid, addons resolve, git history, platform reqs, site settings, VCS host.
-		assert.Len(t, results, 6)
+		// config valid, addons resolve, git history, platform reqs, agent, site settings, VCS host.
+		assert.Len(t, results, 7)
 	})
 
 	t.Run("a shallow clone and unmet platform reqs both surface as failures", func(t *testing.T) {
@@ -215,6 +220,23 @@ func TestRunCheapChecks(t *testing.T) {
 		}
 		assert.Contains(t, names, "git history complete (not a shallow clone)")
 		assert.Contains(t, names, "PHP platform requirements satisfied")
+	})
+
+	t.Run("a missing agent surfaces as a failure", func(t *testing.T) {
+		cfg := &config.Config{WorkingDir: "/project", RepositoryURL: "https://github.com/acme/site.git"}
+		composerSvc := fakeCheapChecksComposer{webRoot: "web", agentErr: errors.New("command drupdater:handshake not defined")}
+
+		results := testApp().runCheapChecks(ctx, logger, filepath.Join(t.TempDir(), ".drupdater.yaml"), cfg, fakeShallowCloneChecker{}, composerSvc, newFS(t, "/project", "default"), "", nil)
+
+		var failed []workflow.CheckResult
+		for _, r := range results {
+			if !r.OK {
+				failed = append(failed, r)
+			}
+		}
+		require.Len(t, failed, 1)
+		assert.Equal(t, "drupdater agent installed in Composer", failed[0].Name)
+		assert.Contains(t, failed[0].Detail, "not defined")
 	})
 
 	t.Run("one result per configured site", func(t *testing.T) {

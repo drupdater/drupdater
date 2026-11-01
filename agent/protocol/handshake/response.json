@@ -1,0 +1,6 @@
+{
+  "protocol": 1,
+  "command": "drupdater:handshake",
+  "ok": true,
+  "result": {}
+}

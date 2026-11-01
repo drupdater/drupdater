@@ -77,7 +77,6 @@ func (a app) runCheck(cmd *cobra.Command, args []string, opts options) error {
 	}
 
 	composerCLI := composer.NewCLI(logger)
-	defer composerCLI.Cleanup()
 
 	results := a.runCheapChecks(ctx, logger, configFilePath(opts.configFile, cfg.WorkingDir), &cfg, gitSvc, composerCLI, afero.NewOsFs(), token, resolveErr)
 
@@ -99,6 +98,7 @@ func (a app) runCheck(cmd *cobra.Command, args []string, opts options) error {
 // cheapChecksComposer is narrow so tests can supply a fake; *composer.CLI satisfies it as-is.
 type cheapChecksComposer interface {
 	workflow.PlatformReqsChecker
+	workflow.AgentChecker
 	workflow.ComposerConfigGetter
 }
 
@@ -118,6 +118,7 @@ func (a app) runCheapChecks(
 	results = append(results, checkConfigAndAddons(a.addons, cfgFilePath, cfg)...)
 	results = append(results, workflow.CheckGitHistoryComplete(ctx, repository, cfg.WorkingDir))
 	results = append(results, workflow.CheckPlatformRequirements(ctx, composerSvc, cfg.WorkingDir))
+	results = append(results, workflow.CheckComposerAgent(ctx, composerSvc, cfg.WorkingDir))
 	for _, site := range cfg.Sites {
 		results = append(results, workflow.CheckSiteSettings(ctx, composerSvc, fs, cfg.WorkingDir, site))
 	}
@@ -211,7 +212,6 @@ func (a app) checkVCS(ctx context.Context, logger *zap.Logger, repositoryURL str
 type fullCheckComposer interface {
 	siteinstall.Composer
 	Install(ctx context.Context, path string) error
-	Cleanup()
 }
 
 // siteInstaller is the one method the tier needs from siteinstall.Installer.
@@ -263,7 +263,6 @@ func (a app) runFullChecks(ctx context.Context, logger *zap.Logger, cfg config.C
 	defer os.RemoveAll(path)
 
 	composerCLI := deps.newComposer()
-	defer composerCLI.Cleanup()
 
 	if err := composerCLI.Install(ctx, path); err != nil {
 		return []workflow.CheckResult{workflow.CheckFailed("composer install", err.Error())}

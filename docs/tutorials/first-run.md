@@ -36,6 +36,7 @@ You should see something like:
 ✓ addon names resolve
 ✓ git history complete (not a shallow clone)
 ✓ PHP platform requirements satisfied
+✓ drupdater agent installed in Composer
 ✓ site "default": settings.php
 ✓ repository host recognized (GitHub/GitLab)
 ```

@@ -65,6 +65,7 @@ func TestRun(t *testing.T) {
 	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
 	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
+	mockComposer.EXPECT().CheckAgent(anyCtx, testCheckout).Return(nil)
 	repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
 	repository.EXPECT().RemoteBranchExists(anyCtx, mock.Anything, mock.Anything).Return(false, nil)
 
@@ -148,6 +149,7 @@ func TestRunPublishUsesLiveContext(t *testing.T) {
 	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
 	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
+	mockComposer.EXPECT().CheckAgent(anyCtx, testCheckout).Return(nil)
 	repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
 	repository.EXPECT().RemoteBranchExists(anyCtx, mock.Anything, mock.Anything).Return(false, nil)
 
@@ -211,6 +213,7 @@ func TestRunSiteFailureDoesNotPublish(t *testing.T) {
 	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
 	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
+	mockComposer.EXPECT().CheckAgent(anyCtx, testCheckout).Return(nil)
 	repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
 	repository.EXPECT().RemoteBranchExists(anyCtx, mock.Anything, mock.Anything).Return(false, nil)
 
@@ -271,6 +274,7 @@ func TestRunTimeout(t *testing.T) {
 	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
 	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
+	mockComposer.EXPECT().CheckAgent(anyCtx, testCheckout).Return(nil)
 
 	// Both phases block on the context, simulating a wedged subprocess; the run
 	// timeout is what releases them.
@@ -335,6 +339,31 @@ func TestRunPlatformReqsFail(t *testing.T) {
 	vcsProvider.AssertNotCalled(t, "CreateMergeRequest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
 
+func TestRunAbortsWithoutTheAgent(t *testing.T) {
+	installer := NewMockInstaller(t)
+	repositoryService := NewMockGitService(t)
+	vcsProvider := NewMockPlatform(t)
+	repository := NewMockGitRepository(t)
+	mockComposer := NewMockComposer(t)
+	expectVersionLookup(mockComposer)
+	drush := NewMockDrush(t)
+
+	cfg := config.Config{RepositoryURL: "https://example.com/repo.git", Branch: "main", Token: "token", Clone: true, Sites: []string{"site1"}}
+
+	worktree := NewMockWorktree(t)
+	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
+	repositoryService.EXPECT().CloneRepository(anyCtx, cfg.RepositoryURL, cfg.Branch, cfg.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
+	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
+	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
+	mockComposer.EXPECT().CheckAgent(anyCtx, testCheckout).Return(errors.New("command drupdater:handshake not defined"))
+
+	err := New(zap.NewNop(), cfg, drush, vcsProvider, repositoryService, installer, mockComposer).Run(context.Background(), nil)
+
+	require.EqualError(t, err, "drupdater agent installed in Composer: command drupdater:handshake not defined "+
+		"(run drupdater from its Docker image, which installs the agent)")
+	mockComposer.AssertNotCalled(t, "Install", mock.Anything, mock.Anything)
+}
+
 func TestRunNoChanges(t *testing.T) {
 	logger := zap.NewNop()
 	installer := NewMockInstaller(t)
@@ -363,6 +392,7 @@ func TestRunNoChanges(t *testing.T) {
 	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
 	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
+	mockComposer.EXPECT().CheckAgent(anyCtx, testCheckout).Return(nil)
 
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil).Once()
 	mockComposer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).Return([]composer.PackageChange{}, nil)
@@ -399,6 +429,7 @@ func TestRunAbortedByAnAddonInstallsNoSite(t *testing.T) {
 	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
 	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
+	mockComposer.EXPECT().CheckAgent(anyCtx, testCheckout).Return(nil)
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil).Once()
 
 	aborts := hookAddon{Hooks{PreComposerUpdate: propose(Prepare, func(*PreComposerUpdateEvent) (UpdatePlan, error) {
@@ -429,6 +460,7 @@ func TestRunUpdatesAsTheAddonsPlanned(t *testing.T) {
 	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
 	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
+	mockComposer.EXPECT().CheckAgent(anyCtx, testCheckout).Return(nil)
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil).Once()
 	mockComposer.EXPECT().Update(anyCtx, testCheckout, []string{"drupal/core"}, []string{"drupal/core:10.2.0"}, true, false).
 		Return(nil, nil)
@@ -472,6 +504,7 @@ func TestRunInstallsSitesAtTheOldCode(t *testing.T) {
 	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
+	mockComposer.EXPECT().CheckAgent(anyCtx, testCheckout).Return(nil)
 	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
 
 	var steps []string
@@ -662,6 +695,7 @@ func TestRunCreatesTheUpdateBranchAfterTheLastCommit(t *testing.T) {
 		Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
 	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
+	mockComposer.EXPECT().CheckAgent(anyCtx, testCheckout).Return(nil)
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
 	mockComposer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).
 		Return([]composer.PackageChange{{Package: "drupal/core", From: "9.0.0", To: "9.1.0"}}, nil)
@@ -711,6 +745,7 @@ func TestRunBranchAlreadyExists(t *testing.T) {
 	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
 	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
+	mockComposer.EXPECT().CheckAgent(anyCtx, testCheckout).Return(nil)
 	repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
 	repository.EXPECT().RemoteBranchExists(anyCtx, mock.Anything, mock.Anything).Return(true, nil)
 
@@ -765,6 +800,7 @@ func TestRunLocalBranchAlreadyExists(t *testing.T) {
 	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
 	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
+	mockComposer.EXPECT().CheckAgent(anyCtx, testCheckout).Return(nil)
 	repository.EXPECT().BranchExists(anyCtx, "update-dummy-hash").Return(true, nil)
 
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
@@ -812,6 +848,7 @@ func TestRunLocalBranchLookupError(t *testing.T) {
 	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
 	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
+	mockComposer.EXPECT().CheckAgent(anyCtx, testCheckout).Return(nil)
 	lookupErr := errors.New("corrupt ref")
 	repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, lookupErr)
 
@@ -870,6 +907,7 @@ func TestRunWithDryRun(t *testing.T) {
 	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
 	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
+	mockComposer.EXPECT().CheckAgent(anyCtx, testCheckout).Return(nil)
 	repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
@@ -999,6 +1037,7 @@ func TestRunCheckoutDryRunWithoutPlatform(t *testing.T) {
 	repositoryService.EXPECT().RemoveWorktree(anyCtx, config.WorkingDir, testCheckout).Return(nil)
 	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
+	mockComposer.EXPECT().CheckAgent(anyCtx, testCheckout).Return(nil)
 	repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
 	repository.EXPECT().Head(anyCtx).Return(testHead, nil)
 
@@ -1070,6 +1109,7 @@ func TestPublishWorkDeletesBranchOnMRFailure(t *testing.T) {
 	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
 	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
+	mockComposer.EXPECT().CheckAgent(anyCtx, testCheckout).Return(nil)
 	repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
 	repository.EXPECT().RemoteBranchExists(anyCtx, mock.Anything, mock.Anything).Return(false, nil)
 
@@ -1137,6 +1177,7 @@ func TestPublishWorkLogsWarningWhenDeleteBranchFails(t *testing.T) {
 	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
 	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
+	mockComposer.EXPECT().CheckAgent(anyCtx, testCheckout).Return(nil)
 	repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
 	repository.EXPECT().RemoteBranchExists(anyCtx, mock.Anything, mock.Anything).Return(false, nil)
 
@@ -1206,6 +1247,7 @@ func TestPublishWorkPushFails(t *testing.T) {
 	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
 	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
+	mockComposer.EXPECT().CheckAgent(anyCtx, testCheckout).Return(nil)
 	repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
 	repository.EXPECT().RemoteBranchExists(anyCtx, mock.Anything, mock.Anything).Return(false, nil)
 
@@ -1254,6 +1296,7 @@ func TestRunGetLockHashError(t *testing.T) {
 	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
 	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
+	mockComposer.EXPECT().CheckAgent(anyCtx, testCheckout).Return(nil)
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
 	mockComposer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).Return([]composer.PackageChange{
 		{Package: "drupal/core", From: "9.0.0", To: "9.1.0"},
@@ -1297,6 +1340,7 @@ func TestRunBranchExistsError(t *testing.T) {
 	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
 	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
+	mockComposer.EXPECT().CheckAgent(anyCtx, testCheckout).Return(nil)
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
 	mockComposer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).Return([]composer.PackageChange{
 		{Package: "drupal/core", From: "9.0.0", To: "9.1.0"},
@@ -1356,6 +1400,7 @@ func TestRunConfigResaveError(t *testing.T) {
 	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
 	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
+	mockComposer.EXPECT().CheckAgent(anyCtx, testCheckout).Return(nil)
 	repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
 	repository.EXPECT().RemoteBranchExists(anyCtx, mock.Anything, mock.Anything).Return(false, nil)
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
@@ -1415,6 +1460,7 @@ func TestRunExportConfigurationError(t *testing.T) {
 	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
 	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
+	mockComposer.EXPECT().CheckAgent(anyCtx, testCheckout).Return(nil)
 	repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
 	repository.EXPECT().RemoteBranchExists(anyCtx, mock.Anything, mock.Anything).Return(false, nil)
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
@@ -1473,6 +1519,7 @@ func TestRunWithAutoMerge(t *testing.T) {
 	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
 	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
+	mockComposer.EXPECT().CheckAgent(anyCtx, testCheckout).Return(nil)
 	repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
 	repository.EXPECT().RemoteBranchExists(anyCtx, mock.Anything, mock.Anything).Return(false, nil)
 	repository.EXPECT().Push(anyCtx, mock.Anything, mock.Anything).Return(nil)
@@ -1543,6 +1590,7 @@ func TestRunAutoMergeError(t *testing.T) {
 	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
 	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
+	mockComposer.EXPECT().CheckAgent(anyCtx, testCheckout).Return(nil)
 	repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
 	repository.EXPECT().RemoteBranchExists(anyCtx, mock.Anything, mock.Anything).Return(false, nil)
 	repository.EXPECT().Push(anyCtx, mock.Anything, mock.Anything).Return(nil)
@@ -1612,6 +1660,7 @@ func TestRunAutoMergeSkippedWhenDisabled(t *testing.T) {
 	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
 	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
+	mockComposer.EXPECT().CheckAgent(anyCtx, testCheckout).Return(nil)
 	repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
 	repository.EXPECT().RemoteBranchExists(anyCtx, mock.Anything, mock.Anything).Return(false, nil)
 	repository.EXPECT().Push(anyCtx, mock.Anything, mock.Anything).Return(nil)
@@ -1669,6 +1718,7 @@ func TestRunFireEventError(t *testing.T) {
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
 	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
+	mockComposer.EXPECT().CheckAgent(anyCtx, testCheckout).Return(nil)
 
 	fails := hookAddon{Hooks{PreComposerUpdate: propose(Change, func(*PreComposerUpdateEvent) (UpdatePlan, error) {
 		return UpdatePlan{}, errors.New("audit unavailable")
@@ -1727,6 +1777,7 @@ func checkoutModeRun(t *testing.T, source, worktreePath string) (*Runner, *MockG
 		Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: worktreePath, Author: testAuthor}, nil)
 	repositoryService.EXPECT().IsShallowClone(anyCtx, worktreePath).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, worktreePath).Return("", nil)
+	mockComposer.EXPECT().CheckAgent(anyCtx, worktreePath).Return(nil)
 	repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
 	repository.EXPECT().RemoteBranchExists(anyCtx, mock.Anything, mock.Anything).Return(false, nil)
 	repository.EXPECT().Push(anyCtx, mock.Anything, mock.Anything).Return(nil)
@@ -2357,6 +2408,8 @@ func TestRunFailsWhenScaffoldChangesCannotBeStaged(t *testing.T) {
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
 
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
+
+	mockComposer.EXPECT().CheckAgent(anyCtx, testCheckout).Return(nil)
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
 	mockComposer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).
 		Return([]composer.PackageChange{{Package: "drupal/core", From: "9.0.0", To: "9.1.0"}}, nil)
@@ -2400,6 +2453,7 @@ func TestRunHandsAddonsTheRunsContextAndCommitter(t *testing.T) {
 	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
 	repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
+	mockComposer.EXPECT().CheckAgent(anyCtx, testCheckout).Return(nil)
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
 	mockComposer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).
 		Return([]composer.PackageChange{{Action: "Upgrade", Package: "drupal/core", From: "9.0.0", To: "9.1.0"}}, nil)

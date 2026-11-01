@@ -100,6 +100,8 @@ func TestRunWithConcurrentSites(t *testing.T) {
 	repository.EXPECT().Push(anyCtx, mock.Anything, mock.Anything).Return(nil)
 
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
+
+	mockComposer.EXPECT().CheckAgent(anyCtx, testCheckout).Return(nil)
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
 	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
 	mockComposer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).

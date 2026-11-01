@@ -208,7 +208,6 @@ func TestCreateAddonsPassesEveryDependency(t *testing.T) {
 
 	logger := zap.NewNop()
 	composerSvc := composer.NewCLI(logger)
-	t.Cleanup(composerSvc.Cleanup)
 	deps := addonDeps{
 		logger:       logger,
 		drush:        drush.NewCLI(logger, "/scripts/drush"),

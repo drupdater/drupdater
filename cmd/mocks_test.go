@@ -1312,6 +1312,63 @@ func (_m *mockcheapChecksComposer) EXPECT() *mockcheapChecksComposer_Expecter {
 	return &mockcheapChecksComposer_Expecter{mock: &_m.Mock}
 }
 
+// CheckAgent provides a mock function for the type mockcheapChecksComposer
+func (_mock *mockcheapChecksComposer) CheckAgent(ctx context.Context, dir string) error {
+	ret := _mock.Called(ctx, dir)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CheckAgent")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = returnFunc(ctx, dir)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// mockcheapChecksComposer_CheckAgent_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CheckAgent'
+type mockcheapChecksComposer_CheckAgent_Call struct {
+	*mock.Call
+}
+
+// CheckAgent is a helper method to define mock.On call
+//   - ctx context.Context
+//   - dir string
+func (_e *mockcheapChecksComposer_Expecter) CheckAgent(ctx any, dir any) *mockcheapChecksComposer_CheckAgent_Call {
+	return &mockcheapChecksComposer_CheckAgent_Call{Call: _e.mock.On("CheckAgent", ctx, dir)}
+}
+
+func (_c *mockcheapChecksComposer_CheckAgent_Call) Run(run func(ctx context.Context, dir string)) *mockcheapChecksComposer_CheckAgent_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *mockcheapChecksComposer_CheckAgent_Call) Return(err error) *mockcheapChecksComposer_CheckAgent_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *mockcheapChecksComposer_CheckAgent_Call) RunAndReturn(run func(ctx context.Context, dir string) error) *mockcheapChecksComposer_CheckAgent_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CheckPlatformReqs provides a mock function for the type mockcheapChecksComposer
 func (_mock *mockcheapChecksComposer) CheckPlatformReqs(ctx context.Context, dir string) (string, error) {
 	ret := _mock.Called(ctx, dir)
@@ -1484,39 +1541,6 @@ type mockfullCheckComposer_Expecter struct {
 
 func (_m *mockfullCheckComposer) EXPECT() *mockfullCheckComposer_Expecter {
 	return &mockfullCheckComposer_Expecter{mock: &_m.Mock}
-}
-
-// Cleanup provides a mock function for the type mockfullCheckComposer
-func (_mock *mockfullCheckComposer) Cleanup() {
-	_mock.Called()
-	return
-}
-
-// mockfullCheckComposer_Cleanup_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Cleanup'
-type mockfullCheckComposer_Cleanup_Call struct {
-	*mock.Call
-}
-
-// Cleanup is a helper method to define mock.On call
-func (_e *mockfullCheckComposer_Expecter) Cleanup() *mockfullCheckComposer_Cleanup_Call {
-	return &mockfullCheckComposer_Cleanup_Call{Call: _e.mock.On("Cleanup")}
-}
-
-func (_c *mockfullCheckComposer_Cleanup_Call) Run(run func()) *mockfullCheckComposer_Cleanup_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run()
-	})
-	return _c
-}
-
-func (_c *mockfullCheckComposer_Cleanup_Call) Return() *mockfullCheckComposer_Cleanup_Call {
-	_c.Call.Return()
-	return _c
-}
-
-func (_c *mockfullCheckComposer_Cleanup_Call) RunAndReturn(run func()) *mockfullCheckComposer_Cleanup_Call {
-	_c.Run(run)
-	return _c
 }
 
 // GetConfig provides a mock function for the type mockfullCheckComposer

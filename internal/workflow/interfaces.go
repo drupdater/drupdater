@@ -22,6 +22,7 @@ type Composer interface {
 	Update(ctx context.Context, dir string, packagesToUpdate []string, packagesToKeep []string, minimalChanges bool, dryRun bool) ([]composer.PackageChange, error)
 	GetLockHash(dir string) (string, error)
 	PlatformReqsChecker
+	AgentChecker
 	ComposerConfigGetter
 	ComposerVersionReporter
 }

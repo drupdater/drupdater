@@ -332,17 +332,6 @@ func TestConstraint(t *testing.T) {
 	assert.Equal(t, "dev-main#141046a", constraint("dev-main 141046a"))
 }
 
-func TestRequireIntoScratchPinsADevPackageByCommit(t *testing.T) {
-	fake := &fakeUpdate{}
-
-	service := &CLI{newCommand: fake.command(t), logger: zap.NewNop()}
-	ok, err := service.requireIntoScratch(t.Context(), t.TempDir(), "drupal/foo", "1.x-dev 0424dff")
-	require.NoError(t, err)
-	assert.True(t, ok)
-
-	assert.Contains(t, fake.call(t, "require"), "drupal/foo:1.x-dev#0424dff")
-}
-
 func TestUpdateDryRunReportsAFailedRestore(t *testing.T) {
 	dir := newUpdateProject(t)
 	fake := &fakeUpdate{diffOut: `{"packages": []}`}

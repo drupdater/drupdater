@@ -65,6 +65,24 @@ func TestCheckPlatformRequirements(t *testing.T) {
 	})
 }
 
+func TestCheckComposerAgent(t *testing.T) {
+	t.Run("an agent that answers passes", func(t *testing.T) {
+		composer := NewMockComposer(t)
+		composer.EXPECT().CheckAgent(t.Context(), "/tmp").Return(nil)
+
+		assert.Equal(t, CheckOK("drupdater agent installed in Composer"), CheckComposerAgent(t.Context(), composer, "/tmp"))
+	})
+
+	t.Run("an agent that does not answer fails, naming the image", func(t *testing.T) {
+		composer := NewMockComposer(t)
+		composer.EXPECT().CheckAgent(t.Context(), "/tmp").Return(errors.New("drupdater:handshake did not answer"))
+
+		assert.Equal(t, CheckFailed("drupdater agent installed in Composer",
+			"drupdater:handshake did not answer (run drupdater from its Docker image, which installs the agent)"),
+			CheckComposerAgent(t.Context(), composer, "/tmp"))
+	})
+}
+
 func TestCheckSiteSettings(t *testing.T) {
 	ctx := context.Background()
 

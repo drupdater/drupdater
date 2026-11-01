@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os/exec"
 	"slices"
 	"strings"
@@ -27,6 +28,7 @@ type Command struct {
 	Program string
 	// ExtraEnv is appended after Env, so it wins over anything inherited — drush's SITE_NAME.
 	ExtraEnv []string
+	Stdin    io.Reader
 }
 
 func (c Command) build(ctx context.Context, args ...string) *exec.Cmd {
@@ -36,6 +38,7 @@ func (c Command) build(ctx context.Context, args ...string) *exec.Cmd {
 	}
 	command := c.New(ctx, program, args...)
 	command.Dir = c.Dir
+	command.Stdin = c.Stdin
 	// Environ() falls back to os.Environ(), layering on the deployment's environment.
 	command.Env = append(Env(command.Environ()), c.ExtraEnv...)
 	return command

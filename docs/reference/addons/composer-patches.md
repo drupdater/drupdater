@@ -43,11 +43,30 @@ patches/<project>/<issue-id>-<sha>-<title>.diff
 Where a package carries several patches, they are validated as a set — patches that each
 apply alone but conflict with each other are caught.
 
-The test happens in a throwaway Composer project, which is given **the repositories your
-project declares** in addition to drupal.org and packagist.org. Without them a package
-served only from a private registry — a private fork of a contrib module, an in-house
-module, anything behind [Private Packagist](../../how-to/use-private-packagist.md) —
-could not be resolved for the test at all.
+### How a patch is tested
+
+The test runs inside your project's own Composer, through `composer drupdater:patch-check`
+— a command of the [Drupdater agent](../docker-images.md#drupdater-agent) the image
+installs. It looks the package up at the new version in **the repositories your project
+declares**, in their order and with your credentials, downloads it into a temporary
+directory, and applies the patches to it in order. Nothing is installed into your project,
+and no Composer installer event fires, so your own plugins never act on the download.
+
+A package served only from a private registry — a private fork of a contrib module, an
+in-house module, anything behind [Private Packagist](../../how-to/use-private-packagist.md)
+— is therefore tested like any other.
+
+Patches are applied the way `cweagans/composer-patches` 1.x applies them, so the verdict is
+the one your own `composer install` would reach:
+
+- With `git apply` first when the package was installed from source, then with `patch`.
+- At levels `-p1`, `-p0`, `-p2` and `-p4`, in that order — or only at the level
+  `extra.patchLevel` names for the package.
+- A remote patch is downloaded with Composer's own HTTP client, and retried once.
+
+Two deliberate differences: each level is tried with a dry run first, so a failed attempt
+leaves no hunks behind for the next one, and a patch that is already applied is rejected
+rather than offered for reversal.
 
 ### Conflict
 
@@ -62,8 +81,9 @@ the packages the audit selected are checked.
 
 A pin means *the patch was tested and rejected*. When the test cannot be carried out at
 all — the package could not be downloaded, a registry was unreachable, a credential was
-refused — the package is **not** pinned and no conflict is reported; the run logs a
-warning naming the package and leaves it to update normally. An unverifiable patch is not
+refused, a remote patch could not be downloaded or a local patch file is missing — the
+package is **not** pinned and no conflict is reported; the run logs a warning naming the
+package and the reason and leaves it to update normally. An unverifiable patch is not
 a known-stale one, and pinning on that path would hold a package back on every run while
 blaming a conflict that never happened.
 

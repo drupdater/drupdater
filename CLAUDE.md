@@ -39,6 +39,7 @@ A change to any of the following **must** update its page in the same PR:
 | An environment variable | `docs/reference/environment-variables.md` |
 | A workflow phase or event | `docs/explanation/how-a-run-works.md`, `docs/explanation/addon-architecture.md` |
 | Published PHP versions | `docs/reference/docker-images.md` |
+| An agent command | `docs/reference/docker-images.md#drupdater-agent`, `docs/contributing/development.md#the-agent` |
 
 Verify with `make docs-build` (runs `mkdocs build --strict`, which fails on broken internal links and bad nav entries). Preview with `make docs-serve`.
 
@@ -57,6 +58,7 @@ Changing a golden file changes the published example.
 make build          # Build binary
 make test           # Run all tests (go test -v ./...)
 make test-race      # Run the suite under the race detector (~1 min; CI runs this too)
+make test-agent     # The agent's PHPUnit suite (agent/; needs PHP and Composer)
 make test-property  # Only the property tests, with far more generated cases (rapid)
 make fuzz           # Fuzz every target (FUZZTIME=30s each by default)
 make mutate         # Mutation testing over the whole module (mutago, pinned in go.mod)
@@ -114,6 +116,8 @@ Where things live. For *how they work*, read `docs/explanation/` rather than dup
 | `internal/siteinstall/` | Installs a throwaway SQLite site for the `check --full` tier |
 | `internal/php/` | What the PHP wrappers share: running a command under Composer's environment, decoding JSON output, and the `CommandFactory` each wrapper holds as its test seam |
 | `scripts/` | PHP embedded in the binary, extracted per run: `rector.php` and the `drupdater:*` Drush commands (`drush --include`) |
+| `agent/` | `drupdater/agent`, the global Composer plugin the image installs: the `composer drupdater:*` commands, its PHPUnit suite, and `protocol/`, the request/reply fixtures both sides test against |
+| `internal/agent/` | `agent.Call`: runs a `composer drupdater:*` command, decodes its envelope, returns an `*agent.Error` with a `Kind` |
 | `tools/` | The PHPCS and Rector the image installs to `/opt/drupdater/tools`, so addons install nothing into the project |
 
 ### Invariants worth knowing before editing
@@ -126,6 +130,7 @@ Where things live. For *how they work*, read `docs/explanation/` rather than dup
 - **An event type names itself and its `Hooks` field** (`name()`, `hook()` in `internal/workflow/event.go`), so `workflow.Fire` runs any event and `Pipeline` has no per-event code. A new event is that type, its `Hooks` field, and the `Fire` call in the runner.
 - **Hook stages are load-bearing** on `pre-composer-update` and `post-code-update`. See `docs/explanation/addon-architecture.md` before changing one.
 - **The MR is rendered from the report**, through its JSON. An addon reaches the description only via its report section; findings from two addons are joined there, never handed between them.
+- **A new question for Composer goes to the agent, not to its console output.** The agent answers in JSON with a closed error `Kind`, decided from the exception it caught. A change to a request or reply changes `agent/protocol/` and both sides' tests; a breaking one bumps `protocol` in `agent/src/Protocol.php` and `internal/agent/agent.go` together.
 - **`internal/addon/report.go` is a published contract.** Renaming a field there is a breaking change to `schema_version`, and `internal/addon/testdata/run_report.json` is what makes such a rename fail rather than ship. A new reporting addon belongs in that golden's `reportingAddons()`.
 - **Report types mirror rather than reuse internal types** (`report.PackageChange` vs `composer.PackageChange`) so an internal refactor can't rename a published field.
 - **The report's deferred write is registered first**, so it runs last and is emitted on every exit path.

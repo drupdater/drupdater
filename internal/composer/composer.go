@@ -21,8 +21,6 @@ type CLI struct {
 	newCommand php.CommandFactory
 	// extraEnv is added to every invocation; see WithoutBlocking.
 	extraEnv []string
-
-	scratch scratchDir
 }
 
 func NewCLI(logger *zap.Logger, opts ...Option) *CLI {

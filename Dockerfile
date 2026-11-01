@@ -57,6 +57,14 @@ COPY tools/composer.json tools/composer.lock /opt/drupdater/tools/
 RUN composer install --working-dir=/opt/drupdater/tools --no-dev --no-interaction --no-progress \
     && composer clear-cache
 
+# drupdater's agent (agent/): the `composer drupdater:*` commands, global so no project is touched.
+COPY agent/composer.json /opt/drupdater/agent/
+COPY agent/src /opt/drupdater/agent/src
+RUN composer global config --no-plugins repositories.drupdater-agent \
+        '{"type": "path", "url": "/opt/drupdater/agent", "options": {"versions": {"drupdater/agent": "1.0.0"}}}'; \
+    composer global config --no-plugins allow-plugins.drupdater/agent true; \
+    composer global require drupdater/agent:1.0.0
+
 COPY --from=build /build/drupdater /opt/drupdater/bin
 
 CMD [""]
