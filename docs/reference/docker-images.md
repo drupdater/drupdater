@@ -104,8 +104,10 @@ credentials, its configuration — without installing anything into it.
 
 | Command | Used by |
 |---|---|
+| `drupdater:audit` | [`composer_audit`](addons/composer-audit.md), before and after the update |
 | `drupdater:handshake` | The [`drupdater agent installed in Composer`](preflight-checks.md#drupdater-agent-installed-in-composer) preflight check |
 | `drupdater:patch-check` | [`composer_patches`](addons/composer-patches.md#how-a-patch-is-tested), to test whether patches still apply |
+| `drupdater:platform-check` | The [`PHP platform requirements satisfied`](preflight-checks.md#php-platform-requirements-satisfied) preflight check |
 | `drupdater:project` | Everything that reads the project's layout, plugins, patches or lock — see below |
 | `drupdater:resolve` | The run's [`resolve update`](../explanation/how-a-run-works.md) phase, and [`composer_patches`](addons/composer-patches.md)' dry run of the update it checks patches against |
 
@@ -117,6 +119,19 @@ branch counts as an upgrade, as in Composer's own output; a package that only mo
 `require` and `require-dev` did not change. A real run adds `--bump-after-update`; a dry run
 adds `--no-scripts` and puts `composer.json` and `composer.lock` back afterwards. When the update
 cannot be resolved, Composer's own explanation is carried into the run's error.
+
+`drupdater:audit` audits the locked packages, dev ones included, as `composer audit --locked`
+does, and under the project's own audit policy: its ignore lists, ignored severities and
+`audit.abandoned` setting all apply. It reports the advisories sorted by package, advisory ID,
+CVE and title, and the abandoned packages by name, each with the replacement its maintainers
+named, if any. A repository whose advisories cannot be fetched fails the audit rather than
+reading as "no advisories", unless the project ignores unreachable repositories for audits.
+
+`drupdater:platform-check` reports the platform requirements — of the locked packages and of
+the root package, `require-dev` included — that the running PHP does not meet, deciding each
+the way `composer check-platform-reqs --lock` does: a requirement is met when one candidate, the
+platform package itself or a package that provides or replaces it, satisfies every constraint
+on it. The project's `config.platform` is ignored, so the answer is about the real runtime.
 
 `drupdater:project` reports, in one call:
 

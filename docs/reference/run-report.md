@@ -136,7 +136,7 @@ Adds `error` when `ok` is `false`. The phase names, in order:
 | Phase | What it covers |
 |---|---|
 | `acquire working copy` | Opening the checkout, or cloning |
-| `preflight` | Git history depth, PHP platform requirements and the Drupdater agent |
+| `preflight` | Git history depth, the Drupdater agent and PHP platform requirements |
 | `composer install` | Installing the current dependency tree |
 | `resolve update` | `composer update` into the lock only, and naming the update branch. All three ways of ending as `no_changes` happen here |
 | `baseline site install` | Installing each site at the old code |

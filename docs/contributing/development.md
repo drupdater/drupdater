@@ -437,13 +437,12 @@ why `make fuzz` loops rather than passing `./...`.
 
 ### The targets
 
-Four, on the code that parses input drupdater does not control:
+Three, on the code that parses input drupdater does not control:
 
 | Target | Covers |
 |---|---|
 | `FuzzParseGitURL` | The repository URL, in both the HTTP and the SCP shape, straight from a CI variable |
 | `FuzzLoadFile` | `.drupdater.yaml`, including that a rejected file leaves the `Config` untouched |
-| `FuzzAuditUnmarshalJSON` | `composer audit` output, across the two shapes composer emits |
 | `FuzzRedact` | That a registered secret never survives redaction, on bytes no generator would write |
 
 ### The convention
@@ -475,7 +474,7 @@ Then do the other half. The mutation gate is blocking and generative exploration
 reproducible, so a mutant killed only because a run happened to generate the right input would
 pass on one pull request and fail on the next. **Fix the code, commit the corpus file, and add an
 ordinary test naming the concrete counterexample.** `TestParseGitURL`'s two `.git`-segment cases
-and `TestAuditUnmarshalShapes`'s ordering case are both written that way.
+are written that way.
 
 !!! note "The generated corpus is not committed"
 
@@ -568,7 +567,10 @@ package it mocks. Do not edit those files by hand.
 globally. It adds `composer drupdater:*` commands that answer what Drupdater can only learn
 from inside the project's own Composer: [`drupdater:project`](../reference/docker-images.md#drupdater-agent),
 the project's layout, plugins, patches and lock;
-[`drupdater:resolve`](../reference/docker-images.md#drupdater-agent), the update itself; and
+[`drupdater:resolve`](../reference/docker-images.md#drupdater-agent), the update itself;
+[`drupdater:audit`](../reference/docker-images.md#drupdater-agent) and
+[`drupdater:platform-check`](../reference/docker-images.md#drupdater-agent), the audit and the
+platform requirements; and
 [`drupdater:patch-check`](../reference/addons/composer-patches.md#how-a-patch-is-tested). The
 Go side calls them through `internal/agent`, and `internal/composer` wraps each in a method.
 

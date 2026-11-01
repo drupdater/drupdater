@@ -119,6 +119,20 @@ final class EndToEndTest extends TestCase
         self::assertSame(['failed', 'the project has no composer.lock'], [$reply['error']['kind'], $reply['error']['reason']]);
     }
 
+    public function testAuditOfACleanLockFindsNothing(): void
+    {
+        $reply = $this->ask('drupdater:audit', $this->lockedProject(), self::fixture('audit/request.json'));
+
+        self::assertSame(['advisories' => [], 'abandoned' => []], $reply['result']);
+    }
+
+    public function testPlatformCheckFindsThisPhpMeetsALockWithoutRequirements(): void
+    {
+        $reply = $this->ask('drupdater:platform-check', $this->lockedProject(), self::fixture('platform-check/request.json'));
+
+        self::assertSame(['unmet' => []], $reply['result']);
+    }
+
     public function testAPatchThatFitsApplies(): void
     {
         $project = $this->project();

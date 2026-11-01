@@ -51,33 +51,37 @@ Or, if the depth could not be determined at all: `could not determine clone dept
 
 **Also runs in a real update**, as part of the `preflight` phase.
 
-### `PHP platform requirements satisfied`
-
-Runs Composer's platform requirement check: does the running PHP satisfy what
-`composer.lock` demands?
-
-**Why it matters:** almost always this means the wrong image was chosen — a project
-requiring PHP 8.4 running in `drupdater-php8.3`. The detail is Composer's own output.
-
-Extension requirements are deliberately **not** checked, only the PHP version itself.
-
-**Also runs in a real update**, as part of the `preflight` phase.
-
 ### `drupdater agent installed in Composer`
 
 Runs `composer drupdater:handshake`: is the [Drupdater
 agent](docker-images.md#drupdater-agent) installed, and does it speak the same protocol as
 this binary?
 
-**Why it matters:** [`composer_patches`](addons/composer-patches.md) tests every patch
-through the agent. Without it no patch can be tested, and every patched package would be
-left to update without its patches being checked. Almost always this means Drupdater is
+**Why it matters:** the platform check below, the update itself, the audit and
+[`composer_patches`](addons/composer-patches.md)' patch tests all go through the agent.
+Without it none of them can run, so it is checked before anything that needs it. Almost always this means Drupdater is
 running outside its Docker image, or an image built from a different revision.
 
 **On failure:** `drupdater:handshake did not answer: …` when the command is missing, or
 `drupdater:handshake: protocol_mismatch (…)` when the agent and the binary are from
 different builds, followed by `(run drupdater from its Docker image, which installs the
 agent)`.
+
+**Also runs in a real update**, as part of the `preflight` phase.
+
+### `PHP platform requirements satisfied`
+
+Runs `composer drupdater:platform-check`, the [Drupdater agent](docker-images.md#drupdater-agent)'s
+version of `composer check-platform-reqs --lock`: does the running PHP satisfy what the locked
+packages and the root package demand?
+
+**Why it matters:** almost always this means the wrong image was chosen — a project
+requiring PHP 8.4 running in `drupdater-php8.3`. The detail names each unmet requirement, one
+per line: `php: drupal/core requires >=8.4, found 8.3.12`, or `found nothing` when the platform
+package is missing altogether.
+
+Extension (`ext-*`) requirements are deliberately **not** checked: the operator cannot act on
+which extensions Drupdater's own runtime loaded.
 
 **Also runs in a real update**, as part of the `preflight` phase.
 

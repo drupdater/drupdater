@@ -45,7 +45,7 @@ git URLs (`git@host:owner/repo.git`) as well as HTTP(S). See [VCS provider
 detection](../../explanation/vcs-provider-detection.md).
 
 Once the run proper begins, a `preflight` phase runs three more checks — full git
-history, PHP platform requirements and the Drupdater agent — which are the same checks
+history, the Drupdater agent and PHP platform requirements — which are the same checks
 [`drupdater check`](check.md) performs. See [Preflight checks](../preflight-checks.md).
 
 ## Checkout mode versus clone mode

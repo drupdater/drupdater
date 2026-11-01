@@ -1,7 +1,7 @@
 name: Fuzzing
 
-# Explores the parsers with generated input: repository URLs, .drupdater.yaml, `composer audit`
-# output, and the redactor's promise that a registered secret never reaches a sink.
+# Explores the parsers with generated input: repository URLs, .drupdater.yaml, and the
+# redactor's promise that a registered secret never reaches a sink.
 #
 # Not a pull request gate. The seed corpus and every committed counterexample already run in
 # go.yml's `test` job, which is the deterministic part; a generative run finds new inputs by

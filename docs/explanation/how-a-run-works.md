@@ -52,8 +52,8 @@ as visible in the report as one during the update itself.
 
 ### 2. `preflight`
 
-Runs three checks: full git history, PHP platform requirements, and the Drupdater agent's
-presence in Composer. These are the same functions [`drupdater
+Runs three checks: full git history, the Drupdater agent's presence in Composer, and PHP
+platform requirements, which the agent answers. These are the same functions [`drupdater
 check`](../reference/cli/check.md) uses, so a shallow checkout is caught identically in both.
 
 They run here — before anything expensive — because each failure is certain rather than

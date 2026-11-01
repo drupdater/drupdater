@@ -52,12 +52,6 @@ func (s *CLI) execComposer(ctx context.Context, dir string, args ...string) (str
 	return s.command(dir).Combined(ctx, args...)
 }
 
-// execComposerJSON returns stdout only, so composer's stderr notices cannot corrupt the payload.
-func (s *CLI) execComposerJSON(ctx context.Context, dir string, args ...string) (string, error) {
-	stdout, _, err := s.command(dir).Split(ctx, args...)
-	return stdout, err
-}
-
 // Versions are the tool versions a run's outcome depends on.
 type Versions struct {
 	Composer string

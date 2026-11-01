@@ -323,6 +323,7 @@ func TestRunPlatformReqsFail(t *testing.T) {
 
 	// The platform check fails → updateSharedCode aborts.
 	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
+	mockComposer.EXPECT().CheckAgent(anyCtx, testCheckout).Return(nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("php 8.1.0 failed", errors.New("unmet platform requirements"))
 
 	// installCode (and a site install) may run concurrently before the cancel propagates.
@@ -354,13 +355,13 @@ func TestRunAbortsWithoutTheAgent(t *testing.T) {
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
 	repositoryService.EXPECT().CloneRepository(anyCtx, cfg.RepositoryURL, cfg.Branch, cfg.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
 	repositoryService.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil)
-	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
 	mockComposer.EXPECT().CheckAgent(anyCtx, testCheckout).Return(errors.New("command drupdater:handshake not defined"))
 
 	err := New(zap.NewNop(), cfg, drush, vcsProvider, repositoryService, installer, mockComposer).Run(context.Background(), nil)
 
 	require.EqualError(t, err, "drupdater agent installed in Composer: command drupdater:handshake not defined "+
 		"(run drupdater from its Docker image, which installs the agent)")
+	mockComposer.AssertNotCalled(t, "CheckPlatformReqs", mock.Anything, mock.Anything)
 	mockComposer.AssertNotCalled(t, "Install", mock.Anything, mock.Anything)
 }
 

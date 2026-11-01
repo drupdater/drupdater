@@ -195,7 +195,7 @@ Mocks are generated with mockery v3 (config in `.mockery.yml`). After changing a
 
 ## Fuzzing
 
-Go's built-in fuzzer covers what a hand-written rapid generator cannot reach: arbitrary bytes, invalid UTF-8, degenerate separators. Convention: file `<subject>_fuzz_test.go`, every target named `Fuzz…`, seeded via `f.Add` with the real shapes *and* the degenerate ones. Four targets, on input drupdater does not control — the repository URL, `.drupdater.yaml`, `composer audit` output, and the redactor.
+Go's built-in fuzzer covers what a hand-written rapid generator cannot reach: arbitrary bytes, invalid UTF-8, degenerate separators. Convention: file `<subject>_fuzz_test.go`, every target named `Fuzz…`, seeded via `f.Add` with the real shapes *and* the degenerate ones. Three targets, on input drupdater does not control — the repository URL, `.drupdater.yaml`, and the redactor.
 
 Same discipline as properties: a failing input lands in `testdata/fuzz/<target>/<hash>`, gets committed (`go test` replays it forever after), **and** gets an ordinary test naming the counterexample, because the blocking mutation gate must not depend on a generative run. Fuzzing itself is not a PR gate — `fuzz.yml` runs weekly; `go.yml`'s `test` job runs the seeds and counterexamples on every push. Details: `docs/contributing/development.md`.
 

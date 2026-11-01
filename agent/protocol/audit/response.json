@@ -1,0 +1,40 @@
+{
+  "protocol": 1,
+  "command": "drupdater:audit",
+  "ok": true,
+  "result": {
+    "advisories": [
+      {
+        "package": "fixture/a",
+        "advisory_id": "PKSA-aaaa-bbbb-cccc",
+        "title": "Remote code execution",
+        "cve": "CVE-2025-0001",
+        "link": "https://example.com/advisories/CVE-2025-0001",
+        "severity": "high",
+        "affected_versions": "<1.1.0",
+        "reported_at": "2025-01-29T06:52:00+00:00",
+        "sources": [
+          {"name": "GitHub", "remote_id": "GHSA-aaaa-bbbb-cccc"},
+          {"name": "FriendsOfPHP/security-advisories", "remote_id": "fixture/a/CVE-2025-0001.yaml"}
+        ]
+      },
+      {
+        "package": "fixture/a",
+        "advisory_id": "PKSA-dddd-eeee-ffff",
+        "title": "Cross-site scripting",
+        "cve": null,
+        "link": null,
+        "severity": null,
+        "affected_versions": ">=1.0.0,<1.0.5",
+        "reported_at": "2025-02-01T00:00:00+00:00",
+        "sources": [
+          {"name": "GitHub", "remote_id": "GHSA-dddd-eeee-ffff"}
+        ]
+      }
+    ],
+    "abandoned": [
+      {"package": "fixture/gone", "replacement": null},
+      {"package": "fixture/old", "replacement": "fixture/new"}
+    ]
+  }
+}
