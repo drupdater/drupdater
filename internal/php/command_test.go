@@ -60,12 +60,12 @@ func TestCommandBuild(t *testing.T) {
 
 	t.Run("feeds Stdin to the process", func(t *testing.T) {
 		var seen []string
-		c := Command{New: shellCommand("cat", &seen), Logger: zap.NewNop(), Stdin: strings.NewReader(`{"protocol":1}`)}
+		c := Command{New: shellCommand("cat", &seen), Logger: zap.NewNop(), Stdin: strings.NewReader(`{"protocol":2}`)}
 
 		out, err := c.Combined(t.Context(), "drupdater:handshake")
 		require.NoError(t, err)
 
-		assert.Equal(t, `{"protocol":1}`, out)
+		assert.Equal(t, `{"protocol":2}`, out)
 	})
 
 	t.Run("ExtraEnv beats the environment composer would otherwise be given", func(t *testing.T) {

@@ -197,7 +197,7 @@ final class ComposerJsonWritesTest extends TestCase
         $project = $this->fixtureProject();
         $before = file_get_contents($project . '/composer.json');
 
-        [$status, $reply] = $this->ask(new AllowPluginsCommand(), $project, ['protocol' => 1, 'request' => $request]);
+        [$status, $reply] = $this->ask(new AllowPluginsCommand(), $project, ['protocol' => 2, 'request' => $request]);
 
         self::assertSame(1, $status);
         self::assertSame(['kind' => 'invalid_request', 'reason' => $reason, 'message' => ''], $reply['error']);
@@ -235,7 +235,7 @@ final class ComposerJsonWritesTest extends TestCase
     public function testWritePatchesKeepsANumericDescriptionAKeyOfAnObject(): void
     {
         $project = $this->fixtureProject();
-        $body = '{"protocol":1,"request":{"patches":{"drupal/token":{"0":"patches/zero.patch"}}}}';
+        $body = '{"protocol":2,"request":{"patches":{"drupal/token":{"0":"patches/zero.patch"}}}}';
 
         $tester = $this->tester(new WritePatchesCommand(), $project);
         $tester->setInputs([$body]);
@@ -290,9 +290,9 @@ final class ComposerJsonWritesTest extends TestCase
      */
     public static function patchesThatAreNotObjects(): iterable
     {
-        yield 'missing' => ['{"protocol":1,"request":{}}'];
-        yield 'a list' => ['{"protocol":1,"request":{"patches":["a.patch"]}}'];
-        yield 'a string' => ['{"protocol":1,"request":{"patches":"a.patch"}}'];
+        yield 'missing' => ['{"protocol":2,"request":{}}'];
+        yield 'a list' => ['{"protocol":2,"request":{"patches":["a.patch"]}}'];
+        yield 'a string' => ['{"protocol":2,"request":{"patches":"a.patch"}}'];
     }
 
     #[DataProvider('patchesThatAreNotObjects')]
@@ -311,7 +311,7 @@ final class ComposerJsonWritesTest extends TestCase
      */
     private function close(mixed $original, bool $opened): array
     {
-        return ['protocol' => 1, 'request' => ['step' => 'close', 'original' => $original, 'opened' => $opened]];
+        return ['protocol' => 2, 'request' => ['step' => 'close', 'original' => $original, 'opened' => $opened]];
     }
 
     /**

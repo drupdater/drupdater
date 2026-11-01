@@ -26,7 +26,7 @@ func TestWritePatchesSendsThePatchesAsGiven(t *testing.T) {
 }
 
 func TestWritePatchesReportsTheAgentsFailure(t *testing.T) {
-	service, _ := fakeAgentCLI(t, `{"protocol":1,"command":"drupdater:write-patches","ok":false,`+
+	service, _ := fakeAgentCLI(t, `{"protocol":2,"command":"drupdater:write-patches","ok":false,`+
 		`"error":{"kind":"failed","reason":"the project has no composer.lock","message":""}}`, 1)
 
 	err := service.WritePatches(t.Context(), t.TempDir(), json.RawMessage(`{}`))

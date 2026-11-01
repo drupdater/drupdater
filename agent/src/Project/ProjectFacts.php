@@ -8,7 +8,6 @@ use Composer\Composer;
 use Composer\Package\AliasPackage;
 use Composer\Package\PackageInterface;
 use Drupdater\Agent\Failure;
-use Drupdater\Agent\Plugins\AllowPlugins;
 
 /**
  * What drupdater reads about a project: composer.json as written, and the lock as Composer
@@ -39,10 +38,7 @@ final class ProjectFacts
             'packages' => new \stdClass(),
             'dependency_patches' => new \stdClass(),
         ];
-        // As written, keys and nesting intact: drupdater restores and rewrites them.
-        if (isset($manifest->config->{'allow-plugins'})) {
-            $facts['allow_plugins'] = $manifest->config->{'allow-plugins'};
-        }
+        // As written, keys and nesting intact: drupdater rewrites them.
         if (isset($manifest->extra->patches)) {
             $facts['patches'] = $manifest->extra->patches;
         }
@@ -59,10 +55,7 @@ final class ProjectFacts
             if ($package instanceof AliasPackage) {
                 continue;
             }
-            $packages[$package->getName()] = [
-                'version' => $package->getPrettyVersion(),
-                'plugin' => in_array($package->getType(), AllowPlugins::PLUGIN_TYPES, true),
-            ];
+            $packages[$package->getName()] = ['version' => $package->getPrettyVersion()];
             foreach (self::declaredPatches($package) as $target => $files) {
                 $dependencyPatches[$target] = [...($dependencyPatches[$target] ?? []), ...$files];
             }

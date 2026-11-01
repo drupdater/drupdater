@@ -109,7 +109,7 @@ credentials, its configuration — without installing anything into it.
 | `drupdater:handshake` | The [`drupdater agent installed in Composer`](preflight-checks.md#drupdater-agent-installed-in-composer) preflight check |
 | `drupdater:patch-check` | [`composer_patches`](addons/composer-patches.md#how-a-patch-is-tested), to test whether patches still apply |
 | `drupdater:platform-check` | The [`PHP platform requirements satisfied`](preflight-checks.md#php-platform-requirements-satisfied) preflight check |
-| `drupdater:project` | Everything that reads the project's layout, plugins, patches or lock — see below |
+| `drupdater:project` | Everything that reads the project's layout, patches or lock — see below |
 | `drupdater:resolve` | The run's [`resolve update`](../explanation/how-a-run-works.md) phase, and [`composer_patches`](addons/composer-patches.md)' dry run of the update it checks patches against |
 | `drupdater:write-patches` | [`composer_patches`](addons/composer-patches.md), to write the patches it rewrote |
 
@@ -153,11 +153,9 @@ on it. The project's `config.platform` is ignored, so the answer is about the re
 - **The custom code directories** — whichever of `modules/custom`, `themes/custom` and
   `profiles/custom` exist under the web root. [`code_beautifier`](addons/code-beautifier.md)
   and [`deprecations_remover`](addons/deprecations-remover.md) work on these.
-- **`allow-plugins` and `extra.patches` exactly as written** in `composer.json`, so the
-  addons that rewrite them can restore them faithfully.
-- **The locked packages**, dev ones included, with their versions, and which of them are
-  plugins: packages of type `composer-plugin` or `composer-installer`, the ones Composer
-  checks against `allow-plugins`.
+- **`extra.patches` exactly as written** in `composer.json`, key order and empty objects
+  intact, so [`composer_patches`](addons/composer-patches.md) can rewrite it faithfully.
+- **The locked packages**, dev ones included, with their versions.
 - **The patches locked dependencies declare** for other packages, which `composer-patches`
   applies on top of the project's own.
 - **The lock's `content-hash`**, which names the [update branch](cli/drupdater.md).

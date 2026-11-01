@@ -579,7 +579,7 @@ Go side calls them through `internal/agent`, and `internal/composer` wraps each 
 Each command reads one JSON request on stdin and prints one JSON envelope on stdout:
 
 ```json
-{"protocol": 1, "command": "drupdater:patch-check", "ok": true, "result": {"outcome": "applies"}}
+{"protocol": 2, "command": "drupdater:patch-check", "ok": true, "result": {"outcome": "applies"}}
 ```
 
 A failure carries an `error` with a closed `kind` — `unobtainable`, `invalid_request`,

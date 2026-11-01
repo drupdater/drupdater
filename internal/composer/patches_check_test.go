@@ -85,7 +85,7 @@ func TestCheckIfPatchesApplySplitsADevVersionsCommit(t *testing.T) {
 
 	require.NoError(t, err)
 	request, _ := sent()
-	assert.JSONEq(t, `{"protocol":1,"request":{"package":"drupal/foo","version":"1.x-dev","reference":"0424dff","patches":["/p.patch"]}}`, request)
+	assert.JSONEq(t, `{"protocol":2,"request":{"package":"drupal/foo","version":"1.x-dev","reference":"0424dff","patches":["/p.patch"]}}`, request)
 }
 
 func TestCheckIfPatchAppliesChecksOnePatch(t *testing.T) {
@@ -96,7 +96,7 @@ func TestCheckIfPatchAppliesChecksOnePatch(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, ok, "a rejection is the patch not applying, not a failure to check")
 	request, _ := sent()
-	assert.JSONEq(t, `{"protocol":1,"request":{"package":"drupal/token","version":"1.15.0","reference":"","patches":["/project/a.patch"]}}`, request)
+	assert.JSONEq(t, `{"protocol":2,"request":{"package":"drupal/token","version":"1.15.0","reference":"","patches":["/project/a.patch"]}}`, request)
 }
 
 func TestCheckIfPatchesApplyReportsAnUnobtainablePackageAsAnError(t *testing.T) {
@@ -113,7 +113,7 @@ func TestCheckIfPatchesApplyReportsAnUnobtainablePackageAsAnError(t *testing.T) 
 }
 
 func TestCheckIfPatchesApplyRefusesAnUnknownOutcome(t *testing.T) {
-	service, _ := fakeAgentCLI(t, `{"protocol":1,"command":"drupdater:patch-check","ok":true,"result":{"outcome":"maybe"}}`, 0)
+	service, _ := fakeAgentCLI(t, `{"protocol":2,"command":"drupdater:patch-check","ok":true,"result":{"outcome":"maybe"}}`, 0)
 
 	ok, err := service.CheckIfPatchesApply(t.Context(), t.TempDir(), "drupal/token", "1.15.0", []string{"/p.patch"})
 

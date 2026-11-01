@@ -163,7 +163,7 @@ final class LockQuestionsTest extends TestCase
         $project = $this->project();
         unlink($project . '/composer.lock');
 
-        [$status, $reply] = $this->ask($command, $project, ['protocol' => 1, 'request' => []]);
+        [$status, $reply] = $this->ask($command, $project, ['protocol' => 2, 'request' => []]);
 
         self::assertSame(1, $status);
         self::assertSame(['kind' => 'failed', 'reason' => 'the project has no composer.lock', 'message' => ''], $reply['error']);

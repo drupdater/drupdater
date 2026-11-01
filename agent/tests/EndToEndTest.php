@@ -40,7 +40,7 @@ final class EndToEndTest extends TestCase
 
     public function testHandshake(): void
     {
-        $reply = $this->ask('drupdater:handshake', $this->project(), ['protocol' => 1, 'request' => []]);
+        $reply = $this->ask('drupdater:handshake', $this->project(), ['protocol' => 2, 'request' => []]);
 
         self::assertEquals(self::fixture('handshake/response.json'), $reply);
     }
@@ -70,7 +70,7 @@ final class EndToEndTest extends TestCase
     {
         $project = $this->lockedProject();
 
-        $reply = $this->ask('drupdater:resolve', $project, ['protocol' => 1, 'request' => ['packages' => [], 'keep' => [], 'minimal_changes' => false, 'write' => true]]);
+        $reply = $this->ask('drupdater:resolve', $project, ['protocol' => 2, 'request' => ['packages' => [], 'keep' => [], 'minimal_changes' => false, 'write' => true]]);
 
         self::assertCount(2, $reply['result']['changes']);
         $lock = json_decode((string) file_get_contents($project . '/composer.lock'), true);
@@ -83,10 +83,10 @@ final class EndToEndTest extends TestCase
     {
         $project = $this->lockedProject();
 
-        $pinned = $this->ask('drupdater:resolve', $project, ['protocol' => 1, 'request' => [
+        $pinned = $this->ask('drupdater:resolve', $project, ['protocol' => 2, 'request' => [
             'packages' => [], 'keep' => [['package' => 'fixture/a', 'version' => '1.0.0']], 'minimal_changes' => false, 'write' => false,
         ]]);
-        $only = $this->ask('drupdater:resolve', $project, ['protocol' => 1, 'request' => [
+        $only = $this->ask('drupdater:resolve', $project, ['protocol' => 2, 'request' => [
             'packages' => ['fixture/a'], 'keep' => [], 'minimal_changes' => false, 'write' => false,
         ]]);
 
@@ -99,7 +99,7 @@ final class EndToEndTest extends TestCase
         $project = $this->lockedProject();
         $lock = file_get_contents($project . '/composer.lock');
 
-        [$reply, $stderr] = $this->askWithErrors('drupdater:resolve', $project, ['protocol' => 1, 'request' => [
+        [$reply, $stderr] = $this->askWithErrors('drupdater:resolve', $project, ['protocol' => 2, 'request' => [
             'packages' => [], 'keep' => [['package' => 'fixture/a', 'version' => '9.9.9']], 'minimal_changes' => false, 'write' => false,
         ]]);
 
@@ -157,7 +157,7 @@ final class EndToEndTest extends TestCase
 
         $opened = $this->ask('drupdater:allow-plugins', $project, self::fixture('allow-plugins/open-request.json'));
         self::assertSame(['original' => null, 'opened' => true], $opened['result']);
-        $closed = $this->ask('drupdater:allow-plugins', $project, ['protocol' => 1, 'request' => ['step' => 'close'] + $opened['result']]);
+        $closed = $this->ask('drupdater:allow-plugins', $project, ['protocol' => 2, 'request' => ['step' => 'close'] + $opened['result']]);
 
         self::assertSame(['denied' => []], $closed['result']);
         self::assertSame($manifest, file_get_contents($project . '/composer.json'));
@@ -258,7 +258,7 @@ final class EndToEndTest extends TestCase
      */
     private function request(array $patches): array
     {
-        return ['protocol' => 1, 'request' => ['package' => 'fixture/greeting', 'version' => '1.0.0', 'reference' => '', 'patches' => $patches]];
+        return ['protocol' => 2, 'request' => ['package' => 'fixture/greeting', 'version' => '1.0.0', 'reference' => '', 'patches' => $patches]];
     }
 
     private function project(): string

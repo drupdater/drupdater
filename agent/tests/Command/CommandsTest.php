@@ -57,7 +57,7 @@ final class CommandsTest extends TestCase
     public function testAMismatchedProtocolIsRefused(): void
     {
         $request = self::fixture('handshake/request.json');
-        $request['protocol'] = 2;
+        $request['protocol'] = 3;
 
         [$status, $reply] = $this->ask(new HandshakeCommand(), $request);
 
@@ -153,7 +153,7 @@ final class CommandsTest extends TestCase
         $fetcher = $this->createMock(PackageFetcher::class);
         $fetcher->expects(self::never())->method('fetch');
 
-        [$status, $reply] = $this->ask($this->patchCheck($fetcher), ['protocol' => 1, 'request' => $request]);
+        [$status, $reply] = $this->ask($this->patchCheck($fetcher), ['protocol' => 2, 'request' => $request]);
 
         self::assertSame(1, $status);
         self::assertSame(['kind' => 'invalid_request', 'reason' => $reason, 'message' => ''], $reply['error']);
@@ -165,7 +165,7 @@ final class CommandsTest extends TestCase
     public static function unreadableBodies(): iterable
     {
         yield 'not JSON' => ['{', 'the request is not JSON'];
-        yield 'no request object' => ['{"protocol":1}', 'the request has no request object'];
+        yield 'no request object' => ['{"protocol":2}', 'the request has no request object'];
         yield 'not an object' => ['"x"', 'the request has no request object'];
     }
 

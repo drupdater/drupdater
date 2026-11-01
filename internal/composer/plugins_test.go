@@ -36,17 +36,17 @@ func TestCloseAllowPluginsSendsWhatOpeningReturnedAndDecodesTheDenials(t *testin
 }
 
 func TestCloseAllowPluginsSendsNullForASettingNeverRecorded(t *testing.T) {
-	service, sent := fakeAgentCLI(t, `{"protocol":1,"command":"drupdater:allow-plugins","ok":true,"result":{"denied":[]}}`, 0)
+	service, sent := fakeAgentCLI(t, `{"protocol":2,"command":"drupdater:allow-plugins","ok":true,"result":{"denied":[]}}`, 0)
 
 	_, err := service.CloseAllowPlugins(t.Context(), t.TempDir(), PluginsOpened{})
 
 	require.NoError(t, err)
 	request, _ := sent()
-	assert.JSONEq(t, `{"protocol":1,"request":{"step":"close","original":null,"opened":false}}`, request)
+	assert.JSONEq(t, `{"protocol":2,"request":{"step":"close","original":null,"opened":false}}`, request)
 }
 
 func TestAllowPluginsReportsTheAgentsFailure(t *testing.T) {
-	reply := `{"protocol":1,"command":"drupdater:allow-plugins","ok":false,` +
+	reply := `{"protocol":2,"command":"drupdater:allow-plugins","ok":false,` +
 		`"error":{"kind":"internal","reason":"the agent failed","message":"composer.json is not writable"}}`
 
 	service, _ := fakeAgentCLI(t, reply, 1)

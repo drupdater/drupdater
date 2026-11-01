@@ -1,5 +1,5 @@
 {
-  "protocol": 1,
+  "protocol": 2,
   "command": "drupdater:project",
   "ok": true,
   "result": {
@@ -7,22 +7,18 @@
     "custom_code_directories": ["web/modules/custom", "web/themes/custom"],
     "lock_hash": "4b2f0e1c9a7d3e5f6a8b0c1d2e3f4a5b",
     "packages": {
-      "cweagans/composer-patches": {"version": "1.7.3", "plugin": true},
-      "dealerdirect/phpcodesniffer-composer-installer": {"version": "v1.0.0", "plugin": true},
-      "drupal/core": {"version": "10.3.1", "plugin": false},
-      "drupal/devel": {"version": "dev-5.x", "plugin": false},
-      "drupal/recipe_kit": {"version": "1.0.0", "plugin": false},
-      "drupal/token": {"version": "1.15.0", "plugin": false}
+      "cweagans/composer-patches": {"version": "1.7.3"},
+      "dealerdirect/phpcodesniffer-composer-installer": {"version": "v1.0.0"},
+      "drupal/core": {"version": "10.3.1"},
+      "drupal/devel": {"version": "dev-5.x"},
+      "drupal/recipe_kit": {"version": "1.0.0"},
+      "drupal/token": {"version": "1.15.0"}
     },
     "dependency_patches": {
       "drupal/core": [
         "https://www.drupal.org/files/issues/3100000-1.patch",
         "https://www.drupal.org/files/issues/3100001-2.patch"
       ]
-    },
-    "allow_plugins": {
-      "cweagans/composer-patches": true,
-      "drupal/*": false
     },
     "patches": {
       "drupal/token": {
