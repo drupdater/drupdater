@@ -5,6 +5,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/drupdater/drupdater/internal/composer"
+
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -87,44 +89,42 @@ func TestCheckSiteSettings(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("settings.php present passes", func(t *testing.T) {
-		composer := NewMockComposer(t)
-		composer.EXPECT().GetConfig(ctx, "/project", "extra.drupal-scaffold.locations.web-root").Return("web", nil)
+		projects := NewMockComposer(t)
+		projects.EXPECT().Project(ctx, "/project").Return(composer.Project{WebRoot: "web"}, nil)
 
 		fs := afero.NewMemMapFs()
 		require.NoError(t, afero.WriteFile(fs, "/project/web/sites/default/settings.php", []byte("<?php"), 0o644))
 
-		result := CheckSiteSettings(ctx, composer, fs, "/project", "default")
-		assert.True(t, result.OK)
-	})
-
-	t.Run("a trailing slash on the web root is tolerated", func(t *testing.T) {
-		composer := NewMockComposer(t)
-		composer.EXPECT().GetConfig(ctx, "/project", "extra.drupal-scaffold.locations.web-root").Return("web/", nil)
-
-		fs := afero.NewMemMapFs()
-		require.NoError(t, afero.WriteFile(fs, "/project/web/sites/default/settings.php", []byte("<?php"), 0o644))
-
-		result := CheckSiteSettings(ctx, composer, fs, "/project", "default")
+		result := CheckSiteSettings(ctx, projects, fs, "/project", "default")
 		assert.True(t, result.OK)
 	})
 
 	t.Run("a missing settings.php fails with its expected path", func(t *testing.T) {
-		composer := NewMockComposer(t)
-		composer.EXPECT().GetConfig(ctx, "/project", "extra.drupal-scaffold.locations.web-root").Return("web", nil)
+		projects := NewMockComposer(t)
+		projects.EXPECT().Project(ctx, "/project").Return(composer.Project{WebRoot: "web"}, nil)
 
 		fs := afero.NewMemMapFs()
 
-		result := CheckSiteSettings(ctx, composer, fs, "/project", "subsite_a")
+		result := CheckSiteSettings(ctx, projects, fs, "/project", "subsite_a")
 		assert.False(t, result.OK)
 		assert.Contains(t, result.Detail, "web/sites/subsite_a/settings.php")
 	})
 
 	t.Run("a composer error surfaces in the detail", func(t *testing.T) {
-		composer := NewMockComposer(t)
-		composer.EXPECT().GetConfig(ctx, "/project", "extra.drupal-scaffold.locations.web-root").Return("", errors.New("composer.json not found"))
+		projects := NewMockComposer(t)
+		projects.EXPECT().Project(ctx, "/project").Return(composer.Project{}, errors.New("composer.json not found"))
 
-		result := CheckSiteSettings(ctx, composer, afero.NewMemMapFs(), "/project", "default")
+		result := CheckSiteSettings(ctx, projects, afero.NewMemMapFs(), "/project", "default")
 		assert.False(t, result.OK)
 		assert.Contains(t, result.Detail, "composer.json not found")
+	})
+
+	t.Run("a project without a web root fails", func(t *testing.T) {
+		projects := NewMockComposer(t)
+		projects.EXPECT().Project(ctx, "/project").Return(composer.Project{}, nil)
+
+		result := CheckSiteSettings(ctx, projects, afero.NewMemMapFs(), "/project", "default")
+		assert.False(t, result.OK)
+		assert.Equal(t, "could not determine web root: extra.drupal-scaffold.locations.web-root is not defined", result.Detail)
 	})
 }

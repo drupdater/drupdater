@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/drupdater/drupdater/internal/php"
 	"slices"
 	"strings"
+
+	"github.com/drupdater/drupdater/internal/php"
 )
 
 // DiffEntry is one package that differs between the committed composer.lock and the working one.

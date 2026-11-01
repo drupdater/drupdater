@@ -17,7 +17,7 @@ func TestDefaultComposerNormalize_PostComposerUpdateHandler_PackageInstalled(t *
 	testPath := "/test/path"
 	committer := &fakeCommitter{}
 
-	composer.EXPECT().IsPackageInstalled(ctx, testPath, "ergebnis/composer-normalize").Return(true, nil)
+	composer.EXPECT().Project(ctx, testPath).Return(lockedProject("ergebnis/composer-normalize"), nil)
 	composer.EXPECT().Normalize(ctx, testPath).Return("normalized", nil)
 
 	normalize := NewComposerNormalizer(logger, composer)
@@ -38,7 +38,7 @@ func TestDefaultComposerNormalize_PostComposerUpdateHandler_PackageNotInstalled(
 	committer := &fakeCommitter{}
 
 	// Configure mock expectations - package not installed
-	composer.EXPECT().IsPackageInstalled(ctx, testPath, "ergebnis/composer-normalize").Return(false, nil)
+	composer.EXPECT().Project(ctx, testPath).Return(lockedProject(), nil)
 
 	normalize := NewComposerNormalizer(logger, composer)
 

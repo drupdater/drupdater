@@ -64,12 +64,9 @@ func TestUpdatePatches(t *testing.T) {
 	t.Run("Local patch still applies", func(t *testing.T) {
 
 		composerService := NewMockPatchesComposer(t)
-		composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
 		drupalOrgService := NewMockDrupalOrg(t)
 
 		var removed []string
-
-		composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/core").Return(true, nil)
 
 		drupalOrgService.EXPECT().FindIssueNumber("local patch without issue number").Return("", false)
 		drupalOrgService.EXPECT().FindIssueNumber("patches/core/0001-local-patch.patch").Return("", false)
@@ -95,7 +92,7 @@ func TestUpdatePatches(t *testing.T) {
 		}
 
 		updater.removeFile = recordRemovals(&removed)
-		report, newPatches := updater.updatePatches(t.Context(), "/tmp", operations, patches)
+		report, newPatches := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), operations, patches)
 		assert.Empty(t, removed)
 		assert.Equal(t, patches, newPatches)
 		assert.False(t, report.Changes())
@@ -110,53 +107,26 @@ func TestUpdatePatches(t *testing.T) {
 		composerService := NewMockPatchesComposer(t)
 		drupalOrgService := NewMockDrupalOrg(t)
 		var removed []string
-
-		composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/core").Return(true, nil)
-		composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(map[string]map[string]bool{
-			"drupal/core": {"patches/local.patch": true},
-		}, nil)
 		drupalOrgService.EXPECT().FindIssueNumber(mock.Anything).Return("", false)
 		composerService.EXPECT().CheckIfPatchApplies(anyCtx, mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/local.patch").Return(true, nil)
 
 		updater := &ComposerPatches1{logger: logger, composer: composerService, drupalOrg: drupalOrgService}
 		operations := []composer.PackageChange{{Action: "Upgrade", Package: "drupal/core", To: "8.8.0"}}
 		patches := map[string]map[string]string{"drupal/core": {"local": "patches/local.patch"}}
+		project := installedProject(patches)
+		project.DependencyPatches = map[string][]string{"drupal/core": {"patches/local.patch"}}
 
 		updater.removeFile = recordRemovals(&removed)
-		report, newPatches := updater.updatePatches(t.Context(), "/tmp", operations, patches)
+		report, newPatches := updater.updatePatches(t.Context(), "/tmp", project, operations, patches)
 		assert.Empty(t, removed)
 		assert.Equal(t, "patches/local.patch", newPatches["drupal/core"]["local"])
 		assert.Empty(t, report.Removed)
-	})
-
-	t.Run("GetDependencyPatches error is non-fatal", func(t *testing.T) {
-		composerService := NewMockPatchesComposer(t)
-		drupalOrgService := NewMockDrupalOrg(t)
-		var removed []string
-
-		composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/core").Return(true, nil)
-		composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, assert.AnError)
-		drupalOrgService.EXPECT().FindIssueNumber(mock.Anything).Return("", false)
-		composerService.EXPECT().CheckIfPatchApplies(anyCtx, mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/local.patch").Return(true, nil)
-
-		updater := &ComposerPatches1{logger: logger, composer: composerService, drupalOrg: drupalOrgService}
-		operations := []composer.PackageChange{{Action: "Upgrade", Package: "drupal/core", To: "8.8.0"}}
-		patches := map[string]map[string]string{"drupal/core": {"local": "patches/local.patch"}}
-
-		updater.removeFile = recordRemovals(&removed)
-		report, newPatches := updater.updatePatches(t.Context(), "/tmp", operations, patches)
-		assert.Empty(t, removed)
-		assert.Equal(t, "patches/local.patch", newPatches["drupal/core"]["local"])
-		assert.False(t, report.Changes())
 	})
 
 	t.Run("Multiple patches apply together", func(t *testing.T) {
 		composerService := NewMockPatchesComposer(t)
 		drupalOrgService := NewMockDrupalOrg(t)
 		var removed []string
-
-		composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/core").Return(true, nil)
-		composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil)
 		drupalOrgService.EXPECT().FindIssueNumber(mock.Anything).Return("", false)
 		composerService.EXPECT().CheckIfPatchApplies(anyCtx, mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/a.patch").Return(true, nil)
 		composerService.EXPECT().CheckIfPatchApplies(anyCtx, mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/b.patch").Return(true, nil)
@@ -167,7 +137,7 @@ func TestUpdatePatches(t *testing.T) {
 		patches := map[string]map[string]string{"drupal/core": {"a": "patches/a.patch", "b": "patches/b.patch"}}
 
 		updater.removeFile = recordRemovals(&removed)
-		report, _ := updater.updatePatches(t.Context(), "/tmp", operations, patches)
+		report, _ := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), operations, patches)
 		assert.Empty(t, removed)
 		assert.False(t, report.Changes())
 	})
@@ -176,9 +146,6 @@ func TestUpdatePatches(t *testing.T) {
 		composerService := NewMockPatchesComposer(t)
 		drupalOrgService := NewMockDrupalOrg(t)
 		var removed []string
-
-		composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/core").Return(true, nil)
-		composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil)
 		drupalOrgService.EXPECT().FindIssueNumber(mock.Anything).Return("", false)
 		composerService.EXPECT().CheckIfPatchApplies(anyCtx, mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/a.patch").Return(true, nil)
 		composerService.EXPECT().CheckIfPatchApplies(anyCtx, mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/b.patch").Return(true, nil)
@@ -189,7 +156,7 @@ func TestUpdatePatches(t *testing.T) {
 		patches := map[string]map[string]string{"drupal/core": {"a": "patches/a.patch", "b": "patches/b.patch"}}
 
 		updater.removeFile = recordRemovals(&removed)
-		report, _ := updater.updatePatches(t.Context(), "/tmp", operations, patches)
+		report, _ := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), operations, patches)
 		assert.Empty(t, removed)
 		assert.Empty(t, report.Conflicts)
 	})
@@ -200,11 +167,6 @@ func TestUpdatePatches(t *testing.T) {
 		var removed []string
 
 		const depPatch = "https://www.drupal.org/files/issues/2024-07-16/2869592-disabled-update-module-71.patch"
-
-		composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/core").Return(true, nil)
-		composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(map[string]map[string]bool{
-			"drupal/core": {depPatch: true},
-		}, nil)
 
 		updater := &ComposerPatches1{
 			logger:    logger,
@@ -220,9 +182,11 @@ func TestUpdatePatches(t *testing.T) {
 				"Issue #2869592: [Disabled update module](https://www.drupal.org/node/2869592)": depPatch,
 			},
 		}
+		project := installedProject(patches)
+		project.DependencyPatches = map[string][]string{"drupal/core": {depPatch}}
 
 		updater.removeFile = recordRemovals(&removed)
-		report, newPatches := updater.updatePatches(t.Context(), "/tmp", operations, patches)
+		report, newPatches := updater.updatePatches(t.Context(), "/tmp", project, operations, patches)
 		assert.Empty(t, removed)
 		assert.Empty(t, newPatches["drupal/core"], "patch provided by a dependency should be removed from root")
 		// The whole record, not just the path: every field ends up in the merge request.
@@ -242,7 +206,6 @@ func TestUpdatePatches(t *testing.T) {
 	t.Run("Local patch not applies", func(t *testing.T) {
 
 		composerService := NewMockPatchesComposer(t)
-		composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
 		drupalOrgService := NewMockDrupalOrg(t)
 
 		var removed []string
@@ -251,7 +214,6 @@ func TestUpdatePatches(t *testing.T) {
 		drupalOrgService.EXPECT().FindIssueNumber("patches/core/0001-local-patch.patch").Return("", false)
 
 		composerService.EXPECT().CheckIfPatchApplies(anyCtx, mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/core/0001-local-patch.patch").Return(false, nil)
-		composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/core").Return(true, nil)
 		updater := &ComposerPatches1{
 			logger:    logger,
 			composer:  composerService,
@@ -273,7 +235,7 @@ func TestUpdatePatches(t *testing.T) {
 		}
 
 		updater.removeFile = recordRemovals(&removed)
-		report, newPatches := updater.updatePatches(t.Context(), "/tmp", operations, patches)
+		report, newPatches := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), operations, patches)
 		assert.Empty(t, removed)
 		assert.Equal(t, map[string]map[string]string{
 			"drupal/core": {
@@ -300,12 +262,9 @@ func TestUpdatePatches(t *testing.T) {
 	t.Run("Remote patch still applies", func(t *testing.T) {
 
 		composerService := NewMockPatchesComposer(t)
-		composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
 		drupalOrgService := NewMockDrupalOrg(t)
 
 		var removed []string
-
-		composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/core").Return(true, nil)
 
 		drupalOrgService.EXPECT().FindIssueNumber("Issue #123456 \"With problems\"").Return("123456", true)
 		drupalOrgService.EXPECT().GetIssue(anyCtx, "123456").Return(&drupalorg.Issue{
@@ -338,7 +297,7 @@ func TestUpdatePatches(t *testing.T) {
 		}
 
 		updater.removeFile = recordRemovals(&removed)
-		report, newPatches := updater.updatePatches(t.Context(), "/tmp", operations, patches)
+		report, newPatches := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), operations, patches)
 		assert.Empty(t, removed)
 		assert.Equal(t, map[string]map[string]string{
 			"drupal/core": {
@@ -354,10 +313,7 @@ func TestUpdatePatches(t *testing.T) {
 	t.Run("Current patch fails, remote patch still applies", func(t *testing.T) {
 
 		composerService := NewMockPatchesComposer(t)
-		composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
 		drupalOrgService := NewMockDrupalOrg(t)
-
-		composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/core").Return(true, nil)
 
 		var removed []string
 
@@ -411,7 +367,7 @@ func TestUpdatePatches(t *testing.T) {
 		}
 
 		updater.removeFile = recordRemovals(&removed)
-		report, newPatches := updater.updatePatches(t.Context(), "/tmp", operations, patches)
+		report, newPatches := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), operations, patches)
 		assert.Equal(t, []string{"/tmp/patches/remote/0001-remote.patch"}, removed)
 		assert.Equal(t, map[string]map[string]string{
 			"drupal/core": {
@@ -427,12 +383,9 @@ func TestUpdatePatches(t *testing.T) {
 	t.Run("Current patch fails, remote patch also fails", func(t *testing.T) {
 
 		composerService := NewMockPatchesComposer(t)
-		composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
 		drupalOrgService := NewMockDrupalOrg(t)
 
 		var removed []string
-
-		composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/core").Return(true, nil)
 
 		drupalOrgService.EXPECT().FindIssueNumber("Issue #123456 \"With problems\"").Return("123456", true)
 		drupalOrgService.EXPECT().GetIssue(anyCtx, "123456").Return(&drupalorg.Issue{
@@ -484,7 +437,7 @@ func TestUpdatePatches(t *testing.T) {
 		}
 
 		updater.removeFile = recordRemovals(&removed)
-		report, newPatches := updater.updatePatches(t.Context(), "/tmp", operations, patches)
+		report, newPatches := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), operations, patches)
 		assert.Empty(t, removed)
 		assert.Equal(t, map[string]map[string]string{
 			"drupal/core": {
@@ -511,11 +464,8 @@ func TestUpdatePatches(t *testing.T) {
 	t.Run("Current patch fails and no drupalcode client records a conflict", func(t *testing.T) {
 		// Without DRUPALCODE_ACCESS_TOKEN the fork lookup is skipped, and the package held back.
 		composerService := NewMockPatchesComposer(t)
-		composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
 		drupalOrgService := NewMockDrupalOrg(t)
 		var removed []string
-
-		composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/core").Return(true, nil)
 
 		drupalOrgService.EXPECT().FindIssueNumber("Issue #123456 \"With problems\"").Return("123456", true)
 		drupalOrgService.EXPECT().GetIssue(anyCtx, "123456").Return(&drupalorg.Issue{
@@ -545,7 +495,7 @@ func TestUpdatePatches(t *testing.T) {
 		}
 
 		updater.removeFile = recordRemovals(&removed)
-		report, _ := updater.updatePatches(t.Context(), "/tmp", operations, patches)
+		report, _ := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), operations, patches)
 		assert.Empty(t, removed)
 		require.Len(t, report.Conflicts, 1)
 		assert.Equal(t, "drupal/core", report.Conflicts[0].Package)
@@ -558,8 +508,6 @@ func TestUpdatePatches(t *testing.T) {
 
 	t.Run("a failed fork lookup is logged and changes nothing", func(t *testing.T) {
 		composerService := NewMockPatchesComposer(t)
-		composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
-		composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/core").Return(true, nil)
 		composerService.EXPECT().CheckIfPatchApplies(anyCtx, mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/remote/0001-remote.patch").Return(false, nil)
 
 		drupalOrgService := NewMockDrupalOrg(t)
@@ -587,7 +535,7 @@ func TestUpdatePatches(t *testing.T) {
 			"drupal/core": {"Issue #123456 \"With problems\"": "patches/remote/0001-remote.patch"},
 		}
 
-		report, newPatches := updater.updatePatches(t.Context(), "/tmp", []composer.PackageChange{
+		report, newPatches := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), []composer.PackageChange{
 			{Action: "Upgrade", Package: "drupal/core", From: "8.7.0", To: "8.8.0"},
 		}, patches)
 
@@ -602,12 +550,9 @@ func TestUpdatePatches(t *testing.T) {
 	t.Run("Remote patch was committed and released", func(t *testing.T) {
 
 		composerService := NewMockPatchesComposer(t)
-		composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
 		drupalOrgService := NewMockDrupalOrg(t)
 
 		var removed []string
-
-		composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/core").Return(true, nil)
 
 		drupalOrgService.EXPECT().FindIssueNumber("Issue #123456 \"With problems\"").Return("123456", true)
 		drupalOrgService.EXPECT().GetIssue(anyCtx, "123456").Return(&drupalorg.Issue{
@@ -647,7 +592,7 @@ func TestUpdatePatches(t *testing.T) {
 		}
 
 		updater.removeFile = recordRemovals(&removed)
-		report, newPatches := updater.updatePatches(t.Context(), "/tmp", operations, patches)
+		report, newPatches := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), operations, patches)
 		assert.Equal(t, []string{"/tmp/patches/remote/0001-remote.patch"}, removed)
 		assert.Equal(t, map[string]map[string]string{}, newPatches)
 		assert.True(t, report.Changes())
@@ -659,12 +604,9 @@ func TestUpdatePatches(t *testing.T) {
 	t.Run("Remote patch was committed, but not yet releases", func(t *testing.T) {
 
 		composerService := NewMockPatchesComposer(t)
-		composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
 		drupalOrgService := NewMockDrupalOrg(t)
 
 		var removed []string
-
-		composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/core").Return(true, nil)
 
 		composerService.EXPECT().CheckIfPatchApplies(anyCtx, mock.Anything, "drupal/core", "8.8.0", "/tmp/patches/remote/0001-remote.patch").Return(true, nil)
 
@@ -706,7 +648,7 @@ func TestUpdatePatches(t *testing.T) {
 		}
 
 		updater.removeFile = recordRemovals(&removed)
-		report, newPatches := updater.updatePatches(t.Context(), "/tmp", operations, patches)
+		report, newPatches := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), operations, patches)
 		assert.Empty(t, removed)
 		assert.Equal(t, map[string]map[string]string{
 			"drupal/core": {
@@ -722,13 +664,9 @@ func TestUpdatePatches(t *testing.T) {
 	t.Run("Module will be removed", func(t *testing.T) {
 
 		composerService := NewMockPatchesComposer(t)
-		composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
 		drupalOrgService := NewMockDrupalOrg(t)
 
 		var removed []string
-
-		composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/core").Return(true, nil)
-		composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/pathauto").Return(true, nil)
 
 		updater := &ComposerPatches1{
 			logger:    logger,
@@ -757,7 +695,7 @@ func TestUpdatePatches(t *testing.T) {
 		}
 
 		updater.removeFile = recordRemovals(&removed)
-		report, newPatches := updater.updatePatches(t.Context(), "/tmp", operations, patches)
+		report, newPatches := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), operations, patches)
 		assert.Equal(t, []string{"/tmp/patches/core/0001-local-patch.patch"}, removed)
 		assert.Equal(t, map[string]map[string]string{
 			"drupal/pathauto": {
@@ -772,11 +710,8 @@ func TestUpdatePatches(t *testing.T) {
 
 	t.Run("Multiple patches conflict when applied together", func(t *testing.T) {
 		composerService := NewMockPatchesComposer(t)
-		composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
 		drupalOrgService := NewMockDrupalOrg(t)
 		var removed []string
-
-		composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/core").Return(true, nil)
 
 		drupalOrgService.EXPECT().FindIssueNumber("patch one").Return("", false)
 		drupalOrgService.EXPECT().FindIssueNumber("patches/core/patch1.patch").Return("", false)
@@ -804,7 +739,7 @@ func TestUpdatePatches(t *testing.T) {
 		}
 
 		updater.removeFile = recordRemovals(&removed)
-		report, _ := updater.updatePatches(t.Context(), "/tmp", operations, patches)
+		report, _ := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), operations, patches)
 		assert.Empty(t, removed)
 		assert.True(t, report.Changes())
 		require.Len(t, report.Conflicts, 1)
@@ -821,12 +756,9 @@ func TestUpdatePatches(t *testing.T) {
 
 	t.Run("Module not installed", func(t *testing.T) {
 		composerService := NewMockPatchesComposer(t)
-		composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
 		drupalOrgService := NewMockDrupalOrg(t)
 
 		var removed []string
-
-		composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/core").Return(false, nil)
 
 		updater := &ComposerPatches1{
 			logger:    logger,
@@ -843,7 +775,7 @@ func TestUpdatePatches(t *testing.T) {
 		}
 
 		updater.removeFile = recordRemovals(&removed)
-		report, newPatches := updater.updatePatches(t.Context(), "/tmp", operations, patches)
+		report, newPatches := updater.updatePatches(t.Context(), "/tmp", lockedProject(), operations, patches)
 		assert.Equal(t, []string{"/tmp/patches/core/0001-local-patch.patch"}, removed)
 		assert.Equal(t, map[string]map[string]string{}, newPatches)
 		assert.True(t, report.Changes())
@@ -913,4 +845,13 @@ func TestDownloadFile(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, content, string(data))
 	})
+}
+
+// installedProject is a project in which every patched package is locked, with no dependency patches.
+func installedProject(patches map[string]map[string]string) composer.Project {
+	project := composer.Project{Packages: map[string]composer.LockedPackage{}}
+	for name := range patches {
+		project.Packages[name] = composer.LockedPackage{Version: "1.0.0"}
+	}
+	return project
 }

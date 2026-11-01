@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/drupdater/drupdater/internal/composer"
+
 	"github.com/drupdater/drupdater/internal/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,8 +26,8 @@ func (f *fakeComposer) Install(_ context.Context, path string) error {
 	return f.installErr
 }
 
-func (f *fakeComposer) GetConfig(_ context.Context, _ string, _ string) (string, error) {
-	return "web", nil
+func (f *fakeComposer) Project(context.Context, string) (composer.Project, error) {
+	return composer.Project{WebRoot: "web"}, nil
 }
 
 // fakeInstaller fails for the sites named in failFor and succeeds for the rest.

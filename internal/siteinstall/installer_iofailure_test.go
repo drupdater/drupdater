@@ -110,7 +110,7 @@ func newFailingInstaller(t *testing.T, fs afero.Fs, coreExtension string) (*Inst
 func TestConfigureDatabaseIOFailures(t *testing.T) {
 	t.Run("settings.php cannot be written", func(t *testing.T) {
 		installer, drush, composer := newFailingInstaller(t, &failingFs{failWrite: true}, coreExtensionWithSqlite)
-		composer.EXPECT().GetConfig(t.Context(), "/project", "extra.drupal-scaffold.locations.web-root").Return("web", nil)
+		composer.EXPECT().Project(t.Context(), "/project").Return(atWebRoot("web"), nil)
 		drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1").Return("/config/sync", nil)
 
 		err := installer.ConfigureDatabase(t.Context(), "/project", "site1")
@@ -123,7 +123,7 @@ func TestConfigureDatabaseIOFailures(t *testing.T) {
 		// The close error matters on its own: a buffered write that only fails at close would
 		// otherwise look like a successful configuration.
 		installer, drush, composer := newFailingInstaller(t, &failingFs{failClose: true}, coreExtensionWithSqlite)
-		composer.EXPECT().GetConfig(t.Context(), "/project", "extra.drupal-scaffold.locations.web-root").Return("web", nil)
+		composer.EXPECT().Project(t.Context(), "/project").Return(atWebRoot("web"), nil)
 		drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1").Return("/config/sync", nil)
 
 		err := installer.ConfigureDatabase(t.Context(), "/project", "site1")
@@ -135,7 +135,7 @@ func TestConfigureDatabaseIOFailures(t *testing.T) {
 	t.Run("missing settings.php names the open failure", func(t *testing.T) {
 		installer, drush, composer := newFailingInstaller(t, &failingFs{}, coreExtensionWithSqlite)
 		require.NoError(t, installer.fs.Remove("/project/web/sites/site1/settings.php"))
-		composer.EXPECT().GetConfig(t.Context(), "/project", "extra.drupal-scaffold.locations.web-root").Return("web", nil)
+		composer.EXPECT().Project(t.Context(), "/project").Return(atWebRoot("web"), nil)
 		drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1").Return("/config/sync", nil)
 
 		err := installer.ConfigureDatabase(t.Context(), "/project", "site1")
@@ -200,7 +200,7 @@ func TestRemoveProfileIOFailures(t *testing.T) {
 func TestRestoreSettingsFailures(t *testing.T) {
 	t.Run("web root cannot be resolved", func(t *testing.T) {
 		installer, _, composer := newFailingInstaller(t, &failingFs{}, coreExtensionWithSqlite)
-		composer.EXPECT().GetConfig(t.Context(), "/project", "extra.drupal-scaffold.locations.web-root").Return("", assert.AnError)
+		composer.EXPECT().Project(t.Context(), "/project").Return(atWebRoot(""), assert.AnError)
 
 		require.ErrorIs(t, installer.RestoreSettings(t.Context(), "/project", "site1"), assert.AnError)
 	})
@@ -208,7 +208,7 @@ func TestRestoreSettingsFailures(t *testing.T) {
 	t.Run("settings.php is gone", func(t *testing.T) {
 		installer, _, composer := newFailingInstaller(t, &failingFs{}, coreExtensionWithSqlite)
 		require.NoError(t, installer.fs.Remove("/project/web/sites/site1/settings.php"))
-		composer.EXPECT().GetConfig(t.Context(), "/project", "extra.drupal-scaffold.locations.web-root").Return("web", nil)
+		composer.EXPECT().Project(t.Context(), "/project").Return(atWebRoot("web"), nil)
 
 		err := installer.RestoreSettings(t.Context(), "/project", "site1")
 		assert.Contains(t, err.Error(), "failed to read settings file")
@@ -220,7 +220,7 @@ func TestRestoreSettingsFailures(t *testing.T) {
 		installer, _, composer := newFailingInstaller(t, fs, coreExtensionWithSqlite)
 		require.NoError(t, afero.WriteFile(installer.fs, "/project/web/sites/site1/settings.php", []byte("<?php\n\n"+settingsMarker+"\n"), 0o644))
 		fs.failWrite = true
-		composer.EXPECT().GetConfig(t.Context(), "/project", "extra.drupal-scaffold.locations.web-root").Return("web", nil)
+		composer.EXPECT().Project(t.Context(), "/project").Return(atWebRoot("web"), nil)
 
 		err := installer.RestoreSettings(t.Context(), "/project", "site1")
 		assert.Contains(t, err.Error(), "failed to restore settings")
@@ -231,7 +231,7 @@ func TestRestoreSettingsFailures(t *testing.T) {
 func TestInstallReportsAFailedRestoreAlongsideTheInstallError(t *testing.T) {
 	fs := &failingFs{}
 	installer, drush, composer := newFailingInstaller(t, fs, coreExtensionWithSqlite)
-	composer.EXPECT().GetConfig(t.Context(), "/project", "extra.drupal-scaffold.locations.web-root").Return("web", nil)
+	composer.EXPECT().Project(t.Context(), "/project").Return(atWebRoot("web"), nil)
 	drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1").Return("/config/sync", nil)
 	installErr := errors.New("site install failed")
 	drush.EXPECT().InstallSite(t.Context(), "/project", "site1").RunAndReturn(func(context.Context, string, string) error {

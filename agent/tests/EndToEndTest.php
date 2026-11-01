@@ -45,6 +45,16 @@ final class EndToEndTest extends TestCase
         self::assertEquals(self::fixture('handshake/response.json'), $reply);
     }
 
+    public function testProjectAnswersTheFixture(): void
+    {
+        $project = $this->scratchDir();
+        (new Filesystem())->copy(__DIR__ . '/fixtures/project', $project);
+
+        $reply = $this->ask('drupdater:project', $project, self::fixture('project/request.json'));
+
+        self::assertEquals(self::fixture('project/response.json'), $reply);
+    }
+
     public function testAPatchThatFitsApplies(): void
     {
         $project = $this->project();

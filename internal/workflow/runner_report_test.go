@@ -109,7 +109,7 @@ func (h *reportHarness) expectFullRun(t *testing.T) {
 
 	h.repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil).Maybe()
 	h.repository.EXPECT().RemoteBranchExists(anyCtx, mock.Anything, mock.Anything).Return(false, nil).Maybe()
-	h.composer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil).Maybe()
+	h.composer.EXPECT().Project(anyCtx, testCheckout).Return(composer.Project{WebRoot: "web", LockHash: "dummy-hash"}, nil).Maybe()
 	h.composer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).
 		Return([]composer.PackageChange{{Action: "Upgrade", Package: "drupal/core", From: "9.0.0", To: "9.1.0"}}, nil).Maybe()
 }
@@ -233,7 +233,7 @@ func TestReportWrittenOnFailureNamesThePhase(t *testing.T) {
 	h.repository.EXPECT().Head(anyCtx).Return("", assert.AnError).Maybe()
 	h.composer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).
 		Return([]composer.PackageChange{{Action: "Upgrade", Package: "drupal/core", From: "9.0.0", To: "9.1.0"}}, nil)
-	h.composer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
+	h.composer.EXPECT().Project(anyCtx, testCheckout).Return(composer.Project{WebRoot: "web", LockHash: "dummy-hash"}, nil)
 	h.repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
 	h.repository.EXPECT().RemoteBranchExists(anyCtx, "update-dummy-hash", mock.Anything).Return(false, nil)
 
@@ -256,7 +256,7 @@ func TestReportOfARunFailingBeforeRenderingCarriesTheAddonSections(t *testing.T)
 	h.repository.EXPECT().Head(anyCtx).Return("", assert.AnError).Maybe()
 	h.composer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).
 		Return([]composer.PackageChange{{Action: "Upgrade", Package: "drupal/core", From: "9.0.0", To: "9.1.0"}}, nil)
-	h.composer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
+	h.composer.EXPECT().Project(anyCtx, testCheckout).Return(composer.Project{WebRoot: "web", LockHash: "dummy-hash"}, nil)
 	h.repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
 	h.repository.EXPECT().RemoteBranchExists(anyCtx, "update-dummy-hash", mock.Anything).Return(false, nil)
 	h.withAddons(&reportingAddon{key: "composer_patches", data: "conflicts"})

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/drupdater/drupdater/internal/composer"
 	"github.com/drupdater/drupdater/internal/phpcs"
 	"github.com/drupdater/drupdater/internal/workflow"
 
@@ -19,9 +20,7 @@ import (
 
 // BeautifierComposer finds custom code and which coding standards the project installs.
 type BeautifierComposer interface {
-	GetCustomCodeDirectories(ctx context.Context, dir string) ([]string, error)
-	GetInstalledPackageVersion(ctx context.Context, dir string, packageName string) (string, error)
-	IsPackageInstalled(ctx context.Context, dir string, packageToCheck string) (bool, error)
+	Project(ctx context.Context, dir string) (composer.Project, error)
 }
 
 // PHPCS runs phpcs and phpcbf.
@@ -127,7 +126,7 @@ func (cb *CodeBeautifier) postCodeUpdateHandler(evt *workflow.PostCodeUpdateEven
 
 	// The project's own coder brings the version and extra standards its phpcs.xml was written for.
 	phpcs := cb.bundledPHPCS
-	if installed, _ := cb.composer.IsPackageInstalled(evt.Context(), evt.Path(), "drupal/coder"); installed {
+	if project, err := cb.composer.Project(evt.Context(), evt.Path()); err == nil && project.Installed("drupal/coder") {
 		phpcs = cb.projectPHPCS
 	}
 
@@ -184,18 +183,20 @@ func (cb *CodeBeautifier) CreatePHPCSConfig(ctx context.Context, path string) (b
 		return false, fmt.Errorf("failed to parse phpcs template: %w", err)
 	}
 
-	drupalVersion, _ := cb.composer.GetInstalledPackageVersion(ctx, path, "drupal/core")
-	majorVersion, _, _ := strings.Cut(drupalVersion, ".")
+	project, err := cb.composer.Project(ctx, path)
+	if err != nil {
+		return false, err
+	}
+	majorVersion, _, _ := strings.Cut(project.Version("drupal/core"), ".")
 
 	data := struct {
 		Files   []string
 		Version string
 	}{
-		Files:   []string{},
 		Version: majorVersion,
 	}
 
-	data.Files, err = cb.composer.GetCustomCodeDirectories(ctx, path)
+	data.Files, err = project.CustomCode()
 	if err != nil {
 		return false, err
 	}

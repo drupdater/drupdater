@@ -20,10 +20,9 @@ type Addon interface {
 type Composer interface {
 	Install(ctx context.Context, dir string) error
 	Update(ctx context.Context, dir string, packagesToUpdate []string, packagesToKeep []string, minimalChanges bool, dryRun bool) ([]composer.PackageChange, error)
-	GetLockHash(dir string) (string, error)
 	PlatformReqsChecker
 	AgentChecker
-	ComposerConfigGetter
+	ProjectReader
 	ComposerVersionReporter
 }
 

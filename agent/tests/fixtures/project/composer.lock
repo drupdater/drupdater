@@ -1,0 +1,67 @@
+{
+    "_readme": ["A fixture lock: only what drupdater:project reads."],
+    "content-hash": "4b2f0e1c9a7d3e5f6a8b0c1d2e3f4a5b",
+    "packages": [
+        {
+            "name": "cweagans/composer-patches",
+            "version": "1.7.3",
+            "type": "composer-plugin",
+            "require": {"composer-plugin-api": "^1.0 || ^2.0"},
+            "extra": {"class": "cweagans\\Composer\\Patches"}
+        },
+        {
+            "name": "drupal/core",
+            "version": "10.3.1",
+            "type": "drupal-core"
+        },
+        {
+            "name": "drupal/recipe_kit",
+            "version": "1.0.0",
+            "type": "drupal-recipe",
+            "extra": {
+                "patches": {
+                    "drupal/core": {
+                        "Core fix the recipe needs": "https://www.drupal.org/files/issues/3100000-1.patch"
+                    },
+                    "drupal/token": [],
+                    "drupal/other": {"Not a patch": 7}
+                }
+            }
+        },
+        {
+            "name": "drupal/token",
+            "version": "1.15.0",
+            "type": "drupal-module",
+            "extra": {
+                "patches": {
+                    "drupal/core": {
+                        "Same core fix": "https://www.drupal.org/files/issues/3100000-1.patch",
+                        "Token's own core fix": "https://www.drupal.org/files/issues/3100001-2.patch"
+                    }
+                }
+            }
+        }
+    ],
+    "packages-dev": [
+        {
+            "name": "dealerdirect/phpcodesniffer-composer-installer",
+            "version": "v1.0.0",
+            "type": "composer-installer",
+            "require": {"composer-plugin-api": "^2.0"}
+        },
+        {
+            "name": "drupal/devel",
+            "version": "dev-5.x",
+            "type": "drupal-module",
+            "extra": {"branch-alias": {"dev-5.x": "5.x-dev"}}
+        }
+    ],
+    "aliases": [],
+    "minimum-stability": "stable",
+    "stability-flags": {},
+    "prefer-stable": true,
+    "prefer-lowest": false,
+    "platform": {},
+    "platform-dev": {},
+    "plugin-api-version": "2.6.0"
+}

@@ -28,8 +28,6 @@ func TestUpdatePatchesLeavesUnverifiablePatchesUnpinned(t *testing.T) {
 		path := t.TempDir()
 
 		composerService := NewMockPatchesComposer(t)
-		composerService.EXPECT().GetDependencyPatches(anyCtx, path).Return(nil, nil).Maybe()
-		composerService.EXPECT().IsPackageInstalled(anyCtx, path, "drupal/core").Return(true, nil)
 		composerService.EXPECT().
 			CheckIfPatchApplies(mock.Anything, path, "drupal/core", "8.8.0", path+"/patches/x.patch").
 			Return(false, unverifiable)
@@ -41,7 +39,7 @@ func TestUpdatePatchesLeavesUnverifiablePatchesUnpinned(t *testing.T) {
 		updater := &ComposerPatches1{logger: logger, composer: composerService, drupalOrg: drupalOrgService}
 		patches := map[string]map[string]string{"drupal/core": {"local patch": "patches/x.patch"}}
 
-		report, newPatches := updater.updatePatches(t.Context(), path, operations, patches)
+		report, newPatches := updater.updatePatches(t.Context(), path, installedProject(patches), operations, patches)
 
 		assert.Empty(t, report.Conflicts, "an unverifiable patch must not be reported as a conflict")
 		assert.False(t, report.Changes())
@@ -53,8 +51,6 @@ func TestUpdatePatchesLeavesUnverifiablePatchesUnpinned(t *testing.T) {
 		path := t.TempDir()
 
 		composerService := NewMockPatchesComposer(t)
-		composerService.EXPECT().GetDependencyPatches(anyCtx, path).Return(nil, nil).Maybe()
-		composerService.EXPECT().IsPackageInstalled(anyCtx, path, "drupal/core").Return(true, nil)
 		// The declared patch is genuinely rejected, so a replacement is fetched from the issue
 		// fork -- and checking *that* one is what cannot be carried out.
 		composerService.EXPECT().
@@ -99,7 +95,7 @@ func TestUpdatePatchesLeavesUnverifiablePatchesUnpinned(t *testing.T) {
 
 		// No removal expected: the replacement is not swapped in, so the old
 		// patch file must not be removed either.
-		report, newPatches := updater.updatePatches(t.Context(), path, operations, patches)
+		report, newPatches := updater.updatePatches(t.Context(), path, installedProject(patches), operations, patches)
 
 		assert.Empty(t, report.Conflicts, "an unverifiable replacement must not be reported as a conflict")
 		assert.Empty(t, report.Updated)

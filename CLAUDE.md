@@ -112,12 +112,13 @@ Where things live. For *how they work*, read `docs/explanation/` rather than dup
 | `internal/logging/redact.go` | Value-based secret redaction, wrapping the zap core |
 | `internal/golden/` | Golden-file comparison and the `-update` flag; imported only from tests |
 | `internal/composer/`, `drush/`, `repo/`, `phpcs/`, `rector/`, `drupalorg/` | One directory per wrapped external tool: `repo` is the git CLI, `drupalorg` is drupal.org issues and its GitLab at git.drupalcode.org |
-| `internal/drupal/` | Where a Drupal project keeps things: web root, custom code directories, drush-reported paths |
+| `internal/drupal/` | Making drush-reported absolute paths relative to the project |
 | `internal/siteinstall/` | Installs a throwaway SQLite site for the `check --full` tier |
 | `internal/php/` | What the PHP wrappers share: running a command under Composer's environment, decoding JSON output, and the `CommandFactory` each wrapper holds as its test seam |
 | `scripts/` | PHP embedded in the binary, extracted per run: `rector.php` and the `drupdater:*` Drush commands (`drush --include`) |
 | `agent/` | `drupdater/agent`, the global Composer plugin the image installs: the `composer drupdater:*` commands, its PHPUnit suite, and `protocol/`, the request/reply fixtures both sides test against |
 | `internal/agent/` | `agent.Call`: runs a `composer drupdater:*` command, decodes its envelope, returns an `*agent.Error` with a `Kind` |
+| `internal/composer/project.go` | `composer.Project`, the agent's snapshot of the project: web root, custom code, `allow-plugins` and `extra.patches` as written, locked packages, dependency patches, lock hash. Ask again after anything rewrites `composer.json` or the lock |
 | `tools/` | The PHPCS and Rector the image installs to `/opt/drupdater/tools`, so addons install nothing into the project |
 
 ### Invariants worth knowing before editing

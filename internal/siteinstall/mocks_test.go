@@ -7,6 +7,7 @@ package siteinstall
 import (
 	"context"
 
+	"github.com/drupdater/drupdater/internal/composer"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -217,46 +218,45 @@ func (_m *MockComposer) EXPECT() *MockComposer_Expecter {
 	return &MockComposer_Expecter{mock: &_m.Mock}
 }
 
-// GetConfig provides a mock function for the type MockComposer
-func (_mock *MockComposer) GetConfig(ctx context.Context, path string, key string) (string, error) {
-	ret := _mock.Called(ctx, path, key)
+// Project provides a mock function for the type MockComposer
+func (_mock *MockComposer) Project(ctx context.Context, dir string) (composer.Project, error) {
+	ret := _mock.Called(ctx, dir)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetConfig")
+		panic("no return value specified for Project")
 	}
 
-	var r0 string
+	var r0 composer.Project
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) (string, error)); ok {
-		return returnFunc(ctx, path, key)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (composer.Project, error)); ok {
+		return returnFunc(ctx, dir)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) string); ok {
-		r0 = returnFunc(ctx, path, key)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) composer.Project); ok {
+		r0 = returnFunc(ctx, dir)
 	} else {
-		r0 = ret.Get(0).(string)
+		r0 = ret.Get(0).(composer.Project)
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
-		r1 = returnFunc(ctx, path, key)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, dir)
 	} else {
 		r1 = ret.Error(1)
 	}
 	return r0, r1
 }
 
-// MockComposer_GetConfig_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetConfig'
-type MockComposer_GetConfig_Call struct {
+// MockComposer_Project_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Project'
+type MockComposer_Project_Call struct {
 	*mock.Call
 }
 
-// GetConfig is a helper method to define mock.On call
+// Project is a helper method to define mock.On call
 //   - ctx context.Context
-//   - path string
-//   - key string
-func (_e *MockComposer_Expecter) GetConfig(ctx any, path any, key any) *MockComposer_GetConfig_Call {
-	return &MockComposer_GetConfig_Call{Call: _e.mock.On("GetConfig", ctx, path, key)}
+//   - dir string
+func (_e *MockComposer_Expecter) Project(ctx any, dir any) *MockComposer_Project_Call {
+	return &MockComposer_Project_Call{Call: _e.mock.On("Project", ctx, dir)}
 }
 
-func (_c *MockComposer_GetConfig_Call) Run(run func(ctx context.Context, path string, key string)) *MockComposer_GetConfig_Call {
+func (_c *MockComposer_Project_Call) Run(run func(ctx context.Context, dir string)) *MockComposer_Project_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -266,25 +266,20 @@ func (_c *MockComposer_GetConfig_Call) Run(run func(ctx context.Context, path st
 		if args[1] != nil {
 			arg1 = args[1].(string)
 		}
-		var arg2 string
-		if args[2] != nil {
-			arg2 = args[2].(string)
-		}
 		run(
 			arg0,
 			arg1,
-			arg2,
 		)
 	})
 	return _c
 }
 
-func (_c *MockComposer_GetConfig_Call) Return(s string, err error) *MockComposer_GetConfig_Call {
-	_c.Call.Return(s, err)
+func (_c *MockComposer_Project_Call) Return(project composer.Project, err error) *MockComposer_Project_Call {
+	_c.Call.Return(project, err)
 	return _c
 }
 
-func (_c *MockComposer_GetConfig_Call) RunAndReturn(run func(ctx context.Context, path string, key string) (string, error)) *MockComposer_GetConfig_Call {
+func (_c *MockComposer_Project_Call) RunAndReturn(run func(ctx context.Context, dir string) (composer.Project, error)) *MockComposer_Project_Call {
 	_c.Call.Return(run)
 	return _c
 }

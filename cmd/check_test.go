@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/drupdater/drupdater/internal/composer"
+
 	"github.com/drupdater/drupdater/internal/config"
 	"github.com/drupdater/drupdater/internal/logging"
 	"github.com/drupdater/drupdater/internal/workflow"
@@ -175,8 +177,8 @@ func (f fakeCheapChecksComposer) CheckPlatformReqs(context.Context, string) (str
 	return f.platformReqsOut, f.platformReqsErr
 }
 
-func (f fakeCheapChecksComposer) GetConfig(context.Context, string, string) (string, error) {
-	return f.webRoot, f.webRootErr
+func (f fakeCheapChecksComposer) Project(context.Context, string) (composer.Project, error) {
+	return composer.Project{WebRoot: f.webRoot}, f.webRootErr
 }
 
 func TestRunCheapChecks(t *testing.T) {

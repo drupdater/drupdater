@@ -12,7 +12,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -51,54 +50,6 @@ func TestExecComposer(t *testing.T) {
 		output, err := service.execComposer(t.Context(), "/tmp", "update")
 		require.Error(t, err)
 		assert.Empty(t, output)
-	})
-
-}
-
-func TestGetInstalledPlugins(t *testing.T) {
-
-	t.Run("A list of plugins", func(t *testing.T) {
-
-		data := `Package "composer-plugin-api *" found in version "2.6.0".
-composer/installers                            v2.3.0  requires composer-plugin-api (^1.0 || ^2.0)
-cweagans/composer-patches                      1.7.3   requires composer-plugin-api (^1.0 || ^2.0)
-dealerdirect/phpcodesniffer-composer-installer v1.0.0  requires composer-plugin-api (^1.0 || ^2.0)
-drupal/core-composer-scaffold                  10.4.1  requires composer-plugin-api (^2)
-oomphinc/composer-installers-extender          2.0.1   requires composer-plugin-api (^1.1 || ^2.0)
-php-http/discovery                             1.20.0  requires composer-plugin-api (^1.0|^2.0)
-phpro/grumphp-shim                             v2.10.0 requires composer-plugin-api (~2.0)
-phpstan/extension-installer                    1.4.3   requires composer-plugin-api (^2.0)
-tbachert/spi                                   v1.0.2  requires composer-plugin-api (^2.0)
-zaporylie/composer-drupal-optimizations        1.2.0   requires composer-plugin-api (^1.1 || ^2.0)`
-
-		newCommand := func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
-			cs := []string{"-test.run=TestHelperProcess", "--", data}
-			cs = append(cs, arg...)
-			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
-			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
-			return cmd
-		}
-
-		service := &CLI{
-			newCommand: newCommand,
-			logger:     zap.NewNop(),
-		}
-
-		plugins, err := service.GetInstalledPlugins(t.Context(), "/tmp")
-
-		require.NoError(t, err)
-		assert.Equal(t, map[string]any{
-			"composer/installers":                            nil,
-			"cweagans/composer-patches":                      nil,
-			"dealerdirect/phpcodesniffer-composer-installer": nil,
-			"drupal/core-composer-scaffold":                  nil,
-			"oomphinc/composer-installers-extender":          nil,
-			"php-http/discovery":                             nil,
-			"phpro/grumphp-shim":                             nil,
-			"phpstan/extension-installer":                    nil,
-			"tbachert/spi":                                   nil,
-			"zaporylie/composer-drupal-optimizations":        nil,
-		}, plugins)
 	})
 
 }
@@ -269,65 +220,6 @@ Run the "diagnose" command to get more detailed diagnostics output.`, &args)
 
 		require.ErrorContains(t, err, "failed to determine composer version")
 		assert.Equal(t, Versions{}, versions)
-	})
-}
-
-func TestGetComposerLockHash(t *testing.T) {
-	data := `{
-	   		"content-hash": "d3d29b1f6a1d8f2c3b9b8e1e4f5f9e3e"
-	   	}`
-
-	fs := afero.NewMemMapFs()
-	err := afero.WriteFile(fs, "/test/composer.lock", []byte(data), 0644)
-	require.NoError(t, err)
-
-	service := &CLI{
-		logger: zap.NewNop(),
-		fs:     fs,
-	}
-	hash, err := service.GetLockHash("/test")
-
-	require.NoError(t, err)
-	assert.Equal(t, "d3d29b1f6a1d8f2c3b9b8e1e4f5f9e3e", hash)
-}
-
-func TestGetInstalledPackageVersion(t *testing.T) {
-
-	service := &CLI{
-		logger: zap.NewNop(),
-	}
-
-	t.Run("returns version when versions array is non-empty", func(t *testing.T) {
-		data := `{"versions":["1.2.3"]}`
-
-		service.newCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
-			cs := []string{"-test.run=TestHelperProcess", "--", data}
-			cs = append(cs, arg...)
-			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
-			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
-			return cmd
-		}
-
-		version, err := service.GetInstalledPackageVersion(t.Context(), "/tmp", "drupal/core")
-		require.NoError(t, err)
-		assert.Equal(t, "1.2.3", version)
-	})
-
-	t.Run("returns error when versions array is empty", func(t *testing.T) {
-		data := `{"versions":[]}`
-
-		service.newCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
-			cs := []string{"-test.run=TestHelperProcess", "--", data}
-			cs = append(cs, arg...)
-			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
-			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
-			return cmd
-		}
-
-		version, err := service.GetInstalledPackageVersion(t.Context(), "/tmp", "drupal/core")
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "no versions found for package drupal/core")
-		assert.Empty(t, version)
 	})
 }
 
@@ -618,42 +510,6 @@ func TestDiffRejectsMalformedOutput(t *testing.T) {
 	}
 }
 
-func TestGetConfigReadsComposerJSONAsComposerConfigPrintsIt(t *testing.T) {
-	fs := afero.NewMemMapFs()
-	require.NoError(t, afero.WriteFile(fs, "/project/composer.json", []byte(`{
-		"extra": {
-			"drupal-scaffold": {"locations": {"web-root": "web/"}},
-			"patches": {"drupal/core": {"Fix": "patches/core.patch"}}
-		}
-	}`), 0o644))
-	service := &CLI{logger: zap.NewNop(), fs: fs}
-
-	webRoot, err := service.GetConfig(t.Context(), "/project", "extra.drupal-scaffold.locations.web-root")
-	require.NoError(t, err)
-	assert.Equal(t, "web/", webRoot, "a string comes back unquoted")
-
-	patches, err := service.GetConfig(t.Context(), "/project", "extra.patches")
-	require.NoError(t, err)
-	assert.JSONEq(t, `{"drupal/core": {"Fix": "patches/core.patch"}}`, patches)
-
-	for _, key := range []string{"extra.missing", "extra.drupal-scaffold.locations.web-root.deeper"} {
-		_, err := service.GetConfig(t.Context(), "/project", key)
-		require.EqualError(t, err, key+" is not defined")
-	}
-}
-
-func TestGetConfigFailsWithoutAReadableComposerJSON(t *testing.T) {
-	fs := afero.NewMemMapFs()
-	service := &CLI{logger: zap.NewNop(), fs: fs}
-
-	_, err := service.GetConfig(t.Context(), "/project", "extra.patches")
-	require.ErrorIs(t, err, os.ErrNotExist)
-
-	require.NoError(t, afero.WriteFile(fs, "/project/composer.json", []byte("{"), 0o644))
-	_, err = service.GetConfig(t.Context(), "/project", "extra.patches")
-	require.ErrorContains(t, err, "failed to decode composer.json")
-}
-
 func TestSetConfig(t *testing.T) {
 	service := &CLI{logger: zap.NewNop()}
 
@@ -677,36 +533,6 @@ func TestSetConfig(t *testing.T) {
 			return cmd
 		}
 		require.Error(t, service.SetConfig(t.Context(), "/tmp", "platform.php", "8.3"))
-	})
-}
-
-func TestIsPackageInstalled(t *testing.T) {
-	service := &CLI{logger: zap.NewNop()}
-
-	t.Run("installed", func(t *testing.T) {
-		service.newCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
-			cs := []string{"-test.run=TestHelperProcess", "--", "ok"}
-			cs = append(cs, arg...)
-			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
-			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
-			return cmd
-		}
-		installed, err := service.IsPackageInstalled(t.Context(), "/tmp", "drupal/core")
-		require.NoError(t, err)
-		assert.True(t, installed)
-	})
-
-	t.Run("not installed", func(t *testing.T) {
-		service.newCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
-			cs := []string{"-test.run=TestHelperProcess", "--"}
-			cs = append(cs, arg...)
-			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
-			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
-			return cmd
-		}
-		installed, err := service.IsPackageInstalled(t.Context(), "/tmp", "drupal/core")
-		require.NoError(t, err)
-		assert.False(t, installed)
 	})
 }
 
@@ -736,28 +562,6 @@ func TestUpdateLockHash(t *testing.T) {
 	})
 }
 
-func TestGetCustomCodeDirectories(t *testing.T) {
-	t.Run("returns existing directories", func(t *testing.T) {
-		fs := afero.NewMemMapFs()
-		_ = fs.MkdirAll("/tmp/web/modules/custom", 0755)
-		_ = fs.MkdirAll("/tmp/web/themes/custom", 0755)
-		require.NoError(t, afero.WriteFile(fs, "/tmp/composer.json", []byte(`{"extra": {"drupal-scaffold": {"locations": {"web-root": "web/"}}}}`), 0o644))
-
-		service := &CLI{logger: zap.NewNop(), fs: fs}
-
-		dirs, err := service.GetCustomCodeDirectories(t.Context(), "/tmp")
-		require.NoError(t, err)
-		assert.ElementsMatch(t, []string{"web/modules/custom", "web/themes/custom"}, dirs)
-	})
-
-	t.Run("GetConfig error", func(t *testing.T) {
-		service := &CLI{logger: zap.NewNop(), fs: afero.NewMemMapFs()}
-
-		_, err := service.GetCustomCodeDirectories(t.Context(), "/project")
-		require.Error(t, err)
-	})
-}
-
 func TestHelperProcess(*testing.T) {
 	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
 		return
@@ -779,67 +583,6 @@ func TestHelperProcess(*testing.T) {
 
 	fmt.Fprintf(os.Stdout, "%v\n", os.Args[3])
 	os.Exit(0)
-}
-
-func TestGetDependencyPatches(t *testing.T) {
-	// A dependency provides a patch; another package has empty extra serialized as [].
-	data := `{
-		"packages": [
-			{
-				"name": "drupal/lightning_core",
-				"extra": {
-					"patches": {
-						"drupal/core": {
-							"2869592 - Disabled update module": "https://example.com/2869592.patch"
-						}
-					}
-				}
-			},
-			{ "name": "drupal/empty_extra", "extra": [] },
-			{ "name": "drupal/no_extra" }
-		],
-		"packages-dev": [
-			{
-				"name": "drupal/devtools",
-				"extra": { "patches": { "drupal/views": { "fix": "https://example.com/views.patch" } } }
-			}
-		]
-	}`
-
-	fs := afero.NewMemMapFs()
-	require.NoError(t, afero.WriteFile(fs, "/test/composer.lock", []byte(data), 0644))
-
-	service := &CLI{logger: zap.NewNop(), fs: fs}
-	patches, err := service.GetDependencyPatches(context.Background(), "/test")
-
-	require.NoError(t, err)
-	assert.Equal(t, map[string]map[string]bool{
-		"drupal/core":  {"https://example.com/2869592.patch": true},
-		"drupal/views": {"https://example.com/views.patch": true},
-	}, patches)
-
-	t.Run("error when composer.lock is missing", func(t *testing.T) {
-		service := &CLI{logger: zap.NewNop(), fs: afero.NewMemMapFs()}
-		_, err := service.GetDependencyPatches(context.Background(), "/missing")
-		require.ErrorContains(t, err, "failed to read composer.lock")
-	})
-
-	t.Run("error when composer.lock is invalid JSON", func(t *testing.T) {
-		fs := afero.NewMemMapFs()
-		require.NoError(t, afero.WriteFile(fs, "/bad/composer.lock", []byte("not-json"), 0644))
-		service := &CLI{logger: zap.NewNop(), fs: fs}
-		_, err := service.GetDependencyPatches(context.Background(), "/bad")
-		require.ErrorContains(t, err, "failed to unmarshal composer.lock")
-	})
-
-	t.Run("returns empty map when no dependency declares patches", func(t *testing.T) {
-		fs := afero.NewMemMapFs()
-		require.NoError(t, afero.WriteFile(fs, "/none/composer.lock", []byte(`{"packages":[{"name":"a/b"}]}`), 0644))
-		service := &CLI{logger: zap.NewNop(), fs: fs}
-		patches, err := service.GetDependencyPatches(context.Background(), "/none")
-		require.NoError(t, err)
-		assert.Empty(t, patches)
-	})
 }
 
 // composerPrinting is a composer that prints out on stdout and exits 0.
@@ -871,53 +614,6 @@ func TestNewCLI(t *testing.T) {
 	require.NotNil(t, cli)
 	assert.Equal(t, logger, cli.logger)
 	assert.NotNil(t, cli.fs)
-}
-
-func allowPluginsFrom(t *testing.T, manifest string) (AllowPlugins, error) {
-	t.Helper()
-	fs := afero.NewMemMapFs()
-	require.NoError(t, afero.WriteFile(fs, "/project/composer.json", []byte(manifest), 0o644))
-	return (&CLI{logger: zap.NewNop(), fs: fs}).GetAllowPlugins("/project")
-}
-
-func TestGetAllowPluginsReadsEveryShape(t *testing.T) {
-	yes, no := true, false
-	for name, tt := range map[string]struct {
-		manifest string
-		want     AllowPlugins
-	}{
-		"absent":       {`{"config": {}}`, AllowPlugins{}},
-		"no config":    {`{}`, AllowPlugins{}},
-		"null":         {`{"config": {"allow-plugins": null}}`, AllowPlugins{}},
-		"true":         {`{"config": {"allow-plugins": true}}`, AllowPlugins{Set: true, All: &yes}},
-		"false":        {`{"config": {"allow-plugins": false}}`, AllowPlugins{Set: true, All: &no}},
-		"empty object": {`{"config": {"allow-plugins": {}}}`, AllowPlugins{Set: true, Rules: map[string]bool{}}},
-		"empty array":  {`{"config": {"allow-plugins": []}}`, AllowPlugins{Set: true, Rules: map[string]bool{}}},
-		"rules": {`{"config": {"allow-plugins": {"drupal/*": true, "phpro/grumphp-shim": false}}}`,
-			AllowPlugins{Set: true, Rules: map[string]bool{"drupal/*": true, "phpro/grumphp-shim": false}}},
-	} {
-		t.Run(name, func(t *testing.T) {
-			got, err := allowPluginsFrom(t, tt.manifest)
-
-			require.NoError(t, err)
-			assert.Equal(t, tt.want, got)
-		})
-	}
-}
-
-func TestGetAllowPluginsErrors(t *testing.T) {
-	t.Run("no composer.json", func(t *testing.T) {
-		_, err := (&CLI{logger: zap.NewNop(), fs: afero.NewMemMapFs()}).GetAllowPlugins("/project")
-		require.ErrorContains(t, err, "failed to read composer.json")
-	})
-	t.Run("composer.json is not JSON", func(t *testing.T) {
-		_, err := allowPluginsFrom(t, `{"config": `)
-		require.ErrorContains(t, err, "failed to parse composer.json")
-	})
-	t.Run("a rule that is not a boolean", func(t *testing.T) {
-		_, err := allowPluginsFrom(t, `{"config": {"allow-plugins": {"a/b": "yes"}}}`)
-		require.ErrorContains(t, err, `failed to parse composer allow-plugins config {"a/b": "yes"}`)
-	})
 }
 
 // The patterns behave as in Composer's PluginManager: anchored, case-insensitive, * for anything.
@@ -957,55 +653,11 @@ func TestInstallReturnsNilOnSuccess(t *testing.T) {
 	require.NoError(t, service.Install(t.Context(), "/tmp"))
 }
 
-func TestGetLockHashErrors(t *testing.T) {
-	t.Run("missing composer.lock", func(t *testing.T) {
-		service := &CLI{logger: zap.NewNop(), fs: afero.NewMemMapFs()}
-		_, err := service.GetLockHash("/nowhere")
-		require.Error(t, err)
-	})
-
-	t.Run("malformed composer.lock", func(t *testing.T) {
-		fs := afero.NewMemMapFs()
-		require.NoError(t, afero.WriteFile(fs, "/tmp/composer.lock", []byte("not json"), 0o644))
-
-		service := &CLI{logger: zap.NewNop(), fs: fs}
-		_, err := service.GetLockHash("/tmp")
-		require.Error(t, err)
-	})
-}
-
-func TestGetInstalledPackageVersionErrors(t *testing.T) {
-	t.Run("composer failure", func(t *testing.T) {
-		service := &CLI{newCommand: composerFailing(), logger: zap.NewNop()}
-		_, err := service.GetInstalledPackageVersion(t.Context(), "/tmp", "drupal/core")
-		require.Error(t, err)
-	})
-
-	t.Run("malformed JSON", func(t *testing.T) {
-		service := &CLI{newCommand: composerPrinting("not-json"), logger: zap.NewNop()}
-		_, err := service.GetInstalledPackageVersion(t.Context(), "/tmp", "drupal/core")
-		require.Error(t, err)
-	})
-
-	t.Run("no versions reported", func(t *testing.T) {
-		service := &CLI{newCommand: composerPrinting(`{"versions":[]}`), logger: zap.NewNop()}
-		_, err := service.GetInstalledPackageVersion(t.Context(), "/tmp", "drupal/core")
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "no versions found")
-	})
-}
-
 func TestDiffFailure(t *testing.T) {
 	service := &CLI{newCommand: composerFailing(), logger: zap.NewNop()}
 	entries, err := service.Diff(t.Context(), "/tmp")
 	require.Error(t, err)
 	assert.Nil(t, entries)
-}
-
-func TestGetInstalledPluginsFailure(t *testing.T) {
-	service := &CLI{newCommand: composerFailing(), logger: zap.NewNop()}
-	_, err := service.GetInstalledPlugins(t.Context(), "/tmp")
-	require.Error(t, err)
 }
 
 func TestAuditMalformedOutput(t *testing.T) {
@@ -1098,24 +750,5 @@ func TestAuditUnmarshalShapes(t *testing.T) {
 			`{"advisories":{"twig/twig":[{"advisoryId":"PKSA-1"}]},"abandoned":{"foo/bar":"baz/qux"}}`)))
 		assert.Len(t, a.Advisories, 1)
 		assert.Len(t, a.Abandoned, 1)
-	})
-}
-
-func TestGetDependencyPatchesErrors(t *testing.T) {
-	t.Run("missing composer.lock", func(t *testing.T) {
-		service := &CLI{logger: zap.NewNop(), fs: afero.NewMemMapFs()}
-		_, err := service.GetDependencyPatches(t.Context(), "/nowhere")
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to read composer.lock")
-	})
-
-	t.Run("malformed composer.lock", func(t *testing.T) {
-		fs := afero.NewMemMapFs()
-		require.NoError(t, afero.WriteFile(fs, "/tmp/composer.lock", []byte("not json"), 0o644))
-
-		service := &CLI{logger: zap.NewNop(), fs: fs}
-		_, err := service.GetDependencyPatches(t.Context(), "/tmp")
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to unmarshal composer.lock")
 	})
 }

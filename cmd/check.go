@@ -99,7 +99,7 @@ func (a app) runCheck(cmd *cobra.Command, args []string, opts options) error {
 type cheapChecksComposer interface {
 	workflow.PlatformReqsChecker
 	workflow.AgentChecker
-	workflow.ComposerConfigGetter
+	workflow.ProjectReader
 }
 
 // runCheapChecks runs the free checks: no install, no network beyond one optional VCS call.

@@ -100,5 +100,6 @@ The Rector rule set comes from `scripts/rector.php` inside the Docker image:
 
 It is not currently configurable per project.
 
-Only the project's **custom** code directories are processed, as resolved from
-`composer.json`. Contributed and core code is never rewritten.
+Only the project's **custom** code directories are processed: `modules/custom`,
+`themes/custom` and `profiles/custom` under the web root `composer.json` names, where they
+exist. Contributed and core code is never rewritten.

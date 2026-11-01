@@ -566,9 +566,10 @@ package it mocks. Do not edit those files by hand.
 
 `agent/` is the PHP half of Drupdater: `drupdater/agent`, a Composer plugin the image installs
 globally. It adds `composer drupdater:*` commands that answer what Drupdater can only learn
-from inside the project's own Composer. Today that is
-[`drupdater:patch-check`](../reference/addons/composer-patches.md#how-a-patch-is-tested); the
-Go side calls it through `internal/agent`.
+from inside the project's own Composer: [`drupdater:project`](../reference/docker-images.md#drupdater-agent),
+the project's layout, plugins, patches and lock, and
+[`drupdater:patch-check`](../reference/addons/composer-patches.md#how-a-patch-is-tested). The
+Go side calls them through `internal/agent`, and `internal/composer` wraps each in a method.
 
 Each command reads one JSON request on stdin and prints one JSON envelope on stdout:
 
@@ -607,13 +608,16 @@ ships.
 | `internal/report/` | The published JSON report schema and its writer |
 | `internal/logging/` | The redactor |
 | `internal/composer/`, `drush/`, `repo/`, `phpcs/`, `rector/`, `drupalorg/`, `php/` | Thin wrappers around external tools |
-| `internal/drupal/`, `internal/siteinstall/` | Where a Drupal project keeps things; installing a throwaway site |
+| `internal/drupal/`, `internal/siteinstall/` | Relating drush-reported paths to the project; installing a throwaway site |
 | `scripts/` | PHP embedded in the binary and extracted per run: Rector's config and drupdater's Drush commands |
 | `agent/`, `internal/agent/` | [The agent](#the-agent): drupdater's Composer plugin, and the Go client for it |
 
+Where the project keeps things — its web root, custom code, plugins and patches — comes from
+the agent, as `composer.Project`, not from a Go reader of `composer.json` or the lock.
+
 The wrappers take one external tool per directory: `composer`, `drush`, `repo` (the git CLI),
 `phpcs`, `rector` and `drupalorg` (Drupal.org issues, and the git.drupalcode.org GitLab).
-`drupal` holds the project-layout helpers (web root, custom code directories) and
+`drupal` relates the absolute paths drush reports to the project, and
 `siteinstall` installs a site for the `check --full` tier. `php` holds what the PHP wrappers share: running a command under
 the environment Composer needs, and decoding its JSON output. Each wrapper takes the
 `php.CommandFactory` that builds its processes as a field, which is where a test fakes one.

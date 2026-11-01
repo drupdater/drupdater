@@ -46,8 +46,6 @@ func TestUpdatePatchesRemovesRemotePatchForFixedIssue(t *testing.T) {
 	const patchURL = "https://www.drupal.org/files/issues/123456-1.patch"
 
 	composerService := NewMockPatchesComposer(t)
-	composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
-	composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/core").Return(true, nil)
 
 	drupalOrgService := NewMockDrupalOrg(t)
 	drupalOrgService.EXPECT().FindIssueNumber("Issue #123456").Return("123456", true)
@@ -66,7 +64,7 @@ func TestUpdatePatchesRemovesRemotePatchForFixedIssue(t *testing.T) {
 		"drupal/core": {"Issue #123456": patchURL},
 	}
 
-	report, newPatches := updater.updatePatches(t.Context(), "/tmp", upgradeCore(), patches)
+	report, newPatches := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), upgradeCore(), patches)
 
 	assert.Empty(t, removed, "a URL is not a file; removing it is exactly the bug under test")
 	assert.Equal(t, map[string]map[string]string{}, newPatches, "the patch must be dropped from composer.json")
@@ -82,8 +80,6 @@ func TestUpdatePatchesKeepsPatchWhenRemovalFails(t *testing.T) {
 	const patchPath = "patches/drupal/123456.patch"
 
 	composerService := NewMockPatchesComposer(t)
-	composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
-	composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/core").Return(true, nil)
 
 	drupalOrgService := NewMockDrupalOrg(t)
 	drupalOrgService.EXPECT().FindIssueNumber("Issue #123456").Return("123456", true)
@@ -101,7 +97,7 @@ func TestUpdatePatchesKeepsPatchWhenRemovalFails(t *testing.T) {
 		"drupal/core": {"Issue #123456": patchPath},
 	}
 
-	report, newPatches := updater.updatePatches(t.Context(), "/tmp", upgradeCore(), patches)
+	report, newPatches := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), upgradeCore(), patches)
 
 	assert.Empty(t, report.Removed)
 	assert.Equal(t, map[string]map[string]string{
@@ -181,8 +177,6 @@ func TestUpdatePatchesRecognisesEveryFixedIssueStatus(t *testing.T) {
 			const patchURL = "https://www.drupal.org/files/issues/123456-1.patch"
 
 			composerService := NewMockPatchesComposer(t)
-			composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
-			composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/core").Return(true, nil)
 			if !tt.wantRemoved {
 				// An open issue keeps its patch, so the patch is re-checked against the new version.
 				composerService.EXPECT().CheckIfPatchApplies(anyCtx, "/tmp", "drupal/core", "8.8.0", patchURL).
@@ -211,7 +205,7 @@ func TestUpdatePatchesRecognisesEveryFixedIssueStatus(t *testing.T) {
 			}
 
 			patches := map[string]map[string]string{"drupal/core": {"Issue #123456": patchURL}}
-			report, newPatches := updater.updatePatches(t.Context(), "/tmp", upgradeCore(), patches)
+			report, newPatches := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), upgradeCore(), patches)
 
 			if tt.wantRemoved {
 				assert.Empty(t, newPatches["drupal/core"], "a fixed issue's patch must be dropped")
@@ -231,8 +225,6 @@ func TestUpdatePatchesKeepsPatchWithoutDrupalCode(t *testing.T) {
 	const patchURL = "https://www.drupal.org/files/issues/123456-1.patch"
 
 	composerService := NewMockPatchesComposer(t)
-	composerService.EXPECT().GetDependencyPatches(anyCtx, "/tmp").Return(nil, nil).Maybe()
-	composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/core").Return(true, nil)
 	composerService.EXPECT().CheckIfPatchApplies(anyCtx, "/tmp", "drupal/core", "8.8.0", patchURL).Return(true, nil).Maybe()
 	composerService.EXPECT().CheckIfPatchesApply(anyCtx, "/tmp", "drupal/core", "8.8.0", mock.Anything).Return(true, nil).Maybe()
 
@@ -248,7 +240,7 @@ func TestUpdatePatchesKeepsPatchWithoutDrupalCode(t *testing.T) {
 	}
 
 	patches := map[string]map[string]string{"drupal/core": {"Issue #123456": patchURL}}
-	_, newPatches := updater.updatePatches(t.Context(), "/tmp", upgradeCore(), patches)
+	_, newPatches := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), upgradeCore(), patches)
 
 	assert.NotEmpty(t, newPatches["drupal/core"])
 }

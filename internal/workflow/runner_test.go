@@ -91,7 +91,7 @@ func TestRun(t *testing.T) {
 		},
 	}, nil)
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
-	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
+	mockComposer.EXPECT().Project(anyCtx, testCheckout).Return(composer.Project{WebRoot: "web", LockHash: "dummy-hash"}, nil)
 
 	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
 	err := workflowService.Run(ctx, nil)
@@ -171,7 +171,7 @@ func TestRunPublishUsesLiveContext(t *testing.T) {
 		{Package: "drupal/core", From: "9.0.0", To: "9.1.0"},
 	}, nil)
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
-	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
+	mockComposer.EXPECT().Project(anyCtx, testCheckout).Return(composer.Project{WebRoot: "web", LockHash: "dummy-hash"}, nil)
 
 	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
 	err = workflowService.Run(ctx, nil)
@@ -223,7 +223,7 @@ func TestRunSiteFailureDoesNotPublish(t *testing.T) {
 	mockComposer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).Return([]composer.PackageChange{
 		{Package: "drupal/core", From: "9.0.0", To: "9.1.0"},
 	}, nil)
-	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
+	mockComposer.EXPECT().Project(anyCtx, testCheckout).Return(composer.Project{WebRoot: "web", LockHash: "dummy-hash"}, nil)
 
 	installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil)
 	installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil)
@@ -505,7 +505,7 @@ func TestRunInstallsSitesAtTheOldCode(t *testing.T) {
 	repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
 	mockComposer.EXPECT().CheckAgent(anyCtx, testCheckout).Return(nil)
-	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
+	mockComposer.EXPECT().Project(anyCtx, testCheckout).Return(composer.Project{WebRoot: "web", LockHash: "dummy-hash"}, nil)
 
 	var steps []string
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).RunAndReturn(func(context.Context, string) error {
@@ -699,7 +699,7 @@ func TestRunCreatesTheUpdateBranchAfterTheLastCommit(t *testing.T) {
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
 	mockComposer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).
 		Return([]composer.PackageChange{{Package: "drupal/core", From: "9.0.0", To: "9.1.0"}}, nil)
-	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
+	mockComposer.EXPECT().Project(anyCtx, testCheckout).Return(composer.Project{WebRoot: "web", LockHash: "dummy-hash"}, nil)
 	installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil)
 	installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil)
 	installer.EXPECT().RestoreSettings(anyCtx, testCheckout, "site1").Return(nil)
@@ -757,7 +757,7 @@ func TestRunBranchAlreadyExists(t *testing.T) {
 			To:      "9.1.0",
 		},
 	}, nil)
-	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
+	mockComposer.EXPECT().Project(anyCtx, testCheckout).Return(composer.Project{WebRoot: "web", LockHash: "dummy-hash"}, nil)
 
 	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
 	err := workflowService.Run(ctx, nil)
@@ -807,7 +807,7 @@ func TestRunLocalBranchAlreadyExists(t *testing.T) {
 	mockComposer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).Return([]composer.PackageChange{
 		{Package: "drupal/core", From: "9.0.0", To: "9.1.0"},
 	}, nil)
-	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
+	mockComposer.EXPECT().Project(anyCtx, testCheckout).Return(composer.Project{WebRoot: "web", LockHash: "dummy-hash"}, nil)
 
 	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
 	err := workflowService.Run(ctx, nil)
@@ -856,7 +856,7 @@ func TestRunLocalBranchLookupError(t *testing.T) {
 	mockComposer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).Return([]composer.PackageChange{
 		{Package: "drupal/core", From: "9.0.0", To: "9.1.0"},
 	}, nil)
-	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
+	mockComposer.EXPECT().Project(anyCtx, testCheckout).Return(composer.Project{WebRoot: "web", LockHash: "dummy-hash"}, nil)
 
 	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
 	err := workflowService.Run(ctx, nil)
@@ -920,7 +920,7 @@ func TestRunWithDryRun(t *testing.T) {
 		},
 	}, nil)
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
-	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
+	mockComposer.EXPECT().Project(anyCtx, testCheckout).Return(composer.Project{WebRoot: "web", LockHash: "dummy-hash"}, nil)
 
 	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
 	err := workflowService.Run(ctx, nil)
@@ -1049,7 +1049,7 @@ func TestRunCheckoutDryRunWithoutPlatform(t *testing.T) {
 		},
 	}, nil)
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
-	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
+	mockComposer.EXPECT().Project(anyCtx, testCheckout).Return(composer.Project{WebRoot: "web", LockHash: "dummy-hash"}, nil)
 
 	// Execute: platform is nil, exactly as cmd/root.go leaves it for this configuration.
 	workflowService := New(logger, config, drush, nil, repositoryService, installer, mockComposer)
@@ -1125,7 +1125,7 @@ func TestPublishWorkDeletesBranchOnMRFailure(t *testing.T) {
 		{Package: "drupal/core", From: "9.0.0", To: "9.1.0"},
 	}, nil)
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
-	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
+	mockComposer.EXPECT().Project(anyCtx, testCheckout).Return(composer.Project{WebRoot: "web", LockHash: "dummy-hash"}, nil)
 
 	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
 	err := workflowService.Run(ctx, nil)
@@ -1194,7 +1194,7 @@ func TestPublishWorkLogsWarningWhenDeleteBranchFails(t *testing.T) {
 		{Package: "drupal/core", From: "9.0.0", To: "9.1.0"},
 	}, nil)
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
-	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
+	mockComposer.EXPECT().Project(anyCtx, testCheckout).Return(composer.Project{WebRoot: "web", LockHash: "dummy-hash"}, nil)
 
 	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
 	err := workflowService.Run(ctx, nil)
@@ -1260,7 +1260,7 @@ func TestPublishWorkPushFails(t *testing.T) {
 		{Package: "drupal/core", From: "9.0.0", To: "9.1.0"},
 	}, nil)
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
-	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
+	mockComposer.EXPECT().Project(anyCtx, testCheckout).Return(composer.Project{WebRoot: "web", LockHash: "dummy-hash"}, nil)
 
 	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
 	err := workflowService.Run(ctx, nil)
@@ -1269,8 +1269,7 @@ func TestPublishWorkPushFails(t *testing.T) {
 	vcsProvider.AssertNotCalled(t, "CreateMergeRequest", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
 
-func TestRunGetLockHashError(t *testing.T) {
-	// If GetLockHash fails, resolveUpdate propagates the error.
+func TestRunProjectReadErrorAfterTheUpdate(t *testing.T) {
 	logger := zap.NewNop()
 	installer := NewMockInstaller(t)
 	repositoryService := NewMockGitService(t)
@@ -1303,7 +1302,7 @@ func TestRunGetLockHashError(t *testing.T) {
 	}, nil)
 
 	hashErr := errors.New("composer.lock not found")
-	mockComposer.EXPECT().GetLockHash(testCheckout).Return("", hashErr)
+	mockComposer.EXPECT().Project(anyCtx, testCheckout).Return(composer.Project{}, hashErr)
 
 	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
 	err := workflowService.Run(ctx, nil)
@@ -1345,7 +1344,7 @@ func TestRunBranchExistsError(t *testing.T) {
 	mockComposer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).Return([]composer.PackageChange{
 		{Package: "drupal/core", From: "9.0.0", To: "9.1.0"},
 	}, nil)
-	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
+	mockComposer.EXPECT().Project(anyCtx, testCheckout).Return(composer.Project{WebRoot: "web", LockHash: "dummy-hash"}, nil)
 
 	branchErr := errors.New("git remote unreachable")
 	repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
@@ -1407,7 +1406,7 @@ func TestRunConfigResaveError(t *testing.T) {
 	mockComposer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).Return([]composer.PackageChange{
 		{Package: "drupal/core", From: "9.0.0", To: "9.1.0"},
 	}, nil)
-	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
+	mockComposer.EXPECT().Project(anyCtx, testCheckout).Return(composer.Project{WebRoot: "web", LockHash: "dummy-hash"}, nil)
 
 	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
 	err := workflowService.Run(ctx, nil)
@@ -1467,7 +1466,7 @@ func TestRunExportConfigurationError(t *testing.T) {
 	mockComposer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).Return([]composer.PackageChange{
 		{Package: "drupal/core", From: "9.0.0", To: "9.1.0"},
 	}, nil)
-	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
+	mockComposer.EXPECT().Project(anyCtx, testCheckout).Return(composer.Project{WebRoot: "web", LockHash: "dummy-hash"}, nil)
 
 	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
 	err := workflowService.Run(ctx, nil)
@@ -1536,7 +1535,7 @@ func TestRunWithAutoMerge(t *testing.T) {
 		{Package: "drupal/core", From: "9.0.0", To: "9.1.0"},
 	}, nil)
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
-	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
+	mockComposer.EXPECT().Project(anyCtx, testCheckout).Return(composer.Project{WebRoot: "web", LockHash: "dummy-hash"}, nil)
 
 	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
 	err = workflowService.Run(ctx, nil)
@@ -1605,7 +1604,7 @@ func TestRunAutoMergeError(t *testing.T) {
 		{Package: "drupal/core", From: "9.0.0", To: "9.1.0"},
 	}, nil)
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
-	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
+	mockComposer.EXPECT().Project(anyCtx, testCheckout).Return(composer.Project{WebRoot: "web", LockHash: "dummy-hash"}, nil)
 
 	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
 	err := workflowService.Run(ctx, nil)
@@ -1675,7 +1674,7 @@ func TestRunAutoMergeSkippedWhenDisabled(t *testing.T) {
 		{Package: "drupal/core", From: "9.0.0", To: "9.1.0"},
 	}, nil)
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
-	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
+	mockComposer.EXPECT().Project(anyCtx, testCheckout).Return(composer.Project{WebRoot: "web", LockHash: "dummy-hash"}, nil)
 
 	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
 	err = workflowService.Run(ctx, nil)
@@ -1787,7 +1786,7 @@ func checkoutModeRun(t *testing.T, source, worktreePath string) (*Runner, *MockG
 		{Package: "drupal/core", From: "9.0.0", To: "9.1.0"},
 	}, nil)
 	mockComposer.EXPECT().Install(anyCtx, worktreePath).Return(nil)
-	mockComposer.EXPECT().GetLockHash(worktreePath).Return("dummy-hash", nil)
+	mockComposer.EXPECT().Project(anyCtx, worktreePath).Return(composer.Project{WebRoot: "web", LockHash: "dummy-hash"}, nil)
 
 	return New(zap.NewNop(), config, drush, vcsProvider, repositoryService, installer, mockComposer), repositoryService, repository
 }
@@ -2272,8 +2271,7 @@ func TestStageScaffoldChanges(t *testing.T) {
 
 	newComposer := func(webroot string) *MockComposer {
 		c := NewMockComposer(t)
-		c.EXPECT().GetConfig(mock.Anything, "/project", "extra.drupal-scaffold.locations.web-root").
-			Return(webroot, nil).Maybe()
+		c.EXPECT().Project(mock.Anything, "/project").Return(composer.Project{WebRoot: webroot}, nil).Maybe()
 		return c
 	}
 
@@ -2287,7 +2285,7 @@ func TestStageScaffoldChanges(t *testing.T) {
 		ws := testRun(services{
 			logger:   zap.New(core),
 			config:   config.Config{Sites: []string{"default"}},
-			composer: newComposer("web/"),
+			composer: newComposer("web"),
 		}, repo.Checkout{Worktree: worktree, Path: "/project"})
 
 		require.NoError(t, ws.stageScaffoldChanges(context.Background()))
@@ -2310,7 +2308,7 @@ func TestStageScaffoldChanges(t *testing.T) {
 		ws := testRun(services{
 			logger:   logger,
 			config:   config.Config{Sites: []string{"default"}},
-			composer: newComposer("web/"),
+			composer: newComposer("web"),
 		}, repo.Checkout{Worktree: worktree, Path: "/project"})
 
 		require.NoError(t, ws.stageScaffoldChanges(context.Background()))
@@ -2321,7 +2319,7 @@ func TestStageScaffoldChanges(t *testing.T) {
 		worktree := NewMockWorktree(t)
 		worktree.EXPECT().Unstaged(anyCtx).Return([]string{"config/sync/core.extension.yml"}, nil)
 
-		ws := testRun(services{logger: logger, composer: newComposer("web/")}, repo.Checkout{Worktree: worktree, Path: "/project"})
+		ws := testRun(services{logger: logger, composer: newComposer("web")}, repo.Checkout{Worktree: worktree, Path: "/project"})
 
 		require.NoError(t, ws.stageScaffoldChanges(context.Background()))
 	})
@@ -2339,7 +2337,7 @@ func TestStageScaffoldChanges(t *testing.T) {
 		worktree := NewMockWorktree(t)
 		worktree.EXPECT().Unstaged(anyCtx).Return(nil, errors.New("boom"))
 
-		ws := testRun(services{logger: logger, composer: newComposer("web/")}, repo.Checkout{Worktree: worktree, Path: "/project"})
+		ws := testRun(services{logger: logger, composer: newComposer("web")}, repo.Checkout{Worktree: worktree, Path: "/project"})
 
 		err := ws.stageScaffoldChanges(context.Background())
 		require.Error(t, err)
@@ -2351,8 +2349,7 @@ func TestStageScaffoldChanges(t *testing.T) {
 		worktree.EXPECT().Unstaged(anyCtx).Return([]string{"web/robots.txt"}, nil)
 
 		composerCLI := NewMockComposer(t)
-		composerCLI.EXPECT().GetConfig(mock.Anything, "/project", "extra.drupal-scaffold.locations.web-root").
-			Return("", errors.New("no web root"))
+		composerCLI.EXPECT().Project(mock.Anything, "/project").Return(composer.Project{}, errors.New("no web root"))
 
 		ws := testRun(services{logger: logger, composer: composerCLI}, repo.Checkout{Worktree: worktree, Path: "/project"})
 
@@ -2366,7 +2363,7 @@ func TestStageScaffoldChanges(t *testing.T) {
 		worktree.EXPECT().Unstaged(anyCtx).Return([]string{"web/robots.txt"}, nil)
 		worktree.EXPECT().Stage(anyCtx, []string{"web/robots.txt"}).Return(assert.AnError)
 
-		ws := testRun(services{logger: logger, composer: newComposer("web/")}, repo.Checkout{Worktree: worktree, Path: "/project"})
+		ws := testRun(services{logger: logger, composer: newComposer("web")}, repo.Checkout{Worktree: worktree, Path: "/project"})
 
 		err := ws.stageScaffoldChanges(context.Background())
 		require.ErrorIs(t, err, assert.AnError)
@@ -2413,7 +2410,7 @@ func TestRunFailsWhenScaffoldChangesCannotBeStaged(t *testing.T) {
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
 	mockComposer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).
 		Return([]composer.PackageChange{{Package: "drupal/core", From: "9.0.0", To: "9.1.0"}}, nil)
-	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
+	mockComposer.EXPECT().Project(anyCtx, testCheckout).Return(composer.Project{WebRoot: "web", LockHash: "dummy-hash"}, nil)
 	repository.EXPECT().RemoteBranchExists(anyCtx, "update-dummy-hash", "token").Return(false, nil)
 
 	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
@@ -2457,7 +2454,7 @@ func TestRunHandsAddonsTheRunsContextAndCommitter(t *testing.T) {
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
 	mockComposer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).
 		Return([]composer.PackageChange{{Action: "Upgrade", Package: "drupal/core", From: "9.0.0", To: "9.1.0"}}, nil)
-	mockComposer.EXPECT().GetLockHash(testCheckout).Return("dummy-hash", nil)
+	mockComposer.EXPECT().Project(anyCtx, testCheckout).Return(composer.Project{WebRoot: "web", LockHash: "dummy-hash"}, nil)
 	installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil)
 	installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil)
 	installer.EXPECT().RestoreSettings(anyCtx, testCheckout, "site1").Return(nil)

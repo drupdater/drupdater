@@ -51,25 +51,23 @@ func (_m *MockBeautifierComposer) EXPECT() *MockBeautifierComposer_Expecter {
 	return &MockBeautifierComposer_Expecter{mock: &_m.Mock}
 }
 
-// GetCustomCodeDirectories provides a mock function for the type MockBeautifierComposer
-func (_mock *MockBeautifierComposer) GetCustomCodeDirectories(ctx context.Context, dir string) ([]string, error) {
+// Project provides a mock function for the type MockBeautifierComposer
+func (_mock *MockBeautifierComposer) Project(ctx context.Context, dir string) (composer.Project, error) {
 	ret := _mock.Called(ctx, dir)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetCustomCodeDirectories")
+		panic("no return value specified for Project")
 	}
 
-	var r0 []string
+	var r0 composer.Project
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) ([]string, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (composer.Project, error)); ok {
 		return returnFunc(ctx, dir)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) []string); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) composer.Project); ok {
 		r0 = returnFunc(ctx, dir)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]string)
-		}
+		r0 = ret.Get(0).(composer.Project)
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
 		r1 = returnFunc(ctx, dir)
@@ -79,19 +77,19 @@ func (_mock *MockBeautifierComposer) GetCustomCodeDirectories(ctx context.Contex
 	return r0, r1
 }
 
-// MockBeautifierComposer_GetCustomCodeDirectories_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetCustomCodeDirectories'
-type MockBeautifierComposer_GetCustomCodeDirectories_Call struct {
+// MockBeautifierComposer_Project_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Project'
+type MockBeautifierComposer_Project_Call struct {
 	*mock.Call
 }
 
-// GetCustomCodeDirectories is a helper method to define mock.On call
+// Project is a helper method to define mock.On call
 //   - ctx context.Context
 //   - dir string
-func (_e *MockBeautifierComposer_Expecter) GetCustomCodeDirectories(ctx any, dir any) *MockBeautifierComposer_GetCustomCodeDirectories_Call {
-	return &MockBeautifierComposer_GetCustomCodeDirectories_Call{Call: _e.mock.On("GetCustomCodeDirectories", ctx, dir)}
+func (_e *MockBeautifierComposer_Expecter) Project(ctx any, dir any) *MockBeautifierComposer_Project_Call {
+	return &MockBeautifierComposer_Project_Call{Call: _e.mock.On("Project", ctx, dir)}
 }
 
-func (_c *MockBeautifierComposer_GetCustomCodeDirectories_Call) Run(run func(ctx context.Context, dir string)) *MockBeautifierComposer_GetCustomCodeDirectories_Call {
+func (_c *MockBeautifierComposer_Project_Call) Run(run func(ctx context.Context, dir string)) *MockBeautifierComposer_Project_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -109,156 +107,12 @@ func (_c *MockBeautifierComposer_GetCustomCodeDirectories_Call) Run(run func(ctx
 	return _c
 }
 
-func (_c *MockBeautifierComposer_GetCustomCodeDirectories_Call) Return(strings []string, err error) *MockBeautifierComposer_GetCustomCodeDirectories_Call {
-	_c.Call.Return(strings, err)
+func (_c *MockBeautifierComposer_Project_Call) Return(project composer.Project, err error) *MockBeautifierComposer_Project_Call {
+	_c.Call.Return(project, err)
 	return _c
 }
 
-func (_c *MockBeautifierComposer_GetCustomCodeDirectories_Call) RunAndReturn(run func(ctx context.Context, dir string) ([]string, error)) *MockBeautifierComposer_GetCustomCodeDirectories_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// GetInstalledPackageVersion provides a mock function for the type MockBeautifierComposer
-func (_mock *MockBeautifierComposer) GetInstalledPackageVersion(ctx context.Context, dir string, packageName string) (string, error) {
-	ret := _mock.Called(ctx, dir, packageName)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetInstalledPackageVersion")
-	}
-
-	var r0 string
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) (string, error)); ok {
-		return returnFunc(ctx, dir, packageName)
-	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) string); ok {
-		r0 = returnFunc(ctx, dir, packageName)
-	} else {
-		r0 = ret.Get(0).(string)
-	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
-		r1 = returnFunc(ctx, dir, packageName)
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// MockBeautifierComposer_GetInstalledPackageVersion_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetInstalledPackageVersion'
-type MockBeautifierComposer_GetInstalledPackageVersion_Call struct {
-	*mock.Call
-}
-
-// GetInstalledPackageVersion is a helper method to define mock.On call
-//   - ctx context.Context
-//   - dir string
-//   - packageName string
-func (_e *MockBeautifierComposer_Expecter) GetInstalledPackageVersion(ctx any, dir any, packageName any) *MockBeautifierComposer_GetInstalledPackageVersion_Call {
-	return &MockBeautifierComposer_GetInstalledPackageVersion_Call{Call: _e.mock.On("GetInstalledPackageVersion", ctx, dir, packageName)}
-}
-
-func (_c *MockBeautifierComposer_GetInstalledPackageVersion_Call) Run(run func(ctx context.Context, dir string, packageName string)) *MockBeautifierComposer_GetInstalledPackageVersion_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 context.Context
-		if args[0] != nil {
-			arg0 = args[0].(context.Context)
-		}
-		var arg1 string
-		if args[1] != nil {
-			arg1 = args[1].(string)
-		}
-		var arg2 string
-		if args[2] != nil {
-			arg2 = args[2].(string)
-		}
-		run(
-			arg0,
-			arg1,
-			arg2,
-		)
-	})
-	return _c
-}
-
-func (_c *MockBeautifierComposer_GetInstalledPackageVersion_Call) Return(s string, err error) *MockBeautifierComposer_GetInstalledPackageVersion_Call {
-	_c.Call.Return(s, err)
-	return _c
-}
-
-func (_c *MockBeautifierComposer_GetInstalledPackageVersion_Call) RunAndReturn(run func(ctx context.Context, dir string, packageName string) (string, error)) *MockBeautifierComposer_GetInstalledPackageVersion_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// IsPackageInstalled provides a mock function for the type MockBeautifierComposer
-func (_mock *MockBeautifierComposer) IsPackageInstalled(ctx context.Context, dir string, packageToCheck string) (bool, error) {
-	ret := _mock.Called(ctx, dir, packageToCheck)
-
-	if len(ret) == 0 {
-		panic("no return value specified for IsPackageInstalled")
-	}
-
-	var r0 bool
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) (bool, error)); ok {
-		return returnFunc(ctx, dir, packageToCheck)
-	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) bool); ok {
-		r0 = returnFunc(ctx, dir, packageToCheck)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
-		r1 = returnFunc(ctx, dir, packageToCheck)
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// MockBeautifierComposer_IsPackageInstalled_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IsPackageInstalled'
-type MockBeautifierComposer_IsPackageInstalled_Call struct {
-	*mock.Call
-}
-
-// IsPackageInstalled is a helper method to define mock.On call
-//   - ctx context.Context
-//   - dir string
-//   - packageToCheck string
-func (_e *MockBeautifierComposer_Expecter) IsPackageInstalled(ctx any, dir any, packageToCheck any) *MockBeautifierComposer_IsPackageInstalled_Call {
-	return &MockBeautifierComposer_IsPackageInstalled_Call{Call: _e.mock.On("IsPackageInstalled", ctx, dir, packageToCheck)}
-}
-
-func (_c *MockBeautifierComposer_IsPackageInstalled_Call) Run(run func(ctx context.Context, dir string, packageToCheck string)) *MockBeautifierComposer_IsPackageInstalled_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 context.Context
-		if args[0] != nil {
-			arg0 = args[0].(context.Context)
-		}
-		var arg1 string
-		if args[1] != nil {
-			arg1 = args[1].(string)
-		}
-		var arg2 string
-		if args[2] != nil {
-			arg2 = args[2].(string)
-		}
-		run(
-			arg0,
-			arg1,
-			arg2,
-		)
-	})
-	return _c
-}
-
-func (_c *MockBeautifierComposer_IsPackageInstalled_Call) Return(b bool, err error) *MockBeautifierComposer_IsPackageInstalled_Call {
-	_c.Call.Return(b, err)
-	return _c
-}
-
-func (_c *MockBeautifierComposer_IsPackageInstalled_Call) RunAndReturn(run func(ctx context.Context, dir string, packageToCheck string) (bool, error)) *MockBeautifierComposer_IsPackageInstalled_Call {
+func (_c *MockBeautifierComposer_Project_Call) RunAndReturn(run func(ctx context.Context, dir string) (composer.Project, error)) *MockBeautifierComposer_Project_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -458,85 +312,23 @@ func (_m *MockAllowPluginsComposer) EXPECT() *MockAllowPluginsComposer_Expecter 
 	return &MockAllowPluginsComposer_Expecter{mock: &_m.Mock}
 }
 
-// GetAllowPlugins provides a mock function for the type MockAllowPluginsComposer
-func (_mock *MockAllowPluginsComposer) GetAllowPlugins(dir string) (composer.AllowPlugins, error) {
-	ret := _mock.Called(dir)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetAllowPlugins")
-	}
-
-	var r0 composer.AllowPlugins
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(string) (composer.AllowPlugins, error)); ok {
-		return returnFunc(dir)
-	}
-	if returnFunc, ok := ret.Get(0).(func(string) composer.AllowPlugins); ok {
-		r0 = returnFunc(dir)
-	} else {
-		r0 = ret.Get(0).(composer.AllowPlugins)
-	}
-	if returnFunc, ok := ret.Get(1).(func(string) error); ok {
-		r1 = returnFunc(dir)
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// MockAllowPluginsComposer_GetAllowPlugins_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetAllowPlugins'
-type MockAllowPluginsComposer_GetAllowPlugins_Call struct {
-	*mock.Call
-}
-
-// GetAllowPlugins is a helper method to define mock.On call
-//   - dir string
-func (_e *MockAllowPluginsComposer_Expecter) GetAllowPlugins(dir any) *MockAllowPluginsComposer_GetAllowPlugins_Call {
-	return &MockAllowPluginsComposer_GetAllowPlugins_Call{Call: _e.mock.On("GetAllowPlugins", dir)}
-}
-
-func (_c *MockAllowPluginsComposer_GetAllowPlugins_Call) Run(run func(dir string)) *MockAllowPluginsComposer_GetAllowPlugins_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 string
-		if args[0] != nil {
-			arg0 = args[0].(string)
-		}
-		run(
-			arg0,
-		)
-	})
-	return _c
-}
-
-func (_c *MockAllowPluginsComposer_GetAllowPlugins_Call) Return(allowPlugins composer.AllowPlugins, err error) *MockAllowPluginsComposer_GetAllowPlugins_Call {
-	_c.Call.Return(allowPlugins, err)
-	return _c
-}
-
-func (_c *MockAllowPluginsComposer_GetAllowPlugins_Call) RunAndReturn(run func(dir string) (composer.AllowPlugins, error)) *MockAllowPluginsComposer_GetAllowPlugins_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// GetInstalledPlugins provides a mock function for the type MockAllowPluginsComposer
-func (_mock *MockAllowPluginsComposer) GetInstalledPlugins(ctx context.Context, dir string) (map[string]any, error) {
+// Project provides a mock function for the type MockAllowPluginsComposer
+func (_mock *MockAllowPluginsComposer) Project(ctx context.Context, dir string) (composer.Project, error) {
 	ret := _mock.Called(ctx, dir)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetInstalledPlugins")
+		panic("no return value specified for Project")
 	}
 
-	var r0 map[string]any
+	var r0 composer.Project
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (map[string]any, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (composer.Project, error)); ok {
 		return returnFunc(ctx, dir)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) map[string]any); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) composer.Project); ok {
 		r0 = returnFunc(ctx, dir)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(map[string]any)
-		}
+		r0 = ret.Get(0).(composer.Project)
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
 		r1 = returnFunc(ctx, dir)
@@ -546,19 +338,19 @@ func (_mock *MockAllowPluginsComposer) GetInstalledPlugins(ctx context.Context, 
 	return r0, r1
 }
 
-// MockAllowPluginsComposer_GetInstalledPlugins_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetInstalledPlugins'
-type MockAllowPluginsComposer_GetInstalledPlugins_Call struct {
+// MockAllowPluginsComposer_Project_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Project'
+type MockAllowPluginsComposer_Project_Call struct {
 	*mock.Call
 }
 
-// GetInstalledPlugins is a helper method to define mock.On call
+// Project is a helper method to define mock.On call
 //   - ctx context.Context
 //   - dir string
-func (_e *MockAllowPluginsComposer_Expecter) GetInstalledPlugins(ctx any, dir any) *MockAllowPluginsComposer_GetInstalledPlugins_Call {
-	return &MockAllowPluginsComposer_GetInstalledPlugins_Call{Call: _e.mock.On("GetInstalledPlugins", ctx, dir)}
+func (_e *MockAllowPluginsComposer_Expecter) Project(ctx any, dir any) *MockAllowPluginsComposer_Project_Call {
+	return &MockAllowPluginsComposer_Project_Call{Call: _e.mock.On("Project", ctx, dir)}
 }
 
-func (_c *MockAllowPluginsComposer_GetInstalledPlugins_Call) Run(run func(ctx context.Context, dir string)) *MockAllowPluginsComposer_GetInstalledPlugins_Call {
+func (_c *MockAllowPluginsComposer_Project_Call) Run(run func(ctx context.Context, dir string)) *MockAllowPluginsComposer_Project_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -576,12 +368,12 @@ func (_c *MockAllowPluginsComposer_GetInstalledPlugins_Call) Run(run func(ctx co
 	return _c
 }
 
-func (_c *MockAllowPluginsComposer_GetInstalledPlugins_Call) Return(stringToAnyMoqParam map[string]any, err error) *MockAllowPluginsComposer_GetInstalledPlugins_Call {
-	_c.Call.Return(stringToAnyMoqParam, err)
+func (_c *MockAllowPluginsComposer_Project_Call) Return(project composer.Project, err error) *MockAllowPluginsComposer_Project_Call {
+	_c.Call.Return(project, err)
 	return _c
 }
 
-func (_c *MockAllowPluginsComposer_GetInstalledPlugins_Call) RunAndReturn(run func(ctx context.Context, dir string) (map[string]any, error)) *MockAllowPluginsComposer_GetInstalledPlugins_Call {
+func (_c *MockAllowPluginsComposer_Project_Call) RunAndReturn(run func(ctx context.Context, dir string) (composer.Project, error)) *MockAllowPluginsComposer_Project_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -960,78 +752,6 @@ func (_m *MockNormalizerComposer) EXPECT() *MockNormalizerComposer_Expecter {
 	return &MockNormalizerComposer_Expecter{mock: &_m.Mock}
 }
 
-// IsPackageInstalled provides a mock function for the type MockNormalizerComposer
-func (_mock *MockNormalizerComposer) IsPackageInstalled(ctx context.Context, dir string, packageToCheck string) (bool, error) {
-	ret := _mock.Called(ctx, dir, packageToCheck)
-
-	if len(ret) == 0 {
-		panic("no return value specified for IsPackageInstalled")
-	}
-
-	var r0 bool
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) (bool, error)); ok {
-		return returnFunc(ctx, dir, packageToCheck)
-	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) bool); ok {
-		r0 = returnFunc(ctx, dir, packageToCheck)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
-		r1 = returnFunc(ctx, dir, packageToCheck)
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// MockNormalizerComposer_IsPackageInstalled_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IsPackageInstalled'
-type MockNormalizerComposer_IsPackageInstalled_Call struct {
-	*mock.Call
-}
-
-// IsPackageInstalled is a helper method to define mock.On call
-//   - ctx context.Context
-//   - dir string
-//   - packageToCheck string
-func (_e *MockNormalizerComposer_Expecter) IsPackageInstalled(ctx any, dir any, packageToCheck any) *MockNormalizerComposer_IsPackageInstalled_Call {
-	return &MockNormalizerComposer_IsPackageInstalled_Call{Call: _e.mock.On("IsPackageInstalled", ctx, dir, packageToCheck)}
-}
-
-func (_c *MockNormalizerComposer_IsPackageInstalled_Call) Run(run func(ctx context.Context, dir string, packageToCheck string)) *MockNormalizerComposer_IsPackageInstalled_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 context.Context
-		if args[0] != nil {
-			arg0 = args[0].(context.Context)
-		}
-		var arg1 string
-		if args[1] != nil {
-			arg1 = args[1].(string)
-		}
-		var arg2 string
-		if args[2] != nil {
-			arg2 = args[2].(string)
-		}
-		run(
-			arg0,
-			arg1,
-			arg2,
-		)
-	})
-	return _c
-}
-
-func (_c *MockNormalizerComposer_IsPackageInstalled_Call) Return(b bool, err error) *MockNormalizerComposer_IsPackageInstalled_Call {
-	_c.Call.Return(b, err)
-	return _c
-}
-
-func (_c *MockNormalizerComposer_IsPackageInstalled_Call) RunAndReturn(run func(ctx context.Context, dir string, packageToCheck string) (bool, error)) *MockNormalizerComposer_IsPackageInstalled_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // Normalize provides a mock function for the type MockNormalizerComposer
 func (_mock *MockNormalizerComposer) Normalize(ctx context.Context, dir string) (string, error) {
 	ret := _mock.Called(ctx, dir)
@@ -1094,6 +814,72 @@ func (_c *MockNormalizerComposer_Normalize_Call) Return(s string, err error) *Mo
 }
 
 func (_c *MockNormalizerComposer_Normalize_Call) RunAndReturn(run func(ctx context.Context, dir string) (string, error)) *MockNormalizerComposer_Normalize_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Project provides a mock function for the type MockNormalizerComposer
+func (_mock *MockNormalizerComposer) Project(ctx context.Context, dir string) (composer.Project, error) {
+	ret := _mock.Called(ctx, dir)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Project")
+	}
+
+	var r0 composer.Project
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (composer.Project, error)); ok {
+		return returnFunc(ctx, dir)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) composer.Project); ok {
+		r0 = returnFunc(ctx, dir)
+	} else {
+		r0 = ret.Get(0).(composer.Project)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, dir)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockNormalizerComposer_Project_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Project'
+type MockNormalizerComposer_Project_Call struct {
+	*mock.Call
+}
+
+// Project is a helper method to define mock.On call
+//   - ctx context.Context
+//   - dir string
+func (_e *MockNormalizerComposer_Expecter) Project(ctx any, dir any) *MockNormalizerComposer_Project_Call {
+	return &MockNormalizerComposer_Project_Call{Call: _e.mock.On("Project", ctx, dir)}
+}
+
+func (_c *MockNormalizerComposer_Project_Call) Run(run func(ctx context.Context, dir string)) *MockNormalizerComposer_Project_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockNormalizerComposer_Project_Call) Return(project composer.Project, err error) *MockNormalizerComposer_Project_Call {
+	_c.Call.Return(project, err)
+	return _c
+}
+
+func (_c *MockNormalizerComposer_Project_Call) RunAndReturn(run func(ctx context.Context, dir string) (composer.Project, error)) *MockNormalizerComposer_Project_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1302,97 +1088,23 @@ func (_c *MockPatchesComposer_CheckIfPatchesApply_Call) RunAndReturn(run func(ct
 	return _c
 }
 
-// GetConfig provides a mock function for the type MockPatchesComposer
-func (_mock *MockPatchesComposer) GetConfig(ctx context.Context, dir string, key string) (string, error) {
-	ret := _mock.Called(ctx, dir, key)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetConfig")
-	}
-
-	var r0 string
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) (string, error)); ok {
-		return returnFunc(ctx, dir, key)
-	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) string); ok {
-		r0 = returnFunc(ctx, dir, key)
-	} else {
-		r0 = ret.Get(0).(string)
-	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
-		r1 = returnFunc(ctx, dir, key)
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// MockPatchesComposer_GetConfig_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetConfig'
-type MockPatchesComposer_GetConfig_Call struct {
-	*mock.Call
-}
-
-// GetConfig is a helper method to define mock.On call
-//   - ctx context.Context
-//   - dir string
-//   - key string
-func (_e *MockPatchesComposer_Expecter) GetConfig(ctx any, dir any, key any) *MockPatchesComposer_GetConfig_Call {
-	return &MockPatchesComposer_GetConfig_Call{Call: _e.mock.On("GetConfig", ctx, dir, key)}
-}
-
-func (_c *MockPatchesComposer_GetConfig_Call) Run(run func(ctx context.Context, dir string, key string)) *MockPatchesComposer_GetConfig_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 context.Context
-		if args[0] != nil {
-			arg0 = args[0].(context.Context)
-		}
-		var arg1 string
-		if args[1] != nil {
-			arg1 = args[1].(string)
-		}
-		var arg2 string
-		if args[2] != nil {
-			arg2 = args[2].(string)
-		}
-		run(
-			arg0,
-			arg1,
-			arg2,
-		)
-	})
-	return _c
-}
-
-func (_c *MockPatchesComposer_GetConfig_Call) Return(s string, err error) *MockPatchesComposer_GetConfig_Call {
-	_c.Call.Return(s, err)
-	return _c
-}
-
-func (_c *MockPatchesComposer_GetConfig_Call) RunAndReturn(run func(ctx context.Context, dir string, key string) (string, error)) *MockPatchesComposer_GetConfig_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// GetDependencyPatches provides a mock function for the type MockPatchesComposer
-func (_mock *MockPatchesComposer) GetDependencyPatches(ctx context.Context, dir string) (map[string]map[string]bool, error) {
+// Project provides a mock function for the type MockPatchesComposer
+func (_mock *MockPatchesComposer) Project(ctx context.Context, dir string) (composer.Project, error) {
 	ret := _mock.Called(ctx, dir)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetDependencyPatches")
+		panic("no return value specified for Project")
 	}
 
-	var r0 map[string]map[string]bool
+	var r0 composer.Project
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (map[string]map[string]bool, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (composer.Project, error)); ok {
 		return returnFunc(ctx, dir)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) map[string]map[string]bool); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) composer.Project); ok {
 		r0 = returnFunc(ctx, dir)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(map[string]map[string]bool)
-		}
+		r0 = ret.Get(0).(composer.Project)
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
 		r1 = returnFunc(ctx, dir)
@@ -1402,19 +1114,19 @@ func (_mock *MockPatchesComposer) GetDependencyPatches(ctx context.Context, dir 
 	return r0, r1
 }
 
-// MockPatchesComposer_GetDependencyPatches_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetDependencyPatches'
-type MockPatchesComposer_GetDependencyPatches_Call struct {
+// MockPatchesComposer_Project_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Project'
+type MockPatchesComposer_Project_Call struct {
 	*mock.Call
 }
 
-// GetDependencyPatches is a helper method to define mock.On call
+// Project is a helper method to define mock.On call
 //   - ctx context.Context
 //   - dir string
-func (_e *MockPatchesComposer_Expecter) GetDependencyPatches(ctx any, dir any) *MockPatchesComposer_GetDependencyPatches_Call {
-	return &MockPatchesComposer_GetDependencyPatches_Call{Call: _e.mock.On("GetDependencyPatches", ctx, dir)}
+func (_e *MockPatchesComposer_Expecter) Project(ctx any, dir any) *MockPatchesComposer_Project_Call {
+	return &MockPatchesComposer_Project_Call{Call: _e.mock.On("Project", ctx, dir)}
 }
 
-func (_c *MockPatchesComposer_GetDependencyPatches_Call) Run(run func(ctx context.Context, dir string)) *MockPatchesComposer_GetDependencyPatches_Call {
+func (_c *MockPatchesComposer_Project_Call) Run(run func(ctx context.Context, dir string)) *MockPatchesComposer_Project_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -1432,84 +1144,12 @@ func (_c *MockPatchesComposer_GetDependencyPatches_Call) Run(run func(ctx contex
 	return _c
 }
 
-func (_c *MockPatchesComposer_GetDependencyPatches_Call) Return(stringToStringToBool map[string]map[string]bool, err error) *MockPatchesComposer_GetDependencyPatches_Call {
-	_c.Call.Return(stringToStringToBool, err)
+func (_c *MockPatchesComposer_Project_Call) Return(project composer.Project, err error) *MockPatchesComposer_Project_Call {
+	_c.Call.Return(project, err)
 	return _c
 }
 
-func (_c *MockPatchesComposer_GetDependencyPatches_Call) RunAndReturn(run func(ctx context.Context, dir string) (map[string]map[string]bool, error)) *MockPatchesComposer_GetDependencyPatches_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// IsPackageInstalled provides a mock function for the type MockPatchesComposer
-func (_mock *MockPatchesComposer) IsPackageInstalled(ctx context.Context, dir string, packageToCheck string) (bool, error) {
-	ret := _mock.Called(ctx, dir, packageToCheck)
-
-	if len(ret) == 0 {
-		panic("no return value specified for IsPackageInstalled")
-	}
-
-	var r0 bool
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) (bool, error)); ok {
-		return returnFunc(ctx, dir, packageToCheck)
-	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) bool); ok {
-		r0 = returnFunc(ctx, dir, packageToCheck)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
-		r1 = returnFunc(ctx, dir, packageToCheck)
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// MockPatchesComposer_IsPackageInstalled_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IsPackageInstalled'
-type MockPatchesComposer_IsPackageInstalled_Call struct {
-	*mock.Call
-}
-
-// IsPackageInstalled is a helper method to define mock.On call
-//   - ctx context.Context
-//   - dir string
-//   - packageToCheck string
-func (_e *MockPatchesComposer_Expecter) IsPackageInstalled(ctx any, dir any, packageToCheck any) *MockPatchesComposer_IsPackageInstalled_Call {
-	return &MockPatchesComposer_IsPackageInstalled_Call{Call: _e.mock.On("IsPackageInstalled", ctx, dir, packageToCheck)}
-}
-
-func (_c *MockPatchesComposer_IsPackageInstalled_Call) Run(run func(ctx context.Context, dir string, packageToCheck string)) *MockPatchesComposer_IsPackageInstalled_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 context.Context
-		if args[0] != nil {
-			arg0 = args[0].(context.Context)
-		}
-		var arg1 string
-		if args[1] != nil {
-			arg1 = args[1].(string)
-		}
-		var arg2 string
-		if args[2] != nil {
-			arg2 = args[2].(string)
-		}
-		run(
-			arg0,
-			arg1,
-			arg2,
-		)
-	})
-	return _c
-}
-
-func (_c *MockPatchesComposer_IsPackageInstalled_Call) Return(b bool, err error) *MockPatchesComposer_IsPackageInstalled_Call {
-	_c.Call.Return(b, err)
-	return _c
-}
-
-func (_c *MockPatchesComposer_IsPackageInstalled_Call) RunAndReturn(run func(ctx context.Context, dir string, packageToCheck string) (bool, error)) *MockPatchesComposer_IsPackageInstalled_Call {
+func (_c *MockPatchesComposer_Project_Call) RunAndReturn(run func(ctx context.Context, dir string) (composer.Project, error)) *MockPatchesComposer_Project_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -2218,25 +1858,23 @@ func (_m *MockDeprecationsComposer) EXPECT() *MockDeprecationsComposer_Expecter 
 	return &MockDeprecationsComposer_Expecter{mock: &_m.Mock}
 }
 
-// GetCustomCodeDirectories provides a mock function for the type MockDeprecationsComposer
-func (_mock *MockDeprecationsComposer) GetCustomCodeDirectories(ctx context.Context, dir string) ([]string, error) {
+// Project provides a mock function for the type MockDeprecationsComposer
+func (_mock *MockDeprecationsComposer) Project(ctx context.Context, dir string) (composer.Project, error) {
 	ret := _mock.Called(ctx, dir)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetCustomCodeDirectories")
+		panic("no return value specified for Project")
 	}
 
-	var r0 []string
+	var r0 composer.Project
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) ([]string, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (composer.Project, error)); ok {
 		return returnFunc(ctx, dir)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) []string); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) composer.Project); ok {
 		r0 = returnFunc(ctx, dir)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]string)
-		}
+		r0 = ret.Get(0).(composer.Project)
 	}
 	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
 		r1 = returnFunc(ctx, dir)
@@ -2246,19 +1884,19 @@ func (_mock *MockDeprecationsComposer) GetCustomCodeDirectories(ctx context.Cont
 	return r0, r1
 }
 
-// MockDeprecationsComposer_GetCustomCodeDirectories_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetCustomCodeDirectories'
-type MockDeprecationsComposer_GetCustomCodeDirectories_Call struct {
+// MockDeprecationsComposer_Project_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Project'
+type MockDeprecationsComposer_Project_Call struct {
 	*mock.Call
 }
 
-// GetCustomCodeDirectories is a helper method to define mock.On call
+// Project is a helper method to define mock.On call
 //   - ctx context.Context
 //   - dir string
-func (_e *MockDeprecationsComposer_Expecter) GetCustomCodeDirectories(ctx any, dir any) *MockDeprecationsComposer_GetCustomCodeDirectories_Call {
-	return &MockDeprecationsComposer_GetCustomCodeDirectories_Call{Call: _e.mock.On("GetCustomCodeDirectories", ctx, dir)}
+func (_e *MockDeprecationsComposer_Expecter) Project(ctx any, dir any) *MockDeprecationsComposer_Project_Call {
+	return &MockDeprecationsComposer_Project_Call{Call: _e.mock.On("Project", ctx, dir)}
 }
 
-func (_c *MockDeprecationsComposer_GetCustomCodeDirectories_Call) Run(run func(ctx context.Context, dir string)) *MockDeprecationsComposer_GetCustomCodeDirectories_Call {
+func (_c *MockDeprecationsComposer_Project_Call) Run(run func(ctx context.Context, dir string)) *MockDeprecationsComposer_Project_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -2276,84 +1914,12 @@ func (_c *MockDeprecationsComposer_GetCustomCodeDirectories_Call) Run(run func(c
 	return _c
 }
 
-func (_c *MockDeprecationsComposer_GetCustomCodeDirectories_Call) Return(strings []string, err error) *MockDeprecationsComposer_GetCustomCodeDirectories_Call {
-	_c.Call.Return(strings, err)
+func (_c *MockDeprecationsComposer_Project_Call) Return(project composer.Project, err error) *MockDeprecationsComposer_Project_Call {
+	_c.Call.Return(project, err)
 	return _c
 }
 
-func (_c *MockDeprecationsComposer_GetCustomCodeDirectories_Call) RunAndReturn(run func(ctx context.Context, dir string) ([]string, error)) *MockDeprecationsComposer_GetCustomCodeDirectories_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// IsPackageInstalled provides a mock function for the type MockDeprecationsComposer
-func (_mock *MockDeprecationsComposer) IsPackageInstalled(ctx context.Context, dir string, packageToCheck string) (bool, error) {
-	ret := _mock.Called(ctx, dir, packageToCheck)
-
-	if len(ret) == 0 {
-		panic("no return value specified for IsPackageInstalled")
-	}
-
-	var r0 bool
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) (bool, error)); ok {
-		return returnFunc(ctx, dir, packageToCheck)
-	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) bool); ok {
-		r0 = returnFunc(ctx, dir, packageToCheck)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
-		r1 = returnFunc(ctx, dir, packageToCheck)
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// MockDeprecationsComposer_IsPackageInstalled_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IsPackageInstalled'
-type MockDeprecationsComposer_IsPackageInstalled_Call struct {
-	*mock.Call
-}
-
-// IsPackageInstalled is a helper method to define mock.On call
-//   - ctx context.Context
-//   - dir string
-//   - packageToCheck string
-func (_e *MockDeprecationsComposer_Expecter) IsPackageInstalled(ctx any, dir any, packageToCheck any) *MockDeprecationsComposer_IsPackageInstalled_Call {
-	return &MockDeprecationsComposer_IsPackageInstalled_Call{Call: _e.mock.On("IsPackageInstalled", ctx, dir, packageToCheck)}
-}
-
-func (_c *MockDeprecationsComposer_IsPackageInstalled_Call) Run(run func(ctx context.Context, dir string, packageToCheck string)) *MockDeprecationsComposer_IsPackageInstalled_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 context.Context
-		if args[0] != nil {
-			arg0 = args[0].(context.Context)
-		}
-		var arg1 string
-		if args[1] != nil {
-			arg1 = args[1].(string)
-		}
-		var arg2 string
-		if args[2] != nil {
-			arg2 = args[2].(string)
-		}
-		run(
-			arg0,
-			arg1,
-			arg2,
-		)
-	})
-	return _c
-}
-
-func (_c *MockDeprecationsComposer_IsPackageInstalled_Call) Return(b bool, err error) *MockDeprecationsComposer_IsPackageInstalled_Call {
-	_c.Call.Return(b, err)
-	return _c
-}
-
-func (_c *MockDeprecationsComposer_IsPackageInstalled_Call) RunAndReturn(run func(ctx context.Context, dir string, packageToCheck string) (bool, error)) *MockDeprecationsComposer_IsPackageInstalled_Call {
+func (_c *MockDeprecationsComposer_Project_Call) RunAndReturn(run func(ctx context.Context, dir string) (composer.Project, error)) *MockDeprecationsComposer_Project_Call {
 	_c.Call.Return(run)
 	return _c
 }
