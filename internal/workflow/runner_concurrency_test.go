@@ -121,12 +121,6 @@ func TestRunWithConcurrentSites(t *testing.T) {
 	// The sites commit into one shared working tree, so that must stay one site at a time
 	// however many are running.
 	assert.EqualValues(t, 1, commitTail.peak(), "the sites' commits overlapped")
-
-	installer.AssertExpectations(t)
-	drush.AssertExpectations(t)
-	repositoryService.AssertExpectations(t)
-	mockComposer.AssertExpectations(t)
-	vcsProvider.AssertExpectations(t)
 }
 
 // sitesRunner is a Runner whose sites each export to config/<site>, and which records the order

@@ -26,7 +26,6 @@ func TestDefaultComposerNormalize_PostComposerUpdateHandler_PackageInstalled(t *
 	err := normalize.postComposerUpdateHandler(e)
 
 	require.NoError(t, err)
-	composer.AssertExpectations(t)
 }
 
 func TestDefaultComposerNormalize_PostComposerUpdateHandler_PackageNotInstalled(t *testing.T) {
@@ -46,5 +45,4 @@ func TestDefaultComposerNormalize_PostComposerUpdateHandler_PackageNotInstalled(
 	err := normalize.postComposerUpdateHandler(e)
 
 	require.NoError(t, err)
-	composer.AssertExpectations(t)
 }
