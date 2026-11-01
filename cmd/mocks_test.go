@@ -350,6 +350,87 @@ func (_c *mockaddonComposer_Diff_Call) RunAndReturn(run func(ctx context.Context
 	return _c
 }
 
+// Exec provides a mock function for the type mockaddonComposer
+func (_mock *mockaddonComposer) Exec(ctx context.Context, dir string, args ...string) (string, error) {
+	var tmpRet mock.Arguments
+	if len(args) > 0 {
+		tmpRet = _mock.Called(ctx, dir, args)
+	} else {
+		tmpRet = _mock.Called(ctx, dir)
+	}
+	ret := tmpRet
+
+	if len(ret) == 0 {
+		panic("no return value specified for Exec")
+	}
+
+	var r0 string
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, ...string) (string, error)); ok {
+		return returnFunc(ctx, dir, args...)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, ...string) string); ok {
+		r0 = returnFunc(ctx, dir, args...)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, ...string) error); ok {
+		r1 = returnFunc(ctx, dir, args...)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// mockaddonComposer_Exec_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Exec'
+type mockaddonComposer_Exec_Call struct {
+	*mock.Call
+}
+
+// Exec is a helper method to define mock.On call
+//   - ctx context.Context
+//   - dir string
+//   - args ...string
+func (_e *mockaddonComposer_Expecter) Exec(ctx any, dir any, args ...any) *mockaddonComposer_Exec_Call {
+	return &mockaddonComposer_Exec_Call{Call: _e.mock.On("Exec",
+		append([]any{ctx, dir}, args...)...)}
+}
+
+func (_c *mockaddonComposer_Exec_Call) Run(run func(ctx context.Context, dir string, args ...string)) *mockaddonComposer_Exec_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 []string
+		var variadicArgs []string
+		if len(args) > 2 {
+			variadicArgs = args[2].([]string)
+		}
+		arg2 = variadicArgs
+		run(
+			arg0,
+			arg1,
+			arg2...,
+		)
+	})
+	return _c
+}
+
+func (_c *mockaddonComposer_Exec_Call) Return(s string, err error) *mockaddonComposer_Exec_Call {
+	_c.Call.Return(s, err)
+	return _c
+}
+
+func (_c *mockaddonComposer_Exec_Call) RunAndReturn(run func(ctx context.Context, dir string, args ...string) (string, error)) *mockaddonComposer_Exec_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetAllowPlugins provides a mock function for the type mockaddonComposer
 func (_mock *mockaddonComposer) GetAllowPlugins(dir string) (composer.AllowPlugins, error) {
 	ret := _mock.Called(dir)
@@ -1211,6 +1292,93 @@ type mockaddonDrush_Expecter struct {
 
 func (_m *mockaddonDrush) EXPECT() *mockaddonDrush_Expecter {
 	return &mockaddonDrush_Expecter{mock: &_m.Mock}
+}
+
+// Exec provides a mock function for the type mockaddonDrush
+func (_mock *mockaddonDrush) Exec(ctx context.Context, dir string, site string, args ...string) (string, error) {
+	var tmpRet mock.Arguments
+	if len(args) > 0 {
+		tmpRet = _mock.Called(ctx, dir, site, args)
+	} else {
+		tmpRet = _mock.Called(ctx, dir, site)
+	}
+	ret := tmpRet
+
+	if len(ret) == 0 {
+		panic("no return value specified for Exec")
+	}
+
+	var r0 string
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, ...string) (string, error)); ok {
+		return returnFunc(ctx, dir, site, args...)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, ...string) string); ok {
+		r0 = returnFunc(ctx, dir, site, args...)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string, ...string) error); ok {
+		r1 = returnFunc(ctx, dir, site, args...)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// mockaddonDrush_Exec_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Exec'
+type mockaddonDrush_Exec_Call struct {
+	*mock.Call
+}
+
+// Exec is a helper method to define mock.On call
+//   - ctx context.Context
+//   - dir string
+//   - site string
+//   - args ...string
+func (_e *mockaddonDrush_Expecter) Exec(ctx any, dir any, site any, args ...any) *mockaddonDrush_Exec_Call {
+	return &mockaddonDrush_Exec_Call{Call: _e.mock.On("Exec",
+		append([]any{ctx, dir, site}, args...)...)}
+}
+
+func (_c *mockaddonDrush_Exec_Call) Run(run func(ctx context.Context, dir string, site string, args ...string)) *mockaddonDrush_Exec_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 []string
+		var variadicArgs []string
+		if len(args) > 3 {
+			variadicArgs = args[3].([]string)
+		}
+		arg3 = variadicArgs
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3...,
+		)
+	})
+	return _c
+}
+
+func (_c *mockaddonDrush_Exec_Call) Return(s string, err error) *mockaddonDrush_Exec_Call {
+	_c.Call.Return(s, err)
+	return _c
+}
+
+func (_c *mockaddonDrush_Exec_Call) RunAndReturn(run func(ctx context.Context, dir string, site string, args ...string) (string, error)) *mockaddonDrush_Exec_Call {
+	_c.Call.Return(run)
+	return _c
 }
 
 // LocalizeTranslations provides a mock function for the type mockaddonDrush

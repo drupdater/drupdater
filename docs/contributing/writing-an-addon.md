@@ -5,6 +5,10 @@ event](../explanation/addon-architecture.md) and does one job when it fires. Add
 capability to Drupdater almost always means adding an addon rather than touching the
 workflow.
 
+This page is about adding a **builtin** addon to this repository. To write one in your own
+module and binary, see [Build an addon outside
+Drupdater](../how-to/build-an-external-addon.md).
+
 ## The rules
 
 **Addons never call each other.** If your addon needs another one to have run first,

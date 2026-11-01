@@ -47,6 +47,12 @@ func (e *CLI) execDrush(ctx context.Context, dir string, site string, args ...st
 	return e.command(dir, site).Combined(ctx, drushArgs(args)...)
 }
 
+// Exec runs drush with args against site in dir and returns its combined output: the escape hatch
+// for an addon outside drupdater.
+func (e *CLI) Exec(ctx context.Context, dir string, site string, args ...string) (string, error) {
+	return e.execDrush(ctx, dir, site, args...)
+}
+
 func (e *CLI) InstallSite(ctx context.Context, dir string, site string) error {
 	out, err := e.execDrush(ctx, dir, site, "--existing-config", "--yes", "site:install", "--sites-subdir="+site, "--verbose")
 	if err != nil {

@@ -115,6 +115,17 @@ func (p *Pipeline) Report(rec *report.Recorder) {
 	}
 }
 
+// DescriptionTemplates returns every describing addon's template by its report key.
+func (p *Pipeline) DescriptionTemplates() map[string]string {
+	templates := map[string]string{}
+	for _, a := range p.addons {
+		if d, ok := a.(Describer); ok {
+			templates[d.ReportKey()] = d.DescriptionTemplate()
+		}
+	}
+	return templates
+}
+
 type staged interface {
 	comparable
 	stage() Stage

@@ -8,12 +8,12 @@ import (
 
 // DescribeWith renders rep with tmpl in place of the embedded templates.
 func DescribeWith(tmpl *template.Template, rep report.Report) (string, error) {
-	return describe(tmpl, rep)
+	return describe(tmpl, rep, nil)
 }
 
 // RenderedSections returns each section the description of rep holds, by template name, in order.
 func RenderedSections(rep report.Report) (names []string, sections []string, err error) {
-	s, err := readSections(rep)
+	s, _, err := readSections(rep)
 	if err != nil {
 		return nil, nil, err
 	}

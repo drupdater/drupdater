@@ -292,3 +292,59 @@ func TestADescriptionWithinTheLimitKeepsItsLinks(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, description, "| [drupal/core](https://p) | Upgraded | 1.0 | 1.1 | [Compare](https://c) |\n")
 }
+
+func TestDescriptionWithRendersAnAddonTemplateAgainstItsSectionsJSONAfterTheBuiltinOnes(t *testing.T) {
+	type finding struct {
+		Count int `json:"tag_count"`
+	}
+	description, err := mergerequest.DescriptionWith(withSections(map[string]any{
+		"update_hooks": map[string]map[string]drush.UpdateHook{"default": {"system_update_1": {Description: "Hook"}}},
+		"zz_tags":      finding{Count: 3},
+		"aa_cache":     []string{"x", "y"},
+	}), map[string]string{
+		"zz_tags":  "## Tags\n\n{{ .tag_count }} tags",
+		"aa_cache": "## Cache\n\n{{ range . }}- {{ . | cell }}\n{{ end }}",
+	})
+
+	require.NoError(t, err)
+	hooks := strings.Index(description, "Update Hooks")
+	cache := strings.Index(description, "## Cache\n\n- x\n- y\n")
+	tags := strings.Index(description, "## Tags\n\n3 tags\n")
+	require.NotEqual(t, -1, hooks)
+	require.NotEqual(t, -1, cache)
+	require.NotEqual(t, -1, tags)
+	assert.Less(t, hooks, cache, "builtin sections come first")
+	assert.Less(t, cache, tags, "addon sections follow in key order")
+}
+
+func TestDescriptionWithSkipsAnAddonTemplateWhoseSectionIsMissing(t *testing.T) {
+	without, err := mergerequest.Description(report.Report{})
+	require.NoError(t, err)
+
+	with, err := mergerequest.DescriptionWith(report.Report{}, map[string]string{"acme": "## Acme"})
+
+	require.NoError(t, err)
+	assert.Equal(t, without, with)
+}
+
+func TestDescriptionWithNamesTheAddonWhoseTemplateDoesNotParse(t *testing.T) {
+	_, err := mergerequest.DescriptionWith(withSections(map[string]any{"acme": 1}), map[string]string{"acme": "{{ .broken"})
+
+	require.ErrorContains(t, err, "addon acme")
+}
+
+func TestDescriptionWithFailsOnAnAddonTemplateThatCannotExecute(t *testing.T) {
+	_, err := mergerequest.DescriptionWith(withSections(map[string]any{"acme": 1}), map[string]string{"acme": "{{ .field.nested }}"})
+
+	require.ErrorContains(t, err, "addon:acme")
+}
+
+func TestDescriptionWithLeavesTheBuiltinTemplatesUnchangedForTheNextCall(t *testing.T) {
+	_, err := mergerequest.DescriptionWith(withSections(map[string]any{"acme": 1}), map[string]string{"acme": "first"})
+	require.NoError(t, err)
+
+	second, err := mergerequest.DescriptionWith(withSections(map[string]any{"acme": 1}), map[string]string{"other": "second"})
+
+	require.NoError(t, err)
+	assert.NotContains(t, second, "first")
+}

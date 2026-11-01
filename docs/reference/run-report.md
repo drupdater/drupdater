@@ -169,6 +169,9 @@ configured.
 | [`deprecations_remover`](addons/deprecations-remover.md) | `[ { file, applied_rectors } ]` |
 | [`translations_updater`](addons/translations-updater.md) | `{ <site>: { path, updated, skipped } }` |
 
+An addon [built outside Drupdater](../how-to/build-an-external-addon.md) adds its section
+under its registered name; its shape is that addon's to document.
+
 Addons with nothing to say are **omitted** rather than present and empty.
 [`composer_normalizer`](addons/composer-normalizer.md) never appears at all — see its page
 for why.

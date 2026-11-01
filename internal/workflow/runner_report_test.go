@@ -476,3 +476,18 @@ func TestReportCollectsSectionsOnlyFromReporters(t *testing.T) {
 	require.NotNil(t, h.got)
 	assert.Equal(t, map[string]any{"translations_updater": map[string]int{"fixed": 2}}, h.got.Addons)
 }
+
+type describedAddon struct{ reportingAddon }
+
+func (*describedAddon) DescriptionTemplate() string { return "## Acme\n\n{{ .count }} found" }
+
+func TestMergeRequestDescriptionCarriesADescribingAddonsSection(t *testing.T) {
+	h := newReportHarness(t, true)
+	h.expectFullRun(t)
+	h.withAddons(&describedAddon{reportingAddon{key: "acme", data: map[string]int{"count": 3}}})
+
+	require.NoError(t, h.run(t))
+
+	require.NotNil(t, h.got)
+	assert.Contains(t, h.got.MergeRequestDescription, "## Acme\n\n3 found")
+}

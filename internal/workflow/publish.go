@@ -14,7 +14,7 @@ func (r *run) renderMergeRequest() (string, string, error) {
 	r.hooks.Report(r.rec)
 	snapshot := r.rec.Snapshot()
 
-	description, err := mergerequest.Description(snapshot)
+	description, err := mergerequest.DescriptionWith(snapshot, r.hooks.DescriptionTemplates())
 	if err != nil {
 		return "", "", fmt.Errorf("failed to generate description: %w", err)
 	}

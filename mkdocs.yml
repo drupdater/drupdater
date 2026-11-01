@@ -106,6 +106,7 @@ nav:
       - Enable patch management: how-to/enable-patch-management.md
       - Enable auto-merge: how-to/enable-auto-merge.md
       - Consume the run report: how-to/consume-the-run-report.md
+      - Build an addon outside Drupdater: how-to/build-an-external-addon.md
       - Migrate the config layout: how-to/migrate-config-layout.md
       - Troubleshoot a run: how-to/troubleshoot.md
   - Reference:

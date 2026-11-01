@@ -191,6 +191,9 @@ func TestExecutePassesTheContextOn(t *testing.T) {
 	assert.Equal(t, "this run", got, "the signal-cancelled context has to reach the run")
 }
 
+// unreported hides an addon's ReportKey, so it can be registered under a probe's name.
+func unreported(a workflow.Addon) workflow.Addon { return struct{ workflow.Addon }{a} }
+
 func TestCreateAddonsPassesEveryDependency(t *testing.T) {
 	// Nothing downstream reports a missing dependency: it surfaces as a nil-pointer panic
 	// mid-run.
@@ -200,8 +203,8 @@ func TestCreateAddonsPassesEveryDependency(t *testing.T) {
 	require.NotNil(t, realFactory)
 	catalog := addonCatalog{
 		factories: map[string]func(addonDeps) workflow.Addon{
-			"probe":       func(d addonDeps) workflow.Addon { got = d; return realFactory(d) },
-			"probe_other": func(d addonDeps) workflow.Addon { second = d; return realFactory(d) },
+			"probe":       func(d addonDeps) workflow.Addon { got = d; return unreported(realFactory(d)) },
+			"probe_other": func(d addonDeps) workflow.Addon { second = d; return unreported(realFactory(d)) },
 		},
 		mandatory: []string{"probe", "probe_other"},
 	}

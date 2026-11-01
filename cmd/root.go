@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -15,6 +16,7 @@ import (
 	"github.com/drupdater/drupdater/internal/config"
 	"github.com/drupdater/drupdater/internal/drupalorg"
 	"github.com/drupdater/drupdater/internal/drush"
+	"github.com/drupdater/drupdater/internal/external"
 	"github.com/drupdater/drupdater/internal/logging"
 	"github.com/drupdater/drupdater/internal/repo"
 	"github.com/drupdater/drupdater/internal/report"
@@ -293,12 +295,32 @@ func handleWorkflowError(logger *zap.Logger, err error) error {
 	return err
 }
 
-func Execute() {
+// ExecuteWith is Execute with addons built outside drupdater, which the sdk package registers.
+func ExecuteWith(addons ...external.Registration) {
 	// Cancel the workflow context on SIGINT/SIGTERM so cleanup runs on termination.
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	code := execute(ctx, productionApp().newRootCmd())
+	code := RunWith(ctx, os.Args[1:], addons...)
 	stop()
 	os.Exit(code)
+}
+
+// RunWith runs the command line args with addons registered and returns the exit status.
+func RunWith(ctx context.Context, args []string, addons ...external.Registration) int {
+	return executeWith(ctx, os.Stderr, productionApp(), addons, args)
+}
+
+// executeWith refuses to start when an addon cannot be registered: that is the binary's bug,
+// not the project's, so no command of it should run.
+func executeWith(ctx context.Context, stderr io.Writer, a app, addons []external.Registration, args []string) int {
+	catalog, err := a.addons.withExternal(addons)
+	if err != nil {
+		fmt.Fprintln(stderr, "invalid addon registration:", err)
+		return 1
+	}
+	a.addons = catalog
+	root := a.newRootCmd()
+	root.SetArgs(args)
+	return execute(ctx, root)
 }
 
 // execute runs cmd and returns the process's exit status, which is what a CI pipeline reads.

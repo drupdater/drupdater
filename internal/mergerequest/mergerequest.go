@@ -8,6 +8,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"sync"
@@ -30,27 +31,69 @@ func Title(rep report.Report) string {
 // Description renders the addon sections rep carries. Over MaxDescriptionBytes it drops the
 // dependency links, the one part of the description that grows by more than a row per package.
 func Description(rep report.Report) (string, error) {
+	return DescriptionWith(rep, nil)
+}
+
+// DescriptionWith is Description plus the sections of addons outside drupdater: templates holds
+// each one's text/template by its report key, rendered after the builtin sections in key order
+// against that key's report section. A key the report has no section for renders nothing.
+func DescriptionWith(rep report.Report, templates map[string]string) (string, error) {
 	tmpl, err := parsedTemplates()
 	if err != nil {
 		return "", fmt.Errorf("failed to parse template: %w", err)
 	}
-	return describe(tmpl, rep)
+	if len(templates) > 0 {
+		if tmpl, err = withAddonTemplates(tmpl, templates); err != nil {
+			return "", err
+		}
+	}
+	return describe(tmpl, rep, slices.Sorted(maps.Keys(templates)))
 }
 
-func describe(tmpl *template.Template, rep report.Report) (string, error) {
-	s, err := readSections(rep)
+func describe(tmpl *template.Template, rep report.Report, addonKeys []string) (string, error) {
+	s, published, err := readSections(rep)
 	if err != nil {
 		return "", err
 	}
+	extra := addonSections(published, addonKeys)
 
-	description, err := render(tmpl, s, true)
+	description, err := render(tmpl, s, extra, true)
 	if err != nil {
 		return "", err
 	}
 	if len(description) <= MaxDescriptionBytes {
 		return description, nil
 	}
-	return render(tmpl, s, false)
+	return render(tmpl, s, extra, false)
+}
+
+func addonTemplateName(key string) string {
+	return "addon:" + key
+}
+
+// withAddonTemplates clones tmpl, so the parsed builtin set stays the same for every run.
+func withAddonTemplates(tmpl *template.Template, templates map[string]string) (*template.Template, error) {
+	tmpl, err := tmpl.Clone()
+	if err != nil {
+		return nil, fmt.Errorf("failed to copy the templates: %w", err)
+	}
+	for key, text := range templates {
+		if _, err := tmpl.New(addonTemplateName(key)).Parse(text); err != nil {
+			return nil, fmt.Errorf("failed to parse the description template of addon %s: %w", key, err)
+		}
+	}
+	return tmpl, nil
+}
+
+// addonSections reads each section from the report's JSON, so a template sees the published names.
+func addonSections(published map[string]any, keys []string) []section {
+	var out []section
+	for _, key := range keys {
+		if data, ok := published[key]; ok {
+			out = append(out, section{addonTemplateName(key), data})
+		}
+	}
+	return out
 }
 
 // sections is this package's reading of the report's addons object: only what it renders.
@@ -123,16 +166,21 @@ type unsupportedModule struct {
 	RecommendedVersion string `json:"recommended_version"`
 }
 
-func readSections(rep report.Report) (sections, error) {
+// readSections returns the builtin sections and, for addons outside drupdater, every section as
+// generic JSON.
+func readSections(rep report.Report) (sections, map[string]any, error) {
 	encoded, err := json.Marshal(rep.Addons)
 	if err != nil {
-		return sections{}, fmt.Errorf("failed to encode the report's addon sections: %w", err)
+		return sections{}, nil, fmt.Errorf("failed to encode the report's addon sections: %w", err)
 	}
 	var s sections
 	if err := json.Unmarshal(encoded, &s); err != nil {
-		return sections{}, fmt.Errorf("failed to read the report's addon sections: %w", err)
+		return sections{}, nil, fmt.Errorf("failed to read the report's addon sections: %w", err)
 	}
-	return s, nil
+	var published map[string]any
+	// Cannot fail where the typed read above succeeded: the same document, into a looser type.
+	_ = json.Unmarshal(encoded, &published)
+	return s, published, nil
 }
 
 // endOfLifeEntry is one row of the table that joins unsupported modules and abandoned packages:
@@ -231,9 +279,9 @@ func (s sections) sectionsInOrder(links bool) []section {
 	return out
 }
 
-func render(tmpl *template.Template, s sections, links bool) (string, error) {
+func render(tmpl *template.Template, s sections, extra []section, links bool) (string, error) {
 	var rendered []string
-	for _, sec := range s.sectionsInOrder(links) {
+	for _, sec := range slices.Concat(s.sectionsInOrder(links), extra) {
 		out, err := renderSection(tmpl, sec)
 		if err != nil {
 			return "", err
