@@ -103,7 +103,7 @@ is exactly the kind of call that outlasts the default.
 | Variable | Forced value | Why Drupdater requires it |
 |---|---|---|
 | `COMPOSER_PROCESS_TIMEOUT` | `0` | Composer's default caps every process it spawns at 300s. A `drupal/core` clone, a large `composer install` on a slow network, or a `drush site:install` exceeds that, and the run dies mid-phase with a message about a killed subprocess and no visible connection to a timeout nobody configured. |
-| `COMPOSER_NO_AUDIT` | `1` | Suppresses the implicit audit Composer runs after `update`, whose extra output the update parsing is not written against. Auditing is the [`composer_audit`](addons/composer-audit.md) addon's job, on its own schedule; the explicit `composer audit` that addon runs is unaffected. |
+| `COMPOSER_NO_AUDIT` | `1` | Suppresses the implicit audit Composer runs after `update`, whose extra output the update parsing is not written against. Auditing is the [`composer_audit`](addons/composer-audit.md) addon's job, on its own schedule; the agent's `drupdater:audit` that addon runs is unaffected. |
 
 These are forced in code rather than left to the image, so they hold however Drupdater was
 installed — the published image, `make build`, or a binary a CI job downloaded. The

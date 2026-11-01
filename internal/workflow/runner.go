@@ -252,11 +252,12 @@ func (r *run) preflight(ctx context.Context) error {
 	if result := CheckGitHistoryComplete(ctx, r.git, r.path); !result.OK {
 		return fmt.Errorf("%s: %s", result.Name, result.Detail)
 	}
-	if result := CheckPlatformRequirements(ctx, r.composer, r.path); !result.OK {
-		return fmt.Errorf("PHP platform requirements not satisfied:\n%s", result.Detail)
-	}
+	// The platform check is an agent command, so a missing agent has to be reported first.
 	if result := CheckComposerAgent(ctx, r.composer, r.path); !result.OK {
 		return fmt.Errorf("%s: %s", result.Name, result.Detail)
+	}
+	if result := CheckPlatformRequirements(ctx, r.composer, r.path); !result.OK {
+		return fmt.Errorf("PHP platform requirements not satisfied:\n%s", result.Detail)
 	}
 	return nil
 }

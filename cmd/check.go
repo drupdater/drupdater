@@ -117,8 +117,8 @@ func (a app) runCheapChecks(
 	var results []workflow.CheckResult
 	results = append(results, checkConfigAndAddons(a.addons, cfgFilePath, cfg)...)
 	results = append(results, workflow.CheckGitHistoryComplete(ctx, repository, cfg.WorkingDir))
-	results = append(results, workflow.CheckPlatformRequirements(ctx, composerSvc, cfg.WorkingDir))
 	results = append(results, workflow.CheckComposerAgent(ctx, composerSvc, cfg.WorkingDir))
+	results = append(results, workflow.CheckPlatformRequirements(ctx, composerSvc, cfg.WorkingDir))
 	for _, site := range cfg.Sites {
 		results = append(results, workflow.CheckSiteSettings(ctx, composerSvc, fs, cfg.WorkingDir, site))
 	}

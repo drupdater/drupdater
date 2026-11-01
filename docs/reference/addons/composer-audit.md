@@ -1,6 +1,7 @@
 # `composer_audit`
 
-Runs `composer audit` and reports what it found. On a `--security` run it also drives the
+Audits `composer.lock` through the [Drupdater agent](../docker-images.md#drupdater-agent)'s
+`drupdater:audit`, which asks Composer's own auditor, and reports what it found. On a `--security` run it also drives the
 update: it decides which packages may be touched.
 
 | | |
@@ -32,7 +33,7 @@ happens to close a CVE says so — without the audit dictating what that update 
 
 ### Before the update — deciding the scope
 
-**`--security` only.** Runs `composer audit` and collects the packages with known
+**`--security` only.** Runs the audit and collects the packages with known
 advisories. It then proposes, on the `pre-composer-update` event, an [update
 plan](../../explanation/addon-architecture.md#steering-the-update-through-proposals) with:
 
@@ -73,9 +74,9 @@ after Rector and PHPCBF have finished.
 
 ### After the code update — abandoned packages
 
-`composer audit` reports more than advisories: its JSON output also lists the packages whose
-maintainers have marked them abandoned, together with the replacement they suggested when
-there is one. The same command is already being run, so this costs nothing extra, and it
+The audit reports more than advisories: it also lists the packages whose maintainers have
+marked them abandoned, together with the replacement they suggested when there is one. The
+audit is already being run, so this costs nothing extra, and it
 covers ground nothing else does — [`unsupported_modules`](unsupported-modules.md) reads
 Drupal.org, so it sees `drupal/*` and nothing else, while a Drupal project's lock file is full
 of ordinary PHP libraries.
@@ -99,7 +100,7 @@ reviewer, and which addon found one is not a reason to put them in different sec
 
 !!! tip "Silencing it"
 
-    drupdater does not pass `--abandoned`, so Composer applies the project's own
+    The audit runs under the project's own audit policy, so Composer applies its
     [`audit.abandoned`](https://getcomposer.org/doc/06-config.md#abandoned) setting. Setting
     it to `ignore` in the project's `composer.json` makes Composer report no abandoned
     packages, and drupdater then has none to show:

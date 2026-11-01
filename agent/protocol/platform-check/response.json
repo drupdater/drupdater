@@ -1,0 +1,11 @@
+{
+  "protocol": 1,
+  "command": "drupdater:platform-check",
+  "ok": true,
+  "result": {
+    "unmet": [
+      {"name": "ext-drupdaterfixture", "version": null, "constraint": "*", "required_by": "fixture/a"},
+      {"name": "php", "version": "8.1.0", "constraint": ">=8.3", "required_by": "fixture/site"}
+    ]
+  }
+}

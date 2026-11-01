@@ -64,28 +64,6 @@ func TestExecComposerEnvironmentReachesTheSubprocess(t *testing.T) {
 		assert.JSONEq(t, `{"http-basic":{}}`, out, "private registry credentials must still reach composer")
 	})
 
-	t.Run("execComposerJSON forces the same settings", func(t *testing.T) {
-		service.newCommand = composerWithEnv(helperEnv(
-			"GO_HELPER_PROCESS_PRINT_ENV=COMPOSER_PROCESS_TIMEOUT",
-			"COMPOSER_PROCESS_TIMEOUT=300",
-		))
-
-		out, err := service.execComposerJSON(t.Context(), "/tmp", "audit", "--format=json")
-		require.NoError(t, err)
-		assert.Equal(t, "0", out)
-	})
-
-	t.Run("execComposerJSON passes the rest of the environment through", func(t *testing.T) {
-		service.newCommand = composerWithEnv(helperEnv(
-			"GO_HELPER_PROCESS_PRINT_ENV=COMPOSER_AUTH",
-			`COMPOSER_AUTH={"http-basic":{}}`,
-		))
-
-		out, err := service.execComposerJSON(t.Context(), "/tmp", "audit", "--format=json")
-		require.NoError(t, err)
-		assert.JSONEq(t, `{"http-basic":{}}`, out)
-	})
-
 	t.Run("inherits the process environment when the caller set none", func(t *testing.T) {
 		// A nil Env inherits os.Environ(), which the forced values must not drop — composer
 		// would lose PATH.
