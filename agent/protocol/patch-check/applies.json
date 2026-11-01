@@ -1,0 +1,8 @@
+{
+  "protocol": 1,
+  "command": "drupdater:patch-check",
+  "ok": true,
+  "result": {
+    "outcome": "applies"
+  }
+}

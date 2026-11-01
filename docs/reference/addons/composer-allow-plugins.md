@@ -22,7 +22,9 @@ A setting that already decides every plugin is left alone: `allow-plugins: true`
 `allow-plugins: false`, or an object with its own `"*"` rule.
 
 **After the update**, it adds `false` for each installed plugin that no rule of the project
-matches, then removes the temporary rule. The denials go in first because Composer refuses
+matches, then removes the temporary rule. A plugin here is what Composer itself checks
+against `allow-plugins`: a locked package of type `composer-plugin` or
+`composer-installer`. The denials go in first because Composer refuses
 to run any command while an installed plugin is undecided. The project ends up exactly where
 it started — same rules, same order — plus one explicit `false` per new plugin. A project
 that had no `allow-plugins` at all gets none back unless a new plugin needed an entry.

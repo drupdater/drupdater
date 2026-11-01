@@ -52,11 +52,11 @@ as visible in the report as one during the update itself.
 
 ### 2. `preflight`
 
-Runs two checks: full git history, and PHP platform requirements. These are the same
-functions [`drupdater check`](../reference/cli/check.md) uses, so a shallow checkout is
-caught identically in both.
+Runs three checks: full git history, PHP platform requirements, and the Drupdater agent's
+presence in Composer. These are the same functions [`drupdater
+check`](../reference/cli/check.md) uses, so a shallow checkout is caught identically in both.
 
-They run here — before anything expensive — because both failures are certain rather than
+They run here — before anything expensive — because each failure is certain rather than
 probable. A shallow checkout *will* fail at push time, several minutes later, with a
 message that does not mention shallowness.
 
@@ -76,9 +76,12 @@ Settles what the update changes and what its branch will be called, while touchi
    [`composer_patches`](../reference/addons/composer-patches.md) pins packages whose
    patches cannot be made to apply.
 2. Run `composer update --no-install` with those constraints. It resolves the update and
-   bumps the constraints in `composer.json`, but leaves `vendor/` at the old code. What
-   changed is read from `composer diff` between the lock before and after, not from
-   Composer's console output. **If nothing changed, the run aborts here.**
+   bumps the constraints in `composer.json`, but leaves `vendor/` at the old code. It runs
+   through the [Drupdater agent](../reference/docker-images.md#drupdater-agent)'s
+   `drupdater:resolve`, which calls Composer's own `update` command in-process, plugins and
+   scripts included, then compares the lock it read before with the one Composer wrote. What
+   changed comes from that comparison, not from Composer's console output. **If nothing
+   changed, the run aborts here.**
 3. Compute the branch name from the resolved `composer.lock` (see
    [below](#content-addressed-branch-names)), and **abort if it already exists**, locally
    or on the remote.

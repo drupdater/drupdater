@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/drupdater/drupdater/internal/composer"
+
 	"github.com/drupdater/drupdater/internal/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -15,9 +17,8 @@ import (
 
 // fakeComposer records what the --full tier asked of composer.
 type fakeComposer struct {
-	installErr    error
-	installCalls  []string
-	cleanupCalled int
+	installErr   error
+	installCalls []string
 }
 
 func (f *fakeComposer) Install(_ context.Context, path string) error {
@@ -25,10 +26,8 @@ func (f *fakeComposer) Install(_ context.Context, path string) error {
 	return f.installErr
 }
 
-func (f *fakeComposer) Cleanup() { f.cleanupCalled++ }
-
-func (f *fakeComposer) GetConfig(_ context.Context, _ string, _ string) (string, error) {
-	return "web", nil
+func (f *fakeComposer) Project(context.Context, string) (composer.Project, error) {
+	return composer.Project{WebRoot: "web"}, nil
 }
 
 // fakeInstaller fails for the sites named in failFor and succeeds for the rest.
@@ -93,10 +92,6 @@ func TestRunFullChecksClonesTheConfiguredBranch(t *testing.T) {
 	assert.Equal(t, "composer install", results[0].Name)
 	assert.True(t, results[1].OK)
 	assert.Contains(t, results[1].Name, `site "default" installs from configuration`)
-
-	// composer must be cleaned up even on the happy path -- it leaves a scratch directory
-	// behind otherwise.
-	assert.Equal(t, 1, comp.cleanupCalled)
 }
 
 func TestRunFullChecksDefaultsToMain(t *testing.T) {
@@ -124,7 +119,6 @@ func TestRunFullChecksStopsAtComposerInstall(t *testing.T) {
 	assert.False(t, results[0].OK)
 	assert.Contains(t, results[0].Detail, "lock file out of date")
 	assert.Empty(t, inst.calls, "no site may be installed after composer install failed")
-	assert.Equal(t, 1, comp.cleanupCalled)
 }
 
 func TestRunFullChecksReportsInstallerConstructionFailure(t *testing.T) {
@@ -174,8 +168,6 @@ func TestRunFullChecksStopsAtCloneFailure(t *testing.T) {
 	assert.Equal(t, "clone for full check", results[0].Name)
 	assert.False(t, results[0].OK)
 	assert.Contains(t, results[0].Detail, "authentication failed")
-	// Nothing was constructed past the clone, so there is nothing to clean up either.
-	assert.Zero(t, comp.cleanupCalled)
 	assert.Empty(t, comp.installCalls)
 }
 

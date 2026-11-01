@@ -42,7 +42,6 @@ func TestPatchRemovalFailuresAreLogged(t *testing.T) {
 		t.Helper()
 		core, logs := observer.New(zapcore.ErrorLevel)
 		composerService := NewMockPatchesComposer(t)
-		composerService.EXPECT().IsPackageInstalled(anyCtx, "/project", "drupal/gone").Return(false, nil).Maybe()
 		return &ComposerPatches1{
 			logger:     zap.New(core),
 			composer:   composerService,
@@ -56,11 +55,11 @@ func TestPatchRemovalFailuresAreLogged(t *testing.T) {
 
 	for _, removeErr := range []error{nil, assert.AnError} {
 		h, logs := newHandler(t, removeErr)
-		assert.Len(t, h.removePackagePatches("/project", removal, patches()), 1)
+		assert.Len(t, h.removePackagePatches("/project", removal, ptr(declaredFrom(patches()))), 1)
 		assert.Equal(t, removeErr != nil, logs.FilterMessage("failed to remove patch").Len() == 1, "removed package, err=%v", removeErr)
 
 		h, logs = newHandler(t, removeErr)
-		assert.Len(t, h.removeUninstalledPackagePatches(t.Context(), "/project", patches()), 1)
+		assert.Len(t, h.removeUninstalledPackagePatches("/project", lockedProject(), ptr(declaredFrom(patches()))), 1)
 		assert.Equal(t, removeErr != nil, logs.FilterMessage("failed to remove patch").Len() == 1, "uninstalled package, err=%v", removeErr)
 	}
 }
@@ -78,7 +77,7 @@ func TestComposerDiffFailure(t *testing.T) {
 func TestComposerNormalizerErrors(t *testing.T) {
 	t.Run("install check fails", func(t *testing.T) {
 		composerService := NewMockNormalizerComposer(t)
-		composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "ergebnis/composer-normalize").Return(false, assert.AnError)
+		composerService.EXPECT().Project(anyCtx, "/tmp").Return(composer.Project{}, assert.AnError)
 
 		cn := NewComposerNormalizer(zap.NewNop(), composerService)
 		require.Error(t, cn.postComposerUpdateHandler(workflow.NewPostComposerUpdateEvent(t.Context(), "/tmp", nil)))
@@ -86,7 +85,7 @@ func TestComposerNormalizerErrors(t *testing.T) {
 
 	t.Run("normalize fails", func(t *testing.T) {
 		composerService := NewMockNormalizerComposer(t)
-		composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "ergebnis/composer-normalize").Return(true, nil)
+		composerService.EXPECT().Project(anyCtx, "/tmp").Return(lockedProject("ergebnis/composer-normalize"), nil)
 		composerService.EXPECT().Normalize(anyCtx, "/tmp").Return("", assert.AnError)
 
 		cn := NewComposerNormalizer(zap.NewNop(), composerService)
@@ -97,10 +96,18 @@ func TestComposerNormalizerErrors(t *testing.T) {
 }
 
 func TestDeprecationsRemoverErrors(t *testing.T) {
-	t.Run("listing custom code directories fails", func(t *testing.T) {
+	t.Run("reading the project fails", func(t *testing.T) {
 		composerService := NewMockDeprecationsComposer(t)
-		composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "palantirnet/drupal-rector").Return(true, nil)
-		composerService.EXPECT().GetCustomCodeDirectories(anyCtx, "/tmp").Return(nil, assert.AnError)
+		composerService.EXPECT().Project(anyCtx, "/tmp").Return(composer.Project{}, assert.AnError)
+
+		dr := NewDeprecationsRemover(zap.NewNop(), NewMockRector(t), NewMockRector(t), composerService)
+		_, err := dr.postCodeUpdateHandler(workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", nil))
+		require.ErrorIs(t, err, assert.AnError)
+	})
+
+	t.Run("a project without a web root has no custom code to find", func(t *testing.T) {
+		composerService := NewMockDeprecationsComposer(t)
+		composerService.EXPECT().Project(anyCtx, "/tmp").Return(composer.Project{}, nil)
 
 		dr := NewDeprecationsRemover(zap.NewNop(), NewMockRector(t), NewMockRector(t), composerService)
 		_, err := dr.postCodeUpdateHandler(workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", nil))
@@ -109,8 +116,7 @@ func TestDeprecationsRemoverErrors(t *testing.T) {
 
 	t.Run("committing the removals fails", func(t *testing.T) {
 		composerService := NewMockDeprecationsComposer(t)
-		composerService.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "palantirnet/drupal-rector").Return(true, nil)
-		composerService.EXPECT().GetCustomCodeDirectories(anyCtx, "/tmp").Return([]string{"web/modules/custom"}, nil)
+		composerService.EXPECT().Project(anyCtx, "/tmp").Return(withCustomCode(lockedProject("palantirnet/drupal-rector"), "web/modules/custom"), nil)
 
 		runner := NewMockRector(t)
 		runner.EXPECT().Run(anyCtx, "/tmp", []string{"web/modules/custom"}).Return(rector.ReturnOutput{

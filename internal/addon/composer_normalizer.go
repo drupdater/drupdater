@@ -4,13 +4,14 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/drupdater/drupdater/internal/composer"
 	"github.com/drupdater/drupdater/internal/workflow"
 	"go.uber.org/zap"
 )
 
 // NormalizerComposer runs composer normalize where the plugin is installed.
 type NormalizerComposer interface {
-	IsPackageInstalled(ctx context.Context, dir string, packageToCheck string) (bool, error)
+	Project(ctx context.Context, dir string) (composer.Project, error)
 	Normalize(ctx context.Context, dir string) (string, error)
 }
 
@@ -34,11 +35,11 @@ func (cn *ComposerNormalizer) Hooks() workflow.Hooks {
 
 func (cn *ComposerNormalizer) postComposerUpdateHandler(evt *workflow.PostComposerUpdateEvent) error {
 
-	installed, err := cn.composer.IsPackageInstalled(evt.Context(), evt.Path(), "ergebnis/composer-normalize")
+	project, err := cn.composer.Project(evt.Context(), evt.Path())
 	if err != nil {
 		return fmt.Errorf("failed to check if composer-normalize is installed: %w", err)
 	}
-	if !installed {
+	if !project.Installed("ergebnis/composer-normalize") {
 		cn.logger.Warn("composer-normalize not installed, skipping")
 		return nil
 	}

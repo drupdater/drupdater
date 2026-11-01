@@ -1,0 +1,10 @@
+{
+  "protocol": 1,
+  "command": "drupdater:patch-check",
+  "ok": false,
+  "error": {
+    "kind": "unobtainable",
+    "reason": "repository authentication failed",
+    "message": "The \"https://packages.example.com/packages.json\" file could not be downloaded (HTTP/2 401 )"
+  }
+}

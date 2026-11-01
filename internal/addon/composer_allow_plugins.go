@@ -3,8 +3,6 @@ package addon
 import (
 	"context"
 	"fmt"
-	"maps"
-	"slices"
 
 	"github.com/drupdater/drupdater/internal/composer"
 	"github.com/drupdater/drupdater/internal/workflow"
@@ -13,8 +11,7 @@ import (
 
 // AllowPluginsComposer reads and rewrites composer.json's allow-plugins list.
 type AllowPluginsComposer interface {
-	GetAllowPlugins(dir string) (composer.AllowPlugins, error)
-	GetInstalledPlugins(ctx context.Context, dir string) (map[string]any, error)
+	Project(ctx context.Context, dir string) (composer.Project, error)
 	SetConfig(ctx context.Context, dir string, key string, value string) error
 	UnsetConfig(ctx context.Context, dir string, key string) error
 }
@@ -51,7 +48,11 @@ func (ap *ComposerAllowPlugins) Hooks() workflow.Hooks {
 // Composer applies the first matching rule, so the project's own rules, denials included, still
 // decide every plugin they name.
 func (ap *ComposerAllowPlugins) preComposerUpdateHandler(evt *workflow.PreComposerUpdateEvent) (workflow.Proposal[allowPluginsBefore], error) {
-	original, err := ap.composer.GetAllowPlugins(evt.Path())
+	project, err := ap.composer.Project(evt.Context(), evt.Path())
+	if err != nil {
+		return workflow.Proposal[allowPluginsBefore]{}, fmt.Errorf("failed to get composer allow plugins: %w", err)
+	}
+	original, err := composer.ParseAllowPlugins(project.AllowPlugins)
 	if err != nil {
 		return workflow.Proposal[allowPluginsBefore]{}, fmt.Errorf("failed to get composer allow plugins: %w", err)
 	}
@@ -74,13 +75,13 @@ func (ap *ComposerAllowPlugins) postComposerUpdateHandler(evt *workflow.PostComp
 	recorded, _ := workflow.Shared[allowPluginsBefore](earlier, workflow.EventPreComposerUpdate)
 	before := recorded.Finding
 
-	installed, err := ap.composer.GetInstalledPlugins(ctx, path)
+	project, err := ap.composer.Project(ctx, path)
 	if err != nil {
 		return workflow.Result[[]string]{}, err
 	}
 
 	var denied []string
-	for _, plugin := range slices.Sorted(maps.Keys(installed)) {
+	for _, plugin := range project.Plugins() {
 		if before.original.Decides(plugin) {
 			continue
 		}

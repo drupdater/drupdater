@@ -1,0 +1,32 @@
+{
+    "name": "fixture/site",
+    "type": "project",
+    "repositories": [
+        {"packagist.org": false}
+    ],
+    "require": {
+        "cweagans/composer-patches": "^1.7",
+        "drupal/core": "^10.3",
+        "drupal/token": "^1.15"
+    },
+    "config": {
+        "allow-plugins": {
+            "cweagans/composer-patches": true,
+            "drupal/*": false
+        }
+    },
+    "extra": {
+        "drupal-scaffold": {
+            "locations": {
+                "web-root": "web/"
+            }
+        },
+        "patches": {
+            "drupal/token": {
+                "Issue #3123456: [Token fix](https://www.drupal.org/i/3123456)": "patches/token/3123456-local.patch",
+                "Remote fix": "https://www.drupal.org/files/issues/3200000-8.patch"
+            },
+            "drupal/empty": {}
+        }
+    }
+}

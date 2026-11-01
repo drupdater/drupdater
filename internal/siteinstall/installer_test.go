@@ -60,7 +60,7 @@ profile: thunder
 		drush.EXPECT().GetConfigSyncDir(t.Context(), "/tmp", "site1").Return(configSyncDir, nil)
 
 		composer := NewMockComposer(t)
-		composer.EXPECT().GetConfig(t.Context(), "/tmp", "extra.drupal-scaffold.locations.web-root").Return("web", nil)
+		composer.EXPECT().Project(t.Context(), "/tmp").Return(atWebRoot("web"), nil)
 
 		installer := &Installer{
 			logger:   logger,
@@ -109,7 +109,7 @@ $settings['hash_salt'] = 'changeme';
 		drush.EXPECT().GetConfigSyncDir(t.Context(), "/tmp", "site1").Return(configSyncDir, nil)
 
 		composer := NewMockComposer(t)
-		composer.EXPECT().GetConfig(t.Context(), "/tmp", "extra.drupal-scaffold.locations.web-root").Return("web", nil)
+		composer.EXPECT().Project(t.Context(), "/tmp").Return(atWebRoot("web"), nil)
 
 		installer := &Installer{
 			logger:   logger,
@@ -338,8 +338,7 @@ func TestInstallStopsAtTheFirstFailure(t *testing.T) {
 	t.Run("database configuration fails", func(t *testing.T) {
 		installer, _, drush, composer := newTestInstaller(t, coreExtensionWithSqlite, "<?php\n")
 		drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1").Return("/config/sync", nil)
-		composer.EXPECT().GetConfig(t.Context(), "/project", "extra.drupal-scaffold.locations.web-root").
-			Return("", assert.AnError)
+		composer.EXPECT().Project(t.Context(), "/project").Return(atWebRoot(""), assert.AnError)
 
 		// No InstallSite expectation: reaching it would fail the mock.
 		err := installer.Install(t.Context(), "/project", "site1")
@@ -350,7 +349,7 @@ func TestInstallStopsAtTheFirstFailure(t *testing.T) {
 
 func TestInstallLooksUpTheConfigSyncDirectoryOnce(t *testing.T) {
 	installer, _, drush, composer := newTestInstaller(t, coreExtensionWithoutSqlite, "<?php\n")
-	composer.EXPECT().GetConfig(t.Context(), "/project", "extra.drupal-scaffold.locations.web-root").Return("web", nil)
+	composer.EXPECT().Project(t.Context(), "/project").Return(atWebRoot("web"), nil)
 	drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1").Return("/config/sync", nil).Once()
 	drush.EXPECT().InstallSite(t.Context(), "/project", "site1").Return(nil)
 
@@ -360,7 +359,7 @@ func TestInstallLooksUpTheConfigSyncDirectoryOnce(t *testing.T) {
 func TestConfigureDatabaseIsIdempotent(t *testing.T) {
 	installer, fs, drush, composer := newTestInstaller(t, coreExtensionWithSqlite, "<?php\n")
 
-	composer.EXPECT().GetConfig(t.Context(), "/project", "extra.drupal-scaffold.locations.web-root").Return("web", nil)
+	composer.EXPECT().Project(t.Context(), "/project").Return(atWebRoot("web"), nil)
 	drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1").Return("/config/sync", nil)
 
 	require.NoError(t, installer.ConfigureDatabase(t.Context(), "/project", "site1"))
@@ -379,7 +378,7 @@ func TestRestoreSettingsPutsBackTheProjectsFileExactly(t *testing.T) {
 	const original = "<?php\n\n$settings['config_sync_directory'] = '../config/sync';\n"
 	installer, fs, drush, composer, logs := newTestInstallerWithLogs(t, coreExtensionWithSqlite, original)
 
-	composer.EXPECT().GetConfig(t.Context(), "/project", "extra.drupal-scaffold.locations.web-root").Return("web", nil)
+	composer.EXPECT().Project(t.Context(), "/project").Return(atWebRoot("web"), nil)
 	drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1").Return("/config/sync", nil)
 
 	require.NoError(t, installer.ConfigureDatabase(t.Context(), "/project", "site1"))
@@ -405,7 +404,7 @@ func TestRestoreSettingsWithoutABlockDoesNotWrite(t *testing.T) {
 	fs := &failingFs{failWrite: true}
 	installer, _, composer := newFailingInstaller(t, fs, coreExtensionWithSqlite)
 	installer.logger = zap.NewNop()
-	composer.EXPECT().GetConfig(t.Context(), "/project", "extra.drupal-scaffold.locations.web-root").Return("web", nil)
+	composer.EXPECT().Project(t.Context(), "/project").Return(atWebRoot("web"), nil)
 
 	require.NoError(t, installer.RestoreSettings(t.Context(), "/project", "site1"))
 }
@@ -415,7 +414,7 @@ func TestReconfiguringAfterRestoreKeepsTheSqliteExclusion(t *testing.T) {
 	// exclusion must survive anyway, or the update's config export ships the throwaway module.
 	installer, fs, drush, composer := newTestInstaller(t, coreExtensionWithoutSqlite, "<?php\n")
 
-	composer.EXPECT().GetConfig(t.Context(), "/project", "extra.drupal-scaffold.locations.web-root").Return("web", nil)
+	composer.EXPECT().Project(t.Context(), "/project").Return(atWebRoot("web"), nil)
 	drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1").Return("/config/sync", nil)
 
 	require.NoError(t, installer.ConfigureDatabase(t.Context(), "/project", "site1"))
@@ -441,7 +440,7 @@ func TestStripSettingsBlock(t *testing.T) {
 func TestConfigureDatabaseEnablesSqliteWhenMissing(t *testing.T) {
 	installer, fs, drush, composer := newTestInstaller(t, coreExtensionWithoutSqlite, "<?php\n")
 
-	composer.EXPECT().GetConfig(t.Context(), "/project", "extra.drupal-scaffold.locations.web-root").Return("web/", nil)
+	composer.EXPECT().Project(t.Context(), "/project").Return(atWebRoot("web"), nil)
 	drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1").Return("/config/sync", nil)
 
 	require.NoError(t, installer.ConfigureDatabase(t.Context(), "/project", "site1"))
@@ -468,8 +467,7 @@ func TestConfigureDatabaseErrors(t *testing.T) {
 	t.Run("web root lookup fails", func(t *testing.T) {
 		installer, _, drush, composer := newTestInstaller(t, coreExtensionWithSqlite, "<?php\n")
 		drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1").Return("/config/sync", nil)
-		composer.EXPECT().GetConfig(t.Context(), "/project", "extra.drupal-scaffold.locations.web-root").
-			Return("", assert.AnError)
+		composer.EXPECT().Project(t.Context(), "/project").Return(atWebRoot(""), assert.AnError)
 
 		err := installer.ConfigureDatabase(t.Context(), "/project", "site1")
 		require.Error(t, err)
@@ -479,7 +477,7 @@ func TestConfigureDatabaseErrors(t *testing.T) {
 
 	t.Run("enabling sqlite fails", func(t *testing.T) {
 		installer, fs, drush, composer := newTestInstaller(t, coreExtensionWithoutSqlite, "<?php\n")
-		composer.EXPECT().GetConfig(t.Context(), "/project", "extra.drupal-scaffold.locations.web-root").Return("web", nil)
+		composer.EXPECT().Project(t.Context(), "/project").Return(atWebRoot("web"), nil)
 		drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1").Return("/config/sync", nil)
 		require.NoError(t, fs.Remove("/config/sync/core.extension.yml"))
 
@@ -495,7 +493,7 @@ func TestConfigureDatabaseErrors(t *testing.T) {
 		installer, fs, drush, composer := newTestInstaller(t, coreExtensionWithSqlite, "<?php\n")
 		require.NoError(t, fs.Remove("/project/web/sites/site1/settings.php"))
 
-		composer.EXPECT().GetConfig(t.Context(), "/project", "extra.drupal-scaffold.locations.web-root").Return("web", nil)
+		composer.EXPECT().Project(t.Context(), "/project").Return(atWebRoot("web"), nil)
 		drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1").Return("/config/sync", nil)
 
 		err := installer.ConfigureDatabase(t.Context(), "/project", "site1")
@@ -614,7 +612,7 @@ func TestConfigureDatabaseOnAReusedWorkingCopy(t *testing.T) {
 	settingsFromEarlierRun := "<?php\n\n" + settingsMarker + "\n$databases['default']['default'] = ['database' => '/gone/site1.sqlite'];\n"
 	installer, fs, drush, composer := newTestInstaller(t, coreExtensionWithoutSqlite, settingsFromEarlierRun)
 
-	composer.EXPECT().GetConfig(t.Context(), "/project", "extra.drupal-scaffold.locations.web-root").Return("web", nil)
+	composer.EXPECT().Project(t.Context(), "/project").Return(atWebRoot("web"), nil)
 	drush.EXPECT().GetConfigSyncDir(t.Context(), "/project", "site1").Return("/config/sync", nil)
 
 	require.NoError(t, installer.ConfigureDatabase(t.Context(), "/project", "site1"))

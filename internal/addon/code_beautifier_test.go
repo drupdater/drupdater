@@ -22,8 +22,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 
 		// Use a path that cannot be written to (root-owned directory)
 		const badPath = "/proc/nonexistent"
-		composer.EXPECT().GetInstalledPackageVersion(anyCtx, badPath, "drupal/core").Return("10.1.0", nil)
-		composer.EXPECT().GetCustomCodeDirectories(anyCtx, badPath).Return([]string{"web/modules/custom"}, nil)
+		composer.EXPECT().Project(anyCtx, badPath).Return(withCustomCode(withCore(lockedProject(), "10.1.0"), "web/modules/custom"), nil)
 
 		cb := NewCodeBeautifier(logger, nil, nil, composer)
 
@@ -37,8 +36,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 
 		tmpDir := t.TempDir()
 
-		composer.EXPECT().GetInstalledPackageVersion(anyCtx, tmpDir, "drupal/core").Return("10.1.0", nil)
-		composer.EXPECT().GetCustomCodeDirectories(anyCtx, tmpDir).Return([]string{}, nil)
+		composer.EXPECT().Project(anyCtx, tmpDir).Return(withCustomCode(withCore(lockedProject(), "10.1.0")), nil)
 
 		cb := NewCodeBeautifier(logger, nil, nil, composer)
 
@@ -56,8 +54,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 
 		tmpDir := t.TempDir()
 
-		composer.EXPECT().GetInstalledPackageVersion(anyCtx, tmpDir, "drupal/core").Return("10.1.0", nil)
-		composer.EXPECT().GetCustomCodeDirectories(anyCtx, tmpDir).Return(nil, assert.AnError)
+		composer.EXPECT().Project(anyCtx, tmpDir).Return(withCore(lockedProject(), "10.1.0"), assert.AnError)
 
 		cb := NewCodeBeautifier(logger, nil, nil, composer)
 
@@ -71,8 +68,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 
 		tmpDir := t.TempDir()
 
-		composer.EXPECT().GetInstalledPackageVersion(anyCtx, tmpDir, "drupal/core").Return("10.1.0", nil)
-		composer.EXPECT().GetCustomCodeDirectories(anyCtx, tmpDir).Return([]string{"web/modules/custom"}, nil)
+		composer.EXPECT().Project(anyCtx, tmpDir).Return(withCustomCode(withCore(lockedProject(), "10.1.0"), "web/modules/custom"), nil)
 
 		cb := NewCodeBeautifier(logger, nil, nil, composer)
 
@@ -108,8 +104,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 		phpcsTemplateStr = "{{ .Files.NoSuchField }}"
 		defer func() { phpcsTemplateStr = oldTemplate }()
 
-		composer.EXPECT().GetInstalledPackageVersion(anyCtx, tmpDir, "drupal/core").Return("10.1.0", nil)
-		composer.EXPECT().GetCustomCodeDirectories(anyCtx, tmpDir).Return([]string{"web/modules/custom"}, nil)
+		composer.EXPECT().Project(anyCtx, tmpDir).Return(withCustomCode(withCore(lockedProject(), "10.1.0"), "web/modules/custom"), nil)
 
 		cb := NewCodeBeautifier(logger, nil, nil, composer)
 
@@ -134,8 +129,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 			t.Skip("cannot create symlink to /dev/full: " + err.Error())
 		}
 
-		composer.EXPECT().GetInstalledPackageVersion(anyCtx, tmpDir, "drupal/core").Return("10.1.0", nil)
-		composer.EXPECT().GetCustomCodeDirectories(anyCtx, tmpDir).Return([]string{"web/modules/custom"}, nil)
+		composer.EXPECT().Project(anyCtx, tmpDir).Return(withCustomCode(withCore(lockedProject(), "10.1.0"), "web/modules/custom"), nil)
 
 		cb := NewCodeBeautifier(logger, nil, nil, composer)
 
@@ -149,8 +143,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 
 		tmpDir := t.TempDir()
 
-		composer.EXPECT().GetInstalledPackageVersion(anyCtx, tmpDir, "drupal/core").Return("10.1.0", nil)
-		composer.EXPECT().GetCustomCodeDirectories(anyCtx, tmpDir).Return(nil, assert.AnError)
+		composer.EXPECT().Project(anyCtx, tmpDir).Return(withCore(lockedProject(), "10.1.0"), assert.AnError)
 
 		cb := NewCodeBeautifier(logger, nil, nil, composer)
 
@@ -316,9 +309,7 @@ func TestCodingStyles(t *testing.T) {
 		}, nil)
 
 		composer := NewMockBeautifierComposer(t)
-		composer.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/coder").Return(true, nil)
-		composer.EXPECT().GetCustomCodeDirectories(anyCtx, "/tmp").Return([]string{"web/modules/custom", "web/themes/custom"}, nil)
-		composer.EXPECT().GetInstalledPackageVersion(anyCtx, "/tmp", "drupal/core").Return("9.2.1", nil)
+		composer.EXPECT().Project(anyCtx, "/tmp").Return(withCustomCode(withCore(lockedProject("drupal/coder"), "9.2.1"), "web/modules/custom", "web/themes/custom"), nil)
 
 		// Create system under test
 		committer := &fakeCommitter{}
@@ -350,7 +341,7 @@ func TestCodingStyles(t *testing.T) {
 		bundled.EXPECT().RunCBF(anyCtx, "/tmp").Return(nil)
 
 		composer := NewMockBeautifierComposer(t)
-		composer.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/coder").Return(false, nil)
+		composer.EXPECT().Project(anyCtx, "/tmp").Return(lockedProject(), nil)
 
 		committer := &fakeCommitter{}
 		cb := NewCodeBeautifier(logger, NewMockPHPCS(t), bundled, composer)
@@ -375,7 +366,7 @@ func TestCodingStyles(t *testing.T) {
 		}, nil)
 
 		composer := NewMockBeautifierComposer(t)
-		composer.EXPECT().IsPackageInstalled(anyCtx, "/tmp", "drupal/coder").Return(true, nil)
+		composer.EXPECT().Project(anyCtx, "/tmp").Return(lockedProject("drupal/coder"), nil)
 
 		committer := &fakeCommitter{}
 		cb := NewCodeBeautifier(logger, project, NewMockPHPCS(t), composer)
@@ -403,7 +394,7 @@ func TestCodingStyles(t *testing.T) {
 			Files: map[string]phpcs.ReturnOutputFile{},
 		}, nil)
 		composer := NewMockBeautifierComposer(t)
-		composer.EXPECT().IsPackageInstalled(anyCtx, "/path/to/repo", "drupal/coder").Return(true, nil)
+		composer.EXPECT().Project(anyCtx, "/path/to/repo").Return(lockedProject("drupal/coder"), nil)
 
 		committer := &fakeCommitter{}
 		updateCodingStyles := NewCodeBeautifier(logger, runner, NewMockPHPCS(t), composer)
@@ -451,7 +442,7 @@ func TestCodingStyles(t *testing.T) {
 		runner.EXPECT().RunCBF(anyCtx, "/path/to/repo").Return(nil)
 
 		composer := NewMockBeautifierComposer(t)
-		composer.EXPECT().IsPackageInstalled(anyCtx, "/path/to/repo", "drupal/coder").Return(true, nil)
+		composer.EXPECT().Project(anyCtx, "/path/to/repo").Return(lockedProject("drupal/coder"), nil)
 
 		committer := &fakeCommitter{}
 		updateCodingStyles := NewCodeBeautifier(logger, runner, NewMockPHPCS(t), composer)
@@ -481,7 +472,7 @@ func TestCodingStyles(t *testing.T) {
 		runner.EXPECT().RunCBF(anyCtx, "/path/to/repo").Return(nil)
 
 		composer := NewMockBeautifierComposer(t)
-		composer.EXPECT().IsPackageInstalled(anyCtx, "/path/to/repo", "drupal/coder").Return(true, nil)
+		composer.EXPECT().Project(anyCtx, "/path/to/repo").Return(lockedProject("drupal/coder"), nil)
 
 		committer := &fakeCommitter{unchanged: true}
 		updateCodingStyles := NewCodeBeautifier(logger, runner, NewMockPHPCS(t), composer)
@@ -530,7 +521,7 @@ func TestCodingStyles(t *testing.T) {
 		}, assert.AnError)
 
 		composer := NewMockBeautifierComposer(t)
-		composer.EXPECT().IsPackageInstalled(anyCtx, "/path/to/repo", "drupal/coder").Return(true, nil)
+		composer.EXPECT().Project(anyCtx, "/path/to/repo").Return(lockedProject("drupal/coder"), nil)
 
 		committer := &fakeCommitter{}
 		updateCodingStyles := NewCodeBeautifier(logger, runner, NewMockPHPCS(t), composer)
@@ -560,7 +551,7 @@ func TestCodingStyleCommitFailureFailsTheHandler(t *testing.T) {
 	}, nil)
 	runner.EXPECT().RunCBF(anyCtx, "/path/to/repo").Return(nil)
 	composer := NewMockBeautifierComposer(t)
-	composer.EXPECT().IsPackageInstalled(anyCtx, "/path/to/repo", "drupal/coder").Return(true, nil)
+	composer.EXPECT().Project(anyCtx, "/path/to/repo").Return(lockedProject("drupal/coder"), nil)
 
 	cb := NewCodeBeautifier(zap.NewNop(), runner, NewMockPHPCS(t), composer)
 	p, err := firePostCodeUpdate(cb, workflow.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", &fakeCommitter{err: assert.AnError}))
@@ -584,9 +575,7 @@ func TestCodingStylesCommitTheCreatedConfigBeforeTheFixes(t *testing.T) {
 	}, nil)
 	runner.EXPECT().RunCBF(anyCtx, tmpDir).Return(assert.AnError)
 	composer := NewMockBeautifierComposer(t)
-	composer.EXPECT().GetInstalledPackageVersion(anyCtx, tmpDir, "drupal/core").Return("10.1.0", nil)
-	composer.EXPECT().GetCustomCodeDirectories(anyCtx, tmpDir).Return([]string{"web/modules/custom"}, nil)
-	composer.EXPECT().IsPackageInstalled(anyCtx, tmpDir, "drupal/coder").Return(true, nil)
+	composer.EXPECT().Project(anyCtx, tmpDir).Return(withCustomCode(withCore(lockedProject("drupal/coder"), "10.1.0"), "web/modules/custom"), nil)
 
 	committer := &fakeCommitter{}
 	_, err := firePostCodeUpdate(NewCodeBeautifier(zap.NewNop(), runner, NewMockPHPCS(t), composer), workflow.NewPostCodeUpdateEvent(t.Context(), tmpDir, committer))
@@ -605,9 +594,7 @@ func TestCodingStylesFailWhenTheCreatedConfigCannotBeCommitted(t *testing.T) {
 	runner := NewMockPHPCS(t)
 	runner.EXPECT().Run(anyCtx, tmpDir).Return(phpcs.ReturnOutput{}, nil)
 	composer := NewMockBeautifierComposer(t)
-	composer.EXPECT().GetInstalledPackageVersion(anyCtx, tmpDir, "drupal/core").Return("10.1.0", nil)
-	composer.EXPECT().GetCustomCodeDirectories(anyCtx, tmpDir).Return([]string{"web/modules/custom"}, nil)
-	composer.EXPECT().IsPackageInstalled(anyCtx, tmpDir, "drupal/coder").Return(true, nil)
+	composer.EXPECT().Project(anyCtx, tmpDir).Return(withCustomCode(withCore(lockedProject("drupal/coder"), "10.1.0"), "web/modules/custom"), nil)
 
 	_, err := firePostCodeUpdate(NewCodeBeautifier(zap.NewNop(), runner, NewMockPHPCS(t), composer),
 		workflow.NewPostCodeUpdateEvent(t.Context(), tmpDir, &fakeCommitter{err: assert.AnError}))
@@ -618,8 +605,7 @@ func TestCodingStylesFailWhenTheCreatedConfigCannotBeCommitted(t *testing.T) {
 func TestCodingStylesFailWhenTheConfigCannotBeCreated(t *testing.T) {
 	fileExists = func(_ string) bool { return false }
 	composer := NewMockBeautifierComposer(t)
-	composer.EXPECT().GetInstalledPackageVersion(anyCtx, "/tmp", "drupal/core").Return("10.1.0", nil)
-	composer.EXPECT().GetCustomCodeDirectories(anyCtx, "/tmp").Return(nil, assert.AnError)
+	composer.EXPECT().Project(anyCtx, "/tmp").Return(withCore(lockedProject(), "10.1.0"), assert.AnError)
 
 	committer := &fakeCommitter{}
 	_, err := firePostCodeUpdate(NewCodeBeautifier(zap.NewNop(), NewMockPHPCS(t), NewMockPHPCS(t), composer),

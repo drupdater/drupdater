@@ -5,6 +5,7 @@ import (
 	"context"
 	"slices"
 
+	"github.com/drupdater/drupdater/internal/composer"
 	"github.com/drupdater/drupdater/internal/rector"
 	"github.com/drupdater/drupdater/internal/workflow"
 
@@ -13,8 +14,7 @@ import (
 
 // DeprecationsComposer finds custom code and whether the project ships its own Rector.
 type DeprecationsComposer interface {
-	GetCustomCodeDirectories(ctx context.Context, dir string) ([]string, error)
-	IsPackageInstalled(ctx context.Context, dir string, packageToCheck string) (bool, error)
+	Project(ctx context.Context, dir string) (composer.Project, error)
 }
 
 // Rector runs rector over custom code.
@@ -49,12 +49,16 @@ func (dr *DeprecationsRemover) Hooks() workflow.Hooks {
 func (dr *DeprecationsRemover) postCodeUpdateHandler(evt *workflow.PostCodeUpdateEvent) (workflow.Result[[]DeprecationFix], error) {
 	dr.logger.Info("removing deprecations")
 
-	rector := dr.rectorFor(evt.Context(), evt.Path())
+	project, err := dr.composer.Project(evt.Context(), evt.Path())
+	if err != nil {
+		return workflow.Result[[]DeprecationFix]{}, err
+	}
+	rector := dr.rectorFor(project)
 	if rector == nil {
 		return workflow.Result[[]DeprecationFix]{}, nil
 	}
 
-	customCodeDirectories, err := dr.composer.GetCustomCodeDirectories(evt.Context(), evt.Path())
+	customCodeDirectories, err := project.CustomCode()
 	if err != nil {
 		return workflow.Result[[]DeprecationFix]{}, err
 	}
@@ -76,12 +80,12 @@ func (dr *DeprecationsRemover) postCodeUpdateHandler(evt *workflow.PostCodeUpdat
 }
 
 // rectorFor returns the Rector that can load the project's code, or nil when neither can.
-func (dr *DeprecationsRemover) rectorFor(ctx context.Context, path string) Rector {
-	if installed, _ := dr.composer.IsPackageInstalled(ctx, path, "palantirnet/drupal-rector"); installed {
+func (dr *DeprecationsRemover) rectorFor(project composer.Project) Rector {
+	if project.Installed("palantirnet/drupal-rector") {
 		return dr.projectRector
 	}
 	// Ours would load the project's autoloader, and with it a second Rector's classes.
-	if installed, _ := dr.composer.IsPackageInstalled(ctx, path, "rector/rector"); installed {
+	if project.Installed("rector/rector") {
 		dr.logger.Warn("skipping deprecation removal: the project requires rector/rector but not palantirnet/drupal-rector")
 		return nil
 	}

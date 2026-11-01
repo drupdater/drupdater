@@ -4,6 +4,7 @@ import (
 	"context"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -55,6 +56,16 @@ func TestCommandBuild(t *testing.T) {
 		resolved, err := filepath.EvalSymlinks(dir)
 		require.NoError(t, err)
 		assert.Equal(t, resolved, out)
+	})
+
+	t.Run("feeds Stdin to the process", func(t *testing.T) {
+		var seen []string
+		c := Command{New: shellCommand("cat", &seen), Logger: zap.NewNop(), Stdin: strings.NewReader(`{"protocol":1}`)}
+
+		out, err := c.Combined(t.Context(), "drupdater:handshake")
+		require.NoError(t, err)
+
+		assert.Equal(t, `{"protocol":1}`, out)
 	})
 
 	t.Run("ExtraEnv beats the environment composer would otherwise be given", func(t *testing.T) {

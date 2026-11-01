@@ -3,7 +3,6 @@ package addon
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"testing"
 
 	"github.com/drupdater/drupdater/internal/composer"
@@ -25,13 +24,9 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 		drupalOrgService := NewMockDrupalOrg(t)
 		committer := &fakeCommitter{}
 
-		composerService.EXPECT().GetConfig(anyCtx, path, "extra.patches").
-			Return(`{"drupal/core":{"Issue #1: [t](u)":"`+depPatch+`"}}`, nil)
+		composerService.EXPECT().Project(anyCtx, path).Return(patchedProject(`{"drupal/core":{"Issue #1: [t](u)":"`+depPatch+`"}}`, map[string][]string{"drupal/core": {depPatch}}, "drupal/core"), nil)
 		composerService.EXPECT().Update(anyCtx, path, []string(nil), []string(nil), false, true).
 			Return([]composer.PackageChange{}, nil)
-		composerService.EXPECT().IsPackageInstalled(anyCtx, path, "drupal/core").Return(true, nil)
-		composerService.EXPECT().GetDependencyPatches(anyCtx, path).
-			Return(map[string]map[string]bool{"drupal/core": {depPatch: true}}, nil)
 
 		var written string
 		composerService.EXPECT().SetConfig(anyCtx, path, "extra.patches", mock.Anything).
@@ -55,12 +50,9 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 		drupalOrgService := NewMockDrupalOrg(t)
 		committer := &fakeCommitter{}
 
-		composerService.EXPECT().GetConfig(anyCtx, path, "extra.patches").
-			Return(`{"drupal/core":{"local patch":"patches/x.patch"}}`, nil)
+		composerService.EXPECT().Project(anyCtx, path).Return(patchedProject(`{"drupal/core":{"local patch":"patches/x.patch"}}`, nil, "drupal/core"), nil)
 		composerService.EXPECT().Update(anyCtx, path, []string(nil), []string(nil), false, true).
 			Return([]composer.PackageChange{{Action: "Upgrade", Package: "drupal/core", From: "8.7.0", To: "8.8.0"}}, nil)
-		composerService.EXPECT().IsPackageInstalled(anyCtx, path, "drupal/core").Return(true, nil)
-		composerService.EXPECT().GetDependencyPatches(anyCtx, path).Return(nil, nil)
 		drupalOrgService.EXPECT().FindIssueNumber("local patch").Return("", false)
 		drupalOrgService.EXPECT().FindIssueNumber("patches/x.patch").Return("", false)
 		composerService.EXPECT().CheckIfPatchApplies(anyCtx, mock.Anything, "drupal/core", "8.8.0", path+"/patches/x.patch").Return(false, nil)
@@ -83,12 +75,9 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 		drupalOrgService := NewMockDrupalOrg(t)
 		committer := &fakeCommitter{}
 
-		composerService.EXPECT().GetConfig(anyCtx, path, "extra.patches").
-			Return(`{"drupal/core":{"local patch":"patches/x.patch"}}`, nil)
+		composerService.EXPECT().Project(anyCtx, path).Return(patchedProject(`{"drupal/core":{"local patch":"patches/x.patch"}}`, nil, "drupal/core"), nil)
 		composerService.EXPECT().Update(anyCtx, path, []string(nil), []string(nil), false, true).
 			Return([]composer.PackageChange{{Action: "Upgrade", Package: "drupal/core", To: "8.8.0"}}, nil)
-		composerService.EXPECT().IsPackageInstalled(anyCtx, path, "drupal/core").Return(true, nil)
-		composerService.EXPECT().GetDependencyPatches(anyCtx, path).Return(nil, nil)
 		drupalOrgService.EXPECT().FindIssueNumber("local patch").Return("", false)
 		drupalOrgService.EXPECT().FindIssueNumber("patches/x.patch").Return("", false)
 		composerService.EXPECT().CheckIfPatchApplies(anyCtx, mock.Anything, "drupal/core", "8.8.0", path+"/patches/x.patch").Return(true, nil)
@@ -106,10 +95,9 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 		composerService := NewMockPatchesComposer(t)
 		committer := &fakeCommitter{}
 
-		composerService.EXPECT().GetConfig(anyCtx, path, "extra.patches").Return("", errors.New("not defined"))
+		composerService.EXPECT().Project(anyCtx, path).Return(patchedProject("", nil), nil)
 		composerService.EXPECT().Update(anyCtx, path, []string(nil), []string(nil), false, true).
 			Return([]composer.PackageChange{}, nil)
-		composerService.EXPECT().GetDependencyPatches(anyCtx, path).Return(nil, nil)
 
 		h := &ComposerPatches1{logger: logger, composer: composerService}
 		e := workflow.NewPreComposerUpdateEvent(t.Context(), path, committer, workflow.UpdatePlan{})
@@ -118,11 +106,21 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("returns error when the project cannot be read", func(t *testing.T) {
+		composerService := NewMockPatchesComposer(t)
+		composerService.EXPECT().Project(anyCtx, path).Return(composer.Project{}, assert.AnError)
+
+		h := &ComposerPatches1{logger: logger, composer: composerService}
+		_, err := h.preComposerUpdateHandler(workflow.NewPreComposerUpdateEvent(t.Context(), path, &fakeCommitter{}, workflow.UpdatePlan{}))
+
+		require.ErrorIs(t, err, assert.AnError)
+	})
+
 	t.Run("returns error on invalid patches JSON", func(t *testing.T) {
 		composerService := NewMockPatchesComposer(t)
 		committer := &fakeCommitter{}
 
-		composerService.EXPECT().GetConfig(anyCtx, path, "extra.patches").Return("not-json", nil)
+		composerService.EXPECT().Project(anyCtx, path).Return(patchedProject("not-json", nil), nil)
 
 		h := &ComposerPatches1{logger: logger, composer: composerService}
 		e := workflow.NewPreComposerUpdateEvent(t.Context(), path, committer, workflow.UpdatePlan{})
@@ -164,13 +162,9 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 				composerService := NewMockPatchesComposer(t)
 				committer := &fakeCommitter{}
 
-				composerService.EXPECT().GetConfig(anyCtx, path, "extra.patches").
-					Return(`{"drupal/core":{"Issue #1: [t](u)":"`+depPatch+`"}}`, nil)
+				composerService.EXPECT().Project(anyCtx, path).Return(patchedProject(`{"drupal/core":{"Issue #1: [t](u)":"`+depPatch+`"}}`, map[string][]string{"drupal/core": {depPatch}}, "drupal/core"), nil)
 				composerService.EXPECT().Update(anyCtx, path, []string(nil), []string(nil), false, true).
 					Return([]composer.PackageChange{}, nil)
-				composerService.EXPECT().IsPackageInstalled(anyCtx, path, "drupal/core").Return(true, nil)
-				composerService.EXPECT().GetDependencyPatches(anyCtx, path).
-					Return(map[string]map[string]bool{"drupal/core": {depPatch: true}}, nil)
 				tc.arrange(composerService)
 
 				h := &ComposerPatches1{logger: logger, composer: composerService}
@@ -187,7 +181,7 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 		composerService := NewMockPatchesComposer(t)
 		committer := &fakeCommitter{}
 
-		composerService.EXPECT().GetConfig(anyCtx, path, "extra.patches").Return("{}", nil)
+		composerService.EXPECT().Project(anyCtx, path).Return(patchedProject("{}", nil), nil)
 		composerService.EXPECT().Update(anyCtx, path, []string(nil), []string(nil), false, true).
 			Return(nil, assert.AnError)
 
@@ -202,10 +196,9 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 	t.Run("dry-runs the update as earlier stages planned it", func(t *testing.T) {
 		composerService := NewMockPatchesComposer(t)
 
-		composerService.EXPECT().GetConfig(anyCtx, path, "extra.patches").Return("{}", nil)
+		composerService.EXPECT().Project(anyCtx, path).Return(patchedProject("{}", nil), nil)
 		composerService.EXPECT().Update(anyCtx, path, []string{"drupal/core"}, []string{"drupal/token:1.13.0"}, true, true).
 			Return(nil, nil)
-		composerService.EXPECT().GetDependencyPatches(anyCtx, path).Return(nil, nil)
 
 		h := &ComposerPatches1{logger: logger, composer: composerService}
 		e := workflow.NewPreComposerUpdateEvent(t.Context(), path, &fakeCommitter{}, workflow.UpdatePlan{
@@ -239,12 +232,8 @@ func TestPatchUpdatesChangedPaths(t *testing.T) {
 func TestComposerPatchesCommitsAndReportsThroughThePipeline(t *testing.T) {
 	const depPatch = "https://www.drupal.org/files/issues/x.patch"
 	composerService := NewMockPatchesComposer(t)
-	composerService.EXPECT().GetConfig(anyCtx, "/repo", "extra.patches").
-		Return(`{"drupal/core":{"Issue #1: [t](u)":"`+depPatch+`"}}`, nil)
+	composerService.EXPECT().Project(anyCtx, "/repo").Return(patchedProject(`{"drupal/core":{"Issue #1: [t](u)":"`+depPatch+`"}}`, map[string][]string{"drupal/core": {depPatch}}, "drupal/core"), nil)
 	composerService.EXPECT().Update(anyCtx, "/repo", []string(nil), []string(nil), false, true).Return(nil, nil)
-	composerService.EXPECT().IsPackageInstalled(anyCtx, "/repo", "drupal/core").Return(true, nil)
-	composerService.EXPECT().GetDependencyPatches(anyCtx, "/repo").
-		Return(map[string]map[string]bool{"drupal/core": {depPatch: true}}, nil)
 	composerService.EXPECT().SetConfig(anyCtx, "/repo", "extra.patches", mock.Anything).Return(nil)
 	composerService.EXPECT().UpdateLockHash(anyCtx, "/repo").Return(nil)
 

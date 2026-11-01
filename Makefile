@@ -1,4 +1,4 @@
-.PHONY: build test test-race test-property fuzz mutate clean mock lint fmt fix run docker-build docker-run docs-serve docs-build help
+.PHONY: build test test-race test-agent test-property fuzz mutate clean mock lint fmt fix run docker-build docker-run docs-serve docs-build help
 
 # Variables
 BINARY_NAME=drupdater
@@ -24,6 +24,9 @@ test-race: ## Run tests with the race detector
 # RAPID_CHECKS rather than -rapid.checks: rapid only registers its flags in test binaries that
 # import it, so passing the flag to ./... fails on every package that has no property tests. The
 # environment variable is read at init and simply ignored by those packages.
+test-agent: ## Run the agent's PHPUnit suite
+	cd agent && composer install --no-interaction --no-progress && vendor/bin/phpunit
+
 test-property: ## Run only the property tests, with far more generated cases than `make test`
 	RAPID_CHECKS=10000 go test ./... -run TestProperty
 

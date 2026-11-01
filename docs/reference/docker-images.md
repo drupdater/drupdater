@@ -92,7 +92,54 @@ Built on `php:<version>-cli-trixie`, with:
   pre-allow-listed.
 - **Helper scripts** at `/opt/drupdater/` — the Rector configuration, the unsupported
   modules query, and the configuration resave script.
+- **The Drupdater agent** at `/opt/drupdater/agent/`, a third global plugin — see below.
 - **Bundled tools** at `/opt/drupdater/tools/` — see below.
+
+### Drupdater agent
+
+`drupdater/agent`, built from `agent/` in the Drupdater repository, is a Composer plugin
+installed globally. It adds hidden `composer drupdater:*` commands that answer Drupdater's
+questions about a project from inside that project's own Composer — its repositories, its
+credentials, its configuration — without installing anything into it.
+
+| Command | Used by |
+|---|---|
+| `drupdater:handshake` | The [`drupdater agent installed in Composer`](preflight-checks.md#drupdater-agent-installed-in-composer) preflight check |
+| `drupdater:patch-check` | [`composer_patches`](addons/composer-patches.md#how-a-patch-is-tested), to test whether patches still apply |
+| `drupdater:project` | Everything that reads the project's layout, plugins, patches or lock — see below |
+| `drupdater:resolve` | The run's [`resolve update`](../explanation/how-a-run-works.md) phase, and [`composer_patches`](addons/composer-patches.md)' dry run of the update it checks patches against |
+
+`drupdater:resolve` runs `composer update --no-install --with-all-dependencies
+--ignore-platform-reqs` with the run's package restriction, pins and `--minimal-changes`, and
+reports each package that changed in the lock: upgraded, downgraded, removed or installed,
+with its versions as the lock prints them (`1.x-dev 0424dff` for a branch). A new commit of a
+branch counts as an upgrade, as in Composer's own output; a package that only moved between
+`require` and `require-dev` did not change. A real run adds `--bump-after-update`; a dry run
+adds `--no-scripts` and puts `composer.json` and `composer.lock` back afterwards. When the update
+cannot be resolved, Composer's own explanation is carried into the run's error.
+
+`drupdater:project` reports, in one call:
+
+- **The web root** — `extra.drupal-scaffold.locations.web-root`, without a trailing slash.
+- **The custom code directories** — whichever of `modules/custom`, `themes/custom` and
+  `profiles/custom` exist under the web root. [`code_beautifier`](addons/code-beautifier.md)
+  and [`deprecations_remover`](addons/deprecations-remover.md) work on these.
+- **`allow-plugins` and `extra.patches` exactly as written** in `composer.json`, so the
+  addons that rewrite them can restore them faithfully.
+- **The locked packages**, dev ones included, with their versions, and which of them are
+  plugins: packages of type `composer-plugin` or `composer-installer`, the ones Composer
+  checks against `allow-plugins`.
+- **The patches locked dependencies declare** for other packages, which `composer-patches`
+  applies on top of the project's own.
+- **The lock's `content-hash`**, which names the [update branch](cli/drupdater.md).
+
+It is asked again whenever `composer.json` or the lock may have changed, so a reader never
+sees a stale answer.
+
+Each command reads one JSON request on stdin and prints one JSON reply on stdout, versioned
+by a `protocol` number the binary and the agent must agree on. The agent ships in the same
+image as the binary, so they always do; the preflight check catches a binary run anywhere
+else.
 
 ### Bundled tools
 

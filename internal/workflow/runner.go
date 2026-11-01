@@ -167,15 +167,7 @@ func (r *Runner) Run(ctx context.Context, addons []Addon) (err error) {
 func (r *run) execute(ctx context.Context) (branch string, err error) {
 	// Fail fast on the prerequisites "drupdater check" shares. Extension requirements are
 	// deliberately not among them — see CheckPlatformReqs.
-	if err := r.rec.Run("preflight", func() error {
-		if result := CheckGitHistoryComplete(ctx, r.git, r.path); !result.OK {
-			return fmt.Errorf("%s: %s", result.Name, result.Detail)
-		}
-		if result := CheckPlatformRequirements(ctx, r.composer, r.path); !result.OK {
-			return fmt.Errorf("PHP platform requirements not satisfied:\n%s", result.Detail)
-		}
-		return nil
-	}); err != nil {
+	if err := r.rec.Run("preflight", func() error { return r.preflight(ctx) }); err != nil {
 		return "", err
 	}
 
@@ -254,6 +246,19 @@ func (r *run) execute(ctx context.Context) (branch string, err error) {
 	return branch, r.rec.Run("publish", func() error {
 		return r.publish(ctx, branch, mrTitle, mrDescription)
 	})
+}
+
+func (r *run) preflight(ctx context.Context) error {
+	if result := CheckGitHistoryComplete(ctx, r.git, r.path); !result.OK {
+		return fmt.Errorf("%s: %s", result.Name, result.Detail)
+	}
+	if result := CheckPlatformRequirements(ctx, r.composer, r.path); !result.OK {
+		return fmt.Errorf("PHP platform requirements not satisfied:\n%s", result.Detail)
+	}
+	if result := CheckComposerAgent(ctx, r.composer, r.path); !result.OK {
+		return fmt.Errorf("%s: %s", result.Name, result.Detail)
+	}
+	return nil
 }
 
 // acquireWorkingCopy clones in clone mode. In checkout mode it adds a linked worktree of the

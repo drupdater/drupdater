@@ -68,9 +68,7 @@ type ConflictPatch struct {
 type PatchesComposer interface {
 	CheckIfPatchApplies(ctx context.Context, dir string, packageName string, packageVersion string, patchPath string) (bool, error)
 	CheckIfPatchesApply(ctx context.Context, dir string, packageName string, packageVersion string, patchPaths []string) (bool, error)
-	GetConfig(ctx context.Context, dir string, key string) (string, error)
-	GetDependencyPatches(ctx context.Context, dir string) (map[string]map[string]bool, error)
-	IsPackageInstalled(ctx context.Context, dir string, packageToCheck string) (bool, error)
+	Project(ctx context.Context, dir string) (composer.Project, error)
 	SetConfig(ctx context.Context, dir string, key string, value string) error
 	Update(ctx context.Context, dir string, packagesToUpdate []string, packagesToKeep []string, minimalChanges bool, dryRun bool) ([]composer.PackageChange, error)
 	UpdateLockHash(ctx context.Context, dir string) error
@@ -128,15 +126,16 @@ func (h *ComposerPatches1) preComposerUpdateHandler(evt *workflow.PreComposerUpd
 	path := evt.Path()
 	plan := evt.Plan()
 
-	patches := make(map[string]map[string]string)
-	patchesString, err := h.composer.GetConfig(ctx, path, "extra.patches")
+	// Before the dry-run update below, which leaves composer.json and the lock as it found them.
+	project, err := h.composer.Project(ctx, path)
 	if err != nil {
-		h.logger.Debug("extra.patches not defined")
-		patchesString = "{}"
+		return workflow.Proposal[PatchUpdates]{}, err
 	}
-
-	if err := json.Unmarshal([]byte(patchesString), &patches); err != nil {
-		return workflow.Proposal[PatchUpdates]{}, fmt.Errorf("failed to unmarshal patches: %w", err)
+	var patches declaredPatches
+	if project.Patches != nil {
+		if err := json.Unmarshal(project.Patches, &patches); err != nil {
+			return workflow.Proposal[PatchUpdates]{}, fmt.Errorf("failed to unmarshal patches: %w", err)
+		}
 	}
 
 	operations, err := h.composer.Update(ctx, path, plan.Only, plan.KeepConstraints(), plan.MinimalChanges, true)
@@ -144,7 +143,7 @@ func (h *ComposerPatches1) preComposerUpdateHandler(evt *workflow.PreComposerUpd
 		return workflow.Proposal[PatchUpdates]{}, fmt.Errorf("failed to get composer updates: %w", err)
 	}
 
-	patchUpdates, newPatches := h.updatePatches(ctx, path, operations, patches)
+	patchUpdates, newPatches := h.updatePatches(ctx, path, project, operations, patches)
 
 	proposal := workflow.Proposal[PatchUpdates]{Finding: patchUpdates}
 	for _, patchUpdate := range patchUpdates.Conflicts {
@@ -178,45 +177,29 @@ func (h *ComposerPatches1) preComposerUpdateHandler(evt *workflow.PreComposerUpd
 	return proposal, nil
 }
 
-func (h *ComposerPatches1) updatePatches(ctx context.Context, path string, operations []composer.PackageChange, patches map[string]map[string]string) (PatchUpdates, map[string]map[string]string) {
+func (h *ComposerPatches1) updatePatches(ctx context.Context, path string, project composer.Project, operations []composer.PackageChange, patches declaredPatches) (PatchUpdates, declaredPatches) {
 	updates := PatchUpdates{}
-	h.logger.Debug("processing composer patches", zap.Any("patches", patches))
+	h.logger.Debug("processing composer patches", zap.Strings("packages", patches.packages))
 
-	updates.Removed = append(updates.Removed, h.removeUninstalledPackagePatches(ctx, path, patches)...)
-	updates.Removed = append(updates.Removed, h.removeDependencyProvidedPatches(ctx, path, patches)...)
+	updates.Removed = append(updates.Removed, h.removeUninstalledPackagePatches(path, project, &patches)...)
+	updates.Removed = append(updates.Removed, h.removeDependencyProvidedPatches(project, &patches)...)
 
 	for _, op := range operations {
 		switch op.Action {
 		case "Upgrade", "Downgrade":
-			// processSinglePatch mutates patches[op.Package]; a key it inserts must not be
-			// visited again in the same pass.
-			for _, e := range snapshotPatches(patches[op.Package]) {
-				h.processSinglePatch(ctx, path, op, e.description, e.patchPath, patches, &updates)
+			// Cloned: processSinglePatch renames and removes entries of the set it is walking.
+			for _, e := range slices.Clone(patches.sets[op.Package]) {
+				h.processSinglePatch(ctx, path, op, e.description, e.path, &patches, &updates)
 			}
-			if len(patches[op.Package]) > 1 {
+			if len(patches.sets[op.Package]) > 1 {
 				h.validateCombinedPatches(ctx, path, op, patches, &updates)
 			}
 		case "Remove":
-			updates.Removed = append(updates.Removed, h.removePackagePatches(path, op, patches)...)
+			updates.Removed = append(updates.Removed, h.removePackagePatches(path, op, &patches)...)
 		}
 	}
 
 	return updates, patches
-}
-
-// patchEntry is a single description→path pair snapshotted from a patch map.
-type patchEntry struct {
-	description string
-	patchPath   string
-}
-
-// snapshotPatches copies a patch map so callers can iterate while mutating the underlying map.
-func snapshotPatches(m map[string]string) []patchEntry {
-	entries := make([]patchEntry, 0, len(m))
-	for description, patchPath := range m {
-		entries = append(entries, patchEntry{description: description, patchPath: patchPath})
-	}
-	return entries
 }
 
 // isRemotePatch checks the scheme explicitly: url.ParseRequestURI also accepts "/patches/x.diff".
@@ -256,69 +239,54 @@ func (h *ComposerPatches1) dropPatchFile(path string, patchPath string) error {
 
 // removeDependencyProvidedPatches drops root patches a dependency already applies, which
 // composer-patches would apply twice. Remote only: a local path is package-relative.
-func (h *ComposerPatches1) removeDependencyProvidedPatches(ctx context.Context, path string, patches map[string]map[string]string) []RemovedPatch {
-	depPatches, err := h.composer.GetDependencyPatches(ctx, path)
-	if err != nil {
-		h.logger.Error("failed to read dependency patches", zap.Error(err))
-		return nil
-	}
-
+func (h *ComposerPatches1) removeDependencyProvidedPatches(project composer.Project, patches *declaredPatches) []RemovedPatch {
 	var removed []RemovedPatch
-	for packageName, byDescription := range patches {
-		depFiles := depPatches[packageName]
-		if depFiles == nil {
-			continue
-		}
-		for description, patchPath := range byDescription {
-			if !isRemotePatch(patchPath) {
+	for _, packageName := range slices.Clone(patches.packages) {
+		depFiles := project.DependencyPatches[packageName]
+		for _, e := range slices.Clone(patches.sets[packageName]) {
+			if !isRemotePatch(e.path) || !slices.Contains(depFiles, e.path) {
 				continue
 			}
-			if !depFiles[patchPath] {
-				continue
-			}
-			h.logger.Info("removing patch: already applied by a dependency", zap.String("package", packageName), zap.String("patch", patchPath))
-			removed = append(removed, RemovedPatch{Package: packageName, PatchPath: patchPath, PatchDescription: description, Reason: fmt.Sprintf("Patch is already applied by a dependency of %s", packageName)})
-			delete(patches[packageName], description)
-		}
-		if len(patches[packageName]) == 0 {
-			delete(patches, packageName)
+			h.logger.Info("removing patch: already applied by a dependency", zap.String("package", packageName), zap.String("patch", e.path))
+			removed = append(removed, RemovedPatch{Package: packageName, PatchPath: e.path, PatchDescription: e.description, Reason: fmt.Sprintf("Patch is already applied by a dependency of %s", packageName)})
+			patches.remove(packageName, e.description)
 		}
 	}
 	return removed
 }
 
-func (h *ComposerPatches1) removeUninstalledPackagePatches(ctx context.Context, path string, patches map[string]map[string]string) []RemovedPatch {
+func (h *ComposerPatches1) removeUninstalledPackagePatches(path string, project composer.Project, patches *declaredPatches) []RemovedPatch {
 	var removed []RemovedPatch
-	for packageName := range patches {
-		if installed, _ := h.composer.IsPackageInstalled(ctx, path, packageName); installed {
+	for _, packageName := range slices.Clone(patches.packages) {
+		if project.Installed(packageName) {
 			continue
 		}
-		for description, patchPath := range patches[packageName] {
-			if err := h.dropPatchFile(path, patchPath); err != nil {
-				h.logger.Error("failed to remove patch", zap.String("patch", patchPath), zap.Error(err))
+		for _, e := range patches.sets[packageName] {
+			if err := h.dropPatchFile(path, e.path); err != nil {
+				h.logger.Error("failed to remove patch", zap.String("patch", e.path), zap.Error(err))
 			}
-			h.logger.Info("removing patch: package no longer installed", zap.String("package", packageName), zap.String("patch", patchPath))
-			removed = append(removed, RemovedPatch{Package: packageName, PatchPath: patchPath, PatchDescription: description, Reason: fmt.Sprintf("%s is not installed in the project", packageName)})
+			h.logger.Info("removing patch: package no longer installed", zap.String("package", packageName), zap.String("patch", e.path))
+			removed = append(removed, RemovedPatch{Package: packageName, PatchPath: e.path, PatchDescription: e.description, Reason: fmt.Sprintf("%s is not installed in the project", packageName)})
 		}
-		delete(patches, packageName)
+		patches.removePackage(packageName)
 	}
 	return removed
 }
 
-func (h *ComposerPatches1) removePackagePatches(path string, op composer.PackageChange, patches map[string]map[string]string) []RemovedPatch {
+func (h *ComposerPatches1) removePackagePatches(path string, op composer.PackageChange, patches *declaredPatches) []RemovedPatch {
 	var removed []RemovedPatch
-	for description, patchPath := range patches[op.Package] {
-		h.logger.Debug("removing patch", zap.String("package", op.Package), zap.String("patch", patchPath))
-		removed = append(removed, RemovedPatch{Package: op.Package, PatchPath: patchPath, PatchDescription: description, Reason: fmt.Sprintf("%s is no longer installed", op.Package)})
-		if err := h.dropPatchFile(path, patchPath); err != nil {
-			h.logger.Error("failed to remove patch", zap.String("patch", patchPath), zap.Error(err))
+	for _, e := range patches.sets[op.Package] {
+		h.logger.Debug("removing patch", zap.String("package", op.Package), zap.String("patch", e.path))
+		removed = append(removed, RemovedPatch{Package: op.Package, PatchPath: e.path, PatchDescription: e.description, Reason: fmt.Sprintf("%s is no longer installed", op.Package)})
+		if err := h.dropPatchFile(path, e.path); err != nil {
+			h.logger.Error("failed to remove patch", zap.String("patch", e.path), zap.Error(err))
 		}
 	}
-	delete(patches, op.Package)
+	patches.removePackage(op.Package)
 	return removed
 }
 
-func (h *ComposerPatches1) processSinglePatch(ctx context.Context, path string, op composer.PackageChange, description, patchPath string, patches map[string]map[string]string, updates *PatchUpdates) { //nolint:cyclop
+func (h *ComposerPatches1) processSinglePatch(ctx context.Context, path string, op composer.PackageChange, description, patchPath string, patches *declaredPatches, updates *PatchUpdates) { //nolint:cyclop
 	issueNumber, issueNumberExists := h.drupalOrg.FindIssueNumber(description)
 	if !issueNumberExists {
 		issueNumber, issueNumberExists = h.drupalOrg.FindIssueNumber(patchPath)
@@ -334,8 +302,6 @@ func (h *ComposerPatches1) processSinglePatch(ctx context.Context, path string, 
 		}
 		h.logger.Debug("fetched issue details", zap.Any("issue", issue))
 
-		delete(patches[op.Package], description)
-
 		// 2 = Fixed, 7 = Closed (fixed), 15 = Patch (to be ported)
 		if h.drupalCode != nil && (issue.Status == "2" || issue.Status == "7" || issue.Status == "15") {
 			fixed, err := h.drupalCode.IsFixedIn(ctx, issue.Project.MaschineName, issue.ID, op.To)
@@ -344,23 +310,21 @@ func (h *ComposerPatches1) processSinglePatch(ctx context.Context, path string, 
 			} else if fixed {
 				h.logger.Debug("issue is fixed", zap.String("issue", issue.ID))
 				if err := h.dropPatchFile(path, patchPath); err != nil {
-					// Restore the entry deleted above: a patch whose file survived must stay
-					// declared rather than vanish from composer.json unreported.
+					// A patch whose file survived stays declared rather than vanish unreported.
 					h.logger.Error("failed to remove patch", zap.String("patch", patchPath), zap.Error(err))
-					patches[op.Package][description] = patchPath
 					return
 				}
-				if len(patches[op.Package]) == 0 {
-					delete(patches, op.Package)
-				}
+				patches.remove(op.Package, description)
 				h.logger.Info("removing patch: issue fixed in new version", zap.String("package", op.Package), zap.String("patch", patchPath))
 				updates.Removed = append(updates.Removed, RemovedPatch{Package: op.Package, PatchPath: patchPath, Reason: fmt.Sprintf("Issue [#%s](%s) is fixed in %s %s", issue.ID, issue.URL, op.Package, op.To), PatchDescription: description})
 				return
 			}
 		}
 
-		description = "Issue #" + issue.ID + ": [" + issue.Title + "](" + issue.URL + ")"
-		patches[op.Package][description] = patchPath
+		canonical := "Issue #" + issue.ID + ": [" + issue.Title + "](" + issue.URL + ")"
+		if patches.rename(op.Package, description, canonical) {
+			description = canonical
+		}
 	}
 
 	ok, err := h.composer.CheckIfPatchApplies(ctx, path, op.Package, op.To, resolvePatchPath(path, patchPath))
@@ -422,7 +386,7 @@ func (h *ComposerPatches1) processSinglePatch(ctx context.Context, path string, 
 			h.logger.Debug("failed to remove old patch file", zap.String("patch", patchPath), zap.Error(err))
 			return
 		}
-		patches[op.Package][description] = fullNewPath
+		patches.setPath(op.Package, description, fullNewPath)
 		h.logger.Info("replacing patch", zap.String("package", op.Package), zap.String("previous_patch", patchPath), zap.String("new_patch", fullNewPath))
 		updates.Updated = append(updates.Updated, UpdatedPatch{Package: op.Package, PreviousPatchPath: patchPath, NewPatchPath: fullNewPath, PatchDescription: description})
 	} else {
@@ -431,10 +395,10 @@ func (h *ComposerPatches1) processSinglePatch(ctx context.Context, path string, 
 	}
 }
 
-func (h *ComposerPatches1) validateCombinedPatches(ctx context.Context, path string, op composer.PackageChange, patches map[string]map[string]string, updates *PatchUpdates) {
-	patchPaths := make([]string, 0, len(patches[op.Package]))
-	for _, patchPath := range patches[op.Package] {
-		patchPaths = append(patchPaths, resolvePatchPath(path, patchPath))
+func (h *ComposerPatches1) validateCombinedPatches(ctx context.Context, path string, op composer.PackageChange, patches declaredPatches, updates *PatchUpdates) {
+	patchPaths := make([]string, 0, len(patches.sets[op.Package]))
+	for _, e := range patches.sets[op.Package] {
+		patchPaths = append(patchPaths, resolvePatchPath(path, e.path))
 	}
 
 	ok, err := h.composer.CheckIfPatchesApply(ctx, path, op.Package, op.To, patchPaths)

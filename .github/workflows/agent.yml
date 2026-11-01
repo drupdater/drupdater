@@ -1,0 +1,52 @@
+name: Agent
+
+# The PHP half of drupdater: agent/, the `composer drupdater:*` commands the image installs. Its
+# protocol fixtures are shared with internal/agent, whose side go.yml tests on every push.
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "agent/**"
+      - ".github/workflows/agent.yml"
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - "agent/**"
+      - ".github/workflows/agent.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  phpunit:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The lowest and the highest PHP the image is published for.
+        php: [ "8.2", "8.5" ]
+    defaults:
+      run:
+        working-directory: agent
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          tools: composer:2.10
+          coverage: none
+
+      - name: Validate composer.json
+        run: composer validate --strict
+
+      - name: Install
+        run: composer install --no-interaction --no-progress
+
+      - name: PHPUnit
+        run: vendor/bin/phpunit

@@ -2,6 +2,7 @@ package addon
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/drupdater/drupdater/internal/composer"
@@ -43,12 +44,32 @@ func postUpdate(t *testing.T, ap *ComposerAllowPlugins, earlier *workflow.Findin
 	return result.Finding, err
 }
 
-func plugins(names ...string) map[string]any {
-	installed := map[string]any{}
+// plugins is a project whose lock has each of names as a plugin, and one package that is not.
+func plugins(names ...string) composer.Project {
+	project := composer.Project{Packages: map[string]composer.LockedPackage{"drupal/core": {Version: "11.0.0"}}}
 	for _, name := range names {
-		installed[name] = nil
+		project.Packages[name] = composer.LockedPackage{Version: "1.0.0", Plugin: true}
 	}
-	return installed
+	return project
+}
+
+// allowing is a project whose composer.json says original, as the agent reports it.
+func allowing(t *testing.T, original composer.AllowPlugins) composer.Project {
+	t.Helper()
+	var raw json.RawMessage
+	switch {
+	case !original.Set:
+	case original.All != nil:
+		raw, _ = json.Marshal(*original.All)
+	default:
+		var err error
+		raw, err = json.Marshal(original.Rules)
+		require.NoError(t, err)
+	}
+	parsed, err := composer.ParseAllowPlugins(raw)
+	require.NoError(t, err)
+	require.Equal(t, original, parsed, "allowing must round-trip")
+	return composer.Project{AllowPlugins: raw}
 }
 
 // The project's rules stay in place and keep deciding every plugin they name; only plugins none
@@ -56,7 +77,7 @@ func plugins(names ...string) map[string]any {
 func TestAllowPluginsWithRulesAddsAndRemovesATrailingWildcard(t *testing.T) {
 	c := NewMockAllowPluginsComposer(t)
 	original := composer.AllowPlugins{Set: true, Rules: map[string]bool{"drupal/*": true, "cweagans/composer-patches": false}}
-	c.EXPECT().GetAllowPlugins("/p").Return(original, nil)
+	c.EXPECT().Project(anyCtx, "/p").Return(allowing(t, original), nil).Once()
 	c.EXPECT().SetConfig(anyCtx, "/p", "allow-plugins.*", "true").Return(nil).Once()
 	ap := NewComposerAllowPlugins(zap.NewNop(), c)
 
@@ -64,9 +85,9 @@ func TestAllowPluginsWithRulesAddsAndRemovesATrailingWildcard(t *testing.T) {
 	require.NoError(t, err)
 
 	c.EXPECT().UnsetConfig(anyCtx, "/p", "allow-plugins.*").Return(nil).Once()
-	c.EXPECT().GetInstalledPlugins(anyCtx, "/p").Return(plugins(
+	c.EXPECT().Project(anyCtx, "/p").Return(plugins(
 		"tbachert/spi", "drupal/core-composer-scaffold", "cweagans/composer-patches", "php-http/discovery",
-	), nil)
+	), nil).Once()
 	var denied []string
 	c.EXPECT().SetConfig(anyCtx, "/p", mock.Anything, "false").RunAndReturn(func(_ context.Context, _, key, _ string) error {
 		denied = append(denied, key)
@@ -89,8 +110,8 @@ func TestAllowPluginsLeavesASettingThatDecidesEverythingAlone(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			c := NewMockAllowPluginsComposer(t)
-			c.EXPECT().GetAllowPlugins("/p").Return(original, nil)
-			c.EXPECT().GetInstalledPlugins(anyCtx, "/p").Return(plugins("drupal/core-composer-scaffold", "tbachert/spi"), nil)
+			c.EXPECT().Project(anyCtx, "/p").Return(allowing(t, original), nil).Once()
+			c.EXPECT().Project(anyCtx, "/p").Return(plugins("drupal/core-composer-scaffold", "tbachert/spi"), nil).Once()
 			ap := NewComposerAllowPlugins(zap.NewNop(), c)
 
 			earlier, err := preUpdate(t, ap)
@@ -106,10 +127,10 @@ func TestAllowPluginsLeavesASettingThatDecidesEverythingAlone(t *testing.T) {
 // With no setting, the wildcard creates one; it goes again unless a new plugin needs an entry.
 func TestAllowPluginsWithoutASettingRestoresItsAbsence(t *testing.T) {
 	c := NewMockAllowPluginsComposer(t)
-	c.EXPECT().GetAllowPlugins("/p").Return(composer.AllowPlugins{}, nil)
+	c.EXPECT().Project(anyCtx, "/p").Return(allowing(t, composer.AllowPlugins{}), nil).Once()
 	c.EXPECT().SetConfig(anyCtx, "/p", "allow-plugins.*", "true").Return(nil)
 	c.EXPECT().UnsetConfig(anyCtx, "/p", "allow-plugins.*").Return(nil)
-	c.EXPECT().GetInstalledPlugins(anyCtx, "/p").Return(plugins(), nil)
+	c.EXPECT().Project(anyCtx, "/p").Return(plugins(), nil).Once()
 	c.EXPECT().UnsetConfig(anyCtx, "/p", "allow-plugins").Return(nil)
 	ap := NewComposerAllowPlugins(zap.NewNop(), c)
 
@@ -121,10 +142,10 @@ func TestAllowPluginsWithoutASettingRestoresItsAbsence(t *testing.T) {
 
 func TestAllowPluginsWithoutASettingKeepsTheNewDenials(t *testing.T) {
 	c := NewMockAllowPluginsComposer(t)
-	c.EXPECT().GetAllowPlugins("/p").Return(composer.AllowPlugins{}, nil)
+	c.EXPECT().Project(anyCtx, "/p").Return(allowing(t, composer.AllowPlugins{}), nil).Once()
 	c.EXPECT().SetConfig(anyCtx, "/p", "allow-plugins.*", "true").Return(nil)
 	c.EXPECT().UnsetConfig(anyCtx, "/p", "allow-plugins.*").Return(nil)
-	c.EXPECT().GetInstalledPlugins(anyCtx, "/p").Return(plugins("tbachert/spi"), nil)
+	c.EXPECT().Project(anyCtx, "/p").Return(plugins("tbachert/spi"), nil).Once()
 	c.EXPECT().SetConfig(anyCtx, "/p", "allow-plugins.tbachert/spi", "false").Return(nil)
 	ap := NewComposerAllowPlugins(zap.NewNop(), c)
 
@@ -138,10 +159,10 @@ func TestAllowPluginsWithoutASettingKeepsTheNewDenials(t *testing.T) {
 // An empty object is a setting: it is left as {} rather than removed.
 func TestAllowPluginsKeepsAnEmptyObject(t *testing.T) {
 	c := NewMockAllowPluginsComposer(t)
-	c.EXPECT().GetAllowPlugins("/p").Return(composer.AllowPlugins{Set: true, Rules: map[string]bool{}}, nil)
+	c.EXPECT().Project(anyCtx, "/p").Return(allowing(t, composer.AllowPlugins{Set: true, Rules: map[string]bool{}}), nil).Once()
 	c.EXPECT().SetConfig(anyCtx, "/p", "allow-plugins.*", "true").Return(nil)
 	c.EXPECT().UnsetConfig(anyCtx, "/p", "allow-plugins.*").Return(nil)
-	c.EXPECT().GetInstalledPlugins(anyCtx, "/p").Return(plugins(), nil)
+	c.EXPECT().Project(anyCtx, "/p").Return(plugins(), nil).Once()
 	ap := NewComposerAllowPlugins(zap.NewNop(), c)
 
 	earlier, err := preUpdate(t, ap)
@@ -153,7 +174,7 @@ func TestAllowPluginsKeepsAnEmptyObject(t *testing.T) {
 func TestAllowPluginsErrors(t *testing.T) {
 	t.Run("reading the setting fails", func(t *testing.T) {
 		c := NewMockAllowPluginsComposer(t)
-		c.EXPECT().GetAllowPlugins("/p").Return(composer.AllowPlugins{}, assert.AnError)
+		c.EXPECT().Project(anyCtx, "/p").Return(composer.Project{}, assert.AnError)
 
 		_, err := preUpdate(t, NewComposerAllowPlugins(zap.NewNop(), c))
 
@@ -163,7 +184,7 @@ func TestAllowPluginsErrors(t *testing.T) {
 
 	t.Run("adding the wildcard fails", func(t *testing.T) {
 		c := NewMockAllowPluginsComposer(t)
-		c.EXPECT().GetAllowPlugins("/p").Return(composer.AllowPlugins{}, nil)
+		c.EXPECT().Project(anyCtx, "/p").Return(allowing(t, composer.AllowPlugins{}), nil).Once()
 		c.EXPECT().SetConfig(anyCtx, "/p", "allow-plugins.*", "true").Return(assert.AnError)
 		ap := NewComposerAllowPlugins(zap.NewNop(), c)
 
@@ -176,7 +197,7 @@ func TestAllowPluginsErrors(t *testing.T) {
 
 	t.Run("removing the wildcard fails", func(t *testing.T) {
 		c := NewMockAllowPluginsComposer(t)
-		c.EXPECT().GetInstalledPlugins(anyCtx, "/p").Return(plugins(), nil)
+		c.EXPECT().Project(anyCtx, "/p").Return(plugins(), nil).Once()
 		c.EXPECT().UnsetConfig(anyCtx, "/p", "allow-plugins.*").Return(assert.AnError)
 		ap := NewComposerAllowPlugins(zap.NewNop(), c)
 
@@ -188,7 +209,7 @@ func TestAllowPluginsErrors(t *testing.T) {
 
 	t.Run("an absent setting drupdater never touched stays absent", func(t *testing.T) {
 		c := NewMockAllowPluginsComposer(t)
-		c.EXPECT().GetInstalledPlugins(anyCtx, "/p").Return(plugins(), nil)
+		c.EXPECT().Project(anyCtx, "/p").Return(plugins(), nil).Once()
 
 		_, err := postUpdate(t, NewComposerAllowPlugins(zap.NewNop(), c), &workflow.Findings{})
 		require.NoError(t, err)
@@ -196,7 +217,7 @@ func TestAllowPluginsErrors(t *testing.T) {
 
 	t.Run("listing installed plugins fails", func(t *testing.T) {
 		c := NewMockAllowPluginsComposer(t)
-		c.EXPECT().GetInstalledPlugins(anyCtx, "/p").Return(nil, assert.AnError)
+		c.EXPECT().Project(anyCtx, "/p").Return(composer.Project{}, assert.AnError)
 
 		_, err := postUpdate(t, NewComposerAllowPlugins(zap.NewNop(), c), &workflow.Findings{})
 		require.ErrorIs(t, err, assert.AnError)
@@ -204,7 +225,7 @@ func TestAllowPluginsErrors(t *testing.T) {
 
 	t.Run("denying a new plugin fails", func(t *testing.T) {
 		c := NewMockAllowPluginsComposer(t)
-		c.EXPECT().GetInstalledPlugins(anyCtx, "/p").Return(plugins("tbachert/spi"), nil)
+		c.EXPECT().Project(anyCtx, "/p").Return(plugins("tbachert/spi"), nil).Once()
 		c.EXPECT().SetConfig(anyCtx, "/p", "allow-plugins.tbachert/spi", "false").Return(assert.AnError)
 
 		_, err := postUpdate(t, NewComposerAllowPlugins(zap.NewNop(), c), &workflow.Findings{})
@@ -216,7 +237,7 @@ func TestAllowPluginsErrors(t *testing.T) {
 	t.Run("removing the emptied setting fails", func(t *testing.T) {
 		c := NewMockAllowPluginsComposer(t)
 		c.EXPECT().UnsetConfig(anyCtx, "/p", "allow-plugins.*").Return(nil)
-		c.EXPECT().GetInstalledPlugins(anyCtx, "/p").Return(plugins(), nil)
+		c.EXPECT().Project(anyCtx, "/p").Return(plugins(), nil).Once()
 		c.EXPECT().UnsetConfig(anyCtx, "/p", "allow-plugins").Return(assert.AnError)
 		ap := NewComposerAllowPlugins(zap.NewNop(), c)
 
@@ -233,7 +254,7 @@ func TestAllowPluginsRemovesTheWildcardLast(t *testing.T) {
 	var calls []string
 	record := func(call string) { calls = append(calls, call) }
 	c := NewMockAllowPluginsComposer(t)
-	c.EXPECT().GetInstalledPlugins(anyCtx, "/p").RunAndReturn(func(context.Context, string) (map[string]any, error) {
+	c.EXPECT().Project(anyCtx, "/p").RunAndReturn(func(context.Context, string) (composer.Project, error) {
 		record("list")
 		return plugins("tbachert/spi"), nil
 	})
@@ -256,9 +277,9 @@ func TestAllowPluginsRemovesTheWildcardLast(t *testing.T) {
 // The post-update hook undoes what its own pre-update hook did, read from the pipeline's findings.
 func TestAllowPluginsUndoesItsWildcardThroughThePipeline(t *testing.T) {
 	c := NewMockAllowPluginsComposer(t)
-	c.EXPECT().GetAllowPlugins("/p").Return(composer.AllowPlugins{Set: true, Rules: map[string]bool{"drupal/*": true}}, nil)
+	c.EXPECT().Project(anyCtx, "/p").Return(allowing(t, composer.AllowPlugins{Set: true, Rules: map[string]bool{"drupal/*": true}}), nil).Once()
 	c.EXPECT().SetConfig(anyCtx, "/p", "allow-plugins.*", "true").Return(nil)
-	c.EXPECT().GetInstalledPlugins(anyCtx, "/p").Return(plugins("drupal/core-composer-scaffold", "tbachert/spi"), nil)
+	c.EXPECT().Project(anyCtx, "/p").Return(plugins("drupal/core-composer-scaffold", "tbachert/spi"), nil).Once()
 	c.EXPECT().SetConfig(anyCtx, "/p", "allow-plugins.tbachert/spi", "false").Return(nil)
 	c.EXPECT().UnsetConfig(anyCtx, "/p", "allow-plugins.*").Return(nil)
 	p := workflow.NewPipeline([]workflow.Addon{NewComposerAllowPlugins(zap.NewNop(), c)})

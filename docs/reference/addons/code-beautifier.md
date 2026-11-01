@@ -16,7 +16,8 @@ a PHPCS configuration first if the project has none.
 ### Ensures a PHPCS configuration exists
 
 If the project has neither `phpcs.xml` nor `phpcs.xml.dist`, one is generated from the
-project's custom code directories and the installed `drupal/core` major version, using
+project's custom code directories — `modules/custom`, `themes/custom` and `profiles/custom`
+under the web root, where they exist — and the installed `drupal/core` major version, using
 the `Drupal` and `DrupalPractice` rulesets and the extensions
 `php,module,inc,install,test,profile,theme`. It is committed as `Add PHPCS config`.
 

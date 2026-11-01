@@ -535,6 +535,63 @@ func (_m *MockComposer) EXPECT() *MockComposer_Expecter {
 	return &MockComposer_Expecter{mock: &_m.Mock}
 }
 
+// CheckAgent provides a mock function for the type MockComposer
+func (_mock *MockComposer) CheckAgent(ctx context.Context, dir string) error {
+	ret := _mock.Called(ctx, dir)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CheckAgent")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = returnFunc(ctx, dir)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockComposer_CheckAgent_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CheckAgent'
+type MockComposer_CheckAgent_Call struct {
+	*mock.Call
+}
+
+// CheckAgent is a helper method to define mock.On call
+//   - ctx context.Context
+//   - dir string
+func (_e *MockComposer_Expecter) CheckAgent(ctx any, dir any) *MockComposer_CheckAgent_Call {
+	return &MockComposer_CheckAgent_Call{Call: _e.mock.On("CheckAgent", ctx, dir)}
+}
+
+func (_c *MockComposer_CheckAgent_Call) Run(run func(ctx context.Context, dir string)) *MockComposer_CheckAgent_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockComposer_CheckAgent_Call) Return(err error) *MockComposer_CheckAgent_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockComposer_CheckAgent_Call) RunAndReturn(run func(ctx context.Context, dir string) error) *MockComposer_CheckAgent_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CheckPlatformReqs provides a mock function for the type MockComposer
 func (_mock *MockComposer) CheckPlatformReqs(ctx context.Context, dir string) (string, error) {
 	ret := _mock.Called(ctx, dir)
@@ -601,138 +658,6 @@ func (_c *MockComposer_CheckPlatformReqs_Call) RunAndReturn(run func(ctx context
 	return _c
 }
 
-// GetConfig provides a mock function for the type MockComposer
-func (_mock *MockComposer) GetConfig(ctx context.Context, dir string, key string) (string, error) {
-	ret := _mock.Called(ctx, dir, key)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetConfig")
-	}
-
-	var r0 string
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) (string, error)); ok {
-		return returnFunc(ctx, dir, key)
-	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) string); ok {
-		r0 = returnFunc(ctx, dir, key)
-	} else {
-		r0 = ret.Get(0).(string)
-	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
-		r1 = returnFunc(ctx, dir, key)
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// MockComposer_GetConfig_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetConfig'
-type MockComposer_GetConfig_Call struct {
-	*mock.Call
-}
-
-// GetConfig is a helper method to define mock.On call
-//   - ctx context.Context
-//   - dir string
-//   - key string
-func (_e *MockComposer_Expecter) GetConfig(ctx any, dir any, key any) *MockComposer_GetConfig_Call {
-	return &MockComposer_GetConfig_Call{Call: _e.mock.On("GetConfig", ctx, dir, key)}
-}
-
-func (_c *MockComposer_GetConfig_Call) Run(run func(ctx context.Context, dir string, key string)) *MockComposer_GetConfig_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 context.Context
-		if args[0] != nil {
-			arg0 = args[0].(context.Context)
-		}
-		var arg1 string
-		if args[1] != nil {
-			arg1 = args[1].(string)
-		}
-		var arg2 string
-		if args[2] != nil {
-			arg2 = args[2].(string)
-		}
-		run(
-			arg0,
-			arg1,
-			arg2,
-		)
-	})
-	return _c
-}
-
-func (_c *MockComposer_GetConfig_Call) Return(s string, err error) *MockComposer_GetConfig_Call {
-	_c.Call.Return(s, err)
-	return _c
-}
-
-func (_c *MockComposer_GetConfig_Call) RunAndReturn(run func(ctx context.Context, dir string, key string) (string, error)) *MockComposer_GetConfig_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// GetLockHash provides a mock function for the type MockComposer
-func (_mock *MockComposer) GetLockHash(dir string) (string, error) {
-	ret := _mock.Called(dir)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetLockHash")
-	}
-
-	var r0 string
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(string) (string, error)); ok {
-		return returnFunc(dir)
-	}
-	if returnFunc, ok := ret.Get(0).(func(string) string); ok {
-		r0 = returnFunc(dir)
-	} else {
-		r0 = ret.Get(0).(string)
-	}
-	if returnFunc, ok := ret.Get(1).(func(string) error); ok {
-		r1 = returnFunc(dir)
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// MockComposer_GetLockHash_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetLockHash'
-type MockComposer_GetLockHash_Call struct {
-	*mock.Call
-}
-
-// GetLockHash is a helper method to define mock.On call
-//   - dir string
-func (_e *MockComposer_Expecter) GetLockHash(dir any) *MockComposer_GetLockHash_Call {
-	return &MockComposer_GetLockHash_Call{Call: _e.mock.On("GetLockHash", dir)}
-}
-
-func (_c *MockComposer_GetLockHash_Call) Run(run func(dir string)) *MockComposer_GetLockHash_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 string
-		if args[0] != nil {
-			arg0 = args[0].(string)
-		}
-		run(
-			arg0,
-		)
-	})
-	return _c
-}
-
-func (_c *MockComposer_GetLockHash_Call) Return(s string, err error) *MockComposer_GetLockHash_Call {
-	_c.Call.Return(s, err)
-	return _c
-}
-
-func (_c *MockComposer_GetLockHash_Call) RunAndReturn(run func(dir string) (string, error)) *MockComposer_GetLockHash_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // Install provides a mock function for the type MockComposer
 func (_mock *MockComposer) Install(ctx context.Context, dir string) error {
 	ret := _mock.Called(ctx, dir)
@@ -786,6 +711,72 @@ func (_c *MockComposer_Install_Call) Return(err error) *MockComposer_Install_Cal
 }
 
 func (_c *MockComposer_Install_Call) RunAndReturn(run func(ctx context.Context, dir string) error) *MockComposer_Install_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Project provides a mock function for the type MockComposer
+func (_mock *MockComposer) Project(ctx context.Context, dir string) (composer.Project, error) {
+	ret := _mock.Called(ctx, dir)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Project")
+	}
+
+	var r0 composer.Project
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (composer.Project, error)); ok {
+		return returnFunc(ctx, dir)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) composer.Project); ok {
+		r0 = returnFunc(ctx, dir)
+	} else {
+		r0 = ret.Get(0).(composer.Project)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, dir)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockComposer_Project_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Project'
+type MockComposer_Project_Call struct {
+	*mock.Call
+}
+
+// Project is a helper method to define mock.On call
+//   - ctx context.Context
+//   - dir string
+func (_e *MockComposer_Expecter) Project(ctx any, dir any) *MockComposer_Project_Call {
+	return &MockComposer_Project_Call{Call: _e.mock.On("Project", ctx, dir)}
+}
+
+func (_c *MockComposer_Project_Call) Run(run func(ctx context.Context, dir string)) *MockComposer_Project_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockComposer_Project_Call) Return(project composer.Project, err error) *MockComposer_Project_Call {
+	_c.Call.Return(project, err)
+	return _c
+}
+
+func (_c *MockComposer_Project_Call) RunAndReturn(run func(ctx context.Context, dir string) (composer.Project, error)) *MockComposer_Project_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -3118,17 +3109,17 @@ func (_c *MockPlatformReqsChecker_CheckPlatformReqs_Call) RunAndReturn(run func(
 	return _c
 }
 
-// NewMockComposerConfigGetter creates a new instance of MockComposerConfigGetter. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
+// NewMockAgentChecker creates a new instance of MockAgentChecker. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
-func NewMockComposerConfigGetter(t interface {
+func NewMockAgentChecker(t interface {
 	mock.TestingT
 	Cleanup(func())
-}) *MockComposerConfigGetter {
+}) *MockAgentChecker {
 	if helper, ok := t.(interface{ Helper() }); ok {
 		helper.Helper()
 	}
 
-	mock := &MockComposerConfigGetter{}
+	mock := &MockAgentChecker{}
 	mock.Mock.Test(t)
 
 	t.Cleanup(func() {
@@ -3141,59 +3132,49 @@ func NewMockComposerConfigGetter(t interface {
 	return mock
 }
 
-// MockComposerConfigGetter is an autogenerated mock type for the ComposerConfigGetter type
-type MockComposerConfigGetter struct {
+// MockAgentChecker is an autogenerated mock type for the AgentChecker type
+type MockAgentChecker struct {
 	mock.Mock
 }
 
-type MockComposerConfigGetter_Expecter struct {
+type MockAgentChecker_Expecter struct {
 	mock *mock.Mock
 }
 
-func (_m *MockComposerConfigGetter) EXPECT() *MockComposerConfigGetter_Expecter {
-	return &MockComposerConfigGetter_Expecter{mock: &_m.Mock}
+func (_m *MockAgentChecker) EXPECT() *MockAgentChecker_Expecter {
+	return &MockAgentChecker_Expecter{mock: &_m.Mock}
 }
 
-// GetConfig provides a mock function for the type MockComposerConfigGetter
-func (_mock *MockComposerConfigGetter) GetConfig(ctx context.Context, dir string, key string) (string, error) {
-	ret := _mock.Called(ctx, dir, key)
+// CheckAgent provides a mock function for the type MockAgentChecker
+func (_mock *MockAgentChecker) CheckAgent(ctx context.Context, dir string) error {
+	ret := _mock.Called(ctx, dir)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetConfig")
+		panic("no return value specified for CheckAgent")
 	}
 
-	var r0 string
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) (string, error)); ok {
-		return returnFunc(ctx, dir, key)
-	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string) string); ok {
-		r0 = returnFunc(ctx, dir, key)
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = returnFunc(ctx, dir)
 	} else {
-		r0 = ret.Get(0).(string)
+		r0 = ret.Error(0)
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
-		r1 = returnFunc(ctx, dir, key)
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
+	return r0
 }
 
-// MockComposerConfigGetter_GetConfig_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetConfig'
-type MockComposerConfigGetter_GetConfig_Call struct {
+// MockAgentChecker_CheckAgent_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CheckAgent'
+type MockAgentChecker_CheckAgent_Call struct {
 	*mock.Call
 }
 
-// GetConfig is a helper method to define mock.On call
+// CheckAgent is a helper method to define mock.On call
 //   - ctx context.Context
 //   - dir string
-//   - key string
-func (_e *MockComposerConfigGetter_Expecter) GetConfig(ctx any, dir any, key any) *MockComposerConfigGetter_GetConfig_Call {
-	return &MockComposerConfigGetter_GetConfig_Call{Call: _e.mock.On("GetConfig", ctx, dir, key)}
+func (_e *MockAgentChecker_Expecter) CheckAgent(ctx any, dir any) *MockAgentChecker_CheckAgent_Call {
+	return &MockAgentChecker_CheckAgent_Call{Call: _e.mock.On("CheckAgent", ctx, dir)}
 }
 
-func (_c *MockComposerConfigGetter_GetConfig_Call) Run(run func(ctx context.Context, dir string, key string)) *MockComposerConfigGetter_GetConfig_Call {
+func (_c *MockAgentChecker_CheckAgent_Call) Run(run func(ctx context.Context, dir string)) *MockAgentChecker_CheckAgent_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -3203,25 +3184,122 @@ func (_c *MockComposerConfigGetter_GetConfig_Call) Run(run func(ctx context.Cont
 		if args[1] != nil {
 			arg1 = args[1].(string)
 		}
-		var arg2 string
-		if args[2] != nil {
-			arg2 = args[2].(string)
-		}
 		run(
 			arg0,
 			arg1,
-			arg2,
 		)
 	})
 	return _c
 }
 
-func (_c *MockComposerConfigGetter_GetConfig_Call) Return(s string, err error) *MockComposerConfigGetter_GetConfig_Call {
-	_c.Call.Return(s, err)
+func (_c *MockAgentChecker_CheckAgent_Call) Return(err error) *MockAgentChecker_CheckAgent_Call {
+	_c.Call.Return(err)
 	return _c
 }
 
-func (_c *MockComposerConfigGetter_GetConfig_Call) RunAndReturn(run func(ctx context.Context, dir string, key string) (string, error)) *MockComposerConfigGetter_GetConfig_Call {
+func (_c *MockAgentChecker_CheckAgent_Call) RunAndReturn(run func(ctx context.Context, dir string) error) *MockAgentChecker_CheckAgent_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// NewMockProjectReader creates a new instance of MockProjectReader. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
+// The first argument is typically a *testing.T value.
+func NewMockProjectReader(t interface {
+	mock.TestingT
+	Cleanup(func())
+}) *MockProjectReader {
+	if helper, ok := t.(interface{ Helper() }); ok {
+		helper.Helper()
+	}
+
+	mock := &MockProjectReader{}
+	mock.Mock.Test(t)
+
+	t.Cleanup(func() {
+		if helper, ok := t.(interface{ Helper() }); ok {
+			helper.Helper()
+		}
+		mock.AssertExpectations(t)
+	})
+
+	return mock
+}
+
+// MockProjectReader is an autogenerated mock type for the ProjectReader type
+type MockProjectReader struct {
+	mock.Mock
+}
+
+type MockProjectReader_Expecter struct {
+	mock *mock.Mock
+}
+
+func (_m *MockProjectReader) EXPECT() *MockProjectReader_Expecter {
+	return &MockProjectReader_Expecter{mock: &_m.Mock}
+}
+
+// Project provides a mock function for the type MockProjectReader
+func (_mock *MockProjectReader) Project(ctx context.Context, dir string) (composer.Project, error) {
+	ret := _mock.Called(ctx, dir)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Project")
+	}
+
+	var r0 composer.Project
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (composer.Project, error)); ok {
+		return returnFunc(ctx, dir)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) composer.Project); ok {
+		r0 = returnFunc(ctx, dir)
+	} else {
+		r0 = ret.Get(0).(composer.Project)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, dir)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockProjectReader_Project_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Project'
+type MockProjectReader_Project_Call struct {
+	*mock.Call
+}
+
+// Project is a helper method to define mock.On call
+//   - ctx context.Context
+//   - dir string
+func (_e *MockProjectReader_Expecter) Project(ctx any, dir any) *MockProjectReader_Project_Call {
+	return &MockProjectReader_Project_Call{Call: _e.mock.On("Project", ctx, dir)}
+}
+
+func (_c *MockProjectReader_Project_Call) Run(run func(ctx context.Context, dir string)) *MockProjectReader_Project_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockProjectReader_Project_Call) Return(project composer.Project, err error) *MockProjectReader_Project_Call {
+	_c.Call.Return(project, err)
+	return _c
+}
+
+func (_c *MockProjectReader_Project_Call) RunAndReturn(run func(ctx context.Context, dir string) (composer.Project, error)) *MockProjectReader_Project_Call {
 	_c.Call.Return(run)
 	return _c
 }

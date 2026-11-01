@@ -14,7 +14,7 @@ import (
 	"github.com/spf13/afero"
 	"gopkg.in/yaml.v3"
 
-	"github.com/drupdater/drupdater/internal/drupal"
+	"github.com/drupdater/drupdater/internal/composer"
 
 	"go.uber.org/zap"
 )
@@ -26,7 +26,7 @@ type Drush interface {
 }
 
 type Composer interface {
-	GetConfig(ctx context.Context, path string, key string) (string, error)
+	Project(ctx context.Context, dir string) (composer.Project, error)
 }
 
 type Installer struct {
@@ -89,7 +89,11 @@ func (is *Installer) Install(ctx context.Context, path string, site string) (err
 const settingsMarker = "// Added by drupdater: test database settings."
 
 func (is *Installer) settingsPath(ctx context.Context, dir string, site string) (string, error) {
-	webroot, err := drupal.WebRoot(ctx, is.composer, dir)
+	project, err := is.composer.Project(ctx, dir)
+	if err != nil {
+		return "", fmt.Errorf("failed to get Drupal web dir: %w", err)
+	}
+	webroot, err := project.RequireWebRoot()
 	if err != nil {
 		return "", fmt.Errorf("failed to get Drupal web dir: %w", err)
 	}
