@@ -220,3 +220,20 @@ func TestCallRejectsAnUnencodableRequest(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to encode the drupdater:handshake request")
 	assert.Nil(t, f.args, "nothing is run for a request that cannot be sent")
 }
+
+func TestCallKeepsComposersExplanationOfAFailure(t *testing.T) {
+	f := &fakeAgent{
+		stdout: `{"protocol":1,"command":"drupdater:resolve","ok":false,"error":{"kind":"failed","reason":"composer update failed","message":"exit code 2"}}`,
+		stderr: "Your requirements could not be resolved to an installable set of packages.",
+		status: 1,
+	}
+
+	_, err := f.callCommand(t, "drupdater:resolve")
+
+	var agentErr *Error
+	require.ErrorAs(t, err, &agentErr)
+	assert.Equal(t, Failed, agentErr.Kind)
+	assert.Equal(t, "Your requirements could not be resolved to an installable set of packages.", agentErr.Output)
+	assert.Equal(t, "drupdater:resolve: failed (composer update failed): exit code 2, "+
+		"output: Your requirements could not be resolved to an installable set of packages.", err.Error())
+}

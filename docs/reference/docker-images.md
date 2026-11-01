@@ -107,6 +107,16 @@ credentials, its configuration — without installing anything into it.
 | `drupdater:handshake` | The [`drupdater agent installed in Composer`](preflight-checks.md#drupdater-agent-installed-in-composer) preflight check |
 | `drupdater:patch-check` | [`composer_patches`](addons/composer-patches.md#how-a-patch-is-tested), to test whether patches still apply |
 | `drupdater:project` | Everything that reads the project's layout, plugins, patches or lock — see below |
+| `drupdater:resolve` | The run's [`resolve update`](../explanation/how-a-run-works.md) phase, and [`composer_patches`](addons/composer-patches.md)' dry run of the update it checks patches against |
+
+`drupdater:resolve` runs `composer update --no-install --with-all-dependencies
+--ignore-platform-reqs` with the run's package restriction, pins and `--minimal-changes`, and
+reports each package that changed in the lock: upgraded, downgraded, removed or installed,
+with its versions as the lock prints them (`1.x-dev 0424dff` for a branch). A new commit of a
+branch counts as an upgrade, as in Composer's own output; a package that only moved between
+`require` and `require-dev` did not change. A real run adds `--bump-after-update`; a dry run
+adds `--no-scripts` and puts `composer.json` and `composer.lock` back afterwards. When the update
+cannot be resolved, Composer's own explanation is carried into the run's error.
 
 `drupdater:project` reports, in one call:
 

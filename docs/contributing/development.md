@@ -567,7 +567,8 @@ package it mocks. Do not edit those files by hand.
 `agent/` is the PHP half of Drupdater: `drupdater/agent`, a Composer plugin the image installs
 globally. It adds `composer drupdater:*` commands that answer what Drupdater can only learn
 from inside the project's own Composer: [`drupdater:project`](../reference/docker-images.md#drupdater-agent),
-the project's layout, plugins, patches and lock, and
+the project's layout, plugins, patches and lock;
+[`drupdater:resolve`](../reference/docker-images.md#drupdater-agent), the update itself; and
 [`drupdater:patch-check`](../reference/addons/composer-patches.md#how-a-patch-is-tested). The
 Go side calls them through `internal/agent`, and `internal/composer` wraps each in a method.
 
@@ -578,8 +579,10 @@ Each command reads one JSON request on stdin and prints one JSON envelope on std
 ```
 
 A failure carries an `error` with a closed `kind` — `unobtainable`, `invalid_request`,
-`protocol_mismatch`, `internal` — decided in PHP from the exception it caught, so Go never
-reads Composer's console wording. Go matches on `*agent.Error`'s `Kind`.
+`protocol_mismatch`, `failed` (Composer ran and reported failure), `internal` — decided in PHP
+from the exception it caught, so Go never reads Composer's console wording. Go matches on
+`*agent.Error`'s `Kind`; its `Output` keeps what Composer wrote to stderr, which is the only
+explanation of a `failed` one.
 
 `agent/protocol/` holds one example of every request and reply. **Both sides test against
 it**: PHPUnit asserts the agent produces each reply, `internal/agent` and

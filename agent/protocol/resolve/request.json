@@ -1,0 +1,9 @@
+{
+  "protocol": 1,
+  "request": {
+    "packages": [],
+    "keep": [],
+    "minimal_changes": false,
+    "write": false
+  }
+}

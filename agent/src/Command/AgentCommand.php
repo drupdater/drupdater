@@ -16,6 +16,9 @@ use Symfony\Component\Console\Output\OutputInterface;
  */
 abstract class AgentCommand extends BaseCommand
 {
+    /** Where a command that runs another of Composer's sends that one's output. */
+    protected ?OutputInterface $output = null;
+
     /**
      * @param array<string, mixed> $request
      * @return array<string, mixed>
@@ -25,6 +28,7 @@ abstract class AgentCommand extends BaseCommand
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $name = (string) $this->getName();
+        $this->output = $output;
         try {
             $result = $this->handle(Protocol::decodeRequest($this->readRequest($input)));
             $output->writeln(Protocol::success($name, $result), OutputInterface::OUTPUT_RAW);

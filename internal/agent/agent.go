@@ -31,6 +31,8 @@ const (
 	ProtocolMismatch Kind = "protocol_mismatch"
 	// Internal is any other failure inside the agent.
 	Internal Kind = "internal"
+	// Failed means Composer ran and reported failure, or the project cannot do what was asked.
+	Failed Kind = "failed"
 )
 
 // Error is a failure the agent reported, or a reply that could not be read as one.
@@ -41,6 +43,8 @@ type Error struct {
 	Reason string
 	// Message is the underlying error's own text, for diagnosis only.
 	Message string
+	// Output is what Composer wrote to stderr meanwhile, which explains a Failed one.
+	Output string
 }
 
 func (e *Error) Error() string {
@@ -50,6 +54,9 @@ func (e *Error) Error() string {
 	}
 	if e.Message != "" {
 		text += ": " + e.Message
+	}
+	if e.Output != "" {
+		text += ", output: " + e.Output
 	}
 	return text
 }
@@ -97,7 +104,7 @@ func Call[Resp any](ctx context.Context, c php.Command, command string, req any)
 		}
 	}
 	if !reply.OK {
-		agentErr := &Error{Command: command, Kind: Internal}
+		agentErr := &Error{Command: command, Kind: Internal, Output: stderr}
 		if reply.Error != nil {
 			agentErr.Kind, agentErr.Reason, agentErr.Message = reply.Error.Kind, reply.Error.Reason, reply.Error.Message
 		}

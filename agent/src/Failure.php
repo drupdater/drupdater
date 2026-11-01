@@ -13,6 +13,8 @@ final class Failure extends \RuntimeException
     public const INVALID_REQUEST = 'invalid_request';
     public const PROTOCOL_MISMATCH = 'protocol_mismatch';
     public const INTERNAL = 'internal';
+    /** Composer ran and reported failure, or the project cannot do what was asked. */
+    public const FAILED = 'failed';
 
     public function __construct(
         public readonly string $kind,

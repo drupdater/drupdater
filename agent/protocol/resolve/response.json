@@ -1,0 +1,11 @@
+{
+  "protocol": 1,
+  "command": "drupdater:resolve",
+  "ok": true,
+  "result": {
+    "changes": [
+      {"action": "Upgrade", "package": "fixture/a", "from": "1.0.0", "to": "1.1.0"},
+      {"action": "Upgrade", "package": "fixture/b", "from": "2.0.0", "to": "2.1.0"}
+    ]
+  }
+}
