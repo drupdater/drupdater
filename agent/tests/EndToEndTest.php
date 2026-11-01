@@ -133,6 +133,36 @@ final class EndToEndTest extends TestCase
         self::assertSame(['unmet' => []], $reply['result']);
     }
 
+    public function testWritePatchesLeavesALockComposerAgreesIsUpToDate(): void
+    {
+        $project = $this->lockedProject();
+        $lock = (string) file_get_contents($project . '/composer.lock');
+
+        $reply = $this->askVerbatim('drupdater:write-patches', $project, 'write-patches/request.json');
+
+        self::assertTrue($reply['ok']);
+        $validate = self::composer(['--working-dir=' . $project, 'validate', '--no-check-publish', '--no-check-all']);
+        self::assertSame(0, $validate->getExitCode(), $validate->getOutput() . $validate->getErrorOutput());
+        $hash = json_decode((string) file_get_contents($project . '/composer.lock'), true)['content-hash'];
+        $before = json_decode($lock, true)['content-hash'];
+        self::assertSame(str_replace($before, $hash, $lock), file_get_contents($project . '/composer.lock'));
+    }
+
+    public function testAllowPluginsOpenedAndClosedLeavesComposerJsonAsItWas(): void
+    {
+        $project = $this->lockedProject();
+        // Composer ends every file it writes with a newline; so does a project's own.
+        file_put_contents($project . '/composer.json', file_get_contents($project . '/composer.json') . "\n");
+        $manifest = (string) file_get_contents($project . '/composer.json');
+
+        $opened = $this->ask('drupdater:allow-plugins', $project, self::fixture('allow-plugins/open-request.json'));
+        self::assertSame(['original' => null, 'opened' => true], $opened['result']);
+        $closed = $this->ask('drupdater:allow-plugins', $project, ['protocol' => 1, 'request' => ['step' => 'close'] + $opened['result']]);
+
+        self::assertSame(['denied' => []], $closed['result']);
+        self::assertSame($manifest, file_get_contents($project . '/composer.json'));
+    }
+
     public function testAPatchThatFitsApplies(): void
     {
         $project = $this->project();
@@ -173,6 +203,19 @@ final class EndToEndTest extends TestCase
     private function ask(string $command, string $project, array $request): array
     {
         return $this->askWithErrors($command, $project, $request)[0];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function askVerbatim(string $command, string $project, string $fixture): array
+    {
+        $process = self::composer(
+            ['--working-dir=' . $project, $command, '--no-interaction', '--no-ansi'],
+            (string) file_get_contents(dirname(__DIR__) . '/protocol/' . $fixture),
+        );
+        $lines = explode("\n", trim($process->getOutput()));
+        return json_decode(end($lines), true, 512, JSON_THROW_ON_ERROR);
     }
 
     /**

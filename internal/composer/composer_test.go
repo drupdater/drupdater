@@ -238,58 +238,6 @@ func TestDiffRejectsMalformedOutput(t *testing.T) {
 	}
 }
 
-func TestSetConfig(t *testing.T) {
-	service := &CLI{logger: zap.NewNop()}
-
-	t.Run("success", func(t *testing.T) {
-		service.newCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
-			cs := []string{"-test.run=TestHelperProcess", "--", "ok"}
-			cs = append(cs, arg...)
-			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
-			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
-			return cmd
-		}
-		require.NoError(t, service.SetConfig(t.Context(), "/tmp", "platform.php", "8.3"))
-	})
-
-	t.Run("error", func(t *testing.T) {
-		service.newCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
-			cs := []string{"-test.run=TestHelperProcess", "--"}
-			cs = append(cs, arg...)
-			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
-			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
-			return cmd
-		}
-		require.Error(t, service.SetConfig(t.Context(), "/tmp", "platform.php", "8.3"))
-	})
-}
-
-func TestUpdateLockHash(t *testing.T) {
-	service := &CLI{logger: zap.NewNop()}
-
-	t.Run("success", func(t *testing.T) {
-		service.newCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
-			cs := []string{"-test.run=TestHelperProcess", "--", "ok"}
-			cs = append(cs, arg...)
-			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
-			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
-			return cmd
-		}
-		require.NoError(t, service.UpdateLockHash(t.Context(), "/tmp"))
-	})
-
-	t.Run("error", func(t *testing.T) {
-		service.newCommand = func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
-			cs := []string{"-test.run=TestHelperProcess", "--"}
-			cs = append(cs, arg...)
-			cmd := exec.CommandContext(ctx, os.Args[0], cs...)
-			cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GO_HELPER_PROCESS_ERROR=1", "GOCOVERDIR=/tmp"}
-			return cmd
-		}
-		require.Error(t, service.UpdateLockHash(t.Context(), "/tmp"))
-	})
-}
-
 func TestHelperProcess(*testing.T) {
 	if os.Getenv("GO_WANT_HELPER_PROCESS") != "1" {
 		return
@@ -345,36 +293,6 @@ func TestNewCLI(t *testing.T) {
 }
 
 // The patterns behave as in Composer's PluginManager: anchored, case-insensitive, * for anything.
-func TestAllowPluginsDecides(t *testing.T) {
-	yes := true
-	rules := AllowPlugins{Set: true, Rules: map[string]bool{"drupal/*": true, "cweagans/composer-patches": false, "a.b/c": true}}
-
-	assert.True(t, rules.Decides("drupal/core-composer-scaffold"), "matched by a wildcard")
-	assert.True(t, rules.Decides("Drupal/Core-Composer-Scaffold"), "case-insensitive")
-	assert.True(t, rules.Decides("cweagans/composer-patches"), "a denial decides too")
-	assert.False(t, rules.Decides("cweagans/composer-patches-extra"), "anchored at the end")
-	assert.False(t, rules.Decides("acme/drupal/x"), "anchored at the start")
-	assert.False(t, rules.Decides("aXb/c"), "a dot is literal")
-	assert.False(t, rules.Decides("php-http/discovery"))
-	assert.False(t, AllowPlugins{}.Decides("drupal/core"), "no setting decides nothing")
-	assert.True(t, AllowPlugins{Set: true, All: &yes}.Decides("anything/at-all"))
-}
-
-func TestUnsetConfig(t *testing.T) {
-	var args []string
-	newCommand := func(ctx context.Context, _ string, arg ...string) *exec.Cmd {
-		args = arg
-		cs := append([]string{"-test.run=TestHelperProcess", "--", ""}, arg...)
-		cmd := exec.CommandContext(ctx, os.Args[0], cs...)
-		cmd.Env = []string{"GO_WANT_HELPER_PROCESS=1", "GOCOVERDIR=/tmp"}
-		return cmd
-	}
-
-	require.NoError(t, (&CLI{newCommand: newCommand, logger: zap.NewNop()}).UnsetConfig(t.Context(), "/tmp", "allow-plugins.*"))
-	assert.Equal(t, []string{"config", "--unset", "allow-plugins.*"}, args)
-
-	require.Error(t, (&CLI{newCommand: composerFailing(), logger: zap.NewNop()}).UnsetConfig(t.Context(), "/tmp", "allow-plugins.*"))
-}
 
 func TestInstallReturnsNilOnSuccess(t *testing.T) {
 	service := &CLI{newCommand: composerPrinting("Nothing to install"), logger: zap.NewNop()}

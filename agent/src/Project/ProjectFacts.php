@@ -8,6 +8,7 @@ use Composer\Composer;
 use Composer\Package\AliasPackage;
 use Composer\Package\PackageInterface;
 use Drupdater\Agent\Failure;
+use Drupdater\Agent\Plugins\AllowPlugins;
 
 /**
  * What drupdater reads about a project: composer.json as written, and the lock as Composer
@@ -15,9 +16,6 @@ use Drupdater\Agent\Failure;
  */
 final class ProjectFacts
 {
-    /** The package types Composer's PluginManager checks against allow-plugins. */
-    private const PLUGIN_TYPES = ['composer-plugin', 'composer-installer'];
-
     private const CUSTOM_CODE_KINDS = ['modules', 'themes', 'profiles'];
 
     public function __construct(private readonly Composer $composer, private readonly string $composerFile)
@@ -63,7 +61,7 @@ final class ProjectFacts
             }
             $packages[$package->getName()] = [
                 'version' => $package->getPrettyVersion(),
-                'plugin' => in_array($package->getType(), self::PLUGIN_TYPES, true),
+                'plugin' => in_array($package->getType(), AllowPlugins::PLUGIN_TYPES, true),
             ];
             foreach (self::declaredPatches($package) as $target => $files) {
                 $dependencyPatches[$target] = [...($dependencyPatches[$target] ?? []), ...$files];

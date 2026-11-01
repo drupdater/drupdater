@@ -1,0 +1,12 @@
+{
+  "protocol": 1,
+  "request": {
+    "patches": {
+      "drupal/token": {
+        "Issue #3123456: [Token fix](https://www.drupal.org/i/3123456)": "patches/token/3123456-local.patch",
+        "Remote fix, rerolled": "https://www.drupal.org/files/issues/3200000-9.patch"
+      },
+      "drupal/empty": {}
+    }
+  }
+}

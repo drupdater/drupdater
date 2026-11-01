@@ -1,0 +1,12 @@
+{
+  "protocol": 1,
+  "command": "drupdater:allow-plugins",
+  "ok": true,
+  "result": {
+    "original": {
+      "cweagans/composer-patches": true,
+      "drupal/*": false
+    },
+    "opened": true
+  }
+}

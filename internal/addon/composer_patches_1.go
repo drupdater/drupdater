@@ -69,9 +69,8 @@ type PatchesComposer interface {
 	CheckIfPatchApplies(ctx context.Context, dir string, packageName string, packageVersion string, patchPath string) (bool, error)
 	CheckIfPatchesApply(ctx context.Context, dir string, packageName string, packageVersion string, patchPaths []string) (bool, error)
 	Project(ctx context.Context, dir string) (composer.Project, error)
-	SetConfig(ctx context.Context, dir string, key string, value string) error
 	Update(ctx context.Context, dir string, packagesToUpdate []string, packagesToKeep []string, minimalChanges bool, dryRun bool) ([]composer.PackageChange, error)
-	UpdateLockHash(ctx context.Context, dir string) error
+	WritePatches(ctx context.Context, dir string, patches json.RawMessage) error
 }
 
 // DrupalOrg looks up the drupal.org issue a patch belongs to.
@@ -165,12 +164,8 @@ func (h *ComposerPatches1) preComposerUpdateHandler(evt *workflow.PreComposerUpd
 		return workflow.Proposal[PatchUpdates]{}, fmt.Errorf("failed to marshal patches: %w", err)
 	}
 
-	if err := h.composer.SetConfig(ctx, path, "extra.patches", string(jsonBytes)); err != nil {
-		return workflow.Proposal[PatchUpdates]{}, fmt.Errorf("failed to set composer config: %w", err)
-	}
-
-	if err := h.composer.UpdateLockHash(ctx, path); err != nil {
-		return workflow.Proposal[PatchUpdates]{}, fmt.Errorf("failed to update composer lock hash: %w", err)
+	if err := h.composer.WritePatches(ctx, path, jsonBytes); err != nil {
+		return workflow.Proposal[PatchUpdates]{}, err
 	}
 
 	proposal.Commits = []workflow.Commit{{Message: "Update patches", Paths: patchUpdates.changedPaths("composer.json", "composer.lock")}}

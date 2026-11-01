@@ -34,7 +34,16 @@ final class CommandsTest extends TestCase
     {
         self::assertSame([\Composer\Plugin\Capability\CommandProvider::class => CommandProvider::class], (new Plugin())->getCapabilities());
         $names = array_map(fn (AgentCommand $c) => $c->getName(), (new CommandProvider())->getCommands());
-        self::assertSame(['drupdater:audit', 'drupdater:handshake', 'drupdater:patch-check', 'drupdater:platform-check', 'drupdater:project', 'drupdater:resolve'], $names);
+        self::assertSame([
+            'drupdater:allow-plugins',
+            'drupdater:audit',
+            'drupdater:handshake',
+            'drupdater:patch-check',
+            'drupdater:platform-check',
+            'drupdater:project',
+            'drupdater:resolve',
+            'drupdater:write-patches',
+        ], $names);
     }
 
     public function testHandshakeAnswersTheFixture(): void

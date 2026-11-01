@@ -45,7 +45,10 @@ apply alone but conflict with each other are caught. The set is applied in the o
 `composer.json` declares it, which is the order `composer-patches` applies it in, so patches
 that only apply one after another are checked that way.
 
-When the addon rewrites `extra.patches`, every package and patch keeps its place. A rewritten
+When the addon rewrites `extra.patches`, it writes them through the
+[Drupdater agent](../docker-images.md#drupdater-agent)'s `drupdater:write-patches`, which also
+updates `composer.lock`'s `content-hash` to match and changes nothing else in the lock. Every
+package and patch keeps its place, and an empty patch list stays an empty object. A rewritten
 description takes the place of the one it replaces. Two patches for the same issue keep their
 own descriptions rather than both being renamed to `Issue #…`, which would leave one key for
 two patches.

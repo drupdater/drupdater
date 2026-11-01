@@ -104,12 +104,14 @@ credentials, its configuration — without installing anything into it.
 
 | Command | Used by |
 |---|---|
+| `drupdater:allow-plugins` | [`composer_allow_plugins`](addons/composer-allow-plugins.md), to open `allow-plugins` before the update and close it after |
 | `drupdater:audit` | [`composer_audit`](addons/composer-audit.md), before and after the update |
 | `drupdater:handshake` | The [`drupdater agent installed in Composer`](preflight-checks.md#drupdater-agent-installed-in-composer) preflight check |
 | `drupdater:patch-check` | [`composer_patches`](addons/composer-patches.md#how-a-patch-is-tested), to test whether patches still apply |
 | `drupdater:platform-check` | The [`PHP platform requirements satisfied`](preflight-checks.md#php-platform-requirements-satisfied) preflight check |
 | `drupdater:project` | Everything that reads the project's layout, plugins, patches or lock — see below |
 | `drupdater:resolve` | The run's [`resolve update`](../explanation/how-a-run-works.md) phase, and [`composer_patches`](addons/composer-patches.md)' dry run of the update it checks patches against |
+| `drupdater:write-patches` | [`composer_patches`](addons/composer-patches.md), to write the patches it rewrote |
 
 `drupdater:resolve` runs `composer update --no-install --with-all-dependencies
 --ignore-platform-reqs` with the run's package restriction, pins and `--minimal-changes`, and
@@ -119,6 +121,18 @@ branch counts as an upgrade, as in Composer's own output; a package that only mo
 `require` and `require-dev` did not change. A real run adds `--bump-after-update`; a dry run
 adds `--no-scripts` and puts `composer.json` and `composer.lock` back afterwards. When the update
 cannot be resolved, Composer's own explanation is carried into the run's error.
+
+`drupdater:allow-plugins` opens `allow-plugins` before the update and closes it after; what
+it writes is described on [`composer_allow_plugins`](addons/composer-allow-plugins.md#what-it-does).
+It decides which plugins the project's rules already cover with Composer's own matching —
+anchored, case-insensitive, `*` for any characters — so it cannot disagree with Composer
+about which plugin a rule names.
+
+`drupdater:write-patches` writes `extra.patches` exactly as given, empty objects and key order
+included, and updates `composer.lock`'s `content-hash` to match, since the hash covers
+`extra`. Nothing is resolved and nothing else in the lock changes. `composer.json` keeps its
+formatting, except where Composer's own JSON editor cannot write the patches faithfully: then
+the whole file is written out again in Composer's format.
 
 `drupdater:audit` audits the locked packages, dev ones included, as `composer audit --locked`
 does, and under the project's own audit policy: its ignore lists, ignored severities and

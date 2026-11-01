@@ -29,9 +29,8 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 			Return([]composer.PackageChange{}, nil)
 
 		var written string
-		composerService.EXPECT().SetConfig(anyCtx, path, "extra.patches", mock.Anything).
-			Run(func(_ context.Context, _, _, value string) { written = value }).Return(nil)
-		composerService.EXPECT().UpdateLockHash(anyCtx, path).Return(nil)
+		composerService.EXPECT().WritePatches(anyCtx, path, mock.Anything).
+			Run(func(_ context.Context, _ string, patches json.RawMessage) { written = string(patches) }).Return(nil)
 
 		h := &ComposerPatches1{logger: logger, composer: composerService, drupalOrg: drupalOrgService}
 		e := workflow.NewPreComposerUpdateEvent(t.Context(), path, committer, workflow.UpdatePlan{})
@@ -57,8 +56,7 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 		drupalOrgService.EXPECT().FindIssueNumber("patches/x.patch").Return("", false)
 		composerService.EXPECT().CheckIfPatchApplies(anyCtx, mock.Anything, "drupal/core", "8.8.0", path+"/patches/x.patch").Return(false, nil)
 
-		composerService.EXPECT().SetConfig(anyCtx, path, "extra.patches", mock.Anything).Return(nil)
-		composerService.EXPECT().UpdateLockHash(anyCtx, path).Return(nil)
+		composerService.EXPECT().WritePatches(anyCtx, path, mock.Anything).Return(nil)
 
 		h := &ComposerPatches1{logger: logger, composer: composerService, drupalOrg: drupalOrgService}
 		e := workflow.NewPreComposerUpdateEvent(t.Context(), path, committer, workflow.UpdatePlan{})
@@ -85,7 +83,7 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 		h := &ComposerPatches1{logger: logger, composer: composerService, drupalOrg: drupalOrgService}
 		e := workflow.NewPreComposerUpdateEvent(t.Context(), path, committer, workflow.UpdatePlan{})
 
-		// No SetConfig/UpdateLockHash expectations: the mock fails if they are called.
+		// No WritePatches expectation: the mock fails if it is called.
 		proposal, err := h.preComposerUpdateHandler(e)
 		require.NoError(t, err)
 		assert.Zero(t, proposal)
@@ -141,19 +139,11 @@ func TestPreComposerUpdateHandler(t *testing.T) {
 			wantErr string
 		}{
 			{
-				name: "SetConfig",
+				name: "WritePatches",
 				arrange: func(c *MockPatchesComposer) {
-					c.EXPECT().SetConfig(anyCtx, path, "extra.patches", mock.Anything).Return(assert.AnError)
+					c.EXPECT().WritePatches(anyCtx, path, mock.Anything).Return(assert.AnError)
 				},
-				wantErr: "failed to set composer config",
-			},
-			{
-				name: "UpdateLockHash",
-				arrange: func(c *MockPatchesComposer) {
-					c.EXPECT().SetConfig(anyCtx, path, "extra.patches", mock.Anything).Return(nil)
-					c.EXPECT().UpdateLockHash(anyCtx, path).Return(assert.AnError)
-				},
-				wantErr: "failed to update composer lock hash",
+				wantErr: assert.AnError.Error(),
 			},
 		}
 
@@ -234,8 +224,7 @@ func TestComposerPatchesCommitsAndReportsThroughThePipeline(t *testing.T) {
 	composerService := NewMockPatchesComposer(t)
 	composerService.EXPECT().Project(anyCtx, "/repo").Return(patchedProject(`{"drupal/core":{"Issue #1: [t](u)":"`+depPatch+`"}}`, map[string][]string{"drupal/core": {depPatch}}, "drupal/core"), nil)
 	composerService.EXPECT().Update(anyCtx, "/repo", []string(nil), []string(nil), false, true).Return(nil, nil)
-	composerService.EXPECT().SetConfig(anyCtx, "/repo", "extra.patches", mock.Anything).Return(nil)
-	composerService.EXPECT().UpdateLockHash(anyCtx, "/repo").Return(nil)
+	composerService.EXPECT().WritePatches(anyCtx, "/repo", mock.Anything).Return(nil)
 
 	p := workflow.NewPipeline([]workflow.Addon{NewComposerPatches1(zap.NewNop(), composerService, nil, nil, nil)})
 	committer := &fakeCommitter{}

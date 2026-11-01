@@ -2,6 +2,7 @@ package addon
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/drupdater/drupdater/internal/composer"
@@ -44,9 +45,8 @@ func TestWritingPatchesBackKeepsTheirOrderAndTheRenamedOnesPlace(t *testing.T) {
 	composerService.EXPECT().CheckIfPatchesApply(anyCtx, "/repo", "drupal/token", "1.15.0",
 		[]string{"/repo/patches/z.patch", "/repo/patches/a.patch", "/repo/patches/b.patch"}).Return(true, nil)
 	var written string
-	composerService.EXPECT().SetConfig(anyCtx, "/repo", "extra.patches", mock.Anything).
-		Run(func(_ context.Context, _, _, value string) { written = value }).Return(nil)
-	composerService.EXPECT().UpdateLockHash(anyCtx, "/repo").Return(nil)
+	composerService.EXPECT().WritePatches(anyCtx, "/repo", mock.Anything).
+		Run(func(_ context.Context, _ string, patches json.RawMessage) { written = string(patches) }).Return(nil)
 
 	drupalOrgService := NewMockDrupalOrg(t)
 	drupalOrgService.EXPECT().FindIssueNumber("Issue #123456").Return("123456", true)
