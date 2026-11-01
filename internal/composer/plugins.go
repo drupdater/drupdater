@@ -1,31 +1,48 @@
 package composer
 
 import (
-	"regexp"
-	"strings"
+	"context"
+	"encoding/json"
+	"fmt"
+
+	"github.com/drupdater/drupdater/internal/agent"
 )
 
-// AllowPlugins is composer.json's config.allow-plugins as the project wrote it.
-type AllowPlugins struct {
-	// Set is false when composer.json has no allow-plugins at all.
-	Set bool
-	// All is the value when it is a boolean, which decides every plugin at once.
-	All *bool
-	// Rules maps package patterns, in which * matches anything, to whether they may run.
-	Rules map[string]bool
+// PluginsOpened is what OpenAllowPlugins did, which CloseAllowPlugins needs to undo it.
+type PluginsOpened struct {
+	// Original is config.allow-plugins as written; JSON null when composer.json had none.
+	Original json.RawMessage `json:"original"`
+	// Opened is set when a trailing "*": true rule was added.
+	Opened bool `json:"opened"`
 }
 
-// Decides reports whether the setting already allows or denies plugin, matching patterns the way
-// Composer's PluginManager does: anchored, case-insensitive, * for any characters.
-func (a AllowPlugins) Decides(plugin string) bool {
-	if a.All != nil {
-		return true
+// OpenAllowPlugins lets the update install any plugin, unless allow-plugins already decides
+// every one. The project's own rules, denials included, keep deciding the plugins they name.
+func (s *CLI) OpenAllowPlugins(ctx context.Context, dir string) (PluginsOpened, error) {
+	opened, err := agent.Call[PluginsOpened](ctx, s.command(dir), "drupdater:allow-plugins", map[string]string{"step": "open"})
+	if err != nil {
+		return PluginsOpened{}, fmt.Errorf("failed to allow plugins for the update: %w", err)
 	}
-	for pattern := range a.Rules {
-		re := "(?i)^" + strings.ReplaceAll(regexp.QuoteMeta(pattern), `\*`, ".*") + "$"
-		if regexp.MustCompile(re).MatchString(plugin) {
-			return true
-		}
+	return opened, nil
+}
+
+type closeAllowPluginsRequest struct {
+	Step string `json:"step"`
+	PluginsOpened
+}
+
+// CloseAllowPlugins denies each locked plugin no rule of the original setting decides, matched
+// by Composer's own PluginManager rules, and removes what OpenAllowPlugins added. It returns the
+// plugins it denied, sorted.
+func (s *CLI) CloseAllowPlugins(ctx context.Context, dir string, opened PluginsOpened) ([]string, error) {
+	if opened.Original == nil {
+		opened.Original = json.RawMessage("null")
 	}
-	return false
+	result, err := agent.Call[struct {
+		Denied []string `json:"denied"`
+	}](ctx, s.command(dir), "drupdater:allow-plugins", closeAllowPluginsRequest{Step: "close", PluginsOpened: opened})
+	if err != nil {
+		return nil, fmt.Errorf("failed to close allow-plugins after the update: %w", err)
+	}
+	return result.Denied, nil
 }

@@ -83,18 +83,16 @@ final class ProjectCommandTest extends TestCase
         ], $reply['result']);
     }
 
-    public function testPassesAnAllowPluginsBooleanThrough(): void
+    public function testFindsCustomProfilesUnderAnotherWebRoot(): void
     {
         $project = $this->scratchDir();
         $this->writeFiles($project, ['composer.json' => json_encode([
-            'config' => ['allow-plugins' => false],
             'extra' => ['drupal-scaffold' => ['locations' => ['web-root' => 'docroot']]],
         ])]);
         mkdir($project . '/docroot/profiles/custom', 0777, true);
 
         [, $reply] = $this->ask($project);
 
-        self::assertFalse($reply['result']['allow_plugins']);
         self::assertSame('docroot', $reply['result']['web_root']);
         self::assertSame(['docroot/profiles/custom'], $reply['result']['custom_code_directories']);
     }

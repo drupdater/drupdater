@@ -118,7 +118,7 @@ Where things live. For *how they work*, read `docs/explanation/` rather than dup
 | `scripts/` | PHP embedded in the binary, extracted per run: `rector.php` and the `drupdater:*` Drush commands (`drush --include`) |
 | `agent/` | `drupdater/agent`, the global Composer plugin the image installs: the `composer drupdater:*` commands, its PHPUnit suite, and `protocol/`, the request/reply fixtures both sides test against |
 | `internal/agent/` | `agent.Call`: runs a `composer drupdater:*` command, decodes its envelope, returns an `*agent.Error` with a `Kind` |
-| `internal/composer/project.go` | `composer.Project`, the agent's snapshot of the project: web root, custom code, `allow-plugins` and `extra.patches` as written, locked packages, dependency patches, lock hash. Ask again after anything rewrites `composer.json` or the lock |
+| `internal/composer/project.go` | `composer.Project`, the agent's snapshot of the project: web root, custom code, `extra.patches` as written, locked packages, dependency patches, lock hash. Ask again after anything rewrites `composer.json` or the lock |
 | `tools/` | The PHPCS and Rector the image installs to `/opt/drupdater/tools`, so addons install nothing into the project |
 
 ### Invariants worth knowing before editing

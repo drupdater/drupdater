@@ -1,0 +1,6 @@
+{
+  "protocol": 2,
+  "command": "drupdater:write-patches",
+  "ok": true,
+  "result": {}
+}

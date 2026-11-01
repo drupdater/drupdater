@@ -96,18 +96,3 @@ func (s *CLI) Install(ctx context.Context, dir string) error {
 func (s *CLI) Normalize(ctx context.Context, dir string) (string, error) {
 	return s.execComposer(ctx, dir, "normalize")
 }
-
-func (s *CLI) SetConfig(ctx context.Context, dir string, key string, value string) error {
-	_, err := s.execComposer(ctx, dir, "config", "--json", key, value)
-	return err
-}
-
-func (s *CLI) UnsetConfig(ctx context.Context, dir string, key string) error {
-	_, err := s.execComposer(ctx, dir, "config", "--unset", key)
-	return err
-}
-
-func (s *CLI) UpdateLockHash(ctx context.Context, dir string) error {
-	_, err := s.execComposer(ctx, dir, "update", "--lock", "--no-install", "--ignore-platform-reqs")
-	return err
-}

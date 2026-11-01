@@ -146,21 +146,21 @@ func TestCallReturnsTheAgentsProtocolMismatch(t *testing.T) {
 	var agentErr *Error
 	require.ErrorAs(t, err, &agentErr)
 	assert.Equal(t, ProtocolMismatch, agentErr.Kind)
-	assert.Equal(t, "drupdater:handshake: protocol_mismatch (drupdater speaks protocol 2, the agent speaks 1)", err.Error())
+	assert.Equal(t, "drupdater:handshake: protocol_mismatch (drupdater speaks protocol 3, the agent speaks 2)", err.Error())
 }
 
 func TestCallRefusesAReplyInAnotherProtocol(t *testing.T) {
-	f := &fakeAgent{stdout: `{"protocol":2,"command":"drupdater:handshake","ok":true,"result":{}}`}
+	f := &fakeAgent{stdout: `{"protocol":3,"command":"drupdater:handshake","ok":true,"result":{}}`}
 
 	_, err := f.call(t)
 
 	var agentErr *Error
 	require.ErrorAs(t, err, &agentErr)
-	assert.Equal(t, &Error{Command: "drupdater:handshake", Kind: ProtocolMismatch, Reason: "agent speaks protocol 2, drupdater speaks 1"}, agentErr)
+	assert.Equal(t, &Error{Command: "drupdater:handshake", Kind: ProtocolMismatch, Reason: "agent speaks protocol 3, drupdater speaks 2"}, agentErr)
 }
 
 func TestCallTreatsAFailureWithoutDetailAsInternal(t *testing.T) {
-	f := &fakeAgent{stdout: `{"protocol":1,"command":"drupdater:handshake","ok":false}`, status: 1}
+	f := &fakeAgent{stdout: `{"protocol":2,"command":"drupdater:handshake","ok":false}`, status: 1}
 
 	_, err := f.call(t)
 
@@ -201,7 +201,7 @@ func TestCallDistrustsASuccessThatExitedNonZero(t *testing.T) {
 }
 
 func TestCallRejectsAResultOfTheWrongShape(t *testing.T) {
-	f := &fakeAgent{stdout: `{"protocol":1,"command":"drupdater:handshake","ok":true,"result":[1]}`}
+	f := &fakeAgent{stdout: `{"protocol":2,"command":"drupdater:handshake","ok":true,"result":[1]}`}
 
 	_, err := f.call(t)
 
@@ -223,7 +223,7 @@ func TestCallRejectsAnUnencodableRequest(t *testing.T) {
 
 func TestCallKeepsComposersExplanationOfAFailure(t *testing.T) {
 	f := &fakeAgent{
-		stdout: `{"protocol":1,"command":"drupdater:resolve","ok":false,"error":{"kind":"failed","reason":"composer update failed","message":"exit code 2"}}`,
+		stdout: `{"protocol":2,"command":"drupdater:resolve","ok":false,"error":{"kind":"failed","reason":"composer update failed","message":"exit code 2"}}`,
 		stderr: "Your requirements could not be resolved to an installable set of packages.",
 		status: 1,
 	}

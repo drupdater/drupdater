@@ -1,5 +1,5 @@
 {
-  "protocol": 1,
+  "protocol": 2,
   "request": {
     "package": "drupal/token",
     "version": "1.15.0",

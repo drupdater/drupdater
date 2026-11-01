@@ -5,9 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"maps"
-	"slices"
-	"strings"
 
 	"github.com/drupdater/drupdater/internal/agent"
 )
@@ -27,16 +24,12 @@ type Project struct {
 	// DependencyPatches maps a package to the patch files locked dependencies declare for it,
 	// which composer-patches 1.x applies on top of the root's.
 	DependencyPatches map[string][]string `json:"dependency_patches"`
-	// AllowPlugins is config.allow-plugins as written; nil when composer.json has none.
-	AllowPlugins json.RawMessage `json:"allow_plugins"`
 	// Patches is extra.patches as written; nil when composer.json has none.
 	Patches json.RawMessage `json:"patches"`
 }
 
 type LockedPackage struct {
 	Version string `json:"version"`
-	// Plugin is true for a package Composer checks against allow-plugins.
-	Plugin bool `json:"plugin"`
 }
 
 var (
@@ -85,34 +78,4 @@ func (p Project) Installed(name string) bool {
 // Version is name's locked version, "" when it is not locked.
 func (p Project) Version(name string) string {
 	return p.Packages[name].Version
-}
-
-// Plugins are the locked plugins' names, sorted.
-func (p Project) Plugins() []string {
-	var plugins []string
-	for _, name := range slices.Sorted(maps.Keys(p.Packages)) {
-		if p.Packages[name].Plugin {
-			plugins = append(plugins, name)
-		}
-	}
-	return plugins
-}
-
-// ParseAllowPlugins reads Project.AllowPlugins. It keeps "no setting" apart from an empty one,
-// which must be restored differently.
-func ParseAllowPlugins(raw json.RawMessage) (AllowPlugins, error) {
-	trimmed := strings.TrimSpace(string(raw))
-	switch trimmed {
-	case "", "null":
-		return AllowPlugins{}, nil
-	case "true", "false":
-		all := trimmed == "true"
-		return AllowPlugins{Set: true, All: &all}, nil
-	}
-
-	rules := map[string]bool{}
-	if err := json.Unmarshal(raw, &rules); err != nil {
-		return AllowPlugins{}, fmt.Errorf("failed to parse composer allow-plugins config %s: %w", trimmed, err)
-	}
-	return AllowPlugins{Set: true, Rules: rules}, nil
 }

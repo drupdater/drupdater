@@ -1,0 +1,11 @@
+{
+  "protocol": 2,
+  "request": {
+    "step": "close",
+    "original": {
+      "cweagans/composer-patches": true,
+      "drupal/*": false
+    },
+    "opened": true
+  }
+}

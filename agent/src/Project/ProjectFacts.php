@@ -15,9 +15,6 @@ use Drupdater\Agent\Failure;
  */
 final class ProjectFacts
 {
-    /** The package types Composer's PluginManager checks against allow-plugins. */
-    private const PLUGIN_TYPES = ['composer-plugin', 'composer-installer'];
-
     private const CUSTOM_CODE_KINDS = ['modules', 'themes', 'profiles'];
 
     public function __construct(private readonly Composer $composer, private readonly string $composerFile)
@@ -41,10 +38,7 @@ final class ProjectFacts
             'packages' => new \stdClass(),
             'dependency_patches' => new \stdClass(),
         ];
-        // As written, keys and nesting intact: drupdater restores and rewrites them.
-        if (isset($manifest->config->{'allow-plugins'})) {
-            $facts['allow_plugins'] = $manifest->config->{'allow-plugins'};
-        }
+        // As written, keys and nesting intact: drupdater rewrites them.
         if (isset($manifest->extra->patches)) {
             $facts['patches'] = $manifest->extra->patches;
         }
@@ -61,10 +55,7 @@ final class ProjectFacts
             if ($package instanceof AliasPackage) {
                 continue;
             }
-            $packages[$package->getName()] = [
-                'version' => $package->getPrettyVersion(),
-                'plugin' => in_array($package->getType(), self::PLUGIN_TYPES, true),
-            ];
+            $packages[$package->getName()] = ['version' => $package->getPrettyVersion()];
             foreach (self::declaredPatches($package) as $target => $files) {
                 $dependencyPatches[$target] = [...($dependencyPatches[$target] ?? []), ...$files];
             }

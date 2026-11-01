@@ -24,10 +24,16 @@ A setting that already decides every plugin is left alone: `allow-plugins: true`
 **After the update**, it adds `false` for each installed plugin that no rule of the project
 matches, then removes the temporary rule. A plugin here is what Composer itself checks
 against `allow-plugins`: a locked package of type `composer-plugin` or
-`composer-installer`. The denials go in first because Composer refuses
-to run any command while an installed plugin is undecided. The project ends up exactly where
-it started — same rules, same order — plus one explicit `false` per new plugin. A project
-that had no `allow-plugins` at all gets none back unless a new plugin needed an entry.
+`composer-installer`. Whether a rule matches is decided by Composer's own pattern matching,
+so a rule decides exactly the plugins Composer would let it decide. The denials go in first
+because Composer refuses to run any command while an installed plugin is undecided. The
+project ends up exactly where it started — same rules, same order — plus one explicit `false`
+per new plugin. A project that had no `allow-plugins` at all gets none back unless a new
+plugin needed an entry, and no empty `config` either.
+
+Both steps run in the project's own Composer, through the
+[Drupdater agent](../docker-images.md#drupdater-agent)'s `drupdater:allow-plugins`, and each
+edit is the one `composer config allow-plugins.<name>` would make.
 
 The result is that new plugins are **not** silently trusted. They are recorded, disabled,
 and surfaced in the pull request for a human to decide on.

@@ -46,7 +46,7 @@ func TestAuditSendsTheRequestFixtureAndDecodesItsReply(t *testing.T) {
 }
 
 func TestAuditOfACleanLockIsEmpty(t *testing.T) {
-	service, _ := fakeAgentCLI(t, `{"protocol":1,"command":"drupdater:audit","ok":true,"result":{"advisories":[],"abandoned":[]}}`, 0)
+	service, _ := fakeAgentCLI(t, `{"protocol":2,"command":"drupdater:audit","ok":true,"result":{"advisories":[],"abandoned":[]}}`, 0)
 
 	audit, err := service.Audit(t.Context(), t.TempDir())
 
@@ -55,7 +55,7 @@ func TestAuditOfACleanLockIsEmpty(t *testing.T) {
 }
 
 func TestAuditReportsUnreachableAdvisoriesAsUnobtainable(t *testing.T) {
-	service, _ := fakeAgentCLI(t, `{"protocol":1,"command":"drupdater:audit","ok":false,`+
+	service, _ := fakeAgentCLI(t, `{"protocol":2,"command":"drupdater:audit","ok":false,`+
 		`"error":{"kind":"unobtainable","reason":"the security advisories could not be fetched","message":"HTTP 503"}}`, 1)
 
 	_, err := service.Audit(t.Context(), t.TempDir())

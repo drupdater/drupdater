@@ -1,5 +1,5 @@
 {
-  "protocol": 1,
+  "protocol": 2,
   "command": "drupdater:patch-check",
   "ok": false,
   "error": {
