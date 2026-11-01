@@ -205,7 +205,8 @@ func TestCallRejectsAResultOfTheWrongShape(t *testing.T) {
 
 	_, err := f.call(t)
 
-	require.Error(t, err)
+	var typeErr *json.UnmarshalTypeError
+	require.ErrorAs(t, err, &typeErr)
 	assert.Contains(t, err.Error(), "failed to decode the drupdater:handshake result")
 }
 
@@ -214,7 +215,8 @@ func TestCallRejectsAnUnencodableRequest(t *testing.T) {
 
 	_, err := Call[map[string]any](t.Context(), f.command(t), "drupdater:handshake", func() {})
 
-	require.Error(t, err)
+	var typeErr *json.UnsupportedTypeError
+	require.ErrorAs(t, err, &typeErr)
 	assert.Contains(t, err.Error(), "failed to encode the drupdater:handshake request")
 	assert.Nil(t, f.args, "nothing is run for a request that cannot be sent")
 }
