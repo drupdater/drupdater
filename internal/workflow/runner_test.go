@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"sync/atomic"
 	"testing"
-	"time"
+	"testing/synctest"
 
 	"github.com/drupdater/drupdater/internal/buildinfo"
 	"github.com/drupdater/drupdater/internal/composer"
@@ -155,24 +155,17 @@ func TestForEachSite(t *testing.T) {
 	sites := []string{"site1", "site2", "site3", "site4"}
 
 	t.Run("bounds concurrency to config.Concurrency", func(t *testing.T) {
-		ws := services{logger: logger, config: config.Config{Sites: sites, Concurrency: 1}}
+		synctest.Test(t, func(t *testing.T) {
+			ws := services{logger: logger, config: config.Config{Sites: sites, Concurrency: 2}}
+			probe := newOccupancyProbe()
 
-		var current, peak atomic.Int32
-		err := ws.forEachSite(context.Background(), func(_ context.Context, _ int, _ string) error {
-			n := current.Add(1)
-			defer current.Add(-1)
-			for {
-				m := peak.Load()
-				if n <= m || peak.CompareAndSwap(m, n) {
-					break
-				}
-			}
-			time.Sleep(time.Millisecond)
-			return nil
+			err := ws.forEachSite(t.Context(), func(ctx context.Context, _ int, site string) error {
+				return probe.probe(ctx, testCheckout, site)
+			})
+
+			require.NoError(t, err)
+			assert.EqualValues(t, 2, probe.peak())
 		})
-
-		require.NoError(t, err)
-		assert.EqualValues(t, 1, peak.Load())
 	})
 
 	t.Run("falls back to GOMAXPROCS(0) when Concurrency is unset", func(t *testing.T) {
