@@ -55,11 +55,11 @@ func TestPatchRemovalFailuresAreLogged(t *testing.T) {
 
 	for _, removeErr := range []error{nil, assert.AnError} {
 		h, logs := newHandler(t, removeErr)
-		assert.Len(t, h.removePackagePatches("/project", removal, patches()), 1)
+		assert.Len(t, h.removePackagePatches("/project", removal, ptr(declaredFrom(patches()))), 1)
 		assert.Equal(t, removeErr != nil, logs.FilterMessage("failed to remove patch").Len() == 1, "removed package, err=%v", removeErr)
 
 		h, logs = newHandler(t, removeErr)
-		assert.Len(t, h.removeUninstalledPackagePatches("/project", lockedProject(), patches()), 1)
+		assert.Len(t, h.removeUninstalledPackagePatches("/project", lockedProject(), ptr(declaredFrom(patches()))), 1)
 		assert.Equal(t, removeErr != nil, logs.FilterMessage("failed to remove patch").Len() == 1, "uninstalled package, err=%v", removeErr)
 	}
 }

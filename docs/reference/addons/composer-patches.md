@@ -41,7 +41,14 @@ patches/<project>/<issue-id>-<sha>-<title>.diff
 ```
 
 Where a package carries several patches, they are validated as a set — patches that each
-apply alone but conflict with each other are caught.
+apply alone but conflict with each other are caught. The set is applied in the order
+`composer.json` declares it, which is the order `composer-patches` applies it in, so patches
+that only apply one after another are checked that way.
+
+When the addon rewrites `extra.patches`, every package and patch keeps its place. A rewritten
+description takes the place of the one it replaces. Two patches for the same issue keep their
+own descriptions rather than both being renamed to `Issue #…`, which would leave one key for
+two patches.
 
 ### How a patch is tested
 

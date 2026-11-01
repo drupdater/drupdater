@@ -64,7 +64,8 @@ func TestUpdatePatchesRemovesRemotePatchForFixedIssue(t *testing.T) {
 		"drupal/core": {"Issue #123456": patchURL},
 	}
 
-	report, newPatches := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), upgradeCore(), patches)
+	report, declared := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), upgradeCore(), declaredFrom(patches))
+	newPatches := asMap(declared)
 
 	assert.Empty(t, removed, "a URL is not a file; removing it is exactly the bug under test")
 	assert.Equal(t, map[string]map[string]string{}, newPatches, "the patch must be dropped from composer.json")
@@ -97,7 +98,8 @@ func TestUpdatePatchesKeepsPatchWhenRemovalFails(t *testing.T) {
 		"drupal/core": {"Issue #123456": patchPath},
 	}
 
-	report, newPatches := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), upgradeCore(), patches)
+	report, declared := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), upgradeCore(), declaredFrom(patches))
+	newPatches := asMap(declared)
 
 	assert.Empty(t, report.Removed)
 	assert.Equal(t, map[string]map[string]string{
@@ -152,7 +154,7 @@ func TestValidateCombinedPatchesResolvesAbsoluteLocalPaths(t *testing.T) {
 	}
 	updates := PatchUpdates{}
 
-	updater.validateCombinedPatches(t.Context(), "/tmp", upgradeCore()[0], patches, &updates)
+	updater.validateCombinedPatches(t.Context(), "/tmp", upgradeCore()[0], declaredFrom(patches), &updates)
 
 	assert.Empty(t, updates.Conflicts)
 }
@@ -205,7 +207,8 @@ func TestUpdatePatchesRecognisesEveryFixedIssueStatus(t *testing.T) {
 			}
 
 			patches := map[string]map[string]string{"drupal/core": {"Issue #123456": patchURL}}
-			report, newPatches := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), upgradeCore(), patches)
+			report, declared := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), upgradeCore(), declaredFrom(patches))
+			newPatches := asMap(declared)
 
 			if tt.wantRemoved {
 				assert.Empty(t, newPatches["drupal/core"], "a fixed issue's patch must be dropped")
@@ -240,7 +243,8 @@ func TestUpdatePatchesKeepsPatchWithoutDrupalCode(t *testing.T) {
 	}
 
 	patches := map[string]map[string]string{"drupal/core": {"Issue #123456": patchURL}}
-	_, newPatches := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), upgradeCore(), patches)
+	_, declared := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), upgradeCore(), declaredFrom(patches))
+	newPatches := asMap(declared)
 
 	assert.NotEmpty(t, newPatches["drupal/core"])
 }

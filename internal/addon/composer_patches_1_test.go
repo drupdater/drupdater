@@ -92,7 +92,8 @@ func TestUpdatePatches(t *testing.T) {
 		}
 
 		updater.removeFile = recordRemovals(&removed)
-		report, newPatches := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), operations, patches)
+		report, declared := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), operations, declaredFrom(patches))
+		newPatches := asMap(declared)
 		assert.Empty(t, removed)
 		assert.Equal(t, patches, newPatches)
 		assert.False(t, report.Changes())
@@ -117,7 +118,8 @@ func TestUpdatePatches(t *testing.T) {
 		project.DependencyPatches = map[string][]string{"drupal/core": {"patches/local.patch"}}
 
 		updater.removeFile = recordRemovals(&removed)
-		report, newPatches := updater.updatePatches(t.Context(), "/tmp", project, operations, patches)
+		report, declared := updater.updatePatches(t.Context(), "/tmp", project, operations, declaredFrom(patches))
+		newPatches := asMap(declared)
 		assert.Empty(t, removed)
 		assert.Equal(t, "patches/local.patch", newPatches["drupal/core"]["local"])
 		assert.Empty(t, report.Removed)
@@ -137,7 +139,7 @@ func TestUpdatePatches(t *testing.T) {
 		patches := map[string]map[string]string{"drupal/core": {"a": "patches/a.patch", "b": "patches/b.patch"}}
 
 		updater.removeFile = recordRemovals(&removed)
-		report, _ := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), operations, patches)
+		report, _ := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), operations, declaredFrom(patches))
 		assert.Empty(t, removed)
 		assert.False(t, report.Changes())
 	})
@@ -156,7 +158,7 @@ func TestUpdatePatches(t *testing.T) {
 		patches := map[string]map[string]string{"drupal/core": {"a": "patches/a.patch", "b": "patches/b.patch"}}
 
 		updater.removeFile = recordRemovals(&removed)
-		report, _ := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), operations, patches)
+		report, _ := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), operations, declaredFrom(patches))
 		assert.Empty(t, removed)
 		assert.Empty(t, report.Conflicts)
 	})
@@ -186,7 +188,8 @@ func TestUpdatePatches(t *testing.T) {
 		project.DependencyPatches = map[string][]string{"drupal/core": {depPatch}}
 
 		updater.removeFile = recordRemovals(&removed)
-		report, newPatches := updater.updatePatches(t.Context(), "/tmp", project, operations, patches)
+		report, declared := updater.updatePatches(t.Context(), "/tmp", project, operations, declaredFrom(patches))
+		newPatches := asMap(declared)
 		assert.Empty(t, removed)
 		assert.Empty(t, newPatches["drupal/core"], "patch provided by a dependency should be removed from root")
 		// The whole record, not just the path: every field ends up in the merge request.
@@ -235,7 +238,8 @@ func TestUpdatePatches(t *testing.T) {
 		}
 
 		updater.removeFile = recordRemovals(&removed)
-		report, newPatches := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), operations, patches)
+		report, declared := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), operations, declaredFrom(patches))
+		newPatches := asMap(declared)
 		assert.Empty(t, removed)
 		assert.Equal(t, map[string]map[string]string{
 			"drupal/core": {
@@ -297,7 +301,8 @@ func TestUpdatePatches(t *testing.T) {
 		}
 
 		updater.removeFile = recordRemovals(&removed)
-		report, newPatches := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), operations, patches)
+		report, declared := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), operations, declaredFrom(patches))
+		newPatches := asMap(declared)
 		assert.Empty(t, removed)
 		assert.Equal(t, map[string]map[string]string{
 			"drupal/core": {
@@ -367,7 +372,8 @@ func TestUpdatePatches(t *testing.T) {
 		}
 
 		updater.removeFile = recordRemovals(&removed)
-		report, newPatches := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), operations, patches)
+		report, declared := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), operations, declaredFrom(patches))
+		newPatches := asMap(declared)
 		assert.Equal(t, []string{"/tmp/patches/remote/0001-remote.patch"}, removed)
 		assert.Equal(t, map[string]map[string]string{
 			"drupal/core": {
@@ -437,7 +443,8 @@ func TestUpdatePatches(t *testing.T) {
 		}
 
 		updater.removeFile = recordRemovals(&removed)
-		report, newPatches := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), operations, patches)
+		report, declared := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), operations, declaredFrom(patches))
+		newPatches := asMap(declared)
 		assert.Empty(t, removed)
 		assert.Equal(t, map[string]map[string]string{
 			"drupal/core": {
@@ -495,7 +502,7 @@ func TestUpdatePatches(t *testing.T) {
 		}
 
 		updater.removeFile = recordRemovals(&removed)
-		report, _ := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), operations, patches)
+		report, _ := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), operations, declaredFrom(patches))
 		assert.Empty(t, removed)
 		require.Len(t, report.Conflicts, 1)
 		assert.Equal(t, "drupal/core", report.Conflicts[0].Package)
@@ -535,9 +542,10 @@ func TestUpdatePatches(t *testing.T) {
 			"drupal/core": {"Issue #123456 \"With problems\"": "patches/remote/0001-remote.patch"},
 		}
 
-		report, newPatches := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), []composer.PackageChange{
+		report, declared := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), []composer.PackageChange{
 			{Action: "Upgrade", Package: "drupal/core", From: "8.7.0", To: "8.8.0"},
-		}, patches)
+		}, declaredFrom(patches))
+		newPatches := asMap(declared)
 
 		assert.Empty(t, removed)
 		assert.Equal(t, PatchUpdates{}, report)
@@ -592,7 +600,8 @@ func TestUpdatePatches(t *testing.T) {
 		}
 
 		updater.removeFile = recordRemovals(&removed)
-		report, newPatches := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), operations, patches)
+		report, declared := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), operations, declaredFrom(patches))
+		newPatches := asMap(declared)
 		assert.Equal(t, []string{"/tmp/patches/remote/0001-remote.patch"}, removed)
 		assert.Equal(t, map[string]map[string]string{}, newPatches)
 		assert.True(t, report.Changes())
@@ -648,7 +657,8 @@ func TestUpdatePatches(t *testing.T) {
 		}
 
 		updater.removeFile = recordRemovals(&removed)
-		report, newPatches := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), operations, patches)
+		report, declared := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), operations, declaredFrom(patches))
+		newPatches := asMap(declared)
 		assert.Empty(t, removed)
 		assert.Equal(t, map[string]map[string]string{
 			"drupal/core": {
@@ -695,7 +705,8 @@ func TestUpdatePatches(t *testing.T) {
 		}
 
 		updater.removeFile = recordRemovals(&removed)
-		report, newPatches := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), operations, patches)
+		report, declared := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), operations, declaredFrom(patches))
+		newPatches := asMap(declared)
 		assert.Equal(t, []string{"/tmp/patches/core/0001-local-patch.patch"}, removed)
 		assert.Equal(t, map[string]map[string]string{
 			"drupal/pathauto": {
@@ -739,7 +750,7 @@ func TestUpdatePatches(t *testing.T) {
 		}
 
 		updater.removeFile = recordRemovals(&removed)
-		report, _ := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), operations, patches)
+		report, _ := updater.updatePatches(t.Context(), "/tmp", installedProject(patches), operations, declaredFrom(patches))
 		assert.Empty(t, removed)
 		assert.True(t, report.Changes())
 		require.Len(t, report.Conflicts, 1)
@@ -775,7 +786,8 @@ func TestUpdatePatches(t *testing.T) {
 		}
 
 		updater.removeFile = recordRemovals(&removed)
-		report, newPatches := updater.updatePatches(t.Context(), "/tmp", lockedProject(), operations, patches)
+		report, declared := updater.updatePatches(t.Context(), "/tmp", lockedProject(), operations, declaredFrom(patches))
+		newPatches := asMap(declared)
 		assert.Equal(t, []string{"/tmp/patches/core/0001-local-patch.patch"}, removed)
 		assert.Equal(t, map[string]map[string]string{}, newPatches)
 		assert.True(t, report.Changes())

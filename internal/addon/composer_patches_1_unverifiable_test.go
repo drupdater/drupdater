@@ -39,7 +39,8 @@ func TestUpdatePatchesLeavesUnverifiablePatchesUnpinned(t *testing.T) {
 		updater := &ComposerPatches1{logger: logger, composer: composerService, drupalOrg: drupalOrgService}
 		patches := map[string]map[string]string{"drupal/core": {"local patch": "patches/x.patch"}}
 
-		report, newPatches := updater.updatePatches(t.Context(), path, installedProject(patches), operations, patches)
+		report, declared := updater.updatePatches(t.Context(), path, installedProject(patches), operations, declaredFrom(patches))
+		newPatches := asMap(declared)
 
 		assert.Empty(t, report.Conflicts, "an unverifiable patch must not be reported as a conflict")
 		assert.False(t, report.Changes())
@@ -95,7 +96,8 @@ func TestUpdatePatchesLeavesUnverifiablePatchesUnpinned(t *testing.T) {
 
 		// No removal expected: the replacement is not swapped in, so the old
 		// patch file must not be removed either.
-		report, newPatches := updater.updatePatches(t.Context(), path, installedProject(patches), operations, patches)
+		report, declared := updater.updatePatches(t.Context(), path, installedProject(patches), operations, declaredFrom(patches))
+		newPatches := asMap(declared)
 
 		assert.Empty(t, report.Conflicts, "an unverifiable replacement must not be reported as a conflict")
 		assert.Empty(t, report.Updated)
