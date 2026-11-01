@@ -1,12 +1,15 @@
 package addon
 
 import (
-	"reflect"
-	"sync"
+	"context"
 	"testing"
 
 	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+
+	"reflect"
+	"sync"
 )
 
 func stages(h workflow.Hooks) map[string]workflow.Stage {
@@ -115,3 +118,7 @@ func TestNoTwoAddonsShareAToolInterface(t *testing.T) {
 	}
 	assert.NotEmpty(t, owner, "no addon has a tool interface, so the check above checked nothing")
 }
+
+// anyCtx matches any non-nil context.Context in a mock expectation. mock.Anything would let a
+// call site drop the context entirely, silently disabling cancellation and the run timeout.
+var anyCtx = mock.MatchedBy(func(ctx context.Context) bool { return ctx != nil })

@@ -1,21 +1,24 @@
 package addon
 
 import (
-	"io"
-	"net/http"
-	"net/http/httptest"
 	"os"
-	"strings"
+	"path/filepath"
 	"testing"
 
 	"github.com/drupdater/drupdater/internal/composer"
-	"github.com/drupdater/drupdater/internal/drupalorg"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
+
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+
+	"github.com/drupdater/drupdater/internal/drupalorg"
 )
 
 func TestIsRemotePatch(t *testing.T) {
@@ -830,4 +833,22 @@ func installedProject(patches map[string]map[string]string) composer.Project {
 		project.Packages[name] = composer.LockedPackage{Version: "1.0.0"}
 	}
 	return project
+}
+
+func TestNewComposerPatches1(t *testing.T) {
+	t.Run("keeps the drupalcode client it is given", func(t *testing.T) {
+		drupalCode := NewMockDrupalCode(t)
+		h := NewComposerPatches1(zap.NewNop(), NewMockPatchesComposer(t), NewMockDrupalOrg(t), drupalCode, nil)
+		assert.Same(t, drupalCode, h.drupalCode)
+	})
+
+	t.Run("drops patch files from the real filesystem", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, "patches"), 0o750))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "patches", "a.patch"), []byte("x"), 0o600))
+
+		h := NewComposerPatches1(zap.NewNop(), NewMockPatchesComposer(t), NewMockDrupalOrg(t), nil, nil)
+		require.NoError(t, h.dropPatchFile(dir, "patches/a.patch"))
+		assert.NoFileExists(t, filepath.Join(dir, "patches", "a.patch"))
+	})
 }

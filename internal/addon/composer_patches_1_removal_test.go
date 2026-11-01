@@ -5,11 +5,14 @@ import (
 	"testing"
 
 	"github.com/drupdater/drupdater/internal/composer"
-	"github.com/drupdater/drupdater/internal/drupalorg"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
+
+	"github.com/drupdater/drupdater/internal/drupalorg"
 )
 
 // fixedInTarget is a drupalcode whose history has issue 123456 fixed in drupal/core 8.8.0.
@@ -247,4 +250,32 @@ func TestUpdatePatchesKeepsPatchWithoutDrupalCode(t *testing.T) {
 	newPatches := asMap(declared)
 
 	assert.NotEmpty(t, newPatches["drupal/core"])
+}
+
+func TestPatchRemovalFailuresAreLogged(t *testing.T) {
+	// The patch is still reported as removed, so the log is the only trace of a file left behind.
+	newHandler := func(t *testing.T, removeErr error) (*ComposerPatches1, *observer.ObservedLogs) {
+		t.Helper()
+		core, logs := observer.New(zapcore.ErrorLevel)
+		composerService := NewMockPatchesComposer(t)
+		return &ComposerPatches1{
+			logger:     zap.New(core),
+			composer:   composerService,
+			removeFile: func(string) error { return removeErr },
+		}, logs
+	}
+	patches := func() map[string]map[string]string {
+		return map[string]map[string]string{"drupal/gone": {"fix": "patches/gone.patch"}}
+	}
+	removal := composer.PackageChange{Action: "Remove", Package: "drupal/gone"}
+
+	for _, removeErr := range []error{nil, assert.AnError} {
+		h, logs := newHandler(t, removeErr)
+		assert.Len(t, h.removePackagePatches("/project", removal, ptr(declaredFrom(patches()))), 1)
+		assert.Equal(t, removeErr != nil, logs.FilterMessage("failed to remove patch").Len() == 1, "removed package, err=%v", removeErr)
+
+		h, logs = newHandler(t, removeErr)
+		assert.Len(t, h.removeUninstalledPackagePatches("/project", lockedProject(), ptr(declaredFrom(patches()))), 1)
+		assert.Equal(t, removeErr != nil, logs.FilterMessage("failed to remove patch").Len() == 1, "uninstalled package, err=%v", removeErr)
+	}
 }

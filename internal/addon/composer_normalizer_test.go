@@ -3,7 +3,9 @@ package addon
 import (
 	"testing"
 
+	"github.com/drupdater/drupdater/internal/composer"
 	"github.com/drupdater/drupdater/internal/workflow"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 )
@@ -44,4 +46,25 @@ func TestDefaultComposerNormalize_PostComposerUpdateHandler_PackageNotInstalled(
 	err := normalize.postComposerUpdateHandler(e)
 
 	require.NoError(t, err)
+}
+
+func TestComposerNormalizerErrors(t *testing.T) {
+	t.Run("install check fails", func(t *testing.T) {
+		composerService := NewMockNormalizerComposer(t)
+		composerService.EXPECT().Project(anyCtx, "/tmp").Return(composer.Project{}, assert.AnError)
+
+		cn := NewComposerNormalizer(zap.NewNop(), composerService)
+		require.Error(t, cn.postComposerUpdateHandler(workflow.NewPostComposerUpdateEvent(t.Context(), "/tmp", nil)))
+	})
+
+	t.Run("normalize fails", func(t *testing.T) {
+		composerService := NewMockNormalizerComposer(t)
+		composerService.EXPECT().Project(anyCtx, "/tmp").Return(lockedProject("ergebnis/composer-normalize"), nil)
+		composerService.EXPECT().Normalize(anyCtx, "/tmp").Return("", assert.AnError)
+
+		cn := NewComposerNormalizer(zap.NewNop(), composerService)
+		err := cn.postComposerUpdateHandler(workflow.NewPostComposerUpdateEvent(t.Context(), "/tmp", nil))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to normalize composer.json")
+	})
 }

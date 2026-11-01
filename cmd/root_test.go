@@ -1,24 +1,28 @@
 package cmd
 
 import (
-	"bytes"
-	"errors"
+	"os"
 	"path/filepath"
-	"slices"
 	"testing"
+	"time"
 
-	"github.com/drupdater/drupdater/internal/composer"
 	"github.com/drupdater/drupdater/internal/config"
 	"github.com/drupdater/drupdater/internal/logging"
 	"github.com/drupdater/drupdater/internal/repo"
-	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/stretchr/testify/assert"
-	mock "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest"
 	"go.uber.org/zap/zaptest/observer"
+
+	"bytes"
+	"errors"
+	"slices"
+
+	"github.com/drupdater/drupdater/internal/composer"
+	"github.com/drupdater/drupdater/internal/workflow"
+	mock "github.com/stretchr/testify/mock"
+	"go.uber.org/zap/zapcore"
 )
 
 func TestNewLogger(t *testing.T) {
@@ -333,4 +337,75 @@ func TestCheckCommandHasTheFullFlag(t *testing.T) {
 	full := check.Flags().Lookup("full")
 	require.NotNil(t, full)
 	assert.Equal(t, "false", full.DefValue)
+}
+
+func TestConfigFilePath(t *testing.T) {
+	assert.Equal(t, "/explicit/config.yaml", configFilePath("/explicit/config.yaml", "/work"))
+	assert.Equal(t, filepath.Join("/work", ".drupdater.yaml"), configFilePath("", "/work"))
+}
+
+func TestLoadProjectConfig(t *testing.T) {
+	logger := zaptest.NewLogger(t)
+
+	t.Run("a missing file applies the defaults", func(t *testing.T) {
+		cfg := config.Config{}
+		require.NoError(t, loadProjectConfig(logger, builtinAddons(), filepath.Join(t.TempDir(), ".drupdater.yaml"), &cfg))
+
+		assert.Equal(t, []string{"default"}, cfg.Sites)
+		assert.Equal(t, 30*time.Minute, cfg.Timeout)
+	})
+
+	t.Run("a file's values are applied", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), ".drupdater.yaml")
+		require.NoError(t, os.WriteFile(path, []byte("sites: [default, sub]\ntimeout: 90s\n"), 0o600))
+
+		cfg := config.Config{}
+		require.NoError(t, loadProjectConfig(logger, builtinAddons(), path, &cfg))
+		assert.Equal(t, []string{"default", "sub"}, cfg.Sites)
+		assert.Equal(t, 90*time.Second, cfg.Timeout)
+	})
+
+	t.Run("an invalid file is an error", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), ".drupdater.yaml")
+		require.NoError(t, os.WriteFile(path, []byte("timeout: nope\n"), 0o600))
+
+		cfg := config.Config{}
+		require.Error(t, loadProjectConfig(logger, builtinAddons(), path, &cfg))
+	})
+
+	t.Run("an unknown addon name is an error", func(t *testing.T) {
+		path := filepath.Join(t.TempDir(), ".drupdater.yaml")
+		require.NoError(t, os.WriteFile(path, []byte("run_types:\n  normal:\n    addons: [no_such_addon]\n"), 0o600))
+
+		cfg := config.Config{}
+		err := loadProjectConfig(logger, builtinAddons(), path, &cfg)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "no_such_addon")
+	})
+}
+
+func TestValidateFlags(t *testing.T) {
+	t.Run("--clone without a repository URL is rejected", func(t *testing.T) {
+		err := validateFlags(config.Config{Clone: true})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "--repository-url is required")
+	})
+
+	t.Run("an SCP-style repository URL is accepted", func(t *testing.T) {
+		require.NoError(t, validateFlags(config.Config{RepositoryURL: "git@github.com:drupdater/drupdater.git"}))
+	})
+
+	t.Run("an HTTPS repository URL is accepted", func(t *testing.T) {
+		require.NoError(t, validateFlags(config.Config{RepositoryURL: "https://github.com/drupdater/drupdater.git"}))
+	})
+
+	t.Run("a malformed repository URL is rejected", func(t *testing.T) {
+		err := validateFlags(config.Config{RepositoryURL: "not a url"})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid repository URL")
+	})
+
+	t.Run("no repository URL is fine in checkout mode", func(t *testing.T) {
+		require.NoError(t, validateFlags(config.Config{}))
+	})
 }

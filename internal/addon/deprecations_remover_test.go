@@ -3,9 +3,9 @@ package addon
 import (
 	"testing"
 
+	"github.com/drupdater/drupdater/internal/composer"
 	"github.com/drupdater/drupdater/internal/rector"
 	"github.com/drupdater/drupdater/internal/workflow"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -139,5 +139,42 @@ func TestRemoveDeprecations(t *testing.T) {
 
 		require.ErrorIs(t, err, assert.AnError)
 		assert.Empty(t, committer.commits)
+	})
+}
+
+func TestDeprecationsRemoverErrors(t *testing.T) {
+	t.Run("reading the project fails", func(t *testing.T) {
+		composerService := NewMockDeprecationsComposer(t)
+		composerService.EXPECT().Project(anyCtx, "/tmp").Return(composer.Project{}, assert.AnError)
+
+		dr := NewDeprecationsRemover(zap.NewNop(), NewMockRector(t), NewMockRector(t), composerService)
+		_, err := dr.postCodeUpdateHandler(workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", nil))
+		require.ErrorIs(t, err, assert.AnError)
+	})
+
+	t.Run("a project without a web root has no custom code to find", func(t *testing.T) {
+		composerService := NewMockDeprecationsComposer(t)
+		composerService.EXPECT().Project(anyCtx, "/tmp").Return(composer.Project{}, nil)
+
+		dr := NewDeprecationsRemover(zap.NewNop(), NewMockRector(t), NewMockRector(t), composerService)
+		_, err := dr.postCodeUpdateHandler(workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", nil))
+		require.Error(t, err)
+	})
+
+	t.Run("committing the removals fails", func(t *testing.T) {
+		composerService := NewMockDeprecationsComposer(t)
+		composerService.EXPECT().Project(anyCtx, "/tmp").Return(withCustomCode(lockedProject("palantirnet/drupal-rector"), "web/modules/custom"), nil)
+
+		runner := NewMockRector(t)
+		runner.EXPECT().Run(anyCtx, "/tmp", []string{"web/modules/custom"}).Return(rector.ReturnOutput{
+			Totals:       rector.ReturnOutputTotals{ChangedFiles: 1},
+			ChangedFiles: []string{"web/modules/custom/a.php"},
+		}, nil)
+
+		committer := &fakeCommitter{err: assert.AnError}
+		dr := NewDeprecationsRemover(zap.NewNop(), runner, NewMockRector(t), composerService)
+		p, err := firePostCodeUpdate(dr, workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", committer))
+		require.ErrorIs(t, err, assert.AnError)
+		assert.Nil(t, reportSection(p, "deprecations_remover"), "a run whose commit failed records nothing")
 	})
 }
