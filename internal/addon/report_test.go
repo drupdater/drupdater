@@ -206,9 +206,8 @@ func TestComposerPatchesReportDataNilWhenNoPatchChanges(t *testing.T) {
 	assert.Nil(t, (&ComposerPatches1{}).ReportData(&workflow.Findings{}), "a run that never got as far")
 }
 
-// Every field is mapped: the description renders composer_diff from this section alone.
 func TestComposerDiffReportData(t *testing.T) {
-	cd := diffFor([]composer.DiffEntry{{
+	cd := diffFor([]DependencyChange{{
 		Package: "drupal/core", Operation: "upgrade", From: "10.3.8", To: "10.3.9", Dev: true, Direct: true,
 		CompareURL: "https://example.com/compare", ProjectURL: "https://example.com/core",
 	}})
@@ -382,7 +381,7 @@ func auditFor(audits auditPair) withFindings {
 }
 
 // diffFor builds composer_diff with the entries its post-composer-update hook would have returned.
-func diffFor(entries []composer.DiffEntry) withFindings {
+func diffFor(entries []DependencyChange) withFindings {
 	findings := &workflow.Findings{}
 	findings.Record(workflow.EventPostComposerUpdate, "", entries, nil)
 	return withFindings{&ComposerDiff{}, findings}

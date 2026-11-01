@@ -117,6 +117,7 @@ Where things live. For *how they work*, read `docs/explanation/` rather than dup
 | `internal/php/` | What the PHP wrappers share: running a command under Composer's environment, decoding JSON output, and the `CommandFactory` each wrapper holds as its test seam |
 | `scripts/` | PHP embedded in the binary, extracted per run: `rector.php` and the `drupdater:*` Drush commands (`drush --include`) |
 | `agent/` | `drupdater/agent`, the global Composer plugin the image installs: the `composer drupdater:*` commands, its PHPUnit suite, and `protocol/`, the request/reply fixtures both sides test against |
+| `agent/src/Addon/` | The addons whose hooks run in the agent, behind `drupdater:addon`; their Go halves call `agentHook` |
 | `internal/agent/` | `agent.Call`: runs a `composer drupdater:*` command, decodes its envelope, returns an `*agent.Error` with a `Kind` |
 | `internal/composer/project.go` | `composer.Project`, the agent's snapshot of the project: web root, custom code, `extra.patches` as written, locked packages, dependency patches, lock hash. Ask again after anything rewrites `composer.json` or the lock |
 | `tools/` | The PHPCS and Rector the image installs to `/opt/drupdater/tools`, so addons install nothing into the project |
@@ -131,6 +132,7 @@ Where things live. For *how they work*, read `docs/explanation/` rather than dup
 - **An event type names itself and its `Hooks` field** (`name()`, `hook()` in `internal/workflow/event.go`), so `workflow.Fire` runs any event and `Pipeline` has no per-event code. A new event is that type, its `Hooks` field, and the `Fire` call in the runner.
 - **Hook stages are load-bearing** on `pre-composer-update` and `post-code-update`. See `docs/explanation/addon-architecture.md` before changing one.
 - **The MR is rendered from the report**, through its JSON. An addon reaches the description only via its report section; findings from two addons are joined there, never handed between them.
+- **New addon logic goes to the agent.** Drupdater is moving into PHP an addon at a time: an addon's hook can run in `composer drupdater:addon` (`agent/src/Addon/`) through `agentHook` (`internal/addon/agent_hook.go`), with the Go type keeping only its tool interface, stages and `ReportData`. `composer_diff` is the first; follow it rather than adding a Go wrapper.
 - **A new question for Composer goes to the agent, not to its console output.** The agent answers in JSON with a closed error `Kind`, decided from the exception it caught. A change to a request or reply changes `agent/protocol/` and both sides' tests; a breaking one bumps `protocol` in `agent/src/Protocol.php` and `internal/agent/agent.go` together.
 - **`internal/addon/report.go` is a published contract.** Renaming a field there is a breaking change to `schema_version`, and `internal/addon/testdata/run_report.json` is what makes such a rename fail rather than ship. A new reporting addon belongs in that golden's `reportingAddons()`.
 - **Report types mirror rather than reuse internal types** (`report.PackageChange` vs `composer.PackageChange`) so an internal refactor can't rename a published field.

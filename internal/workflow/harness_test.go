@@ -120,6 +120,7 @@ func (h *runHarness) expectDefaults() {
 		h.composer.EXPECT().Update(anyCtx, h.path, mock.Anything, mock.Anything, false, false).
 			Return([]composer.PackageChange{{Action: "Upgrade", Package: "drupal/core", From: "9.0.0", To: "9.1.0"}}, nil).Maybe()
 		h.composer.EXPECT().Project(anyCtx, h.path).Return(composer.Project{WebRoot: "web", LockHash: "dummy-hash"}, nil).Maybe()
+		h.worktree.EXPECT().Committed(anyCtx, "composer.lock").Return([]byte(testBaseLock), nil).Maybe()
 	}
 	if h.fullRun {
 		h.expectFullRunDefaults()

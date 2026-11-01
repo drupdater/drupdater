@@ -23,7 +23,7 @@ type addonComposer interface {
 	addon.AuditComposer
 	addon.BeautifierComposer
 	addon.DeprecationsComposer
-	addon.DiffComposer
+	addon.DiffAgent
 	addon.NormalizerComposer
 	addon.PatchesComposer
 }

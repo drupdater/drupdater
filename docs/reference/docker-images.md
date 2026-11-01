@@ -86,13 +86,14 @@ Built on `php:<version>-cli-trixie`, with:
   deliberate commit that CI runs against rather than something that arrives in a published
   image unannounced. Patch releases, where fixes live, still flow in. Every report names the
   [Composer version](run-report.md#composer_version-and-php_version) that produced it.
-- Plus two globally-required Composer plugins:
-  [`mglaman/composer-drupal-lenient`](https://github.com/mglaman/composer-drupal-lenient)
-  and [`ion-bazan/composer-diff`](https://github.com/IonBazan/composer-diff), both
+- Plus a globally-required Composer plugin,
+  [`mglaman/composer-drupal-lenient`](https://github.com/mglaman/composer-drupal-lenient),
   pre-allow-listed.
 - **Helper scripts** at `/opt/drupdater/` — the Rector configuration, the unsupported
   modules query, and the configuration resave script.
-- **The Drupdater agent** at `/opt/drupdater/agent/`, a third global plugin — see below.
+- **The Drupdater agent** at `/opt/drupdater/agent/`, a second global plugin — see below. It
+  brings [`ion-bazan/composer-diff`](https://github.com/IonBazan/composer-diff) with it as a
+  library; that package's own plugin, and with it the `composer diff` command, is disabled.
 - **Bundled tools** at `/opt/drupdater/tools/` — see below.
 
 ### Drupdater agent
@@ -104,6 +105,7 @@ credentials, its configuration — without installing anything into it.
 
 | Command | Used by |
 |---|---|
+| `drupdater:addon` | The addons whose hooks run in the agent — so far [`composer_diff`](addons/composer-diff.md) — see below |
 | `drupdater:allow-plugins` | [`composer_allow_plugins`](addons/composer-allow-plugins.md), to open `allow-plugins` before the update and close it after |
 | `drupdater:audit` | [`composer_audit`](addons/composer-audit.md), before and after the update |
 | `drupdater:handshake` | The [`drupdater agent installed in Composer`](preflight-checks.md#drupdater-agent-installed-in-composer) preflight check |
@@ -112,6 +114,14 @@ credentials, its configuration — without installing anything into it.
 | `drupdater:project` | Everything that reads the project's layout, patches or lock — see below |
 | `drupdater:resolve` | The run's [`resolve update`](../explanation/how-a-run-works.md) phase, and [`composer_patches`](addons/composer-patches.md)' dry run of the update it checks patches against |
 | `drupdater:write-patches` | [`composer_patches`](addons/composer-patches.md), to write the patches it rewrote |
+
+`drupdater:addon` runs one addon's hook for one workflow event. The request names the addon
+and carries the event — its name, plus what that event hands its hooks, such as the
+committed `composer.lock` on `post-composer-update`. The reply is what the hook returned: the
+commits it asks for, its finding, and lines to log. As with every hook, the agent commits
+nothing itself; Drupdater's committer makes the commits, and the finding reaches the run report
+only through the addon's section, decoded strictly against the published
+[report schema](run-report.md).
 
 `drupdater:resolve` runs `composer update --no-install --with-all-dependencies
 --ignore-platform-reqs` with the run's package restriction, pins and `--minimal-changes`, and

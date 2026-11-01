@@ -55,6 +55,8 @@ type Worktree interface {
 	Staged(ctx context.Context) ([]string, error)
 	// Commit commits what is staged, by author.
 	Commit(ctx context.Context, message string, author Identity) error
+	// Committed is path's content as committed at HEAD, path relative to the working copy's root.
+	Committed(ctx context.Context, path string) ([]byte, error)
 }
 
 // Identity is who drupdater's commits are by.
@@ -415,6 +417,11 @@ func (w *workingCopy) Unstaged(ctx context.Context) ([]string, error) {
 func (w *workingCopy) Staged(ctx context.Context) ([]string, error) {
 	out, err := w.git.run(ctx, w.dir, "diff", "--cached", "--name-only", "-z")
 	return splitZ(out), err
+}
+
+func (w *workingCopy) Committed(ctx context.Context, path string) ([]byte, error) {
+	out, err := w.git.run(ctx, w.dir, "show", "HEAD:./"+path)
+	return []byte(out), err
 }
 
 func (w *workingCopy) Commit(ctx context.Context, message string, author Identity) error {

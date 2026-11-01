@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -27,6 +28,7 @@ func TestUpdateSharedCodeFailures(t *testing.T) {
 		t.Helper()
 		mockComposer := NewMockComposer(t)
 		worktree := NewMockWorktree(t)
+		worktree.EXPECT().Committed(anyCtx, "composer.lock").Return([]byte(testBaseLock), nil).Maybe()
 		return testRun(services{logger: zap.NewNop(), composer: mockComposer}, repo.Checkout{Worktree: worktree, Path: testCheckout}, hookAddon{hooks}), mockComposer, worktree
 	}
 
@@ -37,6 +39,18 @@ func TestUpdateSharedCodeFailures(t *testing.T) {
 		err := ws.updateSharedCode(t.Context())
 		require.ErrorIs(t, err, assert.AnError)
 		assert.Contains(t, err.Error(), "failed to install updated dependencies")
+	})
+
+	t.Run("reading the committed lock", func(t *testing.T) {
+		mockComposer := NewMockComposer(t)
+		worktree := NewMockWorktree(t)
+		ws := testRun(services{logger: zap.NewNop(), composer: mockComposer}, repo.Checkout{Worktree: worktree, Path: testCheckout})
+		mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
+		worktree.EXPECT().Committed(anyCtx, "composer.lock").Return(nil, assert.AnError)
+
+		err := ws.updateSharedCode(t.Context())
+		require.ErrorIs(t, err, assert.AnError)
+		assert.Contains(t, err.Error(), "failed to read the committed composer.lock")
 	})
 
 	t.Run("post-composer-update", func(t *testing.T) {
@@ -119,12 +133,32 @@ func TestCreateUpdateBranch(t *testing.T) {
 	})
 }
 
+func TestPostComposerUpdateCarriesTheLockAsCommittedBeforeTheUpdate(t *testing.T) {
+	var got json.RawMessage
+	mockComposer := NewMockComposer(t)
+	worktree := NewMockWorktree(t)
+	ws := testRun(services{logger: zap.NewNop(), composer: mockComposer}, repo.Checkout{Worktree: worktree, Path: testCheckout},
+		hookAddon{Hooks{PostComposerUpdate: On(Inspect, func(e *PostComposerUpdateEvent) error {
+			got = e.BaseLock()
+			return nil
+		})}})
+	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
+	worktree.EXPECT().Committed(anyCtx, "composer.lock").Return([]byte(testBaseLock), nil)
+	worktree.EXPECT().StageGlob(anyCtx, "composer.*").Return(nil)
+	worktree.EXPECT().Unstaged(anyCtx).Return(nil, nil)
+	worktree.EXPECT().Commit(anyCtx, mock.Anything, mock.Anything).Return(nil)
+
+	require.NoError(t, ws.updateSharedCode(t.Context()))
+	assert.JSONEq(t, testBaseLock, string(got))
+}
+
 // The runner's own commit is signed explicitly, so no identity has to be in git config.
 func TestUpdateSharedCodeSignsItsCommit(t *testing.T) {
 	mockComposer := NewMockComposer(t)
 	worktree := NewMockWorktree(t)
 	ws := testRun(services{logger: zap.NewNop(), composer: mockComposer}, repo.Checkout{Worktree: worktree, Path: testCheckout, Author: testAuthor})
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
+	worktree.EXPECT().Committed(anyCtx, "composer.lock").Return([]byte(testBaseLock), nil)
 	worktree.EXPECT().StageGlob(anyCtx, "composer.*").Return(nil)
 	worktree.EXPECT().Unstaged(anyCtx).Return(nil, nil)
 	worktree.EXPECT().Commit(anyCtx, "Update composer.json and composer.lock", testAuthor).Return(nil)
@@ -519,6 +553,8 @@ func TestEnsureUpdateBranchAvailable(t *testing.T) {
 // Outside the temp dir, so a mutant of cleanup's guard has nothing real to delete.
 const testCheckout = "/drupdater-test/checkout"
 
+const testBaseLock = `{"packages":[{"name":"drupal/core","version":"9.0.0"}]}`
+
 // testRun is a run over checkout with s, built by newRun as Run builds one.
 func testRun(s services, checkout repo.Checkout, addons ...Addon) *run {
 	rec := report.NewRecorder(buildinfo.Version, report.ModeNormal, false, "", "", nil)
@@ -684,6 +720,7 @@ func TestRunFailsWhenScaffoldChangesCannotBeStaged(t *testing.T) {
 	}
 
 	worktree := NewMockWorktree(t)
+	worktree.EXPECT().Committed(anyCtx, "composer.lock").Return([]byte(testBaseLock), nil)
 	worktree.EXPECT().StageGlob(anyCtx, mock.Anything).Return(nil)
 	worktree.EXPECT().Unstaged(anyCtx).Return(nil, assert.AnError)
 
@@ -726,6 +763,7 @@ func TestRunHandsAddonsTheRunsContextAndCommitter(t *testing.T) {
 	config := config.Config{RepositoryURL: "https://example.com/repo.git", Branch: "main", Token: "token", Clone: true, Sites: []string{"site1"}, DryRun: true}
 
 	worktree := NewMockWorktree(t)
+	worktree.EXPECT().Committed(anyCtx, "composer.lock").Return([]byte(testBaseLock), nil)
 	worktree.EXPECT().Stage(anyCtx, []string{"config/sync"}).Return(nil).Maybe()
 	worktree.EXPECT().StageGlob(anyCtx, mock.Anything).Return(nil)
 	worktree.EXPECT().Unstaged(anyCtx).Return(nil, nil).Once()

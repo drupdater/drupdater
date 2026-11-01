@@ -24,10 +24,15 @@ final class EndToEndTest extends TestCase
         file_put_contents(self::$home . '/composer.json', json_encode([
             'repositories' => [
                 ['type' => 'path', 'url' => dirname(__DIR__), 'options' => ['symlink' => true, 'versions' => ['drupdater/agent' => '1.0.0']]],
+                // Offline: the agent's one dependency comes from its own vendor/.
+                ['type' => 'path', 'url' => dirname(__DIR__) . '/vendor/ion-bazan/composer-diff', 'options' => [
+                    'symlink' => true, 'versions' => ['ion-bazan/composer-diff' => self::lockedVersion('ion-bazan/composer-diff')],
+                ]],
                 ['packagist.org' => false],
             ],
             'require' => ['drupdater/agent' => '1.0.0'],
-            'config' => ['allow-plugins' => ['drupdater/agent' => true]],
+            // As in the image: the agent only uses composer-diff's classes, never its command.
+            'config' => ['allow-plugins' => ['drupdater/agent' => true, 'ion-bazan/composer-diff' => false]],
         ]));
         $install = self::composer(['global', 'update', '--no-interaction', '--no-progress']);
         self::assertSame(0, $install->getExitCode(), $install->getErrorOutput());
@@ -117,6 +122,24 @@ final class EndToEndTest extends TestCase
         $reply = $this->ask('drupdater:resolve', $project, self::fixture('resolve/request.json'));
 
         self::assertSame(['failed', 'the project has no composer.lock'], [$reply['error']['kind'], $reply['error']['reason']]);
+    }
+
+    public function testComposerDiffReportsWhatTheUpdateChangedSinceTheBaseLock(): void
+    {
+        $project = $this->lockedProject();
+        $base = json_decode((string) file_get_contents($project . '/composer.lock'), true);
+        $update = self::composer(['--working-dir=' . $project, 'update', '--no-install', '--no-interaction', 'fixture/a']);
+        self::assertSame(0, $update->getExitCode(), $update->getErrorOutput());
+
+        $reply = $this->ask('drupdater:addon', $project, ['protocol' => 2, 'request' => [
+            'addon' => 'composer_diff', 'event' => ['name' => 'post-composer-update', 'base_lock' => $base],
+        ]]);
+
+        self::assertTrue($reply['ok'], json_encode($reply));
+        self::assertSame(
+            [['package' => 'fixture/a', 'operation' => 'upgrade', 'from' => '1.0.0', 'to' => '1.1.0', 'dev' => false, 'direct' => true]],
+            $reply['result']['finding'],
+        );
     }
 
     public function testAuditOfACleanLockFindsNothing(): void
@@ -276,6 +299,17 @@ final class EndToEndTest extends TestCase
             ],
         ])]);
         return $project;
+    }
+
+    private static function lockedVersion(string $package): string
+    {
+        $lock = json_decode((string) file_get_contents(dirname(__DIR__) . '/composer.lock'), true, 512, JSON_THROW_ON_ERROR);
+        foreach ($lock['packages'] as $locked) {
+            if ($locked['name'] === $package) {
+                return $locked['version'];
+            }
+        }
+        throw new \LogicException($package . ' is not in the agent\'s composer.lock');
     }
 
     /**

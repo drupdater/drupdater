@@ -88,6 +88,22 @@ tests mock exactly that. Then add the interface to `addonComposer` or `addonDrus
 `cmd/addons.go`: those are the sum of every addon's own interface, and what `*composer.CLI` and
 `*drush.CLI` have to satisfy. Run `make mock` to generate the mock.
 
+### Running the hook in the agent
+
+When the work is a question for Composer, write it in PHP, in the
+[agent](development.md#the-agent), and keep only the shell in Go:
+
+1. In `agent/src/Addon/`, implement `Addon::handle()`, returning a `HookResult` — the finding,
+   the commits, any log lines — and register it in `AddonCommand` under the addon's name.
+2. In Go, give the addon an interface with the one method it needs,
+   `RunHook(ctx, dir, addon, event)`, and build its hook with `agentHook`, which sends the
+   event's payload and decodes the finding into the type its `ReportData` reads.
+3. Add a request and reply to `agent/protocol/addon/` if the shape is new, and test both
+   sides against them.
+
+[`composer_diff`](../reference/addons/composer-diff.md) is the example to copy. An event no
+agent hook has used yet also needs its payload in `internal/addon/agent_hook.go`.
+
 ### Choosing an event and stage
 
 | Event | Use for |

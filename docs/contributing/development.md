@@ -589,9 +589,11 @@ the project's layout, plugins, patches and lock;
 [`drupdater:platform-check`](../reference/docker-images.md#drupdater-agent), the audit and the
 platform requirements; [`drupdater:allow-plugins`](../reference/docker-images.md#drupdater-agent)
 and [`drupdater:write-patches`](../reference/docker-images.md#drupdater-agent), the two edits
-to `composer.json`; and
-[`drupdater:patch-check`](../reference/addons/composer-patches.md#how-a-patch-is-tested). The
-Go side calls them through `internal/agent`, and `internal/composer` wraps each in a method.
+to `composer.json`;
+[`drupdater:patch-check`](../reference/addons/composer-patches.md#how-a-patch-is-tested); and
+[`drupdater:addon`](../reference/docker-images.md#drupdater-agent), which runs the hooks of the
+addons that live in the agent. The Go side calls them through `internal/agent`, and
+`internal/composer` wraps each in a method.
 
 Each command reads one JSON request on stdin and prints one JSON envelope on stdout:
 

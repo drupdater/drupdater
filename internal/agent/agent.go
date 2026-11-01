@@ -131,3 +131,17 @@ func lastEnvelope(stdout string, command string) (envelope, bool) {
 	}
 	return reply, true
 }
+
+// HookCommit is one commit an addon hook running in the agent asks for.
+type HookCommit struct {
+	Message string   `json:"message"`
+	Paths   []string `json:"paths"`
+}
+
+// HookReply is drupdater:addon's result: what one addon hook running in the agent returned.
+type HookReply struct {
+	Commits []HookCommit `json:"commits"`
+	// Finding is the addon's own, for its ReportData to read.
+	Finding json.RawMessage `json:"finding"`
+	Log     []string        `json:"log"`
+}

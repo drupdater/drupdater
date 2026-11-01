@@ -53,7 +53,7 @@ func reportingAddons() []withFindings {
 
 	return []withFindings{
 		allowPluginsFor([]string{"tbachert/spi", "php-http/discovery"}),
-		diffFor([]composer.DiffEntry{
+		diffFor([]DependencyChange{
 			{
 				Package: "drupal/core", Operation: "upgrade", From: "10.3.8", To: "10.3.9", Direct: true,
 				CompareURL: "https://github.com/drupal/core/compare/10.3.8...10.3.9", ProjectURL: "https://github.com/drupal/core",

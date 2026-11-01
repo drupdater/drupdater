@@ -22,7 +22,7 @@ other one is disabled" — because none of them ever depended on another being t
 | Event | Fired | Payload |
 |---|---|---|
 | `pre-composer-update` | Before `composer update`, which only writes the lock — before any site is installed | The update plan, read-only; hooks return proposals |
-| `post-composer-update` | After the resolved update is installed into `vendor/`, before the commit | — |
+| `post-composer-update` | After the resolved update is installed into `vendor/`, before the commit | `composer.lock` as committed at `HEAD`: the lock the update started from |
 | `post-code-update` | After `composer.json`/`.lock` are committed | — |
 | `pre-site-update` | Before each site's update hooks, concurrently across sites | The site name and its facts |
 | `post-site-update` | After every site's hooks, before its config export; one site at a time, in `--sites` order | The site name and its facts |
@@ -96,6 +96,22 @@ Two rules make that safe without any addon knowing about the others:
   one addon cannot end up under another's message, whatever order they ran in.
 
 Changes nobody names stay in the working tree, uncommitted.
+
+## Hooks that run in the agent
+
+A hook can do its work in the [agent](../reference/docker-images.md#drupdater-agent) instead
+of in the binary. The addon is still a Go type, with its own tool interface, stages and report
+section, but its hook only sends the event to `composer drupdater:addon` and returns what comes
+back: the same `Commits` and finding any other hook returns. Everything above holds unchanged —
+the agent commits nothing, the pipeline commits the paths, and the finding reaches the report
+through the addon's `ReportData` alone.
+
+The finding is decoded into the addon's type in `internal/addon/report.go`, refusing any field
+that type does not declare, so a field added on the PHP side cannot reach the published report
+without a change to its schema.
+
+[`composer_diff`](../reference/addons/composer-diff.md) works this way. Logic that is about
+Composer belongs where Composer's own API is, rather than behind a wrapper around its console.
 
 ## Stages
 

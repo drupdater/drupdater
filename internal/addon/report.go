@@ -52,7 +52,8 @@ func (ca *ComposerAudit) ReportData(findings *workflow.Findings) any {
 // --- composer_diff ---
 
 // DependencyChange is one row of the composer_diff section. Unlike the top-level packages, which
-// come from composer's own output, it separates dev packages and links to each change.
+// come from composer's own output, it separates dev packages and links to each change. The agent
+// computes it; drupdater decodes its finding into this type, refusing any field not declared here.
 type DependencyChange struct {
 	Package string `json:"package"`
 	// Operation is install, upgrade, downgrade, remove, or change: a new commit of one version.
@@ -70,20 +71,11 @@ func (cd *ComposerDiff) ReportKey() string { return "composer_diff" }
 
 // ReportData implements workflow.Reporter.
 func (cd *ComposerDiff) ReportData(findings *workflow.Findings) any {
-	recorded, _ := workflow.Shared[[]composer.DiffEntry](findings, workflow.EventPostComposerUpdate)
-	entries := recorded.Finding
-	if len(entries) == 0 {
+	recorded, _ := workflow.Shared[[]DependencyChange](findings, workflow.EventPostComposerUpdate)
+	if len(recorded.Finding) == 0 {
 		return nil
 	}
-
-	changes := make([]DependencyChange, 0, len(entries))
-	for _, e := range entries {
-		changes = append(changes, DependencyChange{
-			Package: e.Package, Operation: e.Operation, From: e.From, To: e.To,
-			Dev: e.Dev, Direct: e.Direct, CompareURL: e.CompareURL, ProjectURL: e.ProjectURL,
-		})
-	}
-	return changes
+	return recorded.Finding
 }
 
 // --- composer_allow_plugins ---

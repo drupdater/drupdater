@@ -259,7 +259,7 @@ func TestProduceFromReadsOnlyItsOwnAddonsEarlierFindings(t *testing.T) {
 
 	_, err := Settle(p, NewPreComposerUpdateEvent(t.Context(), "/p", nil, UpdatePlan{}))
 	require.NoError(t, err)
-	require.NoError(t, Fire(p, NewPostComposerUpdateEvent(t.Context(), "/p", nil)))
+	require.NoError(t, Fire(p, NewPostComposerUpdateEvent(t.Context(), "/p", nil, nil)))
 
 	assert.True(t, sawOwn)
 	assert.False(t, sawOther)

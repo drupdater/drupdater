@@ -105,7 +105,11 @@ func (r *run) updateSharedCode(ctx context.Context) error {
 		return fmt.Errorf("failed to install updated dependencies: %w", err)
 	}
 
-	postComposerUpdateEvent := NewPostComposerUpdateEvent(ctx, r.path, r.committer)
+	baseLock, err := r.worktree.Committed(ctx, "composer.lock")
+	if err != nil {
+		return fmt.Errorf("failed to read the committed composer.lock: %w", err)
+	}
+	postComposerUpdateEvent := NewPostComposerUpdateEvent(ctx, r.path, r.committer, baseLock)
 	if err := Fire(r.hooks, postComposerUpdateEvent); err != nil {
 		return err
 	}

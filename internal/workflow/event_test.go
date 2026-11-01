@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -72,10 +73,11 @@ func TestPlanIsACopyAHookCannotEdit(t *testing.T) {
 func TestNewPostComposerUpdateEvent(t *testing.T) {
 	ctx := t.Context()
 	committer := &fakeCommitter{result: true, err: assert.AnError}
-	evt := NewPostComposerUpdateEvent(ctx, "/repo", committer)
+	evt := NewPostComposerUpdateEvent(ctx, "/repo", committer, json.RawMessage(`{"packages":[]}`))
 
 	assert.Equal(t, ctx, evt.Context())
 	assert.Equal(t, "/repo", evt.Path())
+	assert.JSONEq(t, `{"packages":[]}`, string(evt.BaseLock()))
 	assertCommitsThrough(t, evt, committer)
 }
 

@@ -43,7 +43,7 @@ func TestAllowPluginsClosesWithWhatItsOpeningRecorded(t *testing.T) {
 	earlier.Record(workflow.EventPreComposerUpdate, "", opened, nil)
 
 	result, err := NewComposerAllowPlugins(zap.NewNop(), c).postComposerUpdateHandler(
-		workflow.NewPostComposerUpdateEvent(t.Context(), "/p", nil), earlier)
+		workflow.NewPostComposerUpdateEvent(t.Context(), "/p", nil, nil), earlier)
 
 	require.NoError(t, err)
 	assert.Equal(t, []string{"tbachert/spi"}, result.Finding)
@@ -55,7 +55,7 @@ func TestAllowPluginsClosesWithNothingRecordedAsNeverOpened(t *testing.T) {
 	c.EXPECT().CloseAllowPlugins(anyCtx, "/p", composer.PluginsOpened{}).Return(nil, nil)
 
 	_, err := NewComposerAllowPlugins(zap.NewNop(), c).postComposerUpdateHandler(
-		workflow.NewPostComposerUpdateEvent(t.Context(), "/p", nil), &workflow.Findings{})
+		workflow.NewPostComposerUpdateEvent(t.Context(), "/p", nil, nil), &workflow.Findings{})
 
 	require.NoError(t, err)
 }
@@ -68,7 +68,7 @@ func TestAllowPluginsPassesTheAgentsErrorsOn(t *testing.T) {
 
 	_, err := ap.preComposerUpdateHandler(workflow.NewPreComposerUpdateEvent(t.Context(), "/p", nil, workflow.UpdatePlan{}))
 	require.ErrorIs(t, err, assert.AnError)
-	_, err = ap.postComposerUpdateHandler(workflow.NewPostComposerUpdateEvent(t.Context(), "/p", nil), &workflow.Findings{})
+	_, err = ap.postComposerUpdateHandler(workflow.NewPostComposerUpdateEvent(t.Context(), "/p", nil, nil), &workflow.Findings{})
 	require.ErrorIs(t, err, assert.AnError)
 }
 
@@ -81,7 +81,7 @@ func TestAllowPluginsReportsItsDenialsThroughThePipeline(t *testing.T) {
 
 	_, err := workflow.Settle(p, workflow.NewPreComposerUpdateEvent(t.Context(), "/p", nil, workflow.UpdatePlan{}))
 	require.NoError(t, err)
-	require.NoError(t, workflow.Fire(p, workflow.NewPostComposerUpdateEvent(t.Context(), "/p", nil)))
+	require.NoError(t, workflow.Fire(p, workflow.NewPostComposerUpdateEvent(t.Context(), "/p", nil, nil)))
 
 	assert.Equal(t, PluginAllowlist{Added: []string{"tbachert/spi"}}, reportSection(p, "composer_allow_plugins"))
 }

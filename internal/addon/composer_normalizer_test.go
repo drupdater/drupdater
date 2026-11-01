@@ -23,7 +23,7 @@ func TestDefaultComposerNormalize_PostComposerUpdateHandler_PackageInstalled(t *
 
 	normalize := NewComposerNormalizer(logger, composer)
 
-	e := workflow.NewPostComposerUpdateEvent(ctx, testPath, committer)
+	e := workflow.NewPostComposerUpdateEvent(ctx, testPath, committer, nil)
 	err := normalize.postComposerUpdateHandler(e)
 
 	require.NoError(t, err)
@@ -42,7 +42,7 @@ func TestDefaultComposerNormalize_PostComposerUpdateHandler_PackageNotInstalled(
 
 	normalize := NewComposerNormalizer(logger, composer)
 
-	e := workflow.NewPostComposerUpdateEvent(ctx, testPath, committer)
+	e := workflow.NewPostComposerUpdateEvent(ctx, testPath, committer, nil)
 	err := normalize.postComposerUpdateHandler(e)
 
 	require.NoError(t, err)
@@ -54,7 +54,7 @@ func TestComposerNormalizerErrors(t *testing.T) {
 		composerService.EXPECT().Project(anyCtx, "/tmp").Return(composer.Project{}, assert.AnError)
 
 		cn := NewComposerNormalizer(zap.NewNop(), composerService)
-		require.Error(t, cn.postComposerUpdateHandler(workflow.NewPostComposerUpdateEvent(t.Context(), "/tmp", nil)))
+		require.Error(t, cn.postComposerUpdateHandler(workflow.NewPostComposerUpdateEvent(t.Context(), "/tmp", nil, nil)))
 	})
 
 	t.Run("normalize fails", func(t *testing.T) {
@@ -63,7 +63,7 @@ func TestComposerNormalizerErrors(t *testing.T) {
 		composerService.EXPECT().Normalize(anyCtx, "/tmp").Return("", assert.AnError)
 
 		cn := NewComposerNormalizer(zap.NewNop(), composerService)
-		err := cn.postComposerUpdateHandler(workflow.NewPostComposerUpdateEvent(t.Context(), "/tmp", nil))
+		err := cn.postComposerUpdateHandler(workflow.NewPostComposerUpdateEvent(t.Context(), "/tmp", nil, nil))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to normalize composer.json")
 	})

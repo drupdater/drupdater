@@ -12,9 +12,18 @@ downgraded or removed, with links to the upstream project and compare view.
 
 ## What it does
 
-Runs `composer diff --format=json --with-links`, which compares the working
-`composer.lock` with the one committed at `HEAD`, and records one entry per changed
-package. The same list is logged at info level, one line per package, without the links.
+Compares the working `composer.lock` with the one committed at `HEAD` when
+`post-composer-update` fires — the lock the update started from — and records one entry per
+changed package. The same list is logged at info level, one line per package, without the
+links.
+
+It is the first addon whose hook runs in the [agent](../docker-images.md#drupdater-agent)
+rather than in the binary: Drupdater reads the committed lock through git and sends it to
+`composer drupdater:addon`, which diffs it against the working lock inside the project's own
+Composer. The comparison and the links come from
+[`ion-bazan/composer-diff`](https://github.com/IonBazan/composer-diff)'s library, so they are
+the same as `composer diff --with-links` would produce. A GitLab host other than `gitlab.com`
+gets links when it is listed in the project's `config.gitlab-domains`.
 
 It runs at the **Inspect** stage on `post-composer-update`, so every other addon on that
 event has already finished mutating the lock file before the diff is taken.
@@ -46,8 +55,8 @@ changed in the dependency tree, which is what the reviewer is approving.
 `operation` is one of `install`, `upgrade`, `downgrade`, `remove`, or `change` — a new
 commit of the same version, as with a `dev-` branch. `from` is absent for an install and
 `to` for a removal. `dev` marks a `require-dev` package and `direct` one `composer.json`
-names. `compare_url` and `project_url` are absent where `composer diff` cannot derive one
-from the package's source.
+names. `compare_url` and `project_url` are absent where composer-diff cannot derive one
+from the package's source: it knows GitHub, GitLab, Bitbucket and Drupal.org.
 
 Production packages come first, then dev packages, each sorted by name. Omitted when the
 lock did not change.

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupdater\Agent;
 
 use Composer\Plugin\Capability\CommandProvider as CommandProviderCapability;
+use Drupdater\Agent\Command\AddonCommand;
 use Drupdater\Agent\Command\AllowPluginsCommand;
 use Drupdater\Agent\Command\AuditCommand;
 use Drupdater\Agent\Command\HandshakeCommand;
@@ -19,6 +20,7 @@ final class CommandProvider implements CommandProviderCapability
     public function getCommands(): array
     {
         return [
+            new AddonCommand(),
             new AllowPluginsCommand(),
             new AuditCommand(),
             new HandshakeCommand(),

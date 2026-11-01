@@ -1,9 +1,10 @@
 package addon
 
 import (
+	"encoding/json"
 	"testing"
 
-	"github.com/drupdater/drupdater/internal/composer"
+	"github.com/drupdater/drupdater/internal/agent"
 	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -11,72 +12,69 @@ import (
 	"go.uber.org/zap/zaptest/observer"
 )
 
-func TestNewComposerDiff(t *testing.T) {
-	logger := zap.NewNop()
-	mockComposer := NewMockDiffComposer(t)
+const baseLock = `{"packages":[{"name":"drupal/core","version":"10.3.8"}]}`
 
-	diff := NewComposerDiff(logger, mockComposer)
-
-	assert.NotNil(t, diff)
-	assert.Equal(t, logger, diff.logger)
-	assert.Equal(t, mockComposer, diff.composer)
+func fireComposerDiff(t *testing.T, cd *ComposerDiff) (*workflow.Pipeline, error) {
+	t.Helper()
+	p := workflow.NewPipeline([]workflow.Addon{cd})
+	return p, workflow.Fire(p, workflow.NewPostComposerUpdateEvent(t.Context(), "/test/path", nil, json.RawMessage(baseLock)))
 }
 
-func TestComposerDiffRecordsAndLogsTheChanges(t *testing.T) {
-	core, logs := observer.New(zap.InfoLevel)
-	mockComposer := NewMockDiffComposer(t)
-	entries := []composer.DiffEntry{
-		{Package: "drupal/core", Operation: "upgrade", From: "10.3.8", To: "10.3.9", CompareURL: "https://example.com/compare"},
-		{Package: "drupal/redirect", Operation: "install", To: "1.10.0"},
+func TestComposerDiffSendsTheBaseLockAndReportsTheAgentsChanges(t *testing.T) {
+	a := NewMockDiffAgent(t)
+	a.EXPECT().RunHook(anyCtx, "/test/path", "composer_diff", postComposerUpdatePayload{
+		Name: "post-composer-update", BaseLock: json.RawMessage(baseLock),
+	}).Return(agent.HookReply{Finding: json.RawMessage(`[
+		{"package":"drupal/core","operation":"upgrade","from":"10.3.8","to":"10.3.9","dev":false,"direct":true,
+		 "compare_url":"https://example.com/compare","project_url":"https://example.com/core"},
+		{"package":"phpunit/phpunit","operation":"remove","from":"10.5.1","dev":true,"direct":false}
+	]`)}, nil)
+
+	p, err := fireComposerDiff(t, NewComposerDiff(zap.NewNop(), a))
+
+	require.NoError(t, err)
+	assert.Equal(t, []DependencyChange{
+		{Package: "drupal/core", Operation: "upgrade", From: "10.3.8", To: "10.3.9", Direct: true,
+			CompareURL: "https://example.com/compare", ProjectURL: "https://example.com/core"},
 		{Package: "phpunit/phpunit", Operation: "remove", From: "10.5.1", Dev: true},
-	}
-	mockComposer.EXPECT().Diff(anyCtx, "/test/path").Return(entries, nil)
-
-	cd := NewComposerDiff(zap.New(core), mockComposer)
-	found, err := cd.postComposerUpdateHandler(workflow.NewPostComposerUpdateEvent(t.Context(), "/test/path", nil))
-	require.NoError(t, err)
-
-	assert.Equal(t, entries, found)
-	require.Equal(t, 1, logs.Len())
-	assert.Equal(t, "dependency diff\n"+
-		"upgrade drupal/core: 10.3.8 → 10.3.9\n"+
-		"install drupal/redirect: - → 1.10.0\n"+
-		"remove phpunit/phpunit (dev): 10.5.1 → -\n", logs.All()[0].Message)
+	}, reportSection(p, "composer_diff"))
 }
 
-func TestComposerDiffLogsASingleChange(t *testing.T) {
+func TestComposerDiffLogsWhatTheAgentLogs(t *testing.T) {
 	core, logs := observer.New(zap.InfoLevel)
-	mockComposer := NewMockDiffComposer(t)
-	mockComposer.EXPECT().Diff(anyCtx, "/test/path").Return([]composer.DiffEntry{
-		{Package: "drupal/core", Operation: "change", From: "dev-main 1", To: "dev-main 2"},
-	}, nil)
+	a := NewMockDiffAgent(t)
+	a.EXPECT().RunHook(anyCtx, "/test/path", "composer_diff", postComposerUpdatePayload{
+		Name: "post-composer-update", BaseLock: json.RawMessage(baseLock),
+	}).Return(agent.HookReply{Log: []string{"dependency diff\nupgrade drupal/core: 10.3.8 → 10.3.9\n"}}, nil)
 
-	cd := NewComposerDiff(zap.New(core), mockComposer)
-	_, err := cd.postComposerUpdateHandler(workflow.NewPostComposerUpdateEvent(t.Context(), "/test/path", nil))
+	_, err := fireComposerDiff(t, NewComposerDiff(zap.New(core), a))
+
 	require.NoError(t, err)
-
 	require.Equal(t, 1, logs.Len())
-	assert.Equal(t, "dependency diff\nchange drupal/core: dev-main 1 → dev-main 2\n", logs.All()[0].Message)
+	assert.Equal(t, "dependency diff\nupgrade drupal/core: 10.3.8 → 10.3.9\n", logs.All()[0].Message)
+	assert.Equal(t, "composer_diff", logs.All()[0].ContextMap()["addon"])
 }
 
-func TestComposerDiffLogsNothingWithoutChanges(t *testing.T) {
-	core, logs := observer.New(zap.InfoLevel)
-	mockComposer := NewMockDiffComposer(t)
-	mockComposer.EXPECT().Diff(anyCtx, "/test/path").Return(nil, nil)
+func TestComposerDiffReportsNothingWhenTheAgentFindsNothing(t *testing.T) {
+	a := NewMockDiffAgent(t)
+	a.EXPECT().RunHook(anyCtx, "/test/path", "composer_diff", postComposerUpdatePayload{
+		Name: "post-composer-update", BaseLock: json.RawMessage(baseLock),
+	}).Return(agent.HookReply{Finding: json.RawMessage(`[]`)}, nil)
 
-	cd := NewComposerDiff(zap.New(core), mockComposer)
-	_, err := cd.postComposerUpdateHandler(workflow.NewPostComposerUpdateEvent(t.Context(), "/test/path", nil))
+	p, err := fireComposerDiff(t, NewComposerDiff(zap.NewNop(), a))
+
 	require.NoError(t, err)
-
-	assert.Zero(t, logs.Len())
+	assert.Nil(t, reportSection(p, "composer_diff"))
 }
 
-func TestComposerDiffFailure(t *testing.T) {
-	composerService := NewMockDiffComposer(t)
-	composerService.EXPECT().Diff(anyCtx, "/tmp").Return(nil, assert.AnError)
+func TestComposerDiffFailsWithTheAgent(t *testing.T) {
+	a := NewMockDiffAgent(t)
+	a.EXPECT().RunHook(anyCtx, "/test/path", "composer_diff", postComposerUpdatePayload{
+		Name: "post-composer-update", BaseLock: json.RawMessage(baseLock),
+	}).Return(agent.HookReply{}, assert.AnError)
 
-	cd := NewComposerDiff(zap.NewNop(), composerService)
-	_, err := cd.postComposerUpdateHandler(workflow.NewPostComposerUpdateEvent(t.Context(), "/tmp", nil))
+	_, err := fireComposerDiff(t, NewComposerDiff(zap.NewNop(), a))
+
 	require.ErrorIs(t, err, assert.AnError)
-	assert.Contains(t, err.Error(), "failed to get diff")
+	assert.ErrorContains(t, err, "composer_diff: ")
 }

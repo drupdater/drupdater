@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/drupdater/drupdater/internal/agent"
 	"github.com/drupdater/drupdater/internal/composer"
 	"github.com/drupdater/drupdater/internal/workflow"
 	mock "github.com/stretchr/testify/mock"
@@ -357,74 +358,6 @@ func (_c *mockaddonComposer_CloseAllowPlugins_Call) RunAndReturn(run func(ctx co
 	return _c
 }
 
-// Diff provides a mock function for the type mockaddonComposer
-func (_mock *mockaddonComposer) Diff(ctx context.Context, path string) ([]composer.DiffEntry, error) {
-	ret := _mock.Called(ctx, path)
-
-	if len(ret) == 0 {
-		panic("no return value specified for Diff")
-	}
-
-	var r0 []composer.DiffEntry
-	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) ([]composer.DiffEntry, error)); ok {
-		return returnFunc(ctx, path)
-	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) []composer.DiffEntry); ok {
-		r0 = returnFunc(ctx, path)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]composer.DiffEntry)
-		}
-	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = returnFunc(ctx, path)
-	} else {
-		r1 = ret.Error(1)
-	}
-	return r0, r1
-}
-
-// mockaddonComposer_Diff_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Diff'
-type mockaddonComposer_Diff_Call struct {
-	*mock.Call
-}
-
-// Diff is a helper method to define mock.On call
-//   - ctx context.Context
-//   - path string
-func (_e *mockaddonComposer_Expecter) Diff(ctx any, path any) *mockaddonComposer_Diff_Call {
-	return &mockaddonComposer_Diff_Call{Call: _e.mock.On("Diff", ctx, path)}
-}
-
-func (_c *mockaddonComposer_Diff_Call) Run(run func(ctx context.Context, path string)) *mockaddonComposer_Diff_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		var arg0 context.Context
-		if args[0] != nil {
-			arg0 = args[0].(context.Context)
-		}
-		var arg1 string
-		if args[1] != nil {
-			arg1 = args[1].(string)
-		}
-		run(
-			arg0,
-			arg1,
-		)
-	})
-	return _c
-}
-
-func (_c *mockaddonComposer_Diff_Call) Return(diffEntrys []composer.DiffEntry, err error) *mockaddonComposer_Diff_Call {
-	_c.Call.Return(diffEntrys, err)
-	return _c
-}
-
-func (_c *mockaddonComposer_Diff_Call) RunAndReturn(run func(ctx context.Context, path string) ([]composer.DiffEntry, error)) *mockaddonComposer_Diff_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // Normalize provides a mock function for the type mockaddonComposer
 func (_mock *mockaddonComposer) Normalize(ctx context.Context, dir string) (string, error) {
 	ret := _mock.Called(ctx, dir)
@@ -619,6 +552,84 @@ func (_c *mockaddonComposer_Project_Call) Return(project composer.Project, err e
 }
 
 func (_c *mockaddonComposer_Project_Call) RunAndReturn(run func(ctx context.Context, dir string) (composer.Project, error)) *mockaddonComposer_Project_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// RunHook provides a mock function for the type mockaddonComposer
+func (_mock *mockaddonComposer) RunHook(ctx context.Context, dir string, addon string, event any) (agent.HookReply, error) {
+	ret := _mock.Called(ctx, dir, addon, event)
+
+	if len(ret) == 0 {
+		panic("no return value specified for RunHook")
+	}
+
+	var r0 agent.HookReply
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, any) (agent.HookReply, error)); ok {
+		return returnFunc(ctx, dir, addon, event)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string, string, any) agent.HookReply); ok {
+		r0 = returnFunc(ctx, dir, addon, event)
+	} else {
+		r0 = ret.Get(0).(agent.HookReply)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string, string, any) error); ok {
+		r1 = returnFunc(ctx, dir, addon, event)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// mockaddonComposer_RunHook_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'RunHook'
+type mockaddonComposer_RunHook_Call struct {
+	*mock.Call
+}
+
+// RunHook is a helper method to define mock.On call
+//   - ctx context.Context
+//   - dir string
+//   - addon string
+//   - event any
+func (_e *mockaddonComposer_Expecter) RunHook(ctx any, dir any, addon any, event any) *mockaddonComposer_RunHook_Call {
+	return &mockaddonComposer_RunHook_Call{Call: _e.mock.On("RunHook", ctx, dir, addon, event)}
+}
+
+func (_c *mockaddonComposer_RunHook_Call) Run(run func(ctx context.Context, dir string, addon string, event any)) *mockaddonComposer_RunHook_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 any
+		if args[3] != nil {
+			arg3 = args[3].(any)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *mockaddonComposer_RunHook_Call) Return(hookReply agent.HookReply, err error) *mockaddonComposer_RunHook_Call {
+	_c.Call.Return(hookReply, err)
+	return _c
+}
+
+func (_c *mockaddonComposer_RunHook_Call) RunAndReturn(run func(ctx context.Context, dir string, addon string, event any) (agent.HookReply, error)) *mockaddonComposer_RunHook_Call {
 	_c.Call.Return(run)
 	return _c
 }

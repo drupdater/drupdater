@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/drupdater/drupdater/internal/drush"
 )
@@ -70,6 +71,7 @@ func (e *PreComposerUpdateEvent) Plan() UpdatePlan {
 
 type PostComposerUpdateEvent struct {
 	BasicAddonEvent
+	baseLock json.RawMessage
 }
 
 func (*PostComposerUpdateEvent) name() string { return EventPostComposerUpdate }
@@ -78,10 +80,16 @@ func (*PostComposerUpdateEvent) hook(h Hooks) *Hook[*PostComposerUpdateEvent] {
 	return h.PostComposerUpdate
 }
 
-func NewPostComposerUpdateEvent(ctx context.Context, path string, committer Committer) *PostComposerUpdateEvent {
+func NewPostComposerUpdateEvent(ctx context.Context, path string, committer Committer, baseLock json.RawMessage) *PostComposerUpdateEvent {
 	return &PostComposerUpdateEvent{
 		BasicAddonEvent: newBasicAddonEvent(ctx, path, committer),
+		baseLock:        baseLock,
 	}
+}
+
+// BaseLock is composer.lock as committed when the event fired: the lock the update started from.
+func (e *PostComposerUpdateEvent) BaseLock() json.RawMessage {
+	return e.baseLock
 }
 
 type PostCodeUpdateEvent struct {

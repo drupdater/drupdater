@@ -35,6 +35,7 @@ final class CommandsTest extends TestCase
         self::assertSame([\Composer\Plugin\Capability\CommandProvider::class => CommandProvider::class], (new Plugin())->getCapabilities());
         $names = array_map(fn (AgentCommand $c) => $c->getName(), (new CommandProvider())->getCommands());
         self::assertSame([
+            'drupdater:addon',
             'drupdater:allow-plugins',
             'drupdater:audit',
             'drupdater:handshake',
