@@ -44,7 +44,7 @@ func TestAbortError(t *testing.T) {
 }
 
 func TestNewPreComposerUpdateEvent(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	committer := &fakeCommitter{result: true, err: assert.AnError}
 	plan := UpdatePlan{Only: []string{"drupal/core"}, Keep: []Pin{{Package: "keep/me", Version: "1.0.0"}}, MinimalChanges: true}
 	evt := NewPreComposerUpdateEvent(ctx, "/repo", committer, plan)
@@ -56,7 +56,7 @@ func TestNewPreComposerUpdateEvent(t *testing.T) {
 }
 
 func TestPlanIsACopyAHookCannotEdit(t *testing.T) {
-	evt := NewPreComposerUpdateEvent(context.Background(), "/repo", nil, UpdatePlan{
+	evt := NewPreComposerUpdateEvent(t.Context(), "/repo", nil, UpdatePlan{
 		Only: []string{"drupal/core"},
 		Keep: []Pin{{Package: "keep/me", Version: "1.0.0"}},
 	})
@@ -70,7 +70,7 @@ func TestPlanIsACopyAHookCannotEdit(t *testing.T) {
 }
 
 func TestNewPostComposerUpdateEvent(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	committer := &fakeCommitter{result: true, err: assert.AnError}
 	evt := NewPostComposerUpdateEvent(ctx, "/repo", committer)
 
@@ -80,7 +80,7 @@ func TestNewPostComposerUpdateEvent(t *testing.T) {
 }
 
 func TestNewPostCodeUpdateEvent(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	committer := &fakeCommitter{result: true, err: assert.AnError}
 	evt := NewPostCodeUpdateEvent(ctx, "/repo", committer)
 
@@ -90,7 +90,7 @@ func TestNewPostCodeUpdateEvent(t *testing.T) {
 }
 
 func TestNewPreSiteUpdateEvent(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	committer := &fakeCommitter{result: true, err: assert.AnError}
 	evt := NewPreSiteUpdateEvent(ctx, "/repo", committer, "default", drush.Facts{Modules: []string{"system"}})
 
@@ -102,7 +102,7 @@ func TestNewPreSiteUpdateEvent(t *testing.T) {
 }
 
 func TestNewPostSiteUpdateEvent(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	committer := &fakeCommitter{result: true, err: assert.AnError}
 	evt := NewPostSiteUpdateEvent(ctx, "/repo", committer, "production", drush.Facts{Modules: []string{"system"}})
 
@@ -114,7 +114,7 @@ func TestNewPostSiteUpdateEvent(t *testing.T) {
 }
 
 func TestSiteEventFactsAreCopies(t *testing.T) {
-	evt := NewPreSiteUpdateEvent(context.Background(), "/repo", &fakeCommitter{}, "default", drush.Facts{Modules: []string{"system"}})
+	evt := NewPreSiteUpdateEvent(t.Context(), "/repo", &fakeCommitter{}, "default", drush.Facts{Modules: []string{"system"}})
 
 	evt.Facts().Modules[0] = "changed"
 

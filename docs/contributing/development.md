@@ -231,6 +231,12 @@ the sites share one git index — which is mocked in the suite, so there is no s
 observe. `TestRunWithConcurrentSites` measures peak occupancy instead, and the
 `TestUpdateSites…` tests record the order the commits ran in.
 
+These tests run inside [`testing/synctest`](https://pkg.go.dev/testing/synctest) bubbles. There a
+`time.Sleep` ends only once every other goroutine in the bubble is blocked, so everything that
+can overlap does, and a peak-occupancy assertion is exact rather than hoping the scheduler
+interleaved. A deadlock fails the test at once instead of hanging it. Write a new concurrency
+test the same way; don't add a real sleep or a wall-clock timeout.
+
 ## Mutation testing
 
 Coverage proves a line *ran*. It does not prove a test *fails* when that line is wrong — a
@@ -560,6 +566,17 @@ make mock
 
 mockery's `testify` template emits one consolidated `mocks_test.go` per package, in the
 package it mocks. Do not edit those files by hand.
+
+The generated `NewMockX(t)` constructors assert every expectation when the test ends, and a
+call nobody declared fails the test, so a test needs neither `AssertExpectations` nor
+`AssertNotCalled`. Don't use `AssertNotCalled` at all: it only matches a call with the same
+number of arguments, so a check written with the wrong count passes whatever happened. Where an
+expectation allows a call the test wants absent, assert `AssertNumberOfCalls(t, "Method", 0)`.
+
+Tests of a whole `Runner.Run` use `runHarness` (`internal/workflow/harness_test.go`). A test
+declares only what makes it different. `expectUpdate`, `expectFullRun` and `expectPublish`
+allow the rest of a run, registered when the run starts so the test's own expectations answer
+first. Any mock the harness was not asked to cover stays strict.
 
 ## The agent
 

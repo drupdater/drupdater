@@ -1,7 +1,6 @@
 package workflow
 
 import (
-	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -43,7 +42,7 @@ func newCommitRepo(t *testing.T, files map[string]string) (Worktree, string) {
 	service := repo.New()
 	checkout, err := service.AddWorktree(t.Context(), source, testAuthor)
 	require.NoError(t, err)
-	t.Cleanup(func() { _ = service.RemoveWorktree(context.Background(), source, checkout.Path) })
+	t.Cleanup(func() { _ = service.RemoveWorktree(t.Context(), source, checkout.Path) })
 	return checkout.Worktree, checkout.Path
 }
 

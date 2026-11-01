@@ -1,7 +1,6 @@
 package workflow
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -47,7 +46,7 @@ func TestCheckGitHistoryComplete(t *testing.T) {
 }
 
 func TestCheckPlatformRequirements(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("satisfied requirements pass", func(t *testing.T) {
 		composer := NewMockComposer(t)
@@ -86,7 +85,7 @@ func TestCheckComposerAgent(t *testing.T) {
 }
 
 func TestCheckSiteSettings(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	t.Run("settings.php present passes", func(t *testing.T) {
 		projects := NewMockComposer(t)

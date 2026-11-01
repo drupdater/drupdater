@@ -1,21 +1,24 @@
 package addon
 
 import (
-	"io"
-	"net/http"
-	"net/http/httptest"
 	"os"
-	"strings"
+	"path/filepath"
 	"testing"
 
 	"github.com/drupdater/drupdater/internal/composer"
-	"github.com/drupdater/drupdater/internal/drupalorg"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
+
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+
+	"github.com/drupdater/drupdater/internal/drupalorg"
 )
 
 func TestIsRemotePatch(t *testing.T) {
@@ -97,9 +100,6 @@ func TestUpdatePatches(t *testing.T) {
 		assert.Empty(t, removed)
 		assert.Equal(t, patches, newPatches)
 		assert.False(t, report.Changes())
-
-		composerService.AssertExpectations(t)
-		drupalOrgService.AssertExpectations(t)
 	})
 
 	t.Run("Local patch is not deduplicated against dependencies", func(t *testing.T) {
@@ -201,9 +201,6 @@ func TestUpdatePatches(t *testing.T) {
 			Reason:           "Patch is already applied by a dependency of drupal/core",
 		}, report.Removed[0])
 		assert.True(t, report.Changes())
-
-		composerService.AssertExpectations(t)
-		drupalOrgService.AssertExpectations(t)
 	})
 
 	t.Run("Local patch not applies", func(t *testing.T) {
@@ -258,9 +255,6 @@ func TestUpdatePatches(t *testing.T) {
 			},
 		}, report)
 		assert.True(t, report.Changes())
-
-		composerService.AssertExpectations(t)
-		drupalOrgService.AssertExpectations(t)
 	})
 
 	t.Run("Remote patch still applies", func(t *testing.T) {
@@ -310,9 +304,6 @@ func TestUpdatePatches(t *testing.T) {
 			},
 		}, newPatches)
 		assert.False(t, report.Changes())
-
-		composerService.AssertExpectations(t)
-		drupalOrgService.AssertExpectations(t)
 	})
 
 	t.Run("Current patch fails, remote patch still applies", func(t *testing.T) {
@@ -381,9 +372,6 @@ func TestUpdatePatches(t *testing.T) {
 			},
 		}, newPatches)
 		assert.True(t, report.Changes())
-
-		composerService.AssertExpectations(t)
-		drupalOrgService.AssertExpectations(t)
 	})
 
 	t.Run("Current patch fails, remote patch also fails", func(t *testing.T) {
@@ -463,9 +451,6 @@ func TestUpdatePatches(t *testing.T) {
 			},
 		}, report)
 		assert.True(t, report.Changes())
-
-		composerService.AssertExpectations(t)
-		drupalOrgService.AssertExpectations(t)
 	})
 
 	t.Run("Current patch fails and no drupalcode client records a conflict", func(t *testing.T) {
@@ -508,9 +493,6 @@ func TestUpdatePatches(t *testing.T) {
 		assert.Equal(t, "drupal/core", report.Conflicts[0].Package)
 		assert.Equal(t, "8.7.0", report.Conflicts[0].FixedVersion)
 		assert.Equal(t, "8.8.0", report.Conflicts[0].NewVersion)
-
-		composerService.AssertExpectations(t)
-		drupalOrgService.AssertExpectations(t)
 	})
 
 	t.Run("a failed fork lookup is logged and changes nothing", func(t *testing.T) {
@@ -605,9 +587,6 @@ func TestUpdatePatches(t *testing.T) {
 		assert.Equal(t, []string{"/tmp/patches/remote/0001-remote.patch"}, removed)
 		assert.Equal(t, map[string]map[string]string{}, newPatches)
 		assert.True(t, report.Changes())
-
-		composerService.AssertExpectations(t)
-		drupalOrgService.AssertExpectations(t)
 	})
 
 	t.Run("Remote patch was committed, but not yet releases", func(t *testing.T) {
@@ -666,9 +645,6 @@ func TestUpdatePatches(t *testing.T) {
 			},
 		}, newPatches)
 		assert.False(t, report.Changes())
-
-		composerService.AssertExpectations(t)
-		drupalOrgService.AssertExpectations(t)
 	})
 
 	t.Run("Module will be removed", func(t *testing.T) {
@@ -714,9 +690,6 @@ func TestUpdatePatches(t *testing.T) {
 			},
 		}, newPatches)
 		assert.True(t, report.Changes())
-
-		composerService.AssertExpectations(t)
-		drupalOrgService.AssertExpectations(t)
 	})
 
 	t.Run("Multiple patches conflict when applied together", func(t *testing.T) {
@@ -760,9 +733,6 @@ func TestUpdatePatches(t *testing.T) {
 			NewVersion:       "8.8.0",
 			PatchDescription: "Multiple patches do not apply together",
 		}, report.Conflicts[0], "the description is the reviewer's only clue as to why the version was held back")
-
-		composerService.AssertExpectations(t)
-		drupalOrgService.AssertExpectations(t)
 	})
 
 	t.Run("Module not installed", func(t *testing.T) {
@@ -791,9 +761,6 @@ func TestUpdatePatches(t *testing.T) {
 		assert.Equal(t, []string{"/tmp/patches/core/0001-local-patch.patch"}, removed)
 		assert.Equal(t, map[string]map[string]string{}, newPatches)
 		assert.True(t, report.Changes())
-
-		composerService.AssertExpectations(t)
-		drupalOrgService.AssertExpectations(t)
 	})
 }
 
@@ -866,4 +833,22 @@ func installedProject(patches map[string]map[string]string) composer.Project {
 		project.Packages[name] = composer.LockedPackage{Version: "1.0.0"}
 	}
 	return project
+}
+
+func TestNewComposerPatches1(t *testing.T) {
+	t.Run("keeps the drupalcode client it is given", func(t *testing.T) {
+		drupalCode := NewMockDrupalCode(t)
+		h := NewComposerPatches1(zap.NewNop(), NewMockPatchesComposer(t), NewMockDrupalOrg(t), drupalCode, nil)
+		assert.Same(t, drupalCode, h.drupalCode)
+	})
+
+	t.Run("drops patch files from the real filesystem", func(t *testing.T) {
+		dir := t.TempDir()
+		require.NoError(t, os.MkdirAll(filepath.Join(dir, "patches"), 0o750))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "patches", "a.patch"), []byte("x"), 0o600))
+
+		h := NewComposerPatches1(zap.NewNop(), NewMockPatchesComposer(t), NewMockDrupalOrg(t), nil, nil)
+		require.NoError(t, h.dropPatchFile(dir, "patches/a.patch"))
+		assert.NoFileExists(t, filepath.Join(dir, "patches", "a.patch"))
+	})
 }

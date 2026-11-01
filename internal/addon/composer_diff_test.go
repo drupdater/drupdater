@@ -70,3 +70,13 @@ func TestComposerDiffLogsNothingWithoutChanges(t *testing.T) {
 
 	assert.Zero(t, logs.Len())
 }
+
+func TestComposerDiffFailure(t *testing.T) {
+	composerService := NewMockDiffComposer(t)
+	composerService.EXPECT().Diff(anyCtx, "/tmp").Return(nil, assert.AnError)
+
+	cd := NewComposerDiff(zap.NewNop(), composerService)
+	_, err := cd.postComposerUpdateHandler(workflow.NewPostComposerUpdateEvent(t.Context(), "/tmp", nil))
+	require.ErrorIs(t, err, assert.AnError)
+	assert.Contains(t, err.Error(), "failed to get diff")
+}

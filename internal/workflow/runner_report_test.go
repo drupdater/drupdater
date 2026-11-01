@@ -11,7 +11,6 @@ import (
 	"github.com/drupdater/drupdater/internal/buildinfo"
 	"github.com/drupdater/drupdater/internal/codehosting"
 	"github.com/drupdater/drupdater/internal/composer"
-	"github.com/drupdater/drupdater/internal/config"
 	"github.com/drupdater/drupdater/internal/report"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -19,127 +18,9 @@ import (
 	"go.uber.org/zap"
 )
 
-// reportHarness wires up the mocks a Run run needs, with a report sink attached. Each
-// test then overrides only the expectations relevant to the outcome it exercises.
-type reportHarness struct {
-	config      config.Config
-	installer   *MockInstaller
-	repoSvc     *MockGitService
-	vcsProvider *MockPlatform
-	repository  *MockGitRepository
-	composer    *MockComposer
-	drush       *MockDrush
-	worktree    *MockWorktree
-
-	// addons are handed to Run and registered with the run's event manager, the same
-	// way cmd/root.go wires the real ones up. Empty for the runs that do not care.
-	addons []Addon
-
-	// What the version lookup returns. Fields, so a test can make it fail after the harness has
-	// wired the expectation up.
-	versions    composer.Versions
-	versionsErr error
-
-	got *report.Report
-}
-
-func newReportHarness(t *testing.T, dryRun bool) *reportHarness {
-	t.Helper()
-
-	// Assembled rather than written as one literal so the fixture is not mistaken for a real
-	// embedded credential by static analysis.
-	const testToken = "s3cret"
-	repoURL := "https://user:" + testToken + "@example.com/repo.git"
-
-	h := &reportHarness{
-		config: config.Config{
-			RepositoryURL: repoURL,
-			Branch:        "main",
-			Token:         testToken,
-			Clone:         true,
-			Sites:         []string{"site1"},
-			DryRun:        dryRun,
-		},
-		installer:   NewMockInstaller(t),
-		repoSvc:     NewMockGitService(t),
-		vcsProvider: NewMockPlatform(t),
-		repository:  NewMockGitRepository(t),
-		composer:    NewMockComposer(t),
-		drush:       NewMockDrush(t),
-		worktree:    NewMockWorktree(t),
-
-		versions: composer.Versions{Composer: "2.10.2", PHP: "8.3.14"},
-	}
-	return h
-}
-
-// expectDefaults lets every run get as far as resolving its update. Registered when the run
-// starts, after the test's own expectations, so those answer first.
-func (h *reportHarness) expectDefaults() {
-	h.composer.EXPECT().Version(anyCtx).
-		RunAndReturn(func(context.Context) (composer.Versions, error) { return h.versions, h.versionsErr }).Maybe()
-	h.vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail").Maybe()
-	h.repoSvc.EXPECT().CloneRepository(anyCtx, h.config.RepositoryURL, h.config.Branch, h.config.Token, repo.Identity{Name: "user", Email: "mail"}).
-		Return(repo.Checkout{Repository: h.repository, Worktree: h.worktree, Path: testCheckout, Author: testAuthor}, nil).Maybe()
-	h.repoSvc.EXPECT().IsShallowClone(anyCtx, testCheckout).Return(false, nil).Maybe()
-	h.composer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil).Maybe()
-	h.composer.EXPECT().CheckAgent(anyCtx, testCheckout).Return(nil).Maybe()
-	h.composer.EXPECT().Install(anyCtx, testCheckout).Return(nil).Maybe()
-}
-
-// expectFullRun adds the expectations for a run that gets all the way through the update.
-func (h *reportHarness) expectFullRun(t *testing.T) {
-	t.Helper()
-
-	h.worktree.EXPECT().Commit(anyCtx, mock.Anything, mock.Anything).Return(nil).Maybe()
-	h.worktree.EXPECT().StageGlob(anyCtx, mock.Anything).Return(nil).Maybe()
-	h.worktree.EXPECT().Unstaged(anyCtx).Return(nil, nil).Maybe()
-	h.worktree.EXPECT().Staged(anyCtx).Return(nil, nil).Maybe()
-
-	h.installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil).Maybe()
-	h.installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil).Maybe()
-	h.installer.EXPECT().RestoreSettings(anyCtx, testCheckout, "site1").Return(nil).Maybe()
-	h.drush.EXPECT().UpdateSite(anyCtx, testCheckout, "site1").Return(nil).Maybe()
-	h.drush.EXPECT().ExportConfiguration(anyCtx, testCheckout, "site1").Return(nil).Maybe()
-	h.drush.EXPECT().Facts(anyCtx, testCheckout, "site1").Return(syncFacts(testCheckout+"/config/sync"), nil).Maybe()
-	h.worktree.EXPECT().Stage(anyCtx, []string{"config/sync"}).Return(nil).Maybe()
-	expectUpdateBranch(h.repository)
-	h.drush.EXPECT().ConfigResave(anyCtx, testCheckout, "site1").Return(nil).Maybe()
-	h.drush.EXPECT().LocalFacts(anyCtx, testCheckout, "site1").Return(syncFacts(testCheckout+"/config/sync"), nil).Maybe()
-
-	h.repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil).Maybe()
-	h.repository.EXPECT().RemoteBranchExists(anyCtx, mock.Anything, mock.Anything).Return(false, nil).Maybe()
-	h.composer.EXPECT().Project(anyCtx, testCheckout).Return(composer.Project{WebRoot: "web", LockHash: "dummy-hash"}, nil).Maybe()
-	h.composer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).
-		Return([]composer.PackageChange{{Action: "Upgrade", Package: "drupal/core", From: "9.0.0", To: "9.1.0"}}, nil).Maybe()
-}
-
-// withAddons registers addons with the run, so a test can stand in for the real ones where the
-// workflow reads back what an addon contributed.
-func (h *reportHarness) withAddons(addons ...Addon) {
-	h.addons = addons
-}
-
-// runner is the harness's Runner. Every call builds a new one; run it more than once to reuse it.
-func (h *reportHarness) runner() *Runner {
-	h.expectDefaults()
-	return New(
-		zap.NewNop(), h.config, h.drush, h.vcsProvider, h.repoSvc, h.installer, h.composer,
-		WithReportSink(func(rep report.Report) { h.got = &rep }),
-	)
-}
-
-func (h *reportHarness) run(t *testing.T) error {
-	t.Helper()
-	return h.runner().Run(context.Background(), h.addons)
-}
-
 func TestReportWrittenOnSuccessfulRun(t *testing.T) {
-	h := newReportHarness(t, false)
-	h.expectFullRun(t)
-	h.repository.EXPECT().Push(anyCtx, mock.Anything, mock.Anything).Return(nil)
-	h.vcsProvider.EXPECT().CreateMergeRequest(anyCtx, mock.Anything, mock.Anything, mock.Anything, "main").
-		Return(codehosting.MergeRequest{URL: "https://example.com/mr/1"}, nil)
+	h := newRunHarness(t, false)
+	h.expectPublish()
 
 	require.NoError(t, h.run(t))
 
@@ -162,11 +43,8 @@ func TestReportWrittenOnSuccessfulRun(t *testing.T) {
 
 // Composer decides what a run does, so the report has to name the version that produced it.
 func TestReportRecordsTheToolVersions(t *testing.T) {
-	h := newReportHarness(t, false)
-	h.expectFullRun(t)
-	h.repository.EXPECT().Push(anyCtx, mock.Anything, mock.Anything).Return(nil)
-	h.vcsProvider.EXPECT().CreateMergeRequest(anyCtx, mock.Anything, mock.Anything, mock.Anything, "main").
-		Return(codehosting.MergeRequest{}, nil)
+	h := newRunHarness(t, false)
+	h.expectPublish()
 
 	require.NoError(t, h.run(t))
 
@@ -177,12 +55,9 @@ func TestReportRecordsTheToolVersions(t *testing.T) {
 
 // One subprocess for a field no update depends on must never be what stops a run.
 func TestUnreadableToolVersionsDoNotFailTheRun(t *testing.T) {
-	h := newReportHarness(t, false)
+	h := newRunHarness(t, false)
 	h.versionsErr = errors.New("composer: command not found")
-	h.expectFullRun(t)
-	h.repository.EXPECT().Push(anyCtx, mock.Anything, mock.Anything).Return(nil)
-	h.vcsProvider.EXPECT().CreateMergeRequest(anyCtx, mock.Anything, mock.Anything, mock.Anything, "main").
-		Return(codehosting.MergeRequest{}, nil)
+	h.expectPublish()
 
 	require.NoError(t, h.run(t))
 
@@ -195,11 +70,8 @@ func TestUnreadableToolVersionsDoNotFailTheRun(t *testing.T) {
 // The credential embedded in the repository URL must not reach the report, independently of the
 // log redactor applied at write time.
 func TestReportRepositoryURLHasNoCredentials(t *testing.T) {
-	h := newReportHarness(t, false)
-	h.expectFullRun(t)
-	h.repository.EXPECT().Push(anyCtx, mock.Anything, mock.Anything).Return(nil)
-	h.vcsProvider.EXPECT().CreateMergeRequest(anyCtx, mock.Anything, mock.Anything, mock.Anything, "main").
-		Return(codehosting.MergeRequest{}, nil)
+	h := newRunHarness(t, false)
+	h.expectPublish()
 
 	require.NoError(t, h.run(t))
 
@@ -211,8 +83,8 @@ func TestReportRepositoryURLHasNoCredentials(t *testing.T) {
 // A --dry-run did everything it was asked to, so it is a success — and without --report it
 // produces no output at all.
 func TestReportWrittenOnDryRun(t *testing.T) {
-	h := newReportHarness(t, true)
-	h.expectFullRun(t)
+	h := newRunHarness(t, true)
+	h.expectFullRun()
 
 	require.NoError(t, h.run(t))
 
@@ -228,12 +100,10 @@ func TestReportWrittenOnDryRun(t *testing.T) {
 
 // The most valuable case: a run that fails partway leaves a report naming the phase that failed.
 func TestReportWrittenOnFailureNamesThePhase(t *testing.T) {
-	h := newReportHarness(t, false)
+	h := newRunHarness(t, false)
 	h.installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(errors.New("drush exploded"))
 	h.repository.EXPECT().Head(anyCtx).Return("", assert.AnError).Maybe()
-	h.composer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).
-		Return([]composer.PackageChange{{Action: "Upgrade", Package: "drupal/core", From: "9.0.0", To: "9.1.0"}}, nil)
-	h.composer.EXPECT().Project(anyCtx, testCheckout).Return(composer.Project{WebRoot: "web", LockHash: "dummy-hash"}, nil)
+	h.expectUpdate()
 	h.repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
 	h.repository.EXPECT().RemoteBranchExists(anyCtx, "update-dummy-hash", mock.Anything).Return(false, nil)
 
@@ -251,12 +121,10 @@ func TestReportWrittenOnFailureNamesThePhase(t *testing.T) {
 // The merge request is rendered after the sites update, so a run failing earlier gets its addon
 // sections only from the deferred write.
 func TestReportOfARunFailingBeforeRenderingCarriesTheAddonSections(t *testing.T) {
-	h := newReportHarness(t, false)
+	h := newRunHarness(t, false)
 	h.installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(assert.AnError)
 	h.repository.EXPECT().Head(anyCtx).Return("", assert.AnError).Maybe()
-	h.composer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).
-		Return([]composer.PackageChange{{Action: "Upgrade", Package: "drupal/core", From: "9.0.0", To: "9.1.0"}}, nil)
-	h.composer.EXPECT().Project(anyCtx, testCheckout).Return(composer.Project{WebRoot: "web", LockHash: "dummy-hash"}, nil)
+	h.expectUpdate()
 	h.repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
 	h.repository.EXPECT().RemoteBranchExists(anyCtx, "update-dummy-hash", mock.Anything).Return(false, nil)
 	h.withAddons(&reportingAddon{key: "composer_patches", data: "conflicts"})
@@ -270,7 +138,7 @@ func TestReportOfARunFailingBeforeRenderingCarriesTheAddonSections(t *testing.T)
 // Acquiring the working copy is the first thing that can fail, and the case that "written on
 // every exit path" exists for.
 func TestReportWrittenWhenAcquiringTheWorkingCopyFails(t *testing.T) {
-	h := newReportHarness(t, false)
+	h := newRunHarness(t, false)
 	h.repoSvc.ExpectedCalls = nil
 	h.repoSvc.EXPECT().CloneRepository(anyCtx, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(repo.Checkout{}, errors.New("authentication failed"))
@@ -289,7 +157,7 @@ func TestReportWrittenWhenAcquiringTheWorkingCopyFails(t *testing.T) {
 // "Nothing to update" is reported as its own status rather than as a failure, so a consumer
 // watching many repositories does not treat a healthy, up-to-date site as needing attention.
 func TestReportNoChangesIsNotAFailure(t *testing.T) {
-	h := newReportHarness(t, false)
+	h := newRunHarness(t, false)
 	h.installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil).Maybe()
 	h.installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil).Maybe()
 	h.installer.EXPECT().RestoreSettings(anyCtx, testCheckout, "site1").Return(nil).Maybe()
@@ -308,15 +176,13 @@ func TestReportNoChangesIsNotAFailure(t *testing.T) {
 
 // Without --report no sink is attached, and the run must behave exactly as before.
 func TestRunWithoutReportSinkIsUnaffected(t *testing.T) {
-	h := newReportHarness(t, true)
-	h.expectFullRun(t)
+	h := newRunHarness(t, true)
+	h.expectFullRun()
 	h.expectDefaults()
 
-	svc := New(
-		zap.NewNop(), h.config, h.drush, h.vcsProvider, h.repoSvc, h.installer, h.composer,
-	)
+	svc := New(zap.NewNop(), h.config, h.drush, h.vcsProvider, h.repoSvc, h.installer, h.composer)
 
-	require.NoError(t, svc.Run(context.Background(), nil))
+	require.NoError(t, svc.Run(t.Context(), nil))
 	assert.Nil(t, h.got)
 }
 
@@ -335,8 +201,8 @@ func advisoryAddon() *reportingAddon {
 // A --dry-run assembles a merge request without opening one, which is what makes a broken
 // template visible before a real run has pushed anything.
 func TestReportRecordsMergeRequestContentOnDryRun(t *testing.T) {
-	h := newReportHarness(t, true)
-	h.expectFullRun(t)
+	h := newRunHarness(t, true)
+	h.expectFullRun()
 	h.withAddons(advisoryAddon())
 
 	require.NoError(t, h.run(t))
@@ -352,10 +218,9 @@ func TestReportRecordsMergeRequestContentOnDryRun(t *testing.T) {
 
 // The reported content must be the published content, not a second rendering of it.
 func TestReportedMergeRequestContentIsWhatWasPublished(t *testing.T) {
-	h := newReportHarness(t, false)
-	h.expectFullRun(t)
+	h := newRunHarness(t, false)
+	h.expectPublish()
 	h.withAddons(advisoryAddon())
-	h.repository.EXPECT().Push(anyCtx, mock.Anything, mock.Anything).Return(nil)
 
 	var publishedTitle, publishedDescription string
 	h.vcsProvider.EXPECT().CreateMergeRequest(anyCtx, mock.Anything, mock.Anything, mock.Anything, "main").
@@ -376,8 +241,8 @@ func TestReportedMergeRequestContentIsWhatWasPublished(t *testing.T) {
 // A phase like any other, so its failure is attributed rather than unexplained: here a section
 // whose shape the description cannot read.
 func TestReportNamesTheRenderPhaseWhenAssemblyFails(t *testing.T) {
-	h := newReportHarness(t, true)
-	h.expectFullRun(t)
+	h := newRunHarness(t, true)
+	h.expectFullRun()
 	h.withAddons(&reportingAddon{key: "composer_audit", data: "not an object"})
 
 	err := h.run(t)
@@ -407,11 +272,8 @@ func phaseNames(phases []report.Phase) []string {
 // place a consumer can learn that the MR it is waiting on will not merge itself.
 func TestReportRecordsAutoMergeOutcome(t *testing.T) {
 	t.Run("not requested leaves auto_merge absent", func(t *testing.T) {
-		h := newReportHarness(t, false)
-		h.expectFullRun(t)
-		h.repository.EXPECT().Push(anyCtx, mock.Anything, mock.Anything).Return(nil)
-		h.vcsProvider.EXPECT().CreateMergeRequest(anyCtx, mock.Anything, mock.Anything, mock.Anything, "main").
-			Return(codehosting.MergeRequest{URL: "https://example.com/mr/1"}, nil)
+		h := newRunHarness(t, false)
+		h.expectPublish()
 
 		require.NoError(t, h.run(t))
 
@@ -420,12 +282,9 @@ func TestReportRecordsAutoMergeOutcome(t *testing.T) {
 	})
 
 	t.Run("success is recorded as enabled", func(t *testing.T) {
-		h := newReportHarness(t, false)
+		h := newRunHarness(t, false)
 		h.config.RunTypes.Normal.AutoMerge = true
-		h.expectFullRun(t)
-		h.repository.EXPECT().Push(anyCtx, mock.Anything, mock.Anything).Return(nil)
-		h.vcsProvider.EXPECT().CreateMergeRequest(anyCtx, mock.Anything, mock.Anything, mock.Anything, "main").
-			Return(codehosting.MergeRequest{URL: "https://example.com/mr/1"}, nil)
+		h.expectPublish()
 		h.vcsProvider.EXPECT().EnableAutoMerge(anyCtx, mock.Anything).Return(nil)
 
 		require.NoError(t, h.run(t))
@@ -436,12 +295,9 @@ func TestReportRecordsAutoMergeOutcome(t *testing.T) {
 	})
 
 	t.Run("failure is recorded without failing the run", func(t *testing.T) {
-		h := newReportHarness(t, false)
+		h := newRunHarness(t, false)
 		h.config.RunTypes.Normal.AutoMerge = true
-		h.expectFullRun(t)
-		h.repository.EXPECT().Push(anyCtx, mock.Anything, mock.Anything).Return(nil)
-		h.vcsProvider.EXPECT().CreateMergeRequest(anyCtx, mock.Anything, mock.Anything, mock.Anything, "main").
-			Return(codehosting.MergeRequest{URL: "https://example.com/mr/1"}, nil)
+		h.expectPublish()
 		h.vcsProvider.EXPECT().EnableAutoMerge(anyCtx, mock.Anything).
 			Return(errors.New("auto-merge is not allowed for this repository"))
 
@@ -464,8 +320,8 @@ func (a *reportingAddon) ReportKey() string        { return a.key }
 func (a *reportingAddon) ReportData(*Findings) any { return a.data }
 
 func TestReportCollectsSectionsOnlyFromReporters(t *testing.T) {
-	h := newReportHarness(t, true)
-	h.expectFullRun(t)
+	h := newRunHarness(t, true)
+	h.expectFullRun()
 	h.withAddons(
 		&reportingAddon{key: "translations_updater", data: map[string]int{"fixed": 2}},
 		&reportingAddon{key: "quiet_addon"},

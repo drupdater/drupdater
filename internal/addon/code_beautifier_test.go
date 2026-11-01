@@ -1,7 +1,6 @@
 package addon
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -26,7 +25,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 
 		cb := NewCodeBeautifier(logger, nil, nil, composer)
 
-		_, err := cb.CreatePHPCSConfig(context.Background(), badPath)
+		_, err := cb.CreatePHPCSConfig(t.Context(), badPath)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to create phpcs.xml")
 	})
@@ -40,7 +39,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 
 		cb := NewCodeBeautifier(logger, nil, nil, composer)
 
-		created, err := cb.CreatePHPCSConfig(context.Background(), tmpDir)
+		created, err := cb.CreatePHPCSConfig(t.Context(), tmpDir)
 		require.NoError(t, err)
 		assert.False(t, created)
 
@@ -58,7 +57,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 
 		cb := NewCodeBeautifier(logger, nil, nil, composer)
 
-		_, err := cb.CreatePHPCSConfig(context.Background(), tmpDir)
+		_, err := cb.CreatePHPCSConfig(t.Context(), tmpDir)
 		require.Error(t, err)
 		assert.NoFileExists(t, filepath.Join(tmpDir, "phpcs.xml"))
 	})
@@ -72,7 +71,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 
 		cb := NewCodeBeautifier(logger, nil, nil, composer)
 
-		created, err := cb.CreatePHPCSConfig(context.Background(), tmpDir)
+		created, err := cb.CreatePHPCSConfig(t.Context(), tmpDir)
 		require.NoError(t, err)
 		assert.True(t, created)
 		assert.FileExists(t, filepath.Join(tmpDir, "phpcs.xml"))
@@ -89,7 +88,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 
 		cb := NewCodeBeautifier(logger, nil, nil, composer)
 
-		_, err := cb.CreatePHPCSConfig(context.Background(), tmpDir)
+		_, err := cb.CreatePHPCSConfig(t.Context(), tmpDir)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to parse phpcs template")
 	})
@@ -108,7 +107,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 
 		cb := NewCodeBeautifier(logger, nil, nil, composer)
 
-		_, err := cb.CreatePHPCSConfig(context.Background(), tmpDir)
+		_, err := cb.CreatePHPCSConfig(t.Context(), tmpDir)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to execute phpcs template")
 		// A failed render must not leave a partially written file for the next run to trip on.
@@ -133,7 +132,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 
 		cb := NewCodeBeautifier(logger, nil, nil, composer)
 
-		_, err := cb.CreatePHPCSConfig(context.Background(), tmpDir)
+		_, err := cb.CreatePHPCSConfig(t.Context(), tmpDir)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to write phpcs.xml")
 	})
@@ -147,11 +146,10 @@ func TestCreatePHPCSConfig(t *testing.T) {
 
 		cb := NewCodeBeautifier(logger, nil, nil, composer)
 
-		_, err := cb.CreatePHPCSConfig(context.Background(), tmpDir)
+		_, err := cb.CreatePHPCSConfig(t.Context(), tmpDir)
 		require.Error(t, err)
 		assert.Equal(t, assert.AnError, err)
 	})
-
 }
 
 func TestHasPHPCSPathDefinitions(t *testing.T) {
@@ -265,9 +263,6 @@ func TestCodingStyles(t *testing.T) {
 
 		_, err := firePostCodeUpdate(updateCodingStyles, postCodeUpdate)
 		require.NoError(t, err)
-
-		runner.AssertExpectations(t)
-		composer.AssertExpectations(t)
 	})
 
 	t.Run("Config file exists but hasPHPCSPathDefinitions returns error", func(t *testing.T) {
@@ -314,15 +309,13 @@ func TestCodingStyles(t *testing.T) {
 		// Create system under test
 		committer := &fakeCommitter{}
 		updateCodingStyles := NewCodeBeautifier(logger, runner, NewMockPHPCS(t), composer)
-		postCodeUpdate := workflow.NewPostCodeUpdateEvent(context.Background(), "/tmp", committer)
+		postCodeUpdate := workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", committer)
 
 		// Execute and verify
 		_, err := firePostCodeUpdate(updateCodingStyles, postCodeUpdate)
 		require.NoError(t, err)
 
 		assert.Equal(t, []recordedCommit{{message: "Add PHPCS config", paths: []string{"phpcs.xml"}}}, committer.commits)
-		runner.AssertExpectations(t)
-		composer.AssertExpectations(t)
 	})
 
 	t.Run("without coder in the project, runs the bundled phpcs and leaves composer.* alone", func(t *testing.T) {
@@ -401,8 +394,6 @@ func TestCodingStyles(t *testing.T) {
 		postCodeUpdate := workflow.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", committer)
 		_, err := firePostCodeUpdate(updateCodingStyles, postCodeUpdate)
 		require.NoError(t, err)
-		runner.AssertExpectations(t)
-		composer.AssertExpectations(t)
 	})
 
 	t.Run("Fixable", func(t *testing.T) {
@@ -452,8 +443,6 @@ func TestCodingStyles(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, []recordedCommit{{message: "Update coding styles", paths: []string{"file1.php"}}}, committer.commits)
 		assert.Equal(t, CodingStyleFixes{Files: []string{"file1.php"}, Fixable: 1}, reportSection(p, "code_beautifier"))
-		runner.AssertExpectations(t)
-		composer.AssertExpectations(t)
 	})
 
 	t.Run("Fixable but nothing changed reports no fixes", func(t *testing.T) {
@@ -481,8 +470,6 @@ func TestCodingStyles(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Nil(t, reportSection(p, "code_beautifier"), "phpcbf changed nothing, so nothing was fixed")
-		runner.AssertExpectations(t)
-		composer.AssertExpectations(t)
 	})
 
 	t.Run("Fixable error", func(t *testing.T) {
@@ -530,10 +517,7 @@ func TestCodingStyles(t *testing.T) {
 
 		require.ErrorIs(t, err, assert.AnError)
 		assert.Contains(t, err.Error(), "failed to run phpcs")
-		runner.AssertExpectations(t)
-		composer.AssertExpectations(t)
 	})
-
 }
 
 func TestCodingStyleCommitFailureFailsTheHandler(t *testing.T) {

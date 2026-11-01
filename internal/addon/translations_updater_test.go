@@ -1,14 +1,12 @@
 package addon
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/drupdater/drupdater/internal/drush"
 	"github.com/drupdater/drupdater/internal/workflow"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -28,7 +26,7 @@ func translationsSite(t *testing.T) (string, drush.Facts) {
 func TestUpdateTranslationsEventHandlerWithoutLocaleDeploy(t *testing.T) {
 	handler := NewTranslationsUpdater(zap.NewNop(), NewMockTranslationsDrush(t))
 
-	event := workflow.NewPostSiteUpdateEvent(context.Background(), "/tmp", &fakeCommitter{}, "example.com", drush.Facts{Modules: []string{"locale"}})
+	event := workflow.NewPostSiteUpdateEvent(t.Context(), "/tmp", &fakeCommitter{}, "example.com", drush.Facts{Modules: []string{"locale"}})
 	result, err := handler.postSiteUpdateHandler(event)
 	require.NoError(t, err)
 
@@ -42,7 +40,7 @@ func TestUpdateTranslationsEventHandlerWithLocaleDeploy(t *testing.T) {
 	handler := NewTranslationsUpdater(zap.NewNop(), mockDrush)
 	mockDrush.EXPECT().LocalizeTranslations(anyCtx, project, "example.com").Return(nil)
 
-	event := workflow.NewPostSiteUpdateEvent(context.Background(), project, &fakeCommitter{}, "example.com", facts)
+	event := workflow.NewPostSiteUpdateEvent(t.Context(), project, &fakeCommitter{}, "example.com", facts)
 	result, err := handler.postSiteUpdateHandler(event)
 	require.NoError(t, err)
 
@@ -65,7 +63,7 @@ func TestUpdateTranslationsEventHandlerSkipsWhenTranslationPathUnavailable(t *te
 			mockDrush.EXPECT().LocalizeTranslations(anyCtx, "/tmp", "example.com").Return(nil)
 
 			facts := drush.Facts{Modules: []string{"locale_deploy"}, TranslationPath: translationPath}
-			event := workflow.NewPostSiteUpdateEvent(context.Background(), "/tmp", &fakeCommitter{}, "example.com", facts)
+			event := workflow.NewPostSiteUpdateEvent(t.Context(), "/tmp", &fakeCommitter{}, "example.com", facts)
 			result, err := handler.postSiteUpdateHandler(event)
 			require.NoError(t, err)
 
@@ -96,4 +94,27 @@ func TestTranslationsUpdaterReportsUpdatedOnlyWhenTheCommitWasMade(t *testing.T)
 			assert.Equal(t, []recordedCommit{{message: "Update translations", paths: []string{"translations"}}}, tt.committer.commits)
 		})
 	}
+}
+
+func TestTranslationsUpdaterErrors(t *testing.T) {
+	t.Run("localizing translations fails", func(t *testing.T) {
+		drushService := NewMockTranslationsDrush(t)
+		drushService.EXPECT().LocalizeTranslations(anyCtx, "/tmp", "site1").Return(assert.AnError)
+
+		tu := NewTranslationsUpdater(zap.NewNop(), drushService)
+		evt := workflow.NewPostSiteUpdateEvent(t.Context(), "/tmp", &fakeCommitter{}, "site1", drush.Facts{Modules: []string{"locale_deploy"}})
+		_, err := tu.postSiteUpdateHandler(evt)
+		require.ErrorIs(t, err, assert.AnError)
+	})
+
+	t.Run("committing the translations fails", func(t *testing.T) {
+		project, facts := translationsSite(t)
+		drushService := NewMockTranslationsDrush(t)
+		drushService.EXPECT().LocalizeTranslations(anyCtx, project, "site1").Return(nil)
+
+		p := workflow.NewPipeline([]workflow.Addon{NewTranslationsUpdater(zap.NewNop(), drushService)})
+		err := workflow.Fire(p, workflow.NewPostSiteUpdateEvent(t.Context(), project, &fakeCommitter{err: assert.AnError}, "site1", facts))
+		require.ErrorIs(t, err, assert.AnError)
+		assert.Nil(t, reportSection(p, "translations_updater"), "a site whose commit failed has no outcome to report")
+	})
 }

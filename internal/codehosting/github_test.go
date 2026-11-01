@@ -97,7 +97,7 @@ func TestGithub_CreateMergeRequest(t *testing.T) {
 		repo:   "test_project",
 	}
 
-	mr, err := gh.CreateMergeRequest(context.Background(), "Test MR", "This is a test MR", "source-branch", "target-branch")
+	mr, err := gh.CreateMergeRequest(t.Context(), "Test MR", "This is a test MR", "source-branch", "target-branch")
 
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), mr.ID)
@@ -120,7 +120,7 @@ func TestGithub_GetUser_Returns403FallbackSilently(t *testing.T) {
 	client, _ := github.NewClient(nil).WithEnterpriseURLs(mockServer.URL, "")
 	gh := &Github{client: client, owner: "o", repo: "r"}
 
-	name, email := gh.GetUser(context.Background())
+	name, email := gh.GetUser(t.Context())
 
 	assert.Equal(t, "github-actions[bot]", name)
 	assert.Equal(t, "41898282+github-actions[bot]@users.noreply.github.com", email)
@@ -137,7 +137,7 @@ func TestGithub_GetUser_Returns403ErrorForBadCredentials(t *testing.T) {
 	client, _ := github.NewClient(nil).WithEnterpriseURLs(mockServer.URL, "")
 	gh := &Github{client: client, owner: "o", repo: "r"}
 
-	name, email := gh.GetUser(context.Background())
+	name, email := gh.GetUser(t.Context())
 
 	assert.Empty(t, name)
 	assert.Empty(t, email)
@@ -154,7 +154,7 @@ func TestGithub_GetUser_ReturnsUserOnSuccess(t *testing.T) {
 	client, _ := github.NewClient(nil).WithEnterpriseURLs(mockServer.URL, "")
 	gh := &Github{client: client, owner: "o", repo: "r"}
 
-	name, email := gh.GetUser(context.Background())
+	name, email := gh.GetUser(t.Context())
 
 	assert.Equal(t, "The Octocat", name)
 	assert.Equal(t, "octocat@github.com", email)
@@ -171,7 +171,7 @@ func TestGithub_GetUser_NoEmailFallsBackToNoreply(t *testing.T) {
 	client, _ := github.NewClient(nil).WithEnterpriseURLs(mockServer.URL, "")
 	gh := &Github{client: client, owner: "o", repo: "r"}
 
-	name, email := gh.GetUser(context.Background())
+	name, email := gh.GetUser(t.Context())
 
 	assert.Equal(t, "The Octocat", name)
 	assert.Equal(t, "1234567+octocat@users.noreply.github.com", email)
@@ -183,7 +183,7 @@ func TestGithub_CreateMergeRequest_HonorsContext(t *testing.T) {
 	client, _ := github.NewClient(nil).WithEnterpriseURLs("http://example.invalid", "")
 	gh := &Github{client: client, owner: "o", repo: "r"}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	_, err := gh.CreateMergeRequest(ctx, "Test MR", "body", "source", "target")
@@ -194,7 +194,7 @@ func TestGithub_GetUser_HonorsContext(t *testing.T) {
 	client, _ := github.NewClient(nil).WithEnterpriseURLs("http://example.invalid", "")
 	gh := &Github{client: client, owner: "o", repo: "r"}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	// A request error (not the Actions 403 fallback) yields empty strings.
@@ -216,7 +216,7 @@ func TestGithub_DeleteBranch_Success(t *testing.T) {
 	client, _ := github.NewClient(nil).WithEnterpriseURLs(mockServer.URL, "")
 	gh := &Github{client: client, owner: "test_owner", repo: "test_project"}
 
-	err := gh.DeleteBranch(context.Background(), "update-abc123")
+	err := gh.DeleteBranch(t.Context(), "update-abc123")
 	require.NoError(t, err)
 }
 
@@ -230,7 +230,7 @@ func TestGithub_DeleteBranch_Error(t *testing.T) {
 	client, _ := github.NewClient(nil).WithEnterpriseURLs(mockServer.URL, "")
 	gh := &Github{client: client, owner: "o", repo: "r"}
 
-	err := gh.DeleteBranch(context.Background(), "nonexistent-branch")
+	err := gh.DeleteBranch(t.Context(), "nonexistent-branch")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to delete branch")
 }
@@ -239,7 +239,7 @@ func TestGithub_DeleteBranch_HonorsContext(t *testing.T) {
 	client, _ := github.NewClient(nil).WithEnterpriseURLs("http://example.invalid", "")
 	gh := &Github{client: client, owner: "o", repo: "r"}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	err := gh.DeleteBranch(ctx, "some-branch")
@@ -283,7 +283,7 @@ func TestGithub_EnableAutoMerge_Success(t *testing.T) {
 	client, _ := github.NewClient(nil).WithEnterpriseURLs(mockServer.URL, "")
 	gh := &Github{client: client, owner: "owner", repo: "repo"}
 
-	err := gh.EnableAutoMerge(context.Background(), MergeRequest{ID: 1})
+	err := gh.EnableAutoMerge(t.Context(), MergeRequest{ID: 1})
 	require.NoError(t, err)
 	assert.Equal(t, "MERGE", gotMethod)
 }
@@ -309,7 +309,7 @@ func TestGithub_EnableAutoMerge_UsesPermittedMergeMethod(t *testing.T) {
 			client, _ := github.NewClient(nil).WithEnterpriseURLs(mockServer.URL, "")
 			gh := &Github{client: client, owner: "owner", repo: "repo"}
 
-			require.NoError(t, gh.EnableAutoMerge(context.Background(), MergeRequest{ID: 1}))
+			require.NoError(t, gh.EnableAutoMerge(t.Context(), MergeRequest{ID: 1}))
 			assert.Equal(t, tt.want, gotMethod)
 		})
 	}
@@ -334,7 +334,7 @@ func TestGithub_EnableAutoMerge_GraphQLError(t *testing.T) {
 	client, _ := github.NewClient(nil).WithEnterpriseURLs(mockServer.URL, "")
 	gh := &Github{client: client, owner: "owner", repo: "repo"}
 
-	err := gh.EnableAutoMerge(context.Background(), MergeRequest{ID: 1})
+	err := gh.EnableAutoMerge(t.Context(), MergeRequest{ID: 1})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "Auto-merge is not allowed for this repository")
 	assert.Contains(t, err.Error(), "second problem", "every GraphQL error should be surfaced")
@@ -350,7 +350,7 @@ func TestGithub_EnableAutoMerge_GetPRError(t *testing.T) {
 	client, _ := github.NewClient(nil).WithEnterpriseURLs(mockServer.URL, "")
 	gh := &Github{client: client, owner: "owner", repo: "repo"}
 
-	err := gh.EnableAutoMerge(context.Background(), MergeRequest{ID: 1})
+	err := gh.EnableAutoMerge(t.Context(), MergeRequest{ID: 1})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "could not enable auto merge for PR 1")
 }
@@ -359,7 +359,7 @@ func TestGithub_EnableAutoMerge_HonorsContext(t *testing.T) {
 	client, _ := github.NewClient(nil).WithEnterpriseURLs("http://example.invalid", "")
 	gh := &Github{client: client, owner: "o", repo: "r"}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	err := gh.EnableAutoMerge(ctx, MergeRequest{ID: 1})

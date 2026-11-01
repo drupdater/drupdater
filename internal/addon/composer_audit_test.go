@@ -1,7 +1,6 @@
 package addon
 
 import (
-	"context"
 	"testing"
 
 	"github.com/drupdater/drupdater/internal/composer"
@@ -33,7 +32,7 @@ func TestComposerAudit_PreComposerUpdateHandler_WithAdvisories(t *testing.T) {
 	audit := NewComposerAudit(logger, mockComposer, true)
 	committer := &fakeCommitter{}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	path := "/test/path"
 
 	mockAudit := composer.Audit{
@@ -72,7 +71,7 @@ func TestComposerAudit_PreComposerUpdateHandler_NoAdvisories(t *testing.T) {
 	audit := NewComposerAudit(logger, mockComposer, true)
 	committer := &fakeCommitter{}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	path := "/test/path"
 
 	mockAudit := composer.Audit{
@@ -97,7 +96,7 @@ func TestComposerAudit_PostCodeUpdateHandler(t *testing.T) {
 	committer := &fakeCommitter{}
 	audit := NewComposerAudit(logger, mockComposer, true)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	path := "/test/path"
 
 	mockAudit := composer.Audit{
@@ -241,7 +240,7 @@ func TestComposerAudit_PreComposerUpdateHandler_NormalMode(t *testing.T) {
 	audit := NewComposerAudit(zap.NewNop(), mockComposer, false)
 	committer := &fakeCommitter{}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	path := "/test/path"
 	mockAudit := composer.Audit{
 		Advisories: []composer.Advisory{{PackageName: "drupal/core", CVE: "CVE-2023-1234"}},
@@ -263,7 +262,7 @@ func TestComposerAudit_PreComposerUpdateHandler_NormalModeNoAdvisories(t *testin
 	audit := NewComposerAudit(zap.NewNop(), mockComposer, false)
 	committer := &fakeCommitter{}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	path := "/test/path"
 	mockComposer.EXPECT().Audit(ctx, path).Return(composer.Audit{}, nil)
 
@@ -284,7 +283,7 @@ func TestComposerAudit_AuditFailures(t *testing.T) {
 		audit := NewComposerAudit(zap.NewNop(), mockComposer, true)
 		mockComposer.EXPECT().Audit(anyCtx, path).Return(composer.Audit{}, assert.AnError)
 
-		evt := workflow.NewPreComposerUpdateEvent(context.Background(), path, &fakeCommitter{}, workflow.UpdatePlan{})
+		evt := workflow.NewPreComposerUpdateEvent(t.Context(), path, &fakeCommitter{}, workflow.UpdatePlan{})
 		proposal, err := audit.preComposerUpdateHandler(evt)
 
 		require.ErrorIs(t, err, assert.AnError)
@@ -299,7 +298,7 @@ func TestComposerAudit_AuditFailures(t *testing.T) {
 		audit := NewComposerAudit(zap.NewNop(), mockComposer, true)
 		mockComposer.EXPECT().Audit(anyCtx, path).Return(composer.Audit{}, assert.AnError)
 
-		evt := workflow.NewPostCodeUpdateEvent(context.Background(), path, &fakeCommitter{})
+		evt := workflow.NewPostCodeUpdateEvent(t.Context(), path, &fakeCommitter{})
 		_, err := audit.postCodeUpdateHandler(evt, &workflow.Findings{})
 
 		require.ErrorIs(t, err, assert.AnError)

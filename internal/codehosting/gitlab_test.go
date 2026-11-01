@@ -111,7 +111,7 @@ func TestCreateMergeRequest(t *testing.T) {
 		projectPath: "test_project",
 	}
 
-	mr, err := gitlab.CreateMergeRequest(context.Background(), "Test MR", "This is a test MR", "source-branch", "target-branch")
+	mr, err := gitlab.CreateMergeRequest(t.Context(), "Test MR", "This is a test MR", "source-branch", "target-branch")
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), mr.ID)
 	assert.Equal(t, "http://example.com", mr.URL)
@@ -126,7 +126,7 @@ func TestGitlab_CreateMergeRequest_HonorsContext(t *testing.T) {
 	// A cancelled context must abort before the request is sent.
 	g := newTestGitlab(t)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	_, err := g.CreateMergeRequest(ctx, "Test MR", "body", "source", "target")
@@ -146,7 +146,7 @@ func TestGitlab_DeleteBranch_Success(t *testing.T) {
 	client, _ := gitlab.NewClient("", gitlab.WithBaseURL(mockServer.URL))
 	g := &Gitlab{client: client, projectPath: "test_project"}
 
-	err := g.DeleteBranch(context.Background(), "update-abc123")
+	err := g.DeleteBranch(t.Context(), "update-abc123")
 	require.NoError(t, err)
 }
 
@@ -160,7 +160,7 @@ func TestGitlab_DeleteBranch_Error(t *testing.T) {
 	client, _ := gitlab.NewClient("", gitlab.WithBaseURL(mockServer.URL))
 	g := &Gitlab{client: client, projectPath: "test_project"}
 
-	err := g.DeleteBranch(context.Background(), "nonexistent-branch")
+	err := g.DeleteBranch(t.Context(), "nonexistent-branch")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to delete branch")
 }
@@ -168,7 +168,7 @@ func TestGitlab_DeleteBranch_Error(t *testing.T) {
 func TestGitlab_DeleteBranch_HonorsContext(t *testing.T) {
 	g := newTestGitlab(t)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	err := g.DeleteBranch(ctx, "some-branch")
@@ -178,7 +178,7 @@ func TestGitlab_DeleteBranch_HonorsContext(t *testing.T) {
 func TestGitlab_GetUser_HonorsContext(t *testing.T) {
 	g := newTestGitlab(t)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	name, email := g.GetUser(ctx)
@@ -218,7 +218,7 @@ func TestGitlab_EnableAutoMerge_WaitsOutPendingStatus(t *testing.T) {
 	client, _ := gitlab.NewClient("", gitlab.WithBaseURL(mockServer.URL))
 	g := &Gitlab{client: client, projectPath: "test_project", retryInterval: 0}
 
-	err := g.EnableAutoMerge(context.Background(), MergeRequest{ID: 1})
+	err := g.EnableAutoMerge(t.Context(), MergeRequest{ID: 1})
 	require.NoError(t, err)
 	assert.Equal(t, 3, *getCount, "should poll while the merge status is still being computed")
 	assert.Equal(t, 1, *putCount)
@@ -234,7 +234,7 @@ func TestGitlab_EnableAutoMerge_AcceptsWhileCIRunning(t *testing.T) {
 			client, _ := gitlab.NewClient("", gitlab.WithBaseURL(mockServer.URL))
 			g := &Gitlab{client: client, projectPath: "test_project", retryInterval: 0}
 
-			err := g.EnableAutoMerge(context.Background(), MergeRequest{ID: 1})
+			err := g.EnableAutoMerge(t.Context(), MergeRequest{ID: 1})
 			require.NoError(t, err)
 			assert.Equal(t, 1, *getCount, "a CI status is settled — no reason to keep polling")
 			assert.Equal(t, 1, *putCount, "auto-merge must be enabled while the pipeline runs")
@@ -248,7 +248,7 @@ func TestGitlab_EnableAutoMerge_StatusNeverSettles(t *testing.T) {
 	client, _ := gitlab.NewClient("", gitlab.WithBaseURL(mockServer.URL))
 	g := &Gitlab{client: client, projectPath: "test_project", retryInterval: 0}
 
-	err := g.EnableAutoMerge(context.Background(), MergeRequest{ID: 1})
+	err := g.EnableAutoMerge(t.Context(), MergeRequest{ID: 1})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "merge status was still pending after 7 checks")
 	assert.Equal(t, maxMergeStatusChecks, *getCount)
@@ -281,7 +281,7 @@ func TestGitlab_EnableAutoMerge_MergeRetryOn405(t *testing.T) {
 	client, _ := gitlab.NewClient("", gitlab.WithBaseURL(mockServer.URL))
 	g := &Gitlab{client: client, projectPath: "test_project", retryInterval: 0}
 
-	err := g.EnableAutoMerge(context.Background(), MergeRequest{ID: 1})
+	err := g.EnableAutoMerge(t.Context(), MergeRequest{ID: 1})
 	require.NoError(t, err)
 	assert.Equal(t, 3, putCount, "should retry merge on 405")
 }
@@ -307,7 +307,7 @@ func TestGitlab_EnableAutoMerge_MergeFailsAfterMaxRetries(t *testing.T) {
 	client, _ := gitlab.NewClient("", gitlab.WithBaseURL(mockServer.URL))
 	g := &Gitlab{client: client, projectPath: "test_project", retryInterval: 0}
 
-	err := g.EnableAutoMerge(context.Background(), MergeRequest{ID: 1})
+	err := g.EnableAutoMerge(t.Context(), MergeRequest{ID: 1})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "could not set auto merge for MR 1")
 	assert.Contains(t, err.Error(), `draft_status`, "the settled status names the real blocker")
@@ -325,7 +325,7 @@ func TestGitlab_EnableAutoMerge_GetMRError(t *testing.T) {
 	client, _ := gitlab.NewClient("bad-token", gitlab.WithBaseURL(mockServer.URL))
 	g := &Gitlab{client: client, projectPath: "test_project", retryInterval: 0}
 
-	err := g.EnableAutoMerge(context.Background(), MergeRequest{ID: 1})
+	err := g.EnableAutoMerge(t.Context(), MergeRequest{ID: 1})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "could not set auto merge for MR 1")
 }
@@ -333,7 +333,7 @@ func TestGitlab_EnableAutoMerge_GetMRError(t *testing.T) {
 func TestGitlab_EnableAutoMerge_HonorsContext(t *testing.T) {
 	g := newTestGitlab(t)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	err := g.EnableAutoMerge(ctx, MergeRequest{ID: 1})
@@ -353,7 +353,7 @@ func TestGetUser_ReturnsEmptyStringsOnError(t *testing.T) {
 		projectPath: "test_project",
 	}
 
-	name, email := g.GetUser(context.Background())
+	name, email := g.GetUser(t.Context())
 	assert.Empty(t, name)
 	assert.Empty(t, email)
 }
