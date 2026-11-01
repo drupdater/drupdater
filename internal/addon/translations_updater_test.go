@@ -1,7 +1,6 @@
 package addon
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -28,7 +27,7 @@ func translationsSite(t *testing.T) (string, drush.Facts) {
 func TestUpdateTranslationsEventHandlerWithoutLocaleDeploy(t *testing.T) {
 	handler := NewTranslationsUpdater(zap.NewNop(), NewMockTranslationsDrush(t))
 
-	event := workflow.NewPostSiteUpdateEvent(context.Background(), "/tmp", &fakeCommitter{}, "example.com", drush.Facts{Modules: []string{"locale"}})
+	event := workflow.NewPostSiteUpdateEvent(t.Context(), "/tmp", &fakeCommitter{}, "example.com", drush.Facts{Modules: []string{"locale"}})
 	result, err := handler.postSiteUpdateHandler(event)
 	require.NoError(t, err)
 
@@ -42,7 +41,7 @@ func TestUpdateTranslationsEventHandlerWithLocaleDeploy(t *testing.T) {
 	handler := NewTranslationsUpdater(zap.NewNop(), mockDrush)
 	mockDrush.EXPECT().LocalizeTranslations(anyCtx, project, "example.com").Return(nil)
 
-	event := workflow.NewPostSiteUpdateEvent(context.Background(), project, &fakeCommitter{}, "example.com", facts)
+	event := workflow.NewPostSiteUpdateEvent(t.Context(), project, &fakeCommitter{}, "example.com", facts)
 	result, err := handler.postSiteUpdateHandler(event)
 	require.NoError(t, err)
 
@@ -65,7 +64,7 @@ func TestUpdateTranslationsEventHandlerSkipsWhenTranslationPathUnavailable(t *te
 			mockDrush.EXPECT().LocalizeTranslations(anyCtx, "/tmp", "example.com").Return(nil)
 
 			facts := drush.Facts{Modules: []string{"locale_deploy"}, TranslationPath: translationPath}
-			event := workflow.NewPostSiteUpdateEvent(context.Background(), "/tmp", &fakeCommitter{}, "example.com", facts)
+			event := workflow.NewPostSiteUpdateEvent(t.Context(), "/tmp", &fakeCommitter{}, "example.com", facts)
 			result, err := handler.postSiteUpdateHandler(event)
 			require.NoError(t, err)
 

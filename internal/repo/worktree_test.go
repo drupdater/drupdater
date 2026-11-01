@@ -22,7 +22,7 @@ func addWorktree(t *testing.T, username, email string) (string, Checkout) {
 
 	checkout, err := service.AddWorktree(t.Context(), source, Identity{Name: username, Email: email})
 	require.NoError(t, err)
-	t.Cleanup(func() { _ = service.RemoveWorktree(context.Background(), source, checkout.Path) })
+	t.Cleanup(func() { _ = service.RemoveWorktree(t.Context(), source, checkout.Path) })
 	return source, checkout
 }
 
@@ -162,7 +162,7 @@ func TestStage(t *testing.T) {
 		gitOutput(t, source, "commit", "--quiet", "-m", "init")
 		checkout, err := New().AddWorktree(t.Context(), source, Identity{})
 		require.NoError(t, err)
-		t.Cleanup(func() { _ = New().RemoveWorktree(context.Background(), source, checkout.Path) })
+		t.Cleanup(func() { _ = New().RemoveWorktree(t.Context(), source, checkout.Path) })
 		return checkout
 	}
 

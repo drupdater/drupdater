@@ -1,7 +1,6 @@
 package addon
 
 import (
-	"context"
 	"testing"
 
 	"github.com/drupdater/drupdater/internal/workflow"
@@ -13,7 +12,7 @@ func TestDefaultComposerNormalize_PostComposerUpdateHandler_PackageInstalled(t *
 	logger := zap.NewNop()
 	composer := NewMockNormalizerComposer(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	testPath := "/test/path"
 	committer := &fakeCommitter{}
 
@@ -32,7 +31,7 @@ func TestDefaultComposerNormalize_PostComposerUpdateHandler_PackageNotInstalled(
 	logger := zap.NewNop()
 	composer := NewMockNormalizerComposer(t)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	testPath := "/test/path"
 	committer := &fakeCommitter{}
 

@@ -1,7 +1,6 @@
 package addon
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -26,7 +25,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 
 		cb := NewCodeBeautifier(logger, nil, nil, composer)
 
-		_, err := cb.CreatePHPCSConfig(context.Background(), badPath)
+		_, err := cb.CreatePHPCSConfig(t.Context(), badPath)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to create phpcs.xml")
 	})
@@ -40,7 +39,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 
 		cb := NewCodeBeautifier(logger, nil, nil, composer)
 
-		created, err := cb.CreatePHPCSConfig(context.Background(), tmpDir)
+		created, err := cb.CreatePHPCSConfig(t.Context(), tmpDir)
 		require.NoError(t, err)
 		assert.False(t, created)
 
@@ -58,7 +57,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 
 		cb := NewCodeBeautifier(logger, nil, nil, composer)
 
-		_, err := cb.CreatePHPCSConfig(context.Background(), tmpDir)
+		_, err := cb.CreatePHPCSConfig(t.Context(), tmpDir)
 		require.Error(t, err)
 		assert.NoFileExists(t, filepath.Join(tmpDir, "phpcs.xml"))
 	})
@@ -72,7 +71,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 
 		cb := NewCodeBeautifier(logger, nil, nil, composer)
 
-		created, err := cb.CreatePHPCSConfig(context.Background(), tmpDir)
+		created, err := cb.CreatePHPCSConfig(t.Context(), tmpDir)
 		require.NoError(t, err)
 		assert.True(t, created)
 		assert.FileExists(t, filepath.Join(tmpDir, "phpcs.xml"))
@@ -89,7 +88,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 
 		cb := NewCodeBeautifier(logger, nil, nil, composer)
 
-		_, err := cb.CreatePHPCSConfig(context.Background(), tmpDir)
+		_, err := cb.CreatePHPCSConfig(t.Context(), tmpDir)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to parse phpcs template")
 	})
@@ -108,7 +107,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 
 		cb := NewCodeBeautifier(logger, nil, nil, composer)
 
-		_, err := cb.CreatePHPCSConfig(context.Background(), tmpDir)
+		_, err := cb.CreatePHPCSConfig(t.Context(), tmpDir)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to execute phpcs template")
 		// A failed render must not leave a partially written file for the next run to trip on.
@@ -133,7 +132,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 
 		cb := NewCodeBeautifier(logger, nil, nil, composer)
 
-		_, err := cb.CreatePHPCSConfig(context.Background(), tmpDir)
+		_, err := cb.CreatePHPCSConfig(t.Context(), tmpDir)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to write phpcs.xml")
 	})
@@ -147,7 +146,7 @@ func TestCreatePHPCSConfig(t *testing.T) {
 
 		cb := NewCodeBeautifier(logger, nil, nil, composer)
 
-		_, err := cb.CreatePHPCSConfig(context.Background(), tmpDir)
+		_, err := cb.CreatePHPCSConfig(t.Context(), tmpDir)
 		require.Error(t, err)
 		assert.Equal(t, assert.AnError, err)
 	})
@@ -310,7 +309,7 @@ func TestCodingStyles(t *testing.T) {
 		// Create system under test
 		committer := &fakeCommitter{}
 		updateCodingStyles := NewCodeBeautifier(logger, runner, NewMockPHPCS(t), composer)
-		postCodeUpdate := workflow.NewPostCodeUpdateEvent(context.Background(), "/tmp", committer)
+		postCodeUpdate := workflow.NewPostCodeUpdateEvent(t.Context(), "/tmp", committer)
 
 		// Execute and verify
 		_, err := firePostCodeUpdate(updateCodingStyles, postCodeUpdate)

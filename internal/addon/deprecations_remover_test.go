@@ -1,7 +1,6 @@
 package addon
 
 import (
-	"context"
 	"testing"
 
 	"github.com/drupdater/drupdater/internal/rector"
@@ -46,7 +45,7 @@ func TestRemoveDeprecations(t *testing.T) {
 
 		committer := &fakeCommitter{}
 		dr := NewDeprecationsRemover(logger, project, NewMockRector(t), composer)
-		_, err := firePostCodeUpdate(dr, workflow.NewPostCodeUpdateEvent(context.Background(), "/path/to/repo", committer))
+		_, err := firePostCodeUpdate(dr, workflow.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", committer))
 
 		require.NoError(t, err)
 		assert.Empty(t, committer.commits)
@@ -63,7 +62,7 @@ func TestRemoveDeprecations(t *testing.T) {
 
 		committer := &fakeCommitter{}
 		dr := NewDeprecationsRemover(logger, NewMockRector(t), bundled, composer)
-		_, err := firePostCodeUpdate(dr, workflow.NewPostCodeUpdateEvent(context.Background(), "/path/to/repo", committer))
+		_, err := firePostCodeUpdate(dr, workflow.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", committer))
 
 		require.NoError(t, err)
 		assert.Equal(t, []recordedCommit{
@@ -78,7 +77,7 @@ func TestRemoveDeprecations(t *testing.T) {
 
 		committer := &fakeCommitter{}
 		dr := NewDeprecationsRemover(zap.New(core), NewMockRector(t), NewMockRector(t), composer)
-		p, err := firePostCodeUpdate(dr, workflow.NewPostCodeUpdateEvent(context.Background(), "/path/to/repo", committer))
+		p, err := firePostCodeUpdate(dr, workflow.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", committer))
 
 		require.NoError(t, err)
 		assert.Empty(t, committer.commits)
@@ -112,7 +111,7 @@ func TestRemoveDeprecations(t *testing.T) {
 
 		committer := &fakeCommitter{}
 		dr := NewDeprecationsRemover(logger, runner, NewMockRector(t), composer)
-		p, err := firePostCodeUpdate(dr, workflow.NewPostCodeUpdateEvent(context.Background(), "/path/to/repo", committer))
+		p, err := firePostCodeUpdate(dr, workflow.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", committer))
 
 		require.NoError(t, err)
 		assert.Equal(t, []recordedCommit{
@@ -136,7 +135,7 @@ func TestRemoveDeprecations(t *testing.T) {
 
 		committer := &fakeCommitter{}
 		dr := NewDeprecationsRemover(logger, runner, NewMockRector(t), composer)
-		_, err := firePostCodeUpdate(dr, workflow.NewPostCodeUpdateEvent(context.Background(), "/path/to/repo", committer))
+		_, err := firePostCodeUpdate(dr, workflow.NewPostCodeUpdateEvent(t.Context(), "/path/to/repo", committer))
 
 		require.ErrorIs(t, err, assert.AnError)
 		assert.Empty(t, committer.commits)

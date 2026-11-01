@@ -1,7 +1,6 @@
 package drupalorg
 
 import (
-	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -41,7 +40,7 @@ func TestGetIssue_Timeout(t *testing.T) {
 		client:           &http.Client{Timeout: 10 * time.Millisecond},
 	}
 
-	issue, err := service.GetIssue(context.Background(), "12345")
+	issue, err := service.GetIssue(t.Context(), "12345")
 	require.Error(t, err)
 	assert.Nil(t, issue)
 	assert.Contains(t, err.Error(), "failed to make request")
@@ -78,7 +77,7 @@ func TestGetIssue(t *testing.T) {
 
 	// Call GetIssue method
 	issueID := "12345"
-	issue, err := service.GetIssue(context.Background(), issueID)
+	issue, err := service.GetIssue(t.Context(), issueID)
 
 	// Assertions
 	require.NoError(t, err)
@@ -106,7 +105,7 @@ func TestGetIssue_Failure(t *testing.T) {
 
 	// Call GetIssue method
 	issueID := "12345"
-	issue, err := service.GetIssue(context.Background(), issueID)
+	issue, err := service.GetIssue(t.Context(), issueID)
 
 	// Assertions
 	require.Error(t, err)
@@ -128,7 +127,7 @@ func TestGetIssue_MalformedBody(t *testing.T) {
 		client:           &http.Client{},
 	}
 
-	issue, err := service.GetIssue(context.Background(), "12345")
+	issue, err := service.GetIssue(t.Context(), "12345")
 	require.Error(t, err)
 	assert.Nil(t, issue)
 	assert.Contains(t, err.Error(), "failed to decode response")
@@ -177,7 +176,7 @@ func TestGetIssue_NonOKStatus(t *testing.T) {
 				client:           mockServer.Client(),
 			}
 
-			issue, err := service.GetIssue(context.Background(), "12345")
+			issue, err := service.GetIssue(t.Context(), "12345")
 			require.Error(t, err)
 			assert.Nil(t, issue)
 			assert.Contains(t, err.Error(), "unexpected status")
@@ -192,7 +191,7 @@ func TestGetIssue_InvalidURL(t *testing.T) {
 		client:           &http.Client{},
 	}
 
-	issue, err := service.GetIssue(context.Background(), "12345")
+	issue, err := service.GetIssue(t.Context(), "12345")
 	require.Error(t, err)
 	assert.Nil(t, issue)
 }

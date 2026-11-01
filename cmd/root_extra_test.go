@@ -289,12 +289,12 @@ func TestEnsureGitSafeDirectory(t *testing.T) {
 		gitconfig := withScratchGitConfig(t)
 		dir := t.TempDir()
 
-		ensureGitSafeDirectory(context.Background(), zap.NewNop(), dir)
+		ensureGitSafeDirectory(t.Context(), zap.NewNop(), dir)
 		first := readEntries(t)
 		assert.Contains(t, first, dir)
 
 		// A second run must not append the same entry again.
-		ensureGitSafeDirectory(context.Background(), zap.NewNop(), dir)
+		ensureGitSafeDirectory(t.Context(), zap.NewNop(), dir)
 		assert.Equal(t, first, readEntries(t))
 
 		assert.FileExists(t, gitconfig)
@@ -309,7 +309,7 @@ func TestEnsureGitSafeDirectory(t *testing.T) {
 
 		require.NoError(t, exec.CommandContext(t.Context(), "git", "config", "--global", "--add", "safe.directory", "*").Run())
 
-		ensureGitSafeDirectory(context.Background(), zap.NewNop(), dir)
+		ensureGitSafeDirectory(t.Context(), zap.NewNop(), dir)
 		assert.NotContains(t, readEntries(t), dir)
 	})
 
@@ -318,7 +318,7 @@ func TestEnsureGitSafeDirectory(t *testing.T) {
 
 		// A cancelled context makes the git invocation fail; the run must continue regardless,
 		// because safe.directory is a convenience, not a requirement.
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(t.Context())
 		cancel()
 
 		ensureGitSafeDirectory(ctx, zap.New(core), t.TempDir())

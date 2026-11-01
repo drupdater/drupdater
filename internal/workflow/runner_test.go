@@ -172,7 +172,7 @@ func TestForEachSite(t *testing.T) {
 		ws := services{logger: logger, config: config.Config{Sites: sites}}
 
 		var calls atomic.Int32
-		err := ws.forEachSite(context.Background(), func(_ context.Context, _ int, _ string) error {
+		err := ws.forEachSite(t.Context(), func(_ context.Context, _ int, _ string) error {
 			calls.Add(1)
 			return nil
 		})
@@ -185,7 +185,7 @@ func TestForEachSite(t *testing.T) {
 		ws := services{logger: logger, config: config.Config{Sites: sites, Concurrency: 2}}
 		boom := errors.New("boom")
 
-		err := ws.forEachSite(context.Background(), func(_ context.Context, _ int, site string) error {
+		err := ws.forEachSite(t.Context(), func(_ context.Context, _ int, site string) error {
 			if site == "site1" {
 				return boom
 			}
@@ -199,7 +199,7 @@ func TestForEachSite(t *testing.T) {
 		ws := services{logger: logger, config: config.Config{Sites: sites, Concurrency: 1}}
 
 		var started []string
-		err := ws.forEachSite(context.Background(), func(_ context.Context, _ int, site string) error {
+		err := ws.forEachSite(t.Context(), func(_ context.Context, _ int, site string) error {
 			started = append(started, site)
 			return assert.AnError
 		})
@@ -568,7 +568,7 @@ func TestStageScaffoldChanges(t *testing.T) {
 			composer: newComposer("web"),
 		}, repo.Checkout{Worktree: worktree, Path: "/project"})
 
-		require.NoError(t, ws.stageScaffoldChanges(context.Background()))
+		require.NoError(t, ws.stageScaffoldChanges(t.Context()))
 		require.Equal(t, 1, logs.FilterMessage("staged scaffold changes").Len())
 	})
 
@@ -591,7 +591,7 @@ func TestStageScaffoldChanges(t *testing.T) {
 			composer: newComposer("web"),
 		}, repo.Checkout{Worktree: worktree, Path: "/project"})
 
-		require.NoError(t, ws.stageScaffoldChanges(context.Background()))
+		require.NoError(t, ws.stageScaffoldChanges(t.Context()))
 	})
 
 	t.Run("stages nothing when only files outside the web root changed", func(t *testing.T) {
@@ -601,7 +601,7 @@ func TestStageScaffoldChanges(t *testing.T) {
 
 		ws := testRun(services{logger: logger, composer: newComposer("web")}, repo.Checkout{Worktree: worktree, Path: "/project"})
 
-		require.NoError(t, ws.stageScaffoldChanges(context.Background()))
+		require.NoError(t, ws.stageScaffoldChanges(t.Context()))
 	})
 
 	t.Run("looks up no web root when nothing changed", func(t *testing.T) {
@@ -610,7 +610,7 @@ func TestStageScaffoldChanges(t *testing.T) {
 
 		ws := testRun(services{logger: logger, composer: NewMockComposer(t)}, repo.Checkout{Worktree: worktree, Path: "/project"})
 
-		require.NoError(t, ws.stageScaffoldChanges(context.Background()))
+		require.NoError(t, ws.stageScaffoldChanges(t.Context()))
 	})
 
 	t.Run("propagates a status failure", func(t *testing.T) {
@@ -619,7 +619,7 @@ func TestStageScaffoldChanges(t *testing.T) {
 
 		ws := testRun(services{logger: logger, composer: newComposer("web")}, repo.Checkout{Worktree: worktree, Path: "/project"})
 
-		err := ws.stageScaffoldChanges(context.Background())
+		err := ws.stageScaffoldChanges(t.Context())
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to read worktree status")
 	})
@@ -630,7 +630,7 @@ func TestStageScaffoldChanges(t *testing.T) {
 
 		ws := testRun(services{logger: logger, composer: newComposer("")}, repo.Checkout{Worktree: worktree, Path: "/project"})
 
-		err := ws.stageScaffoldChanges(context.Background())
+		err := ws.stageScaffoldChanges(t.Context())
 		require.EqualError(t, err, "failed to determine web root: extra.drupal-scaffold.locations.web-root is not defined")
 	})
 
@@ -644,7 +644,7 @@ func TestStageScaffoldChanges(t *testing.T) {
 
 		ws := testRun(services{logger: logger, composer: composerCLI}, repo.Checkout{Worktree: worktree, Path: "/project"})
 
-		err := ws.stageScaffoldChanges(context.Background())
+		err := ws.stageScaffoldChanges(t.Context())
 		require.ErrorIs(t, err, noWebRoot, "a failed read is not mistaken for the web root it happened to return")
 		assert.Contains(t, err.Error(), "failed to determine web root")
 	})
@@ -656,7 +656,7 @@ func TestStageScaffoldChanges(t *testing.T) {
 
 		ws := testRun(services{logger: logger, composer: newComposer("web")}, repo.Checkout{Worktree: worktree, Path: "/project"})
 
-		err := ws.stageScaffoldChanges(context.Background())
+		err := ws.stageScaffoldChanges(t.Context())
 		require.ErrorIs(t, err, assert.AnError)
 		assert.Contains(t, err.Error(), "failed to stage web/robots.txt")
 	})
@@ -705,7 +705,7 @@ func TestRunFailsWhenScaffoldChangesCannotBeStaged(t *testing.T) {
 	repository.EXPECT().RemoteBranchExists(anyCtx, "update-dummy-hash", "token").Return(false, nil)
 
 	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
-	err := workflowService.Run(context.Background(), nil)
+	err := workflowService.Run(t.Context(), nil)
 
 	require.ErrorIs(t, err, assert.AnError)
 	assert.Contains(t, err.Error(), "failed to read worktree status")

@@ -1,7 +1,6 @@
 package addon
 
 import (
-	"context"
 	"testing"
 
 	"github.com/drupdater/drupdater/internal/drush"
@@ -28,7 +27,7 @@ func TestUpdateHooksFindsTheSitesPendingHooks(t *testing.T) {
 		"module1_update_8001": {Module: "module1", Description: "Update description"},
 	}
 
-	evt := workflow.NewPreSiteUpdateEvent(context.Background(), "/test/path", &fakeCommitter{}, "default", drush.Facts{UpdateHooks: pending})
+	evt := workflow.NewPreSiteUpdateEvent(t.Context(), "/test/path", &fakeCommitter{}, "default", drush.Facts{UpdateHooks: pending})
 
 	found, err := updateHooks.preSiteUpdateHandler(evt)
 	require.NoError(t, err)
@@ -39,14 +38,14 @@ func TestUpdateHooksLogsOnlyASiteWithPendingHooks(t *testing.T) {
 	core, logs := observer.New(zapcore.InfoLevel)
 	updateHooks := NewUpdateHooks(zap.New(core))
 
-	evt := workflow.NewPreSiteUpdateEvent(context.Background(), "/test/path", &fakeCommitter{}, "default", drush.Facts{UpdateHooks: map[string]drush.UpdateHook{}})
+	evt := workflow.NewPreSiteUpdateEvent(t.Context(), "/test/path", &fakeCommitter{}, "default", drush.Facts{UpdateHooks: map[string]drush.UpdateHook{}})
 	found, err := updateHooks.preSiteUpdateHandler(evt)
 	require.NoError(t, err)
 	assert.Empty(t, found)
 	assert.Zero(t, logs.Len())
 
 	pending := map[string]drush.UpdateHook{"node_update_10001": {Module: "node"}}
-	evt = workflow.NewPreSiteUpdateEvent(context.Background(), "/test/path", &fakeCommitter{}, "second", drush.Facts{UpdateHooks: pending})
+	evt = workflow.NewPreSiteUpdateEvent(t.Context(), "/test/path", &fakeCommitter{}, "second", drush.Facts{UpdateHooks: pending})
 	_, err = updateHooks.preSiteUpdateHandler(evt)
 	require.NoError(t, err)
 	require.Equal(t, 1, logs.Len())
