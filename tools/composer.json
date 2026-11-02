@@ -4,7 +4,7 @@
     "type": "project",
     "license": "Apache-2.0",
     "require": {
-        "drupal/coder": "^8.3.31",
+        "drupal/coder": "^9.0.1",
         "mglaman/phpstan-drupal": "^2.2.2",
         "palantirnet/drupal-rector": "^1.1.3"
     },
