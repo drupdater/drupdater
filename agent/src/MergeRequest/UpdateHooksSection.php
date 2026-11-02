@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Drupdater\Agent\MergeRequest;
 
+use Drupdater\Agent\Json;
+
 /** The hooks each site ran, sites and hooks by name. One site needs no heading of its own. */
 final class UpdateHooksSection implements Section
 {
@@ -41,7 +43,7 @@ final class UpdateHooksSection implements Section
      */
     private static function byName(?\stdClass $object): array
     {
-        $members = get_object_vars($object ?? new \stdClass());
+        $members = Json::map($object);
         ksort($members, SORT_STRING);
         return $members;
     }

@@ -90,7 +90,7 @@ final class ResolverTest extends TestCase
                 ['packagist.org' => false],
             ],
             'require' => ['fixture/a' => '^1.0', 'fixture/b' => '^2.0'],
-        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)]);
+        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)]);
         $this->lockAtTheOlderVersions($project);
         return $project;
     }

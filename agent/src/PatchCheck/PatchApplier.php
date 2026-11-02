@@ -59,7 +59,7 @@ final class PatchApplier
     }
 
     /**
-     * @param list<string> $command
+     * @param non-empty-list<string> $command
      */
     private function run(array $command): bool
     {

@@ -7,6 +7,7 @@ namespace Drupdater\Agent\Tests\Addon;
 use Drupdater\Agent\Addon\ComposerDiff;
 use Drupdater\Agent\Addon\Event;
 use Drupdater\Agent\Failure;
+use Drupdater\Agent\Json;
 use Drupdater\Agent\Log;
 use Drupdater\Agent\Tests\InProject;
 use PHPUnit\Framework\TestCase;
@@ -82,7 +83,7 @@ final class ComposerDiffTest extends TestCase
     {
         $at = static fn (string $reference): array => ['packages' => [['name' => 'fixture/a', 'version' => 'dev-main', 'type' => 'library', 'source' => ['type' => 'git', 'url' => 'https://example.com/a.git', 'reference' => $reference]]]];
 
-        self::assertSame(['change'], array_column($this->diff($at('bbbbbbb'), $at('aaaaaaa'))->finding, 'operation'));
+        self::assertSame(['change'], array_column(Json::list($this->diff($at('bbbbbbb'), $at('aaaaaaa'))->finding), 'operation'));
     }
 
     public function testSortsEachHalfByName(): void
@@ -92,7 +93,7 @@ final class ComposerDiffTest extends TestCase
             ['name' => 'fixture/alpha', 'version' => '1.0.0', 'type' => 'library'],
         ], 'packages-dev' => [['name' => 'fixture/beta', 'version' => '1.0.0', 'type' => 'library']]];
 
-        self::assertSame(['fixture/alpha', 'fixture/zeta', 'fixture/beta'], array_column($this->diff($locked, ['packages' => []])->finding, 'package'));
+        self::assertSame(['fixture/alpha', 'fixture/zeta', 'fixture/beta'], array_column(Json::list($this->diff($locked, ['packages' => []])->finding), 'package'));
     }
 
     public function testRefusesAProjectWithoutALock(): void
@@ -135,8 +136,8 @@ final class ComposerDiffTest extends TestCase
                 'repositories' => [['packagist.org' => false]],
                 'require' => ['fixture/a' => '^1.0'],
                 'require-dev' => ['fixture/tool' => '^2.0'],
-            ], JSON_UNESCAPED_SLASHES),
-            'composer.lock' => json_encode($lock + ['packages' => [], 'packages-dev' => []], JSON_UNESCAPED_SLASHES),
+            ], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
+            'composer.lock' => json_encode($lock + ['packages' => [], 'packages-dev' => []], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
         ]);
         return $project;
     }

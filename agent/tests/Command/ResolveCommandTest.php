@@ -6,6 +6,7 @@ namespace Drupdater\Agent\Tests\Command;
 
 use Composer\Console\Application;
 use Drupdater\Agent\Command\ResolveCommand;
+use Drupdater\Agent\Json;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -37,10 +38,10 @@ final class ResolveCommandTest extends TestCase
         $application->setAutoExit(false);
         $application->add($command);
         $tester = new CommandTester($command);
-        $tester->setInputs([json_encode(['protocol' => 6, 'request' => $request])]);
+        $tester->setInputs([json_encode(['protocol' => 6, 'request' => $request], JSON_THROW_ON_ERROR)]);
 
         self::assertSame(1, $tester->execute([]));
         $reply = json_decode($tester->getDisplay(), true);
-        self::assertSame(['kind' => 'invalid_request', 'reason' => $reason, 'message' => ''], $reply['error']);
+        self::assertSame(['kind' => 'invalid_request', 'reason' => $reason, 'message' => ''], Json::at($reply, 'error'));
     }
 }

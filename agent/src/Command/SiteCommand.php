@@ -6,6 +6,7 @@ namespace Drupdater\Agent\Command;
 
 use Composer\Factory;
 use Drupdater\Agent\Failure;
+use Drupdater\Agent\Json;
 use Drupdater\Agent\Process\ProcessRunner;
 use Drupdater\Agent\Project\ProjectFacts;
 use Drupdater\Agent\Site\TestDatabase;
@@ -35,7 +36,7 @@ abstract class SiteCommand extends AgentCommand
 
     protected function drush(): Drush
     {
-        $bin = (string) $this->requireComposer()->getConfig()->get('bin-dir');
+        $bin = Json::string($this->requireComposer()->getConfig()->get('bin-dir'));
         return new Drush(new ProcessRunner(), new Bin($bin), $this->projectDir(), Drush::include());
     }
 

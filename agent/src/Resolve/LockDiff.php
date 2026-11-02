@@ -7,6 +7,7 @@ namespace Drupdater\Agent\Resolve;
 use Composer\Package\Loader\ArrayLoader;
 use Composer\Package\PackageInterface;
 use Composer\Package\Version\VersionParser;
+use Drupdater\Agent\Json;
 
 /**
  * What changed between two composer.lock files, package by package.
@@ -17,11 +18,11 @@ final class LockDiff
     private const ACTION_ORDER = ['Upgrade', 'Downgrade', 'Remove', 'Install'];
 
     /**
-     * @param array<string, mixed> $before
-     * @param array<string, mixed> $after
+     * @param mixed $before the lock as JsonFile reads it
+     * @param mixed $after the lock as JsonFile reads it
      * @return list<array{action: string, package: string, from: string, to: string}>
      */
-    public static function between(array $before, array $after): array
+    public static function between(mixed $before, mixed $after): array
     {
         $old = self::packages($before);
         $new = self::packages($after);
@@ -55,14 +56,13 @@ final class LockDiff
      * Dev and non-dev packages together, by name: a package that only moved between require and
      * require-dev did not change.
      *
-     * @param array<string, mixed> $lock
      * @return array<string, PackageInterface>
      */
-    private static function packages(array $lock): array
+    private static function packages(mixed $lock): array
     {
         $loader = new ArrayLoader(null, true);
         $packages = [];
-        foreach ([...($lock['packages'] ?? []), ...($lock['packages-dev'] ?? [])] as $config) {
+        foreach ([...Json::maps(Json::at($lock, 'packages')), ...Json::maps(Json::at($lock, 'packages-dev'))] as $config) {
             $package = $loader->load($config);
             $packages[$package->getName()] = $package;
         }

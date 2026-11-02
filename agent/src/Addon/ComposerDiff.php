@@ -6,6 +6,7 @@ namespace Drupdater\Agent\Addon;
 
 use Composer\Composer;
 use Drupdater\Agent\Failure;
+use Drupdater\Agent\Json;
 use Drupdater\Agent\Log;
 use IonBazan\ComposerDiff\Diff\DiffEntry;
 use IonBazan\ComposerDiff\PackageDiff;
@@ -51,7 +52,7 @@ final class ComposerDiff implements Addon
         $direct = array_map('strtolower', array_keys([...$root->getRequires(), ...$root->getDevRequires()]));
 
         $diff = new PackageDiff();
-        $diff->setUrlGenerator(new GeneratorContainer((array) $composer->getConfig()->get('gitlab-domains')));
+        $diff->setUrlGenerator(new GeneratorContainer(Json::strings($composer->getConfig()->get('gitlab-domains'))));
 
         $rows = [];
         foreach ([false, true] as $dev) {
@@ -100,7 +101,7 @@ final class ComposerDiff implements Addon
     /**
      * The log's rendering: one line per package, without the links a terminal can't use.
      *
-     * @param list<array<string, mixed>> $rows
+     * @param list<array{package: string, operation: string, from?: string, to?: string, dev: bool}> $rows
      */
     private static function plain(array $rows): string
     {

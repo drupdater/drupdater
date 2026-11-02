@@ -12,7 +12,7 @@ use Composer\Util\Filesystem;
 class PatchChecker
 {
     /**
-     * @param array<mixed> $patchLevels the project's extra.patchLevel: one level per package
+     * @param array<string, mixed> $patchLevels the project's extra.patchLevel: one level per package
      */
     public function __construct(
         private readonly PackageFetcher $fetcher,

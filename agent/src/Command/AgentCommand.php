@@ -6,6 +6,7 @@ namespace Drupdater\Agent\Command;
 
 use Composer\Command\BaseCommand;
 use Drupdater\Agent\Failure;
+use Drupdater\Agent\Json;
 use Drupdater\Agent\Log;
 use Drupdater\Agent\Protocol;
 use Drupdater\Agent\Resolve\Resolver;
@@ -60,18 +61,13 @@ abstract class AgentCommand extends BaseCommand
      */
     protected function rawMember(string $key): mixed
     {
-        $decoded = json_decode($this->body, false, 512, JSON_THROW_ON_ERROR);
-        return $decoded->request->{$key} ?? null;
+        return Json::at(json_decode($this->body, false, 512, JSON_THROW_ON_ERROR), 'request', $key);
     }
 
     /** Composer's own update command, run in this process with this command's output. */
     protected function resolver(): Resolver
     {
-        $update = $this->getApplication()?->find('update');
-        if ($update === null) {
-            throw new Failure(Failure::INTERNAL, 'Composer has no update command');
-        }
-        return new Resolver($update, $this->output ?? throw new \LogicException('no output'));
+        return new Resolver($this->getApplication()->find('update'), $this->output ?? throw new \LogicException('no output'));
     }
 
     private function readRequest(InputInterface $input): string

@@ -1,4 +1,4 @@
-.PHONY: build test test-race test-agent test-property fuzz mutate clean mock lint fmt fix run docker-build docker-run docs-serve docs-build help
+.PHONY: build test test-race test-agent lint-agent mutate-agent test-property fuzz mutate clean mock lint fmt fix run docker-build docker-run docs-serve docs-build help
 
 # Variables
 BINARY_NAME=drupdater
@@ -26,6 +26,12 @@ test-race: ## Run tests with the race detector
 # environment variable is read at init and simply ignored by those packages.
 test-agent: ## Run the agent's PHPUnit suite
 	cd agent && composer install --no-interaction --no-progress && vendor/bin/phpunit
+
+lint-agent: ## Run PHPStan over the agent
+	cd agent && composer install --no-interaction --no-progress && vendor/bin/phpstan analyse --memory-limit=1G
+
+mutate-agent: ## Run mutation testing over the agent (Infection; needs pcov or Xdebug)
+	cd agent && composer install --no-interaction --no-progress && vendor/bin/infection --threads=max
 
 test-property: ## Run only the property tests, with far more generated cases than `make test`
 	RAPID_CHECKS=10000 go test ./... -run TestProperty

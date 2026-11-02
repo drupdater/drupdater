@@ -8,9 +8,14 @@ use Drupdater\Agent\Addon\AbortRun;
 use Drupdater\Agent\Addon\ComposerAudit;
 use Drupdater\Agent\Addon\Event;
 use Drupdater\Agent\Addon\Plan;
+use Drupdater\Agent\Audit\LockAudit;
+use Drupdater\Agent\Json;
 use Drupdater\Agent\Log;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * @phpstan-import-type Advisory from LockAudit
+ */
 final class ComposerAuditTest extends TestCase
 {
     public function testANormalRunRecordsTheAuditInTheReportsNamesAndProposesNothing(): void
@@ -41,7 +46,7 @@ final class ComposerAuditTest extends TestCase
 
         $finding = self::audit([$advisory])->handle(Event::preComposerUpdate('/p', new Plan()))->finding;
 
-        self::assertSame('', $finding['advisories'][0]['cve']);
+        self::assertSame('', Json::at($finding, 'advisories', 0, 'cve'));
     }
 
     public function testASecurityRunRestrictsTheUpdateToTheAffectedPackagesWithCoresCompanions(): void
@@ -74,7 +79,7 @@ final class ComposerAuditTest extends TestCase
         $after = (new ComposerAudit($log, static fn (): array => ['advisories' => [self::lockAdvisory('b/b', 'CVE-2')], 'abandoned' => [['package' => 'drupal/old', 'replacement' => null]]]))
             ->handle(Event::postCodeUpdate('/p', earlier: Records::findings([Records::record('pre-composer-update', $before)])));
 
-        self::assertSame(['b/b'], array_column($after->finding['advisories'], 'packageName'));
+        self::assertSame(['b/b'], array_column(Json::list(Json::at($after->finding, 'advisories')), 'packageName'));
         self::assertSame([['level' => 'info', 'message' => 'security advisories', 'context' => ['fixed' => 1, 'unresolved' => 1, 'abandoned' => 0]]], $log->entries());
     }
 
@@ -105,8 +110,8 @@ final class ComposerAuditTest extends TestCase
             Records::record('post-code-update', ['advisories' => [], 'abandoned' => []]),
         ]));
 
-        self::assertSame([], $section['remaining']);
-        self::assertSame([], $section['abandoned']);
+        self::assertSame([], Json::at($section, 'remaining'));
+        self::assertSame([], Json::at($section, 'abandoned'));
     }
 
     public function testNoReportWithoutTheAuditAfterTheUpdateOrWithNothingToSay(): void
@@ -148,7 +153,7 @@ final class ComposerAuditTest extends TestCase
     }
 
     /**
-     * @param list<array<string, mixed>> $advisories
+     * @param list<Advisory> $advisories
      * @param list<array{package: string, replacement: string|null}> $abandoned
      */
     private static function audit(array $advisories, array $abandoned = []): ComposerAudit
@@ -159,7 +164,7 @@ final class ComposerAuditTest extends TestCase
     /**
      * An advisory as LockAudit reports it.
      *
-     * @return array<string, mixed>
+     * @return Advisory
      */
     private static function lockAdvisory(string $package, ?string $cve): array
     {

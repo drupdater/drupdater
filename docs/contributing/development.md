@@ -20,6 +20,8 @@ make build          # build the binary (injects the version via -ldflags)
 make test           # go test -v ./...
 make test-race      # the suite under the race detector
 make test-agent     # the agent's PHPUnit suite (agent/; needs PHP and Composer)
+make lint-agent     # PHPStan over the agent, at its strictest level
+make mutate-agent   # Infection over the agent (needs pcov or Xdebug)
 make test-property  # only the property tests, with far more generated cases
 make fuzz           # fuzz every target (FUZZTIME=30s each by default)
 make mutate         # mutation testing over the whole module (mutago)
@@ -272,7 +274,8 @@ went unnoticed. Read it as a question: *which assertion would have caught this?*
 | Where | Scope | Blocking |
 |---|---|---|
 | `mutation` job in `go.yml` | Only the lines the pull request changes | **Yes** — fails below 75 % MSI |
-| `mutation.yml` | The whole module, weekly and on demand | No |
+| `mutation` job in `agent.yml` | Only the agent's lines the pull request changes | **Yes** — fails below 75 % MSI |
+| `mutation.yml` | The whole module and the whole agent, weekly and on demand | No |
 
 Scoring the full module on every pull request would be slow and would fail on survivors
 nobody touched, so the gate looks at changed lines only: new code has to be tested properly,
@@ -334,6 +337,25 @@ buf := make([]byte, 0, 64)
 Use the narrowest form that works — name the specific mutator rather than `*` — and add a
 comment saying *why* the mutation is equivalent. If you cannot articulate the reason, the
 mutant is probably telling you about a missing assertion.
+
+### The agent
+
+The agent is held to the same gate with [Infection](https://infection.github.io/), configured in
+`agent/infection.json5`:
+
+```bash
+make mutate-agent
+```
+
+It needs a coverage driver, pcov or Xdebug. To iterate on one file, filter it:
+
+```bash
+cd agent && vendor/bin/infection --threads=max --filter=src/Json.php
+```
+
+Survivors are in `agent/build/infection/infection.log`, each with its diff. An equivalent mutant
+is ignored in `infection.json5`, by mutator and method, with a comment saying why — the same rule
+as the Go side.
 
 ## Property-based testing
 
@@ -636,7 +658,14 @@ one side alone fails the other's suite. A breaking change bumps `protocol`, in
 
 ```bash
 make test-agent
+make lint-agent
 ```
+
+PHPStan runs at `max` over `src` and `tests` with no baseline (`agent/phpstan.neon.dist`), so
+every value read from JSON drupdater does not control — a tool's report, an HTTP reply, a
+finding sent back — goes through `Drupdater\Agent\Json`, which reads it as the type the code
+expects: a missing or mistyped value reads as empty, never as a warning. A test reads a decoded
+reply the same way, and `Tests\Decoded` asserts the shape it decodes into.
 
 The suite includes an end-to-end test that installs the agent as a global plugin into a
 throwaway `COMPOSER_HOME`, as the image does, and runs the commands through a real Composer —

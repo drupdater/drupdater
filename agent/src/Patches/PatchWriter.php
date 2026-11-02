@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace Drupdater\Agent\Patches;
 
-use Composer\Config\JsonConfigSource;
 use Composer\Json\JsonFile;
+use Composer\Json\JsonManipulator;
 use Composer\Package\Locker;
 use Drupdater\Agent\Failure;
+use Drupdater\Agent\Json;
 
 /**
  * Writes extra.patches into composer.json and the lock's content-hash to match, which hashes
@@ -49,13 +50,29 @@ class PatchWriter
      */
     private function writePatches(\stdClass $patches): void
     {
-        (new JsonConfigSource(new JsonFile($this->composerFile)))->addProperty('extra.patches', $patches);
-
-        $manifest = json_decode((string) file_get_contents($this->composerFile), false, 512, JSON_THROW_ON_ERROR);
-        if (JsonFile::encode($manifest->extra->patches ?? null) === JsonFile::encode($patches)) {
+        $contents = (string) file_get_contents($this->composerFile);
+        $manipulator = new JsonManipulator($contents);
+        if ($manipulator->addProperty('extra.patches', $patches)
+            && JsonFile::encode(Json::at(self::decode($manipulator->getContents()), 'extra', 'patches')) === JsonFile::encode($patches)) {
+            file_put_contents($this->composerFile, $manipulator->getContents());
             return;
         }
-        $manifest->extra->patches = $patches;
+        $manifest = self::decode($contents);
+        $extra = $manifest->extra ?? new \stdClass();
+        if (!$extra instanceof \stdClass) {
+            throw new Failure(Failure::FAILED, 'extra in composer.json is not an object');
+        }
+        $extra->patches = $patches;
+        $manifest->extra = $extra;
         file_put_contents($this->composerFile, JsonFile::encode($manifest) . "\n");
+    }
+
+    private static function decode(string $contents): \stdClass
+    {
+        $manifest = json_decode($contents, false, 512, JSON_THROW_ON_ERROR);
+        if (!$manifest instanceof \stdClass) {
+            throw new Failure(Failure::FAILED, 'composer.json is not a JSON object');
+        }
+        return $manifest;
     }
 }

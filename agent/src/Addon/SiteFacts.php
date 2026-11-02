@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupdater\Agent\Addon;
 
 use Drupdater\Agent\Failure;
+use Drupdater\Agent\Json;
 
 /**
  * What drupdater read from a site in one bootstrap, through drush's drupdater:facts. Paths are
@@ -39,16 +40,17 @@ final class SiteFacts
         $modules = $facts['modules'] ?? [];
         $updateHooks = $facts['update_hooks'] ?? [];
         $unsupported = $facts['unsupported_modules'] ?? [];
-        if (!is_array($modules) || array_filter($modules, 'is_string') !== $modules || !is_array($updateHooks)
-            || !is_array($unsupported) || !array_is_list($unsupported)) {
+        if (!is_array($modules) || array_filter($modules, is_string(...)) !== $modules
+            || !is_array($updateHooks) || array_filter($updateHooks, is_array(...)) !== $updateHooks
+            || !is_array($unsupported) || !array_is_list($unsupported) || array_filter($unsupported, is_array(...)) !== $unsupported) {
             throw new Failure(Failure::INVALID_REQUEST, 'facts.modules, facts.update_hooks and facts.unsupported_modules are malformed');
         }
         return new self(
             self::string($facts, 'config_sync_directory'),
             self::string($facts, 'translation_path'),
-            array_values($modules),
-            $updateHooks,
-            $unsupported,
+            Json::strings($modules),
+            array_map(Json::map(...), Json::map($updateHooks)),
+            Json::maps($unsupported),
             self::string($facts, 'unsupported_modules_error'),
         );
     }

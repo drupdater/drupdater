@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupdater\Agent\Tests;
 
 use Composer\Util\Filesystem;
+use Drupdater\Agent\Json;
 
 trait Scratch
 {
@@ -43,7 +44,7 @@ trait Scratch
      */
     protected static function fixture(string $name): array
     {
-        return json_decode((string) file_get_contents(__DIR__ . '/../protocol/' . $name), true, 512, JSON_THROW_ON_ERROR);
+        return Json::map(json_decode((string) file_get_contents(__DIR__ . '/../protocol/' . $name), true, 512, JSON_THROW_ON_ERROR));
     }
 
     protected const GREETING_PATCH = <<<'PATCH'

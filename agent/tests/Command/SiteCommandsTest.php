@@ -12,7 +12,9 @@ use Drupdater\Agent\Command\SiteFactsCommand;
 use Drupdater\Agent\Command\SiteInstallCommand;
 use Drupdater\Agent\Command\SiteRestoreCommand;
 use Drupdater\Agent\Command\SiteUpdateCommand;
+use Drupdater\Agent\Json;
 use Drupdater\Agent\Site\TestDatabase;
+use Drupdater\Agent\Tests\Decoded;
 use Drupdater\Agent\Tests\InProject;
 use Drupdater\Agent\Tools\Drush;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -58,7 +60,7 @@ final class SiteCommandsTest extends TestCase
     {
         $this->project();
         $request = self::fixture('site-facts/request.json');
-        $request['request']['update_status'] = false;
+        $request['request'] = ['update_status' => false] + Json::map($request['request'] ?? null);
 
         $this->ask(new SiteFactsCommand(), $request);
 
@@ -99,8 +101,8 @@ final class SiteCommandsTest extends TestCase
         [$status, $reply] = $this->ask(new SiteUpdateCommand(), self::fixture('site-update/request.json'));
 
         self::assertSame(1, $status);
-        self::assertSame(['failed', 'drush updatedb --yes failed'], [$reply['error']['kind'], $reply['error']['reason']]);
-        self::assertStringContainsString('SQLSTATE: no such table', $reply['error']['message']);
+        self::assertSame(['failed', 'drush updatedb --yes failed'], [Json::at($reply, 'error', 'kind'), Json::at($reply, 'error', 'reason')]);
+        self::assertStringContainsString('SQLSTATE: no such table', Json::string(Json::at($reply, 'error', 'message')));
         self::assertSame(['default updatedb --yes'], $this->drushLog(), 'nothing runs after a failed update');
     }
 
@@ -142,7 +144,7 @@ final class SiteCommandsTest extends TestCase
         self::assertEquals(self::fixture('site-install/response.json'), self::withoutLog($reply));
         self::assertSame('default --existing-config --yes site:install --sites-subdir=default --verbose', $this->drushLog()[1]);
         self::assertSame("<?php\n", file_get_contents($this->project . '/web/sites/default/settings.php'));
-        self::assertSame('installing site', $reply['log'][0]['message'] ?? null, 'what it logged reaches drupdater');
+        self::assertSame('installing site', Json::at($reply, 'log', 0, 'message'), 'what it logged reaches drupdater');
     }
 
     /**
@@ -198,17 +200,17 @@ final class SiteCommandsTest extends TestCase
     private function project(): void
     {
         $this->project = $this->scratchDir();
-        $facts = self::rawFixture('site-facts/response.json')->result->facts;
-        $after = self::rawFixture('site-update/response.json')->result->facts;
+        $facts = Json::at(self::rawFixture('site-facts/response.json'), 'result', 'facts');
+        $after = Json::at(self::rawFixture('site-update/response.json'), 'result', 'facts');
         $this->writeFiles($this->project, [
             'composer.json' => json_encode([
                 'name' => 'fixture/site',
                 'repositories' => [['packagist.org' => false]],
                 'extra' => ['drupal-scaffold' => ['locations' => ['web-root' => 'web/']]],
-            ], JSON_UNESCAPED_SLASHES),
+            ], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
             'vendor/bin/drush' => self::DRUSH,
-            'facts.json' => (string) json_encode($facts, JSON_UNESCAPED_SLASHES),
-            'facts-after.json' => (string) json_encode($after, JSON_UNESCAPED_SLASHES),
+            'facts.json' => (string) json_encode($facts, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
+            'facts-after.json' => (string) json_encode($after, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
             'web/sites/default/settings.php' => "<?php\n",
             'config/sync/core.extension.yml' => "module:\n  node: 0\n  sqlite: 0\ntheme:\n  stark: 0\nprofile: minimal\n",
         ]);
@@ -230,7 +232,7 @@ final class SiteCommandsTest extends TestCase
     private function withDataDir(string $fixture, string $dataDir): array
     {
         $request = self::fixture($fixture);
-        $request['request']['data_dir'] = $dataDir;
+        $request['request'] = ['data_dir' => $dataDir] + Json::map($request['request'] ?? null);
         return $request;
     }
 
@@ -244,7 +246,7 @@ final class SiteCommandsTest extends TestCase
         return $reply;
     }
 
-    private static function rawFixture(string $name): \stdClass
+    private static function rawFixture(string $name): mixed
     {
         return json_decode((string) file_get_contents(__DIR__ . '/../../protocol/' . $name), false, 512, JSON_THROW_ON_ERROR);
     }
@@ -263,6 +265,6 @@ final class SiteCommandsTest extends TestCase
         $tester->setInputs([json_encode($request, JSON_THROW_ON_ERROR)]);
         $status = $tester->execute([]);
         $raw = trim($tester->getDisplay());
-        return [$status, json_decode($raw, true, 512, JSON_THROW_ON_ERROR), $raw];
+        return [$status, Decoded::envelope($raw), $raw];
     }
 }

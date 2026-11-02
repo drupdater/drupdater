@@ -59,6 +59,8 @@ make build          # Build binary
 make test           # Run all tests (go test -v ./...)
 make test-race      # Run the suite under the race detector (~1 min; CI runs this too)
 make test-agent     # The agent's PHPUnit suite (agent/; needs PHP and Composer)
+make lint-agent     # PHPStan over the agent at level max, src and tests, no baseline
+make mutate-agent   # Mutation testing over the agent (Infection; needs pcov or Xdebug)
 make test-property  # Only the property tests, with far more generated cases (rapid)
 make fuzz           # Fuzz every target (FUZZTIME=30s each by default)
 make mutate         # Mutation testing over the whole module (mutago, pinned in go.mod)
@@ -188,6 +190,12 @@ Mocks are generated with mockery v3 (config in `.mockery.yml`). After changing a
 ## Mutation testing
 
 `mutago` (pinned via the `tool` directive in `go.mod`, configured in `mutago.yaml`) scores whether the tests *assert* rather than merely execute. CI enforces it on the lines a PR changes (`mutation` job in `.github/workflows/go.yml`, fails below 75 % MSI) and reports the whole module weekly (`.github/workflows/mutation.yml`, one matrix leg per package, never blocking). Suppress a genuinely equivalent mutant with a `// mutator-disable-next-line <mutator>` comment and a reason — never by lowering the threshold. Details: `docs/contributing/development.md`.
+
+The agent has the same gate with Infection (`agent/infection.json5`): `agent.yml`'s `mutation` job on changed lines at 75 % MSI, and `mutation.yml`'s `agent` job weekly. An equivalent mutant is ignored in `infection.json5` by mutator and method, with a comment saying why.
+
+## Static analysis of the agent
+
+PHPStan runs at `max` over `agent/src` and `agent/tests` with no baseline and no `@phpstan-ignore`. Decoded JSON drupdater does not control is read through `Drupdater\Agent\Json` (`at`, `map`, `list`, `maps`, `string`, `int`, `strings`) rather than cast or indexed blind; a test asserts a decoded shape with `Tests\Decoded`.
 
 ## Property-based testing
 

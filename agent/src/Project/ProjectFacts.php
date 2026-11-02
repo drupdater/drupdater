@@ -8,6 +8,7 @@ use Composer\Composer;
 use Composer\Package\AliasPackage;
 use Composer\Package\PackageInterface;
 use Drupdater\Agent\Failure;
+use Drupdater\Agent\Json;
 
 /**
  * Reads a project: composer.json as written, and the lock as Composer reads it.
@@ -23,12 +24,12 @@ final class ProjectFacts
     public function project(): Project
     {
         $manifest = $this->manifest();
-        $webRoot = $manifest->extra->{'drupal-scaffold'}->locations->{'web-root'} ?? null;
+        $webRoot = Json::at($manifest, 'extra', 'drupal-scaffold', 'locations', 'web-root');
         // A single trailing slash only, as drupal-scaffold itself joins paths.
         $webRoot = is_string($webRoot) && $webRoot !== '' ? (string) preg_replace('{/$}', '', $webRoot) : null;
         $customCode = $webRoot === null ? [] : $this->customCodeDirectories($webRoot);
         // As written, keys and nesting intact: composer_patches rewrites them.
-        $patches = $manifest->extra->patches ?? null;
+        $patches = Json::at($manifest, 'extra', 'patches');
 
         $locker = $this->composer->getLocker();
         if (!$locker->isLocked()) {

@@ -19,7 +19,7 @@ final class DeclaredPatchesTest extends TestCase
 
         self::assertSame(['z/z', 'a/a', 'm/m'], $patches->packages());
         self::assertSame([['description' => 'b', 'path' => '2.patch'], ['description' => 'a', 'path' => '1.patch']], $patches->of('z/z'));
-        self::assertSame($json, json_encode($patches->toJson(), JSON_UNESCAPED_SLASHES));
+        self::assertSame($json, json_encode($patches->toJson(), JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
     }
 
     public function testARepeatedDescriptionKeepsItsFirstPlaceAndItsLastPath(): void
@@ -33,7 +33,7 @@ final class DeclaredPatchesTest extends TestCase
     public function testNullIsNone(): void
     {
         self::assertSame([], DeclaredPatches::fromJson(null)->packages());
-        self::assertSame('{}', json_encode(DeclaredPatches::fromJson(null)->toJson()));
+        self::assertSame('{}', json_encode(DeclaredPatches::fromJson(null)->toJson(), JSON_THROW_ON_ERROR));
     }
 
     /**
@@ -72,7 +72,7 @@ final class DeclaredPatchesTest extends TestCase
         $patches->remove('a/a', 'one');
         $patches->remove('b/b', 'x');
 
-        self::assertSame('{"a/a":{"two":"new.patch"}}', json_encode($patches->toJson(), JSON_UNESCAPED_SLASHES));
+        self::assertSame('{"a/a":{"two":"new.patch"}}', json_encode($patches->toJson(), JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
     }
 
     private static function patches(string $json): DeclaredPatches

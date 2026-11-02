@@ -12,3 +12,4 @@ site/
 # mutation testing output
 mutago-*.json
 mutago-report.html
+agent/build/

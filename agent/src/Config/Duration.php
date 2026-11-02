@@ -43,7 +43,7 @@ final class Duration
 
         $total = 0;
         while ($rest !== '') {
-            if (!preg_match('/^(\d*)(?:\.(\d*))?([^\d.]*)/', $rest, $m) || ($m[1] === '' && ($m[2] ?? '') === '')) {
+            if (!preg_match('/^(\d*)(?:\.(\d*))?([^\d.]*)/', $rest, $m) || ($m[1] === '' && $m[2] === '')) {
                 throw $invalid;
             }
             [$whole, $integer, $fraction, $unit] = [$m[0], $m[1], $m[2], $m[3]];

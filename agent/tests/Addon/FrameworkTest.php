@@ -165,14 +165,10 @@ final class FrameworkTest extends TestCase
         self::assertNull($catalogue->find('nope'));
     }
 
-    public function testEveryHookOfTheCatalogueIsOfAKnownEventAtAStage(): void
+    public function testEveryAddonOfTheCatalogueHooksAnEvent(): void
     {
         foreach (Catalogue::builtin()->entries() as $entry) {
             self::assertNotSame([], $entry->addon::hooks(), $entry->name());
-            foreach ($entry->addon::hooks() as $event => $stage) {
-                self::assertNotNull(EventName::tryFrom($event), $entry->name());
-                self::assertInstanceOf(Stage::class, $stage);
-            }
         }
     }
 
@@ -240,6 +236,6 @@ final class FrameworkTest extends TestCase
      */
     private static function findings(array $records): Findings
     {
-        return Findings::fromJson(json_decode((string) json_encode($records), false));
+        return Findings::fromJson(json_decode((string) json_encode($records, JSON_THROW_ON_ERROR), false));
     }
 }

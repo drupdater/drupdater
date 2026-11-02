@@ -117,7 +117,7 @@ class Drush
     private function run(string $site, string ...$args): ProcessResult
     {
         // The project's settings.php picks the site from SITE_NAME.
-        $result = $this->runner->run([...$this->bin->command('drush'), ...$args], $this->projectDir, ['SITE_NAME' => $site] + $this->bin->env());
+        $result = $this->runner->run([...$this->bin->command('drush'), ...array_values($args)], $this->projectDir, ['SITE_NAME' => $site] + $this->bin->env());
         if (!$result->succeeded()) {
             $named = array_filter($args, static fn (string $arg): bool => !str_starts_with($arg, '--include='));
             throw ToolFailure::exited('drush ' . implode(' ', $named), $result);

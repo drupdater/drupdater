@@ -7,12 +7,15 @@ namespace Drupdater\Agent\Tests\Audit;
 use Composer\Policy\PolicyConfig;
 use Drupdater\Agent\Audit\LockAudit;
 use Drupdater\Agent\Failure;
+use Drupdater\Agent\Json;
 use Drupdater\Agent\Tests\InProject;
 use PHPUnit\Framework\TestCase;
 
 /**
  * The audit of composer.lock, against an offline project whose package repository carries its
  * own security advisories.
+ *
+ * @phpstan-import-type Advisory from LockAudit
  */
 final class LockAuditTest extends TestCase
 {
@@ -125,7 +128,7 @@ final class LockAuditTest extends TestCase
     public function testFindsNothingInAnEmptyLock(): void
     {
         $project = $this->project();
-        $this->writeFiles($project, ['composer.lock' => json_encode(['packages' => [], 'packages-dev' => []])]);
+        $this->writeFiles($project, ['composer.lock' => json_encode(['packages' => [], 'packages-dev' => []], JSON_THROW_ON_ERROR)]);
 
         self::assertSame(['advisories' => [], 'abandoned' => []], $this->audit($project));
     }
@@ -140,7 +143,7 @@ final class LockAuditTest extends TestCase
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array{advisories: list<Advisory>, abandoned: list<array{package: string, replacement: string|null}>}
      */
     private function audit(string $project): array
     {
@@ -171,10 +174,10 @@ final class LockAuditTest extends TestCase
                     ]],
                     ['packagist.org' => false],
                 ],
-                'require' => ['php' => '>=8.3'] + array_fill_keys(array_column($locked, 'name'), '*'),
+                'require' => ['php' => '>=8.3'] + array_fill_keys(Json::strings(array_column($locked, 'name')), '*'),
                 'config' => (object) $config,
-            ], JSON_UNESCAPED_SLASHES),
-            'composer.lock' => json_encode(['packages' => $locked, 'packages-dev' => []], JSON_UNESCAPED_SLASHES),
+            ], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
+            'composer.lock' => json_encode(['packages' => $locked, 'packages-dev' => []], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
         ]);
         return $project;
     }
