@@ -15,6 +15,11 @@ Read from `<working-dir>/.drupdater.yaml`, or from the path given to `--config`.
 **The file is optional.** A missing file is not an error: the built-in defaults apply. An
 empty file, or one containing only comments, is treated the same way.
 
+The [Drupdater agent](docker-images.md#drupdater-agent) reads it (`drupdater:config`) and checks
+it whole before anything else happens: a file that fails any check stops the run, and nothing of
+it is applied. Unknown keys are rejected, so a typo fails loudly rather than being ignored. A key
+left blank (`timeout:`) counts as unset, except `sites:`, which is then an empty list.
+
 ## Complete schema
 
 ```yaml
@@ -49,7 +54,8 @@ exactly as shown.
 | Required | The key is optional, but must not be an empty list |
 
 The Drupal site directory names to update — the directories under `web/sites/`. Each one
-gets a baseline install, its own update hooks run, and its own configuration export.
+gets a baseline install, its own update hooks run, and its own configuration export. Each name
+must be a directory name — not empty, `.`, `..` or a path — and listed once.
 
 An empty list is rejected:
 
@@ -85,7 +91,7 @@ timeout: 0      # no deadline
 An unparseable value fails at startup:
 
 ```text
-invalid timeout "30 minutes" (use a Go duration like "30m" or "2h", or 0 to disable)
+invalid timeout "30 minutes" (use a Go duration like "30m" or "2h", or 0 to disable): time: unknown unit " minutes" in duration "30 minutes"
 ```
 
 ### `run_types`
@@ -125,7 +131,7 @@ unknown addon "code_beautifer" (run "drupdater addons" to list valid names)
 
 | | |
 |---|---|
-| Type | boolean |
+| Type | boolean — `true` or `false`; `yes`/`no` and `on`/`off` are still read as booleans |
 | Default | `false` in both blocks |
 
 Ask the platform to merge the request as soon as its pipeline succeeds. Nothing is merged

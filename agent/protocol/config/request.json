@@ -1,0 +1,6 @@
+{
+  "protocol": 6,
+  "request": {
+    "path": "/tmp/drupdater-config-fixture/.drupdater.yaml"
+  }
+}

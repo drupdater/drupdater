@@ -61,19 +61,10 @@ func newAddonCatalog(addons []agent.Addon) (addonCatalog, error) {
 	return c, nil
 }
 
-// create returns the mandatory addons, then the ones the active run type configures. A normal run
-// that configures none gets the catalogue's defaults; a security run stays a focused fix.
+// create returns the addons the active run type runs, in the order drupdater:config resolved.
 func (c addonCatalog) create(cfg config.Config) ([]workflow.Addon, error) {
-	configured := cfg.ActiveRunType().Addons
-	if configured == nil && !cfg.Security {
-		configured = c.defaults
-	}
-
 	var addons []workflow.Addon
-	for _, name := range slices.Concat(c.mandatory, configured) {
-		if slices.ContainsFunc(addons, func(a workflow.Addon) bool { return a.Name == name }) {
-			continue
-		}
+	for _, name := range cfg.ActiveRunType().Addons {
 		i := slices.IndexFunc(c.addons, func(a workflow.Addon) bool { return a.Name == name })
 		if i < 0 {
 			return nil, fmt.Errorf("unknown addon %q", name)
@@ -81,16 +72,6 @@ func (c addonCatalog) create(cfg config.Config) ([]workflow.Addon, error) {
 		addons = append(addons, c.addons[i])
 	}
 	return addons, nil
-}
-
-// validate checks both run types, so a typo under run_types.security fails a normal run too.
-func (c addonCatalog) validate(cfg config.Config) error {
-	for _, name := range slices.Concat(cfg.RunTypes.Normal.Addons, cfg.RunTypes.Security.Addons) {
-		if !slices.ContainsFunc(c.addons, func(a workflow.Addon) bool { return a.Name == name }) {
-			return fmt.Errorf("unknown addon %q (run \"drupdater addons\" to list valid names)", name)
-		}
-	}
-	return nil
 }
 
 // configurable returns the sorted addon names, minus the mandatory ones.

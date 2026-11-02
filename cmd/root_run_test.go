@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
+	"github.com/drupdater/drupdater/internal/composer"
 	"github.com/drupdater/drupdater/internal/config"
 	"github.com/drupdater/drupdater/internal/workflow"
 )
@@ -57,8 +58,9 @@ func TestRunUpdateRejectsAnUnreadableConfigFile(t *testing.T) {
 
 	t.Setenv("DRUPDATER_TOKEN", "dummy-token")
 	err := runUpdateWith(t, testApp(), options{config: config.Config{WorkingDir: dir, DryRun: true}, configFile: cfgPath})
-	require.Error(t, err)
-	assert.NotContains(t, err.Error(), "no token provided")
+	var invalid *composer.InvalidConfigError
+	require.ErrorAs(t, err, &invalid)
+	assert.Contains(t, invalid.Reason, cfgPath)
 }
 
 func TestRunUpdateFailsOnACheckoutWithoutAnOrigin(t *testing.T) {

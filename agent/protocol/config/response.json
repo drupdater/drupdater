@@ -1,0 +1,38 @@
+{
+  "protocol": 6,
+  "command": "drupdater:config",
+  "ok": true,
+  "result": {
+    "found": true,
+    "sites": [
+      "default",
+      "second"
+    ],
+    "timeout_ns": 5400000000000,
+    "run_types": {
+      "normal": {
+        "addons": [
+          "composer_allow_plugins",
+          "composer_patches",
+          "composer_diff",
+          "update_hooks",
+          "composer_audit",
+          "unsupported_modules",
+          "code_beautifier"
+        ],
+        "auto_merge": false
+      },
+      "security": {
+        "addons": [
+          "composer_allow_plugins",
+          "composer_patches",
+          "composer_diff",
+          "update_hooks",
+          "composer_audit",
+          "unsupported_modules"
+        ],
+        "auto_merge": true
+      }
+    }
+  }
+}

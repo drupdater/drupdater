@@ -9,7 +9,9 @@ import (
 	"path/filepath"
 	"runtime"
 	"syscall"
+	"time"
 
+	"github.com/drupdater/drupdater/internal/agent"
 	"github.com/drupdater/drupdater/internal/codehosting"
 	"github.com/drupdater/drupdater/internal/composer"
 	"github.com/drupdater/drupdater/internal/config"
@@ -33,6 +35,8 @@ type app struct {
 	trustCheckout func(ctx context.Context, logger *zap.Logger, dir string)
 	// addonCatalog asks the agent which addons there are.
 	addonCatalog func(ctx context.Context, logger *zap.Logger) (addonCatalog, error)
+	// projectConfig asks the agent for .drupdater.yaml, read and checked.
+	projectConfig func(ctx context.Context, logger *zap.Logger, path string) (agent.ConfigReply, error)
 }
 
 func productionApp() app {
@@ -44,6 +48,9 @@ func productionApp() app {
 		newFullCheckDeps: realFullCheckDeps,
 		trustCheckout:    ensureGitSafeDirectory,
 		addonCatalog:     agentAddonCatalog,
+		projectConfig: func(ctx context.Context, logger *zap.Logger, path string) (agent.ConfigReply, error) {
+			return composer.NewCLI(logger).Config(ctx, path)
+		},
 	}
 }
 
@@ -151,7 +158,7 @@ func (a app) runUpdate(cmd *cobra.Command, args []string, opts options) error {
 		logger.Error("failed to read the addon catalogue", zap.Error(err))
 		return err
 	}
-	if err := loadProjectConfig(logger, catalog, configFilePath(opts.configFile, cfg.WorkingDir), &cfg); err != nil {
+	if err := a.loadProjectConfig(cmd.Context(), logger, configFilePath(opts.configFile, cfg.WorkingDir), &cfg); err != nil {
 		return err
 	}
 
@@ -248,19 +255,16 @@ func configFilePath(explicit string, workingDir string) string {
 }
 
 // loadProjectConfig layers .drupdater.yaml onto cfg. A missing file is not an error.
-func loadProjectConfig(logger *zap.Logger, catalog addonCatalog, path string, cfg *config.Config) error {
-	found, err := config.LoadFile(path, cfg)
+func (a app) loadProjectConfig(ctx context.Context, logger *zap.Logger, path string, cfg *config.Config) error {
+	reply, err := a.projectConfig(ctx, logger, path)
 	if err != nil {
 		logger.Error("invalid configuration", zap.String("path", path), zap.Error(err))
 		return err
 	}
-	if err := catalog.validate(*cfg); err != nil {
-		logger.Error("invalid configuration", zap.String("path", path), zap.Error(err))
-		return err
-	}
+	applyProjectConfig(reply, cfg)
 	logger.Debug("configuration loaded",
 		zap.String("path", path),
-		zap.Bool("file_found", found),
+		zap.Bool("file_found", reply.Found),
 		zap.Strings("sites", cfg.Sites),
 		zap.Duration("timeout", cfg.Timeout),
 		zap.Strings("run_types.normal.addons", cfg.RunTypes.Normal.Addons),
@@ -269,6 +273,15 @@ func loadProjectConfig(logger *zap.Logger, catalog addonCatalog, path string, cf
 		zap.Bool("run_types.security.auto_merge", cfg.RunTypes.Security.AutoMerge),
 	)
 	return nil
+}
+
+func applyProjectConfig(reply agent.ConfigReply, cfg *config.Config) {
+	cfg.Sites = reply.Sites
+	cfg.Timeout = time.Duration(reply.TimeoutNS)
+	cfg.RunTypes = config.RunTypesConfig{
+		Normal:   config.RunTypeConfig{Addons: reply.RunTypes.Normal.Addons, AutoMerge: reply.RunTypes.Normal.AutoMerge},
+		Security: config.RunTypeConfig{Addons: reply.RunTypes.Security.Addons, AutoMerge: reply.RunTypes.Security.AutoMerge},
+	}
 }
 
 // handleWorkflowError logs AbortErrors as warnings (non-fatal) and all others as errors (fatal).

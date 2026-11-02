@@ -40,7 +40,7 @@ func TestAddonsReportsAnAgentThatCannotAnswer(t *testing.T) {
 }
 
 func TestAddonsKeepsTheAgentsFailure(t *testing.T) {
-	service, _ := fakeAgentCLI(t, `{"protocol":5,"command":"drupdater:addons","ok":false,`+
+	service, _ := fakeAgentCLI(t, `{"protocol":6,"command":"drupdater:addons","ok":false,`+
 		`"error":{"kind":"internal","reason":"the agent failed","message":"boom"}}`, 1)
 
 	_, err := service.Addons(t.Context())
@@ -73,7 +73,7 @@ func TestRunHookSendsTheRequestFixtureAndDecodesItsReply(t *testing.T) {
 }
 
 func TestRunHookReportsTheAgentsRefusal(t *testing.T) {
-	service, _ := fakeAgentCLI(t, `{"protocol":5,"command":"drupdater:hook","ok":false,`+
+	service, _ := fakeAgentCLI(t, `{"protocol":6,"command":"drupdater:hook","ok":false,`+
 		`"error":{"kind":"invalid_request","reason":"no addon \"nope\" is in the catalogue","message":""}}`, 1)
 
 	_, err := service.RunHook(t.Context(), t.TempDir(), agent.HookRequest{Addon: "nope"})
@@ -100,7 +100,7 @@ func TestReportSendsTheRequestFixtureAndDecodesTheSections(t *testing.T) {
 }
 
 func TestReportReportsTheAgentsFailure(t *testing.T) {
-	service, _ := fakeAgentCLI(t, `{"protocol":5,"command":"drupdater:report","ok":false,`+
+	service, _ := fakeAgentCLI(t, `{"protocol":6,"command":"drupdater:report","ok":false,`+
 		`"error":{"kind":"internal","reason":"the agent failed","message":"boom"}}`, 1)
 
 	_, err := service.Report(t.Context(), agent.ReportRequest{})
@@ -145,7 +145,7 @@ func TestTheMergeRequestFixtureRendersThePublishedExampleReport(t *testing.T) {
 }
 
 func TestMergeRequestReportsTheAgentsFailure(t *testing.T) {
-	service, _ := fakeAgentCLI(t, `{"protocol":5,"command":"drupdater:merge-request","ok":false,`+
+	service, _ := fakeAgentCLI(t, `{"protocol":6,"command":"drupdater:merge-request","ok":false,`+
 		`"error":{"kind":"invalid_request","reason":"the report's composer_audit section is unreadable: fixed must be a list","message":""}}`, 1)
 
 	_, err := service.MergeRequest(t.Context(), agent.MergeRequestRequest{Report: json.RawMessage(`{}`)})

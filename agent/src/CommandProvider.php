@@ -6,6 +6,7 @@ namespace Drupdater\Agent;
 
 use Composer\Plugin\Capability\CommandProvider as CommandProviderCapability;
 use Drupdater\Agent\Command\AddonsCommand;
+use Drupdater\Agent\Command\ConfigCommand;
 use Drupdater\Agent\Command\ConfigExportCommand;
 use Drupdater\Agent\Command\HandshakeCommand;
 use Drupdater\Agent\Command\HookCommand;
@@ -27,6 +28,7 @@ final class CommandProvider implements CommandProviderCapability
     {
         return [
             new AddonsCommand(),
+            new ConfigCommand(),
             new ConfigExportCommand(),
             new HandshakeCommand(),
             new HookCommand(),

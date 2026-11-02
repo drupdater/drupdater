@@ -13,24 +13,24 @@ optional read-only API call.
 
 ### `.drupdater.yaml valid (sites: …)`
 
-Loads and validates the configuration file. The site list is included in the check name,
-so the output confirms which sites the rest of the run will operate on.
+Has the [Drupdater agent](docker-images.md#drupdater-agent) read and check the configuration
+file, its addon names included. The site list is included in the check name, so the output
+confirms which sites the rest of the run will operate on.
 
-**On failure** the name is just `.drupdater.yaml valid` and the detail is the loader
-error — a strict-decode failure on an unknown key, an unparseable `timeout`, an empty
-`sites` list, or the [legacy layout error](../how-to/migrate-config-layout.md).
+**On failure** the name is just `.drupdater.yaml valid` and the detail says what to fix: an
+unknown key, a value of the wrong type, an unparseable `timeout`, an empty or repeated `sites`
+entry, the [legacy layout error](../how-to/migrate-config-layout.md), or an addon name in
+**either** run type block that the agent's catalogue lacks:
+
+```text
+unknown addon "code_beautifer" (run "drupdater addons" to list valid names)
+```
+
+When the agent cannot be asked at all, the detail is `failed to read the configuration: …`,
+which the `drupdater agent installed in Composer` check below explains.
 
 The remaining config-dependent checks still run, against the defaults, so one bad key does
 not hide every other problem in the project.
-
-### `addon names resolve`
-
-Every addon name in **both** run type blocks is checked against the [Drupdater
-agent](docker-images.md#drupdater-agent)'s addon catalogue, regardless of which mode is active.
-
-**On failure:** `unknown addon "code_beautifer" (run "drupdater addons" to list valid
-names)`, or `failed to read the addon catalogue: …` when the agent cannot be asked — which the
-`drupdater agent installed in Composer` check below explains.
 
 ### `git history complete (not a shallow clone)`
 

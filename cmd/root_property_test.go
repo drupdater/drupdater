@@ -11,7 +11,6 @@ import (
 
 	"github.com/drupdater/drupdater/internal/config"
 	"github.com/drupdater/drupdater/internal/logging"
-	"github.com/drupdater/drupdater/internal/workflow"
 )
 
 // COMPOSER_AUTH's shape is Composer's to extend, so the walk that finds its secrets has to hold
@@ -154,39 +153,11 @@ func TestPropertyConfigurableAddonsMatchesTheCatalogue(t *testing.T) {
 		assert.True(t, slices.IsSorted(names), "the printed list is sorted")
 		assert.Len(t, slices.Compact(slices.Clone(names)), len(names), "and free of duplicates")
 
-		// Round-trip: every name it offers is a name validateAddons accepts, under either run
-		// type, since a typo in one block aborts a run in the other too.
+		// Every name it offers is one a run can create, under either run type.
 		split := rapid.IntRange(0, len(names)).Draw(t, "split")
-		assert.NoError(t, agentCatalog.validate(config.Config{RunTypes: config.RunTypesConfig{
-			Normal:   config.RunTypeConfig{Addons: names[:split]},
-			Security: config.RunTypeConfig{Addons: names[split:]},
-		}}))
-	})
-}
-
-func TestPropertyValidateAddonsRejectsUnknownNamesInEitherRunType(t *testing.T) {
-	rapid.Check(t, func(t *rapid.T) {
-		unknown := rapid.StringMatching(`[a-z_]{1,20}`).
-			Filter(func(s string) bool {
-				return !slices.ContainsFunc(agentCatalog.addons, func(a workflow.Addon) bool { return a.Name == s })
-			}).
-			Draw(t, "unknown")
-		known := rapid.SliceOfNDistinct(rapid.SampledFrom(agentCatalog.configurable()), 0, 3, rapid.ID).Draw(t, "known")
-		inSecurity := rapid.Bool().Draw(t, "inSecurity")
-
-		config := config.Config{RunTypes: config.RunTypesConfig{
-			Normal:   config.RunTypeConfig{Addons: known},
-			Security: config.RunTypeConfig{Addons: known},
-		}}
-		if inSecurity {
-			config.RunTypes.Security.Addons = append(slices.Clone(known), unknown)
-		} else {
-			config.RunTypes.Normal.Addons = append(slices.Clone(known), unknown)
-		}
-
-		// Symmetric on purpose, so a typo surfaces the first time the tool runs at all.
-		err := agentCatalog.validate(config)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), unknown)
+		_, err := agentCatalog.create(config.Config{RunTypes: config.RunTypesConfig{Normal: config.RunTypeConfig{Addons: names[:split]}}})
+		require.NoError(t, err)
+		_, err = agentCatalog.create(config.Config{Security: true, RunTypes: config.RunTypesConfig{Security: config.RunTypeConfig{Addons: names[split:]}}})
+		require.NoError(t, err)
 	})
 }

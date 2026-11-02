@@ -6,7 +6,8 @@
     "require": {
         "php": ">=8.2",
         "composer-plugin-api": "^2.6",
-        "ion-bazan/composer-diff": "^2.4"
+        "ion-bazan/composer-diff": "^2.4",
+        "symfony/yaml": "^6.4 || ^7.0"
     },
     "require-dev": {
         "composer/composer": "~2.10.0",

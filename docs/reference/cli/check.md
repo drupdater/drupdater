@@ -38,13 +38,12 @@ The full ordered list, with the exact check names as they appear in output and i
 In short:
 
 1. `.drupdater.yaml valid (sites: …)`
-2. `addon names resolve`
-3. `git history complete (not a shallow clone)`
-4. `drupdater agent installed in Composer`
-5. `PHP platform requirements satisfied`
-6. `site "<name>": settings.php` — once per configured site
-7. `repository host recognized (GitHub/GitLab)`
-8. `token authenticates` — only when a token was given
+2. `git history complete (not a shallow clone)`
+3. `drupdater agent installed in Composer`
+4. `PHP platform requirements satisfied`
+5. `site "<name>": settings.php` — once per configured site
+6. `repository host recognized (GitHub/GitLab)`
+7. `token authenticates` — only when a token was given
 
 With `--full`, three more are appended: `clone for full check`, `composer install`, and
 `site "<name>" installs from configuration` per site.
@@ -61,7 +60,6 @@ Results are printed one per line, with failures detailed:
 
 ```text
 ✓ .drupdater.yaml valid (sites: default)
-✓ addon names resolve
 ✓ git history complete (not a shallow clone)
 ✓ drupdater agent installed in Composer
 ✓ PHP platform requirements satisfied

@@ -111,9 +111,7 @@ func (a app) runCheapChecks(
 	token string,
 	resolveErr error,
 ) []workflow.CheckResult {
-	var results []workflow.CheckResult
-	catalog, catalogErr := a.addonCatalog(ctx, logger)
-	results = append(results, checkConfigAndAddons(catalog, catalogErr, cfgFilePath, cfg)...)
+	results := []workflow.CheckResult{a.checkConfig(ctx, logger, cfgFilePath, cfg)}
 	results = append(results, workflow.CheckGitHistoryComplete(ctx, repository, cfg.WorkingDir))
 	results = append(results, workflow.CheckComposerAgent(ctx, composerSvc, cfg.WorkingDir))
 	results = append(results, workflow.CheckPlatformRequirements(ctx, composerSvc, cfg.WorkingDir))
@@ -156,25 +154,15 @@ func checkToken(args []string) string {
 	return os.Getenv("DRUPDATER_TOKEN")
 }
 
-// checkConfigAndAddons validates .drupdater.yaml and its addon names against the agent's
-// catalogue, catalogErr when it could not be read, and fills cfg for the rest.
-func checkConfigAndAddons(catalog addonCatalog, catalogErr error, path string, cfg *config.Config) []workflow.CheckResult {
-	if _, err := config.LoadFile(path, cfg); err != nil {
-		return []workflow.CheckResult{workflow.CheckFailed(".drupdater.yaml valid", err.Error())}
+// checkConfig reads .drupdater.yaml through the agent, which checks its addon names against the
+// catalogue too, and fills cfg for the rest.
+func (a app) checkConfig(ctx context.Context, logger *zap.Logger, path string, cfg *config.Config) workflow.CheckResult {
+	reply, err := a.projectConfig(ctx, logger, path)
+	if err != nil {
+		return workflow.CheckFailed(".drupdater.yaml valid", err.Error())
 	}
-
-	results := []workflow.CheckResult{
-		workflow.CheckOK(fmt.Sprintf(".drupdater.yaml valid (sites: %s)", strings.Join(cfg.Sites, ", "))),
-	}
-
-	const addonsName = "addon names resolve"
-	if catalogErr != nil {
-		return append(results, workflow.CheckFailed(addonsName, catalogErr.Error()))
-	}
-	if err := catalog.validate(*cfg); err != nil {
-		return append(results, workflow.CheckFailed(addonsName, err.Error()))
-	}
-	return append(results, workflow.CheckOK(addonsName))
+	applyProjectConfig(reply, cfg)
+	return workflow.CheckOK(fmt.Sprintf(".drupdater.yaml valid (sites: %s)", strings.Join(cfg.Sites, ", ")))
 }
 
 // checkVCS reports whether the URL routes to a known provider and, with a token, authenticates.

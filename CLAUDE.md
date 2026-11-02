@@ -95,14 +95,14 @@ Where things live. For *how they work*, read `docs/explanation/` rather than dup
 | Path | Contains |
 |---|---|
 | `main.go` → `cmd/root.go` | Cobra commands built per call by `app`, which holds every outside dependency |
-| `cmd/addons.go` | The agent's addon catalogue: validating `.drupdater.yaml` and building the run's addons from it; the `addons` command |
+| `cmd/addons.go` | The agent's addon catalogue: building the run's addons from the names `drupdater:config` resolved; the `addons` command |
 | `cmd/secrets.go`, `cmd/checkout.go` | Token resolution and secret registration; checkout URL/branch and `safe.directory` |
 | `cmd/check.go` | The `check` command and its cheap/full check tiers |
 | `internal/workflow/runner.go` | `Runner.Run` and the nine phases; their bodies in `update.go`, `sites.go`, `branch.go`, `publish.go` |
 | `internal/workflow/addon.go`, `events.go` | `Addon` (a name and a stage per event), `Stage`, the five events and what each hands its hooks, `AbortError` |
 | `internal/workflow/pipeline.go` | Runs each hook in the agent in stage order, commits between hooks, merges the plan, keeps the findings, asks the agent for the report sections |
 | `internal/workflow/preflight.go` | Checks shared between `check` and the run's own `preflight` phase |
-| `internal/config/` | `Config`; `file.go` loads `.drupdater.yaml`: defaults, strict decode, legacy-layout rejection |
+| `internal/config/` | `Config`, what a run is invoked with; `.drupdater.yaml`'s part of it comes from the agent's `drupdater:config` |
 | `internal/buildinfo/` | `Version`, set by `-ldflags` |
 | `internal/codehosting/` | GitHub and GitLab implementations, provider factory |
 | `internal/report/` | The published JSON report schema and its atomic writer |
@@ -112,9 +112,10 @@ Where things live. For *how they work*, read `docs/explanation/` rather than dup
 | `internal/php/` | Running a composer command under Composer's environment, and the `CommandFactory` each wrapper holds as its test seam |
 | `agent/` | `drupdater/agent`, the global Composer plugin the image installs: every addon, the `composer drupdater:*` commands, its PHPUnit suite, and `protocol/`, the request/reply fixtures both sides test against |
 | `agent/src/Addon/` | **The ten addons**, their contract (`Addon`, `Event`, `HookResult`, `Findings`), `Catalogue::builtin()` — which addons exist, mandatory and default — and `Services`, the composition root `create()` builds each from |
-| `agent/src/Command/` | `drupdater:addons`, `drupdater:hook`, `drupdater:report`, `drupdater:merge-request`, and the runner's own `project`, `install`, `resolve`, `platform-check`, `handshake` and the site commands (`site-facts`, `site-update`, `config-export`, `site-install`, `site-database`, `site-restore`) |
+| `agent/src/Command/` | `drupdater:addons`, `drupdater:config`, `drupdater:hook`, `drupdater:report`, `drupdater:merge-request`, and the runner's own `project`, `install`, `resolve`, `platform-check`, `handshake` and the site commands (`site-facts`, `site-update`, `config-export`, `site-install`, `site-database`, `site-restore`) |
 | `agent/src/Tools/`, `DrupalOrg/`, `Patches/`, `PatchCheck/`, `Resolve/`, `Audit/`, `Plugins/`, `Project/` | What the addons run: phpcs, Rector, drush, Composer again; drupal.org and git.drupalcode.org; the patches; the update; the audit; allow-plugins; the project |
 | `agent/src/Site/` | A site's throwaway SQLite database: the `settings.php` block and the `core.extension.yml` edits |
+| `agent/src/Config/` | `.drupdater.yaml` read and checked for `drupdater:config`: defaults, strict keys, legacy layout, Go durations, addon names resolved against the catalogue |
 | `agent/src/MergeRequest/` | The MR title and description, rendered from the run report by `drupdater:merge-request`: one `Section` per section |
 | `agent/resources/` | The Rector config `deprecations_remover` runs with; `drush/`, the `drupdater:*` Drush commands loaded with `drush --include` |
 | `internal/agent/` | `agent.Call`: runs a `composer drupdater:*` command, decodes its envelope, returns an `*agent.Error` with a `Kind` |
@@ -196,7 +197,7 @@ Mocks are generated with mockery v3 (config in `.mockery.yml`). After changing a
 
 ## Fuzzing
 
-Go's built-in fuzzer covers what a hand-written rapid generator cannot reach: arbitrary bytes, invalid UTF-8, degenerate separators. Convention: file `<subject>_fuzz_test.go`, every target named `Fuzz…`, seeded via `f.Add` with the real shapes *and* the degenerate ones. Three targets, on input drupdater does not control — the repository URL, `.drupdater.yaml`, and the redactor.
+Go's built-in fuzzer covers what a hand-written rapid generator cannot reach: arbitrary bytes, invalid UTF-8, degenerate separators. Convention: file `<subject>_fuzz_test.go`, every target named `Fuzz…`, seeded via `f.Add` with the real shapes *and* the degenerate ones. Two targets, on input drupdater does not control — the repository URL and the redactor; `.drupdater.yaml` is read by the agent, whose suite covers hostile files.
 
 Same discipline as properties: a failing input lands in `testdata/fuzz/<target>/<hash>`, gets committed (`go test` replays it forever after), **and** gets an ordinary test naming the counterexample, because the blocking mutation gate must not depend on a generative run. Fuzzing itself is not a PR gate — `fuzz.yml` runs weekly; `go.yml`'s `test` job runs the seeds and counterexamples on every push. Details: `docs/contributing/development.md`.
 

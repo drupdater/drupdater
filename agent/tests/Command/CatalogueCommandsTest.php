@@ -10,6 +10,7 @@ use Drupdater\Agent\Addon\CatalogueEntry;
 use Drupdater\Agent\Addon\Findings;
 use Drupdater\Agent\Command\AddonsCommand;
 use Drupdater\Agent\Command\AgentCommand;
+use Drupdater\Agent\Command\ConfigCommand;
 use Drupdater\Agent\Command\MergeRequestCommand;
 use Drupdater\Agent\Command\ReportCommand;
 use Drupdater\Agent\Tests\Addon\ScriptedAddon;
@@ -19,7 +20,8 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Tester\CommandTester;
 
 /**
- * drupdater:addons, drupdater:report and drupdater:merge-request, the commands that need no project.
+ * drupdater:addons, drupdater:config, drupdater:report and drupdater:merge-request, the commands
+ * that need no project.
  */
 final class CatalogueCommandsTest extends TestCase
 {
@@ -38,6 +40,51 @@ final class CatalogueCommandsTest extends TestCase
         self::assertEquals(self::fixture('addons/response.json'), $reply);
     }
 
+    public function testConfigAnswersTheFixture(): void
+    {
+        $dir = '/tmp/drupdater-config-fixture';
+        (new \Symfony\Component\Filesystem\Filesystem())->dumpFile($dir . '/.drupdater.yaml', "sites: [default, second]\ntimeout: 1h30m\nrun_types:\n  normal:\n    addons: [code_beautifier]\n  security:\n    auto_merge: true\n");
+        try {
+            [$status, $reply] = self::askVerbatim(new ConfigCommand(), 'config/request.json');
+        }
+        finally {
+            (new \Symfony\Component\Filesystem\Filesystem())->remove($dir);
+        }
+
+        self::assertSame(0, $status);
+        self::assertEquals(self::fixture('config/response.json'), $reply);
+    }
+
+    public function testConfigFailsAnInvalidFileWithWhatToFix(): void
+    {
+        $path = $this->scratchDir() . '/.drupdater.yaml';
+        file_put_contents($path, "sites: []\n");
+
+        [$status, $reply] = self::ask(new ConfigCommand(), ['protocol' => 6, 'request' => ['path' => $path]]);
+
+        self::assertSame(1, $status);
+        self::assertSame(['kind' => 'failed', 'reason' => 'in ' . $path . ': no sites configured: "sites" must list at least one Drupal site name', 'message' => ''], $reply['error']);
+    }
+
+    /**
+     * @return iterable<string, array{mixed}>
+     */
+    public static function invalidConfigPaths(): iterable
+    {
+        yield 'missing' => [null];
+        yield 'relative' => ['.drupdater.yaml'];
+        yield 'not a string' => [1];
+    }
+
+    #[DataProvider('invalidConfigPaths')]
+    public function testConfigNeedsAnAbsolutePath(mixed $path): void
+    {
+        [$status, $reply] = self::ask(new ConfigCommand(), ['protocol' => 6, 'request' => ['path' => $path]]);
+
+        self::assertSame(1, $status);
+        self::assertSame(['kind' => 'invalid_request', 'reason' => 'path must be an absolute path', 'message' => ''], $reply['error']);
+    }
+
     public function testReportAnswersTheFixture(): void
     {
         [$status, $reply] = self::askVerbatim(new ReportCommand(), 'report/request.json');
@@ -54,7 +101,7 @@ final class CatalogueCommandsTest extends TestCase
             return null;
         };
 
-        [, $reply, $output] = self::ask(new ReportCommand(new Catalogue([new CatalogueEntry(ScriptedAddon::class)])), ['protocol' => 5, 'request' => ['addons' => [
+        [, $reply, $output] = self::ask(new ReportCommand(new Catalogue([new CatalogueEntry(ScriptedAddon::class)])), ['protocol' => 6, 'request' => ['addons' => [
             ['addon' => 'scripted', 'findings' => [['event' => 'post-code-update', 'site' => '', 'finding' => 7, 'committed' => ['c']]]],
         ]]]);
 
@@ -80,7 +127,7 @@ final class CatalogueCommandsTest extends TestCase
     #[DataProvider('invalidReportRequests')]
     public function testReportRefusesAnInvalidRequest(array $request, string $reason): void
     {
-        [$status, $reply] = self::ask(new ReportCommand(), ['protocol' => 5, 'request' => $request]);
+        [$status, $reply] = self::ask(new ReportCommand(), ['protocol' => 6, 'request' => $request]);
 
         self::assertSame(1, $status);
         self::assertSame(['kind' => 'invalid_request', 'reason' => $reason, 'message' => ''], $reply['error']);
@@ -96,7 +143,7 @@ final class CatalogueCommandsTest extends TestCase
 
     public function testAReportWithoutAddonsGetsADescriptionWithoutSections(): void
     {
-        [$status, $reply] = self::ask(new MergeRequestCommand(), ['protocol' => 5, 'request' => ['report' => ['mode' => 'normal', 'started_at' => '2026-07-25T09:00:00Z']]]);
+        [$status, $reply] = self::ask(new MergeRequestCommand(), ['protocol' => 6, 'request' => ['report' => ['mode' => 'normal', 'started_at' => '2026-07-25T09:00:00Z']]]);
 
         self::assertSame(0, $status);
         self::assertSame('July 2026: Drupal Maintenance Updates', $reply['result']['title']);
@@ -121,7 +168,7 @@ final class CatalogueCommandsTest extends TestCase
     #[DataProvider('invalidMergeRequestRequests')]
     public function testMergeRequestRefusesAnInvalidRequest(array $request, string $reason): void
     {
-        [$status, $reply] = self::ask(new MergeRequestCommand(), ['protocol' => 5, 'request' => $request]);
+        [$status, $reply] = self::ask(new MergeRequestCommand(), ['protocol' => 6, 'request' => $request]);
 
         self::assertSame(1, $status);
         self::assertSame(['kind' => 'invalid_request', 'reason' => $reason, 'message' => ''], $reply['error']);
