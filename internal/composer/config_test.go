@@ -1,14 +1,18 @@
 package composer
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 
 	"github.com/drupdater/drupdater/internal/agent"
 )
@@ -70,4 +74,20 @@ func TestAnAgentThatCannotAnswerIsNoInvalidConfiguration(t *testing.T) {
 	agentErr, ok := errors.AsType[*agent.Error](err)
 	require.True(t, ok, "%v", err)
 	assert.Equal(t, agent.Internal, agentErr.Kind)
+}
+
+func TestARelativePathNeedsAWorkingDirectoryThatStillExists(t *testing.T) {
+	asked := false
+	service := &CLI{logger: zap.NewNop(), newCommand: func(ctx context.Context, name string, arg ...string) *exec.Cmd {
+		asked = true
+		return exec.CommandContext(ctx, name, arg...)
+	}}
+	gone := t.TempDir()
+	t.Chdir(gone)
+	require.NoError(t, os.Remove(gone))
+
+	_, err := service.Config(t.Context(), ".drupdater.yaml")
+
+	require.Error(t, err)
+	assert.False(t, asked, "the agent is not asked about a path it cannot be told")
 }

@@ -145,3 +145,12 @@ func TestTheAgentsCatalogueIsAskedOfComposer(t *testing.T) {
 	require.ErrorContains(t, err, "failed to read the addon catalogue")
 	assert.Contains(t, err.Error(), "composer")
 }
+
+func TestTheProjectConfigIsAskedOfComposer(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+
+	_, err := productionApp().projectConfig(t.Context(), zap.NewNop(), "/project/.drupdater.yaml")
+
+	require.ErrorContains(t, err, "failed to read the configuration")
+	assert.Contains(t, err.Error(), "composer")
+}
