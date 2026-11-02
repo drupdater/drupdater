@@ -103,7 +103,7 @@ func TestReportWrittenOnDryRun(t *testing.T) {
 // The most valuable case: a run that fails partway leaves a report naming the phase that failed.
 func TestReportWrittenOnFailureNamesThePhase(t *testing.T) {
 	h := newRunHarness(t, false)
-	h.installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(errors.New("drush exploded"))
+	h.sites.EXPECT().Install(anyCtx, testCheckout, "site1").Return(errors.New("drush exploded"))
 	h.repository.EXPECT().Head(anyCtx).Return("", assert.AnError).Maybe()
 	h.expectUpdate()
 	h.repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
@@ -124,7 +124,7 @@ func TestReportWrittenOnFailureNamesThePhase(t *testing.T) {
 // sections only from the deferred write.
 func TestReportOfARunFailingBeforeRenderingCarriesTheAddonSections(t *testing.T) {
 	h := newRunHarness(t, false)
-	h.installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(assert.AnError)
+	h.sites.EXPECT().Install(anyCtx, testCheckout, "site1").Return(assert.AnError)
 	h.repository.EXPECT().Head(anyCtx).Return("", assert.AnError).Maybe()
 	h.expectUpdate()
 	h.repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
@@ -160,9 +160,9 @@ func TestReportWrittenWhenAcquiringTheWorkingCopyFails(t *testing.T) {
 // watching many repositories does not treat a healthy, up-to-date site as needing attention.
 func TestReportNoChangesIsNotAFailure(t *testing.T) {
 	h := newRunHarness(t, false)
-	h.installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil).Maybe()
-	h.installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil).Maybe()
-	h.installer.EXPECT().RestoreSettings(anyCtx, testCheckout, "site1").Return(nil).Maybe()
+	h.sites.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil).Maybe()
+	h.sites.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil).Maybe()
+	h.sites.EXPECT().RestoreSettings(anyCtx, testCheckout, "site1").Return(nil).Maybe()
 	h.repository.EXPECT().Head(anyCtx).Return("", assert.AnError).Maybe()
 	h.composer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false).
 		Return([]composer.PackageChange{}, nil)
@@ -182,7 +182,7 @@ func TestRunWithoutReportSinkIsUnaffected(t *testing.T) {
 	h.expectFullRun()
 	h.expectDefaults()
 
-	svc := New(zap.NewNop(), h.config, h.drush, h.vcsProvider, h.repoSvc, h.installer, h.composer)
+	svc := New(zap.NewNop(), h.config, h.sites, h.vcsProvider, h.repoSvc, h.composer)
 
 	require.NoError(t, svc.Run(t.Context(), nil))
 	assert.Nil(t, h.got)

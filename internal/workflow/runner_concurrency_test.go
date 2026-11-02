@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"context"
+	"encoding/json"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -62,10 +63,11 @@ func TestRunWithConcurrentSites(t *testing.T) {
 		baseline := newOccupancyProbe()
 		commitTail := newOccupancyProbe()
 		for _, site := range sites {
-			h.installer.EXPECT().Install(anyCtx, testCheckout, site).RunAndReturn(baseline.probe).Once()
-			h.drush.EXPECT().Facts(anyCtx, testCheckout, site).Return(syncFacts(testCheckout+"/config/"+site), nil)
-			h.drush.EXPECT().LocalFacts(anyCtx, testCheckout, site).Return(syncFacts(testCheckout+"/config/"+site), nil)
-			h.drush.EXPECT().ExportConfiguration(anyCtx, testCheckout, site).RunAndReturn(commitTail.probe).Once()
+			h.sites.EXPECT().Install(anyCtx, testCheckout, site).RunAndReturn(baseline.probe).Once()
+			h.sites.EXPECT().Facts(anyCtx, testCheckout, site).Return(siteFacts, nil)
+			h.sites.EXPECT().ExportConfiguration(anyCtx, testCheckout, site).RunAndReturn(func(ctx context.Context, dir string, site string) (string, error) {
+				return "config/" + site, commitTail.probe(ctx, dir, site)
+			}).Once()
 			h.worktree.EXPECT().Stage(anyCtx, []string{"config/" + site}).Return(nil).Once()
 		}
 
@@ -84,34 +86,30 @@ func TestRunWithConcurrentSites(t *testing.T) {
 // the exports happen in. stub sets what each site's update hooks do.
 func sitesRunner(t *testing.T, sites []string, concurrency int, stub func(site string) error) (*run, *fakeCommitter, func() []string) {
 	t.Helper()
-	installer := NewMockInstaller(t)
-	drush := NewMockDrush(t)
+	mockSites := NewMockSites(t)
 	var mu sync.Mutex
 	var exported []string
 
 	for _, site := range sites {
-		installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, site).Return(nil)
-		installer.EXPECT().RestoreSettings(anyCtx, testCheckout, site).Return(nil).Once()
-		drush.EXPECT().Facts(anyCtx, testCheckout, site).Return(syncFacts(testCheckout+"/config/"+site), nil)
-		drush.EXPECT().UpdateSite(anyCtx, testCheckout, site).RunAndReturn(func(context.Context, string, string) error {
-			return stub(site)
+		mockSites.EXPECT().ConfigureDatabase(anyCtx, testCheckout, site).Return(nil)
+		mockSites.EXPECT().RestoreSettings(anyCtx, testCheckout, site).Return(nil).Once()
+		mockSites.EXPECT().Facts(anyCtx, testCheckout, site).Return(siteFacts, nil)
+		mockSites.EXPECT().Update(anyCtx, testCheckout, site).RunAndReturn(func(context.Context, string, string) (json.RawMessage, error) {
+			return siteFacts, stub(site)
 		})
-		drush.EXPECT().ConfigResave(anyCtx, testCheckout, site).Return(nil).Maybe()
-		drush.EXPECT().LocalFacts(anyCtx, testCheckout, site).Return(syncFacts(testCheckout+"/config/"+site), nil).Maybe()
-		drush.EXPECT().ExportConfiguration(anyCtx, testCheckout, site).RunAndReturn(func(context.Context, string, string) error {
+		mockSites.EXPECT().ExportConfiguration(anyCtx, testCheckout, site).RunAndReturn(func(context.Context, string, string) (string, error) {
 			mu.Lock()
 			defer mu.Unlock()
 			exported = append(exported, site)
-			return nil
+			return "config/" + site, nil
 		}).Maybe()
 	}
 
 	committer := &fakeCommitter{result: true}
 	r := testRun(services{
-		logger:    zap.NewNop(),
-		config:    config.Config{Sites: sites, Concurrency: concurrency},
-		installer: installer,
-		drush:     drush,
+		logger: zap.NewNop(),
+		config: config.Config{Sites: sites, Concurrency: concurrency},
+		sites:  mockSites,
 	}, repo.Checkout{Path: testCheckout})
 	r.committer = committer
 	return r, committer, func() []string {

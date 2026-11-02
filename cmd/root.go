@@ -13,13 +13,10 @@ import (
 	"github.com/drupdater/drupdater/internal/codehosting"
 	"github.com/drupdater/drupdater/internal/composer"
 	"github.com/drupdater/drupdater/internal/config"
-	"github.com/drupdater/drupdater/internal/drush"
 	"github.com/drupdater/drupdater/internal/logging"
 	"github.com/drupdater/drupdater/internal/repo"
 	"github.com/drupdater/drupdater/internal/report"
-	"github.com/drupdater/drupdater/internal/siteinstall"
 	"github.com/drupdater/drupdater/internal/workflow"
-	"github.com/drupdater/drupdater/scripts"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -41,7 +38,7 @@ type app struct {
 func productionApp() app {
 	return app{
 		newRunner: func(logger *zap.Logger, cfg config.Config, s workflowServices, opts ...workflow.Option) updateRunner {
-			return workflow.New(logger, cfg, s.drush, s.platform, s.git, s.installer, s.composer, opts...)
+			return workflow.New(logger, cfg, s.sites, s.platform, s.git, s.composer, opts...)
 		},
 		newPlatform:      codehosting.New,
 		newFullCheckDeps: realFullCheckDeps,
@@ -52,11 +49,10 @@ func productionApp() app {
 
 // workflowServices are what runUpdate builds for the workflow to run with.
 type workflowServices struct {
-	drush     workflow.Drush
-	platform  codehosting.Platform
-	git       workflow.GitService
-	installer workflow.Installer
-	composer  workflow.Composer
+	sites    workflow.Sites
+	platform codehosting.Platform
+	git      workflow.GitService
+	composer workflow.Composer
 }
 
 // options is what one command tree's flags set; a run gets a copy, so nothing carries over.
@@ -159,14 +155,6 @@ func (a app) runUpdate(cmd *cobra.Command, args []string, opts options) error {
 		return err
 	}
 
-	scriptsDir, err := scripts.Extract()
-	if err != nil {
-		logger.Error("failed to extract the bundled scripts", zap.Error(err))
-		return err
-	}
-	defer os.RemoveAll(scriptsDir)
-
-	drush := drush.NewCLI(logger, scripts.DrushInclude(scriptsDir))
 	composer := composer.NewCLI(logger, composerOptions(cfg)...)
 	siteData, err := os.MkdirTemp("", "drupdater-sites-")
 	if err != nil {
@@ -174,7 +162,6 @@ func (a app) runUpdate(cmd *cobra.Command, args []string, opts options) error {
 		return err
 	}
 	defer os.RemoveAll(siteData)
-	installer := siteinstall.NewInstaller(logger, drush, composer, siteData)
 	git := repo.New()
 
 	// In checkout mode the URL and target branch come from the checkout; --branch is --clone only.
@@ -209,11 +196,10 @@ func (a app) runUpdate(cmd *cobra.Command, args []string, opts options) error {
 		runnerOpts = append(runnerOpts, workflow.WithReportSink(reportSink(logger, redactor, cfg.ReportPath)))
 	}
 	runner := a.newRunner(logger, cfg, workflowServices{
-		drush:     drush,
-		platform:  platform,
-		git:       git,
-		installer: installer,
-		composer:  composer,
+		sites:    composer.Sites(siteData),
+		platform: platform,
+		git:      git,
+		composer: composer,
 	}, runnerOpts...)
 
 	err = runner.Run(cmd.Context(), addons)

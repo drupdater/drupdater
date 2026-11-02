@@ -29,10 +29,17 @@ func composerWithEnv(env []string) php.CommandFactory {
 	}
 }
 
-func TestExecComposerEnvironmentReachesTheSubprocess(t *testing.T) {
+// run is any composer invocation of service's, as every agent call makes one.
+func run(t *testing.T, service *CLI, dir string) (string, error) {
+	t.Helper()
+	out, _, err := service.command(dir).Split(t.Context(), "drupdater:handshake")
+	return out, err
+}
+
+func TestComposerEnvironmentReachesTheSubprocess(t *testing.T) {
 	service := &CLI{logger: zap.NewNop()}
 
-	t.Run("execComposer forces the process timeout over an inherited one", func(t *testing.T) {
+	t.Run("forces the process timeout over an inherited one", func(t *testing.T) {
 		// Asserted on what the subprocess sees, not the slice drupdater built, so a value
 		// that never survives into the child is caught.
 		service.newCommand = composerWithEnv(helperEnv(
@@ -40,26 +47,26 @@ func TestExecComposerEnvironmentReachesTheSubprocess(t *testing.T) {
 			"COMPOSER_PROCESS_TIMEOUT=300",
 		))
 
-		out, err := service.execComposer(t.Context(), "/tmp", "update")
+		out, err := run(t, service, "/tmp")
 		require.NoError(t, err)
 		assert.Equal(t, "0", out)
 	})
 
-	t.Run("execComposer disables the implicit audit", func(t *testing.T) {
+	t.Run("disables the implicit audit", func(t *testing.T) {
 		service.newCommand = composerWithEnv(helperEnv("GO_HELPER_PROCESS_PRINT_ENV=COMPOSER_NO_AUDIT"))
 
-		out, err := service.execComposer(t.Context(), "/tmp", "update")
+		out, err := run(t, service, "/tmp")
 		require.NoError(t, err)
 		assert.Equal(t, "1", out)
 	})
 
-	t.Run("execComposer passes the rest of the environment through", func(t *testing.T) {
+	t.Run("passes the rest of the environment through", func(t *testing.T) {
 		service.newCommand = composerWithEnv(helperEnv(
 			"GO_HELPER_PROCESS_PRINT_ENV=COMPOSER_AUTH",
 			`COMPOSER_AUTH={"http-basic":{}}`,
 		))
 
-		out, err := service.execComposer(t.Context(), "/tmp", "update")
+		out, err := run(t, service, "/tmp")
 		require.NoError(t, err)
 		assert.JSONEq(t, `{"http-basic":{}}`, out, "private registry credentials must still reach composer")
 	})
@@ -77,7 +84,7 @@ func TestExecComposerEnvironmentReachesTheSubprocess(t *testing.T) {
 			return exec.CommandContext(ctx, os.Args[0], cs...) //nolint:gosec // test helper process
 		}
 
-		out, err := service.execComposer(t.Context(), "/tmp", "update")
+		out, err := run(t, service, "/tmp")
 		require.NoError(t, err)
 		assert.Equal(t, "inherited", out)
 	})
@@ -93,7 +100,7 @@ func TestWithoutBlocking(t *testing.T) {
 		service := NewCLI(zap.NewNop(), WithoutBlocking())
 		service.newCommand = printBlocking
 
-		out, err := service.execComposer(t.Context(), t.TempDir(), "update")
+		out, err := run(t, service, t.TempDir())
 		require.NoError(t, err)
 
 		assert.Equal(t, "1", out, "it must also win over an inherited value")
@@ -105,7 +112,7 @@ func TestWithoutBlocking(t *testing.T) {
 		service := NewCLI(zap.NewNop())
 		service.newCommand = printBlocking
 
-		out, err := service.execComposer(t.Context(), t.TempDir(), "update")
+		out, err := run(t, service, t.TempDir())
 		require.NoError(t, err)
 
 		assert.Equal(t, "unset", out)

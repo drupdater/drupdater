@@ -13,13 +13,10 @@ import (
 	"github.com/drupdater/drupdater/internal/codehosting"
 	"github.com/drupdater/drupdater/internal/composer"
 	"github.com/drupdater/drupdater/internal/config"
-	"github.com/drupdater/drupdater/internal/drush"
 	"github.com/drupdater/drupdater/internal/logging"
 	"github.com/drupdater/drupdater/internal/repo"
 	"github.com/drupdater/drupdater/internal/report"
-	"github.com/drupdater/drupdater/internal/siteinstall"
 	"github.com/drupdater/drupdater/internal/workflow"
-	"github.com/drupdater/drupdater/scripts"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -215,11 +212,10 @@ func (a app) checkVCS(ctx context.Context, logger *zap.Logger, repositoryURL str
 
 // fullCheckComposer is what the --full tier needs from composer.
 type fullCheckComposer interface {
-	siteinstall.Composer
 	Install(ctx context.Context, path string) error
 }
 
-// siteInstaller is the one method the tier needs from siteinstall.Installer.
+// siteInstaller is the one method the tier needs of composer.Sites.
 type siteInstaller interface {
 	Install(ctx context.Context, dir string, site string) error
 }
@@ -229,7 +225,7 @@ type siteInstaller interface {
 type fullCheckDeps struct {
 	clone        func(ctx context.Context, repositoryURL string, branch string, token string) (string, error)
 	newComposer  func() fullCheckComposer
-	newInstaller func(c fullCheckComposer, dataDir string, drushInclude string) (siteInstaller, error)
+	newInstaller func(dataDir string) siteInstaller
 }
 
 // realFullCheckDeps builds the dependencies that really clone and install.
@@ -240,10 +236,8 @@ func realFullCheckDeps(logger *zap.Logger) fullCheckDeps {
 				CloneRepository(ctx, repositoryURL, branch, token, repo.Identity{})
 			return checkout.Path, err
 		},
-		newComposer: func() fullCheckComposer { return composer.NewCLI(logger) },
-		newInstaller: func(c fullCheckComposer, dataDir string, drushInclude string) (siteInstaller, error) {
-			return siteinstall.NewInstaller(logger, drush.NewCLI(logger, drushInclude), c, dataDir), nil
-		},
+		newComposer:  func() fullCheckComposer { return composer.NewCLI(logger) },
+		newInstaller: func(dataDir string) siteInstaller { return composer.NewCLI(logger).Sites(dataDir) },
 	}
 }
 
@@ -280,16 +274,7 @@ func (a app) runFullChecks(ctx context.Context, logger *zap.Logger, cfg config.C
 	}
 	defer os.RemoveAll(siteData)
 
-	scriptsDir, err := scripts.Extract()
-	if err != nil {
-		return append(results, workflow.CheckFailed("drush site-install --existing-config", err.Error()))
-	}
-	defer os.RemoveAll(scriptsDir)
-
-	installer, err := deps.newInstaller(composerCLI, siteData, scripts.DrushInclude(scriptsDir))
-	if err != nil {
-		return append(results, workflow.CheckFailed("drush site-install --existing-config", err.Error()))
-	}
+	installer := deps.newInstaller(siteData)
 
 	for _, site := range cfg.Sites {
 		name := fmt.Sprintf("site %q installs from configuration", site)

@@ -1,8 +1,6 @@
 package workflow
 
-import "github.com/drupdater/drupdater/internal/drush"
+import "encoding/json"
 
-// syncFacts is a site whose facts matter to the runner only for where its configuration exports.
-func syncFacts(configSyncDirectory string) drush.Facts {
-	return drush.Facts{ConfigSyncDirectory: configSyncDirectory}
-}
+// siteFacts are a site's facts where the test does not read them: the runner hands them on unread.
+var siteFacts = json.RawMessage(`{"modules":["system"]}`)

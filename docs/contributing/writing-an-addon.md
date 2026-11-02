@@ -105,7 +105,7 @@ Each event hands its hooks what it carries: `plan()` on `pre-composer-update`, `
 facts are what the site reported before its update hooks ran, on `post-site-update` what it
 reported after them, without the unsupported modules. Read a site's modules, paths or pending
 hooks from there instead of running drush yourself; a new fact belongs in `drupdater:facts`
-(`scripts/drush/Commands/DrupdaterCommands.php`) and `SiteFacts`.
+(`agent/resources/drush/Commands/DrupdaterCommands.php`) and `SiteFacts`.
 
 Pick the stage from what the hook does: `Prepare` if later hooks on the event read what it
 writes, `Change` if it edits the project, `Format` if it restyles what `Change` wrote, and

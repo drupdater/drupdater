@@ -1,0 +1,33 @@
+{
+  "protocol": 4,
+  "command": "drupdater:site-facts",
+  "ok": true,
+  "result": {
+    "facts": {
+      "config_sync_directory": "/project/web/../config/sync",
+      "translation_path": "/project/web/../translations",
+      "modules": [
+        "locale",
+        "locale_deploy",
+        "node",
+        "system"
+      ],
+      "update_hooks": {
+        "node_update_11001": {
+          "module": "node",
+          "update_id": "11001",
+          "description": "Adds an index to node_field_data.",
+          "type": "hook_update_n"
+        }
+      },
+      "unsupported_modules": [
+        {
+          "name": "potx",
+          "installed_version": "8.x-1.1",
+          "recommended_version": "None"
+        }
+      ],
+      "unsupported_modules_error": ""
+    }
+  }
+}

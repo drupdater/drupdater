@@ -110,7 +110,7 @@ func TestCheckResolvesTheCheckoutOnlyInCheckoutMode(t *testing.T) {
 
 func TestCheckRunsTheFullTierOnlyWhenAskedTo(t *testing.T) {
 	installer := &fakeInstaller{}
-	a, _ := appWithFullCheckDoubles(t.TempDir(), nil, &fakeComposer{}, installer, nil)
+	a, _ := appWithFullCheckDoubles(t.TempDir(), nil, &fakeComposer{}, installer)
 	dir := bareCheckout(t, t.TempDir())
 	cfg := config.Config{WorkingDir: dir, Clone: true, RepositoryURL: "https://github.com/acme/site.git", Sites: []string{"default"}}
 
@@ -168,10 +168,9 @@ func TestRunUpdateHandsTheWorkflowEveryService(t *testing.T) {
 
 	require.NoError(t, runUpdateWith(t, appWithWorkflow(fake), options{config: config.Config{WorkingDir: checkoutWithOrigin(t)}}))
 
-	assert.NotNil(t, fake.services.drush)
+	assert.NotNil(t, fake.services.sites)
 	assert.NotNil(t, fake.services.platform, "a publishing run needs its platform")
 	assert.NotNil(t, fake.services.git)
-	assert.NotNil(t, fake.services.installer)
 	assert.NotNil(t, fake.services.composer)
 }
 

@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"runtime"
@@ -9,8 +10,6 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/drupdater/drupdater/internal/drupal"
-	"github.com/drupdater/drupdater/internal/drush"
 )
 
 // forEachSite runs fn per site concurrently, bounded by config.Concurrency, cancelling the rest
@@ -38,7 +37,7 @@ func (s services) forEachSite(ctx context.Context, fn func(context.Context, int,
 // the working tree one site at a time, in --sites order: the sites share one git index, and two
 // may name the same config or translation directory.
 func (r *run) updateSites(ctx context.Context) (err error) {
-	updated := make([]drush.Facts, len(r.config.Sites))
+	updated := make([]json.RawMessage, len(r.config.Sites))
 	configured := make([]bool, len(r.config.Sites))
 	// Uncancelled: the first failing site cancels ctx, and every site must still be put back.
 	defer func() {
@@ -46,14 +45,14 @@ func (r *run) updateSites(ctx context.Context) (err error) {
 			if !configured[i] {
 				continue
 			}
-			if restoreErr := r.installer.RestoreSettings(context.WithoutCancel(ctx), r.path, site); restoreErr != nil {
+			if restoreErr := r.sites.RestoreSettings(context.WithoutCancel(ctx), r.path, site); restoreErr != nil {
 				err = errors.Join(err, fmt.Errorf("failed to restore settings of %s: %w", site, restoreErr))
 			}
 		}
 	}()
 
 	if err := r.forEachSite(ctx, func(ctx context.Context, i int, site string) error {
-		if err := r.installer.ConfigureDatabase(ctx, r.path, site); err != nil {
+		if err := r.sites.ConfigureDatabase(ctx, r.path, site); err != nil {
 			return fmt.Errorf("failed to configure database: %w", err)
 		}
 		configured[i] = true
@@ -73,44 +72,36 @@ func (r *run) updateSites(ctx context.Context) (err error) {
 }
 
 // updateDatabase runs the site's update hooks and returns its facts as they stand afterwards.
-func (r *run) updateDatabase(ctx context.Context, site string) (drush.Facts, error) {
+func (r *run) updateDatabase(ctx context.Context, site string) (json.RawMessage, error) {
 	r.logger.Info("updating site", zap.String("site", site))
 
-	facts, err := r.drush.Facts(ctx, r.path, site)
+	facts, err := r.sites.Facts(ctx, r.path, site)
 	if err != nil {
-		return drush.Facts{}, err
+		return nil, err
 	}
 
 	if _, err := r.pipeline.fire(ctx, r.path, r.committer, preSiteUpdate(site, facts)); err != nil {
-		return drush.Facts{}, err
+		return nil, err
 	}
 
-	if err := r.drush.UpdateSite(ctx, r.path, site); err != nil {
-		return drush.Facts{}, fmt.Errorf("failed to update site: %w", err)
-	}
-
-	if err := r.drush.ConfigResave(ctx, r.path, site); err != nil {
-		return drush.Facts{}, fmt.Errorf("failed to resave config: %w", err)
-	}
-
-	// Read again: an update hook may enable a module or move a path the facts named before.
-	return r.drush.LocalFacts(ctx, r.path, site)
+	return r.sites.Update(ctx, r.path, site)
 }
 
-func (r *run) commitSiteChanges(ctx context.Context, site string, facts drush.Facts) error {
+func (r *run) commitSiteChanges(ctx context.Context, site string, facts json.RawMessage) error {
 	if _, err := r.pipeline.fire(ctx, r.path, r.committer, postSiteUpdate(site, facts)); err != nil {
 		return err
 	}
 
 	r.logger.Info("exporting configuration", zap.String("site", site))
-	if err := r.drush.ExportConfiguration(ctx, r.path, site); err != nil {
-		return fmt.Errorf("failed to export configuration: %w", err)
+	exported, err := r.sites.ExportConfiguration(ctx, r.path, site)
+	if err != nil {
+		return err
 	}
 	// The committer reads an empty path as the whole tree, which would sweep in unrelated changes.
-	if facts.ConfigSyncDirectory == "" {
+	if exported == "" {
 		return fmt.Errorf("failed to locate the exported configuration: site %s has no config sync directory", site)
 	}
-	if _, err := r.committer.Commit(ctx, "Update configuration "+site, drupal.RelativeTo(r.path, facts.ConfigSyncDirectory)); err != nil {
+	if _, err := r.committer.Commit(ctx, "Update configuration "+site, exported); err != nil {
 		return fmt.Errorf("failed to commit the exported configuration: %w", err)
 	}
 

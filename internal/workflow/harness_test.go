@@ -27,12 +27,11 @@ import (
 type runHarness struct {
 	config      config.Config
 	logger      *zap.Logger
-	installer   *MockInstaller
+	sites       *MockSites
 	repoSvc     *MockGitService
 	vcsProvider *MockPlatform
 	repository  *MockGitRepository
 	composer    *MockComposer
-	drush       *MockDrush
 	worktree    *MockWorktree
 	// hooks answers the hooks withHook scripted.
 	hooks *scriptedAgent
@@ -72,12 +71,11 @@ func newRunHarness(t *testing.T, dryRun bool) *runHarness {
 			DryRun:        dryRun,
 		},
 		logger:      zap.NewNop(),
-		installer:   NewMockInstaller(t),
+		sites:       NewMockSites(t),
 		repoSvc:     NewMockGitService(t),
 		vcsProvider: NewMockPlatform(t),
 		repository:  NewMockGitRepository(t),
 		composer:    NewMockComposer(t),
-		drush:       NewMockDrush(t),
 		worktree:    NewMockWorktree(t),
 		path:        testCheckout,
 
@@ -179,14 +177,12 @@ func (h *runHarness) expectFullRunDefaults() {
 	h.worktree.EXPECT().Staged(anyCtx).Return(nil, nil).Maybe()
 
 	for _, site := range h.config.Sites {
-		h.installer.EXPECT().Install(anyCtx, h.path, site).Return(nil).Maybe()
-		h.installer.EXPECT().ConfigureDatabase(anyCtx, h.path, site).Return(nil).Maybe()
-		h.installer.EXPECT().RestoreSettings(anyCtx, h.path, site).Return(nil).Maybe()
-		h.drush.EXPECT().Facts(anyCtx, h.path, site).Return(syncFacts(h.path+"/config/sync"), nil).Maybe()
-		h.drush.EXPECT().UpdateSite(anyCtx, h.path, site).Return(nil).Maybe()
-		h.drush.EXPECT().ConfigResave(anyCtx, h.path, site).Return(nil).Maybe()
-		h.drush.EXPECT().LocalFacts(anyCtx, h.path, site).Return(syncFacts(h.path+"/config/sync"), nil).Maybe()
-		h.drush.EXPECT().ExportConfiguration(anyCtx, h.path, site).Return(nil).Maybe()
+		h.sites.EXPECT().Install(anyCtx, h.path, site).Return(nil).Maybe()
+		h.sites.EXPECT().ConfigureDatabase(anyCtx, h.path, site).Return(nil).Maybe()
+		h.sites.EXPECT().RestoreSettings(anyCtx, h.path, site).Return(nil).Maybe()
+		h.sites.EXPECT().Facts(anyCtx, h.path, site).Return(siteFacts, nil).Maybe()
+		h.sites.EXPECT().Update(anyCtx, h.path, site).Return(siteFacts, nil).Maybe()
+		h.sites.EXPECT().ExportConfiguration(anyCtx, h.path, site).Return("config/sync", nil).Maybe()
 	}
 }
 
@@ -197,7 +193,7 @@ func (h *runHarness) runner() *Runner {
 	if !h.withoutPlatform {
 		platform = h.vcsProvider
 	}
-	return New(h.logger, h.config, h.drush, platform, h.repoSvc, h.installer, h.composer,
+	return New(h.logger, h.config, h.sites, platform, h.repoSvc, h.composer,
 		WithReportSink(func(rep report.Report) { h.got = &rep }))
 }
 

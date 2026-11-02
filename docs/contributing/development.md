@@ -75,8 +75,8 @@ go run . --working-dir /path/to/a/drupal/checkout --dry-run --verbose
 `php` and `git` are on `PATH`, against whatever Composer configuration your environment
 provides. That is supported: the two Composer settings the tool's own correctness depends
 on (`COMPOSER_PROCESS_TIMEOUT`, `COMPOSER_NO_AUDIT`) are forced by `composer.Env` on every
-invocation rather than inherited from the image — including the `composer exec` calls that
-`internal/drush` makes, and the agent's commands, whose tools inherit them. The image's remaining Composer variables
+invocation rather than inherited from the image — including the agent's commands, whose tools,
+drush among them, inherit them. The image's remaining Composer variables
 are deployment policy and need no local equivalent — see [environment
 variables](../reference/environment-variables.md#set-by-drupdater).
 
@@ -203,7 +203,7 @@ still comes from an uninstrumented run.
 
 !!! note "It takes about a minute, not a couple of seconds"
 
-    `internal/composer` and `internal/drush` fake subprocesses with the `TestHelperProcess` pattern, which
+    `internal/composer` and `internal/agent` fake subprocesses with the `TestHelperProcess` pattern, which
     re-executes the test binary once per faked command. Under `-race` every one of those execs
     starts an instrumented process, so those two packages account for almost all of the runtime.
     Nothing is wrong; they simply have no concurrency for the detector to find either.
@@ -307,7 +307,7 @@ new tests:
   per clause, or two thirds of it can be deleted unnoticed.
 - **Error branches that need a failing filesystem.** An in-memory `afero.Fs` never fails, so
   write, close and flush error paths stay unreachable until a wrapper makes them fail on
-  demand. `internal/report` and `internal/siteinstall` both have one to copy.
+  demand. `internal/report` has one to copy.
 
 The weekly run scores one package per matrix leg rather than the module in one go, so it
 finishes in the time of its slowest package and a failed leg can be re-run on its own. A
@@ -590,24 +590,30 @@ addon catalogue; [`drupdater:hook`](../reference/docker-images.md#drupdater-agen
 hook for one event; [`drupdater:report`](../reference/docker-images.md#drupdater-agent), the
 addons' report sections; [`drupdater:project`](../reference/docker-images.md#drupdater-agent),
 the web root and lock hash; [`drupdater:resolve`](../reference/docker-images.md#drupdater-agent),
-the update itself; and [`drupdater:platform-check`](../reference/docker-images.md#drupdater-agent)
-and [`drupdater:handshake`](../reference/docker-images.md#drupdater-agent) for the preflight. The
-Go side calls them through `internal/agent`, and `internal/composer` wraps each in a method.
+the update itself; [`drupdater:install`](../reference/docker-images.md#drupdater-agent), the
+install; the [site commands](../reference/docker-images.md#drupdater-agent) — `site-facts`,
+`site-update`, `config-export`, `site-install`, `site-database` and `site-restore` — for
+everything a run does to a site; and
+[`drupdater:platform-check`](../reference/docker-images.md#drupdater-agent) and
+[`drupdater:handshake`](../reference/docker-images.md#drupdater-agent) for the preflight and the
+tool versions. The Go side calls them through `internal/agent`, and `internal/composer` wraps
+each in a method: `composer.Sites` the site commands.
 
 | Path | Contains |
 |---|---|
 | `agent/src/Addon/` | The addons, their contract (`Addon`, `Event`, `HookResult`, `Findings`), the catalogue, and `Services`, which builds them from the real tools |
 | `agent/src/Command/` | The commands, each answering one request with one envelope |
 | `agent/src/Tools/`, `Process/` | phpcs, Rector, drush and Composer run as processes |
+| `agent/src/Site/` | A site's throwaway SQLite database: the `settings.php` block and `core.extension.yml` |
 | `agent/src/DrupalOrg/` | drupal.org's node API and git.drupalcode.org's GitLab API, over Composer's HTTP |
 | `agent/src/Patches/`, `PatchCheck/` | `extra.patches` read, rewritten and test-applied |
 | `agent/src/Resolve/`, `Audit/`, `Plugins/`, `Project/`, `Platform/` | The update, the audit, allow-plugins, the project and the platform, through Composer's own API |
-| `agent/resources/` | The Rector config `deprecations_remover` runs with |
+| `agent/resources/` | The Rector config `deprecations_remover` runs with, and drupdater's Drush commands (`drush/`, loaded with `--include`) |
 
 Each command reads one JSON request on stdin and prints one JSON envelope on stdout:
 
 ```json
-{"protocol": 3, "command": "drupdater:hook", "ok": true, "result": {"finding": null, "commits": [], "plan": null, "abort": null}, "log": [{"level": "info", "message": "updating coding styles", "context": {"addon": "code_beautifier"}}]}
+{"protocol": 4, "command": "drupdater:hook", "ok": true, "result": {"finding": null, "commits": [], "plan": null, "abort": null}, "log": [{"level": "info", "message": "updating coding styles", "context": {"addon": "code_beautifier"}}]}
 ```
 
 `log` holds what the command logged, on success and failure alike, and `agent.Call` logs each
@@ -645,19 +651,16 @@ ships.
 | `internal/codehosting/` | The GitHub and GitLab implementations and the provider factory |
 | `internal/report/` | The published JSON report schema and its writer |
 | `internal/logging/` | The redactor |
-| `internal/composer/`, `drush/`, `repo/`, `php/` | Thin wrappers around external tools |
-| `internal/drupal/`, `internal/siteinstall/` | Relating drush-reported paths to the project; installing a throwaway site |
-| `scripts/` | PHP embedded in the binary and extracted per run: drupdater's Drush commands |
+| `internal/composer/`, `repo/`, `php/` | Thin wrappers around external tools |
 | `agent/`, `internal/agent/` | [The agent](#the-agent): drupdater's Composer plugin, and the Go client for it |
 
 Where the project keeps its web root, and the lock hash that names the update branch, comes from
 the agent, as `composer.Project`, not from a Go reader of `composer.json` or the lock.
 
-The wrappers take one external tool per directory: `composer`, `drush` and `repo` (the git CLI).
-`drupal` relates the absolute paths drush reports to the project, and
-`siteinstall` installs a site for the `check --full` tier. `php` holds what the PHP wrappers share: running a command under
-the environment Composer needs, and decoding its JSON output. Each wrapper takes the
-`php.CommandFactory` that builds its processes as a field, which is where a test fakes one.
+The wrappers take one external tool per directory: `composer`, which reaches everything PHP —
+drush included — through the agent, and `repo` (the git CLI). `php` runs a composer command under
+the environment Composer needs. Each wrapper takes the `php.CommandFactory` that builds its
+processes as a field, which is where a test fakes one.
 
 For how these fit together, read [Explanation](../explanation/index.md) — in particular
 [How a run works](../explanation/how-a-run-works.md) and [The addon

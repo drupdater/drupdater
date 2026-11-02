@@ -7,8 +7,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/drupdater/drupdater/internal/composer"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -27,10 +25,6 @@ func (f *fakeComposer) Install(_ context.Context, path string) error {
 	return f.installErr
 }
 
-func (f *fakeComposer) Project(context.Context, string) (composer.Project, error) {
-	return composer.Project{WebRoot: "web"}, nil
-}
-
 // fakeInstaller fails for the sites named in failFor and succeeds for the rest.
 type fakeInstaller struct {
 	failFor map[string]error
@@ -38,9 +32,6 @@ type fakeInstaller struct {
 
 	dataDir        string
 	dataDirExisted bool
-	drushInclude   string
-	// commandsExisted records whether drupdater's drush commands were on disk during the install.
-	commandsExisted bool
 	// contexts are the contexts the installs ran under, so a dropped one shows.
 	contexts []context.Context
 }
@@ -50,14 +41,12 @@ func (f *fakeInstaller) Install(ctx context.Context, dir string, site string) er
 	f.calls = append(f.calls, dir+"/"+site)
 	_, err := os.Stat(f.dataDir)
 	f.dataDirExisted = err == nil
-	_, err = os.Stat(filepath.Join(f.drushInclude, "Commands", "DrupdaterCommands.php"))
-	f.commandsExisted = err == nil
 	return f.failFor[site]
 }
 
 // appWithFullCheckDoubles is an app whose --full tier clones, installs and installs sites with
 // doubles, without which the tier's control flow is untestable. It records the clone's arguments.
-func appWithFullCheckDoubles(clonePath string, cloneErr error, composerDouble *fakeComposer, installer siteInstaller, installerErr error) (app, *[]string) {
+func appWithFullCheckDoubles(clonePath string, cloneErr error, composerDouble *fakeComposer, installer siteInstaller) (app, *[]string) {
 	cloneArgs := &[]string{}
 	a := testApp()
 	a.newFullCheckDeps = func(*zap.Logger) fullCheckDeps {
@@ -67,12 +56,11 @@ func appWithFullCheckDoubles(clonePath string, cloneErr error, composerDouble *f
 				return clonePath, cloneErr
 			},
 			newComposer: func() fullCheckComposer { return composerDouble },
-			newInstaller: func(_ fullCheckComposer, dataDir string, drushInclude string) (siteInstaller, error) {
+			newInstaller: func(dataDir string) siteInstaller {
 				if fake, ok := installer.(*fakeInstaller); ok {
 					fake.dataDir = dataDir
-					fake.drushInclude = drushInclude
 				}
-				return installer, installerErr
+				return installer
 			},
 		}
 	}
@@ -82,7 +70,7 @@ func appWithFullCheckDoubles(clonePath string, cloneErr error, composerDouble *f
 func TestRunFullChecksClonesTheConfiguredBranch(t *testing.T) {
 	comp := &fakeComposer{}
 	inst := &fakeInstaller{}
-	a, cloneArgs := appWithFullCheckDoubles(t.TempDir(), nil, comp, inst, nil)
+	a, cloneArgs := appWithFullCheckDoubles(t.TempDir(), nil, comp, inst)
 
 	cfg := config.Config{RepositoryURL: "https://example.com/acme/site.git", Branch: "develop", Sites: []string{"default"}}
 	results := a.runFullChecks(t.Context(), zap.NewNop(), cfg, "tok")
@@ -96,7 +84,7 @@ func TestRunFullChecksClonesTheConfiguredBranch(t *testing.T) {
 }
 
 func TestRunFullChecksDefaultsToMain(t *testing.T) {
-	a, cloneArgs := appWithFullCheckDoubles(t.TempDir(), nil, &fakeComposer{}, &fakeInstaller{}, nil)
+	a, cloneArgs := appWithFullCheckDoubles(t.TempDir(), nil, &fakeComposer{}, &fakeInstaller{})
 
 	cfg := config.Config{RepositoryURL: "https://example.com/acme/site.git"}
 	a.runFullChecks(t.Context(), zap.NewNop(), cfg, "")
@@ -108,7 +96,7 @@ func TestRunFullChecksDefaultsToMain(t *testing.T) {
 func TestRunFullChecksStopsAtComposerInstall(t *testing.T) {
 	comp := &fakeComposer{installErr: errors.New("lock file out of date")}
 	inst := &fakeInstaller{}
-	a, _ := appWithFullCheckDoubles(t.TempDir(), nil, comp, inst, nil)
+	a, _ := appWithFullCheckDoubles(t.TempDir(), nil, comp, inst)
 
 	cfg := config.Config{RepositoryURL: "https://example.com/acme/site.git", Sites: []string{"default"}}
 	results := a.runFullChecks(t.Context(), zap.NewNop(), cfg, "")
@@ -122,9 +110,11 @@ func TestRunFullChecksStopsAtComposerInstall(t *testing.T) {
 	assert.Empty(t, inst.calls, "no site may be installed after composer install failed")
 }
 
-func TestRunFullChecksReportsInstallerConstructionFailure(t *testing.T) {
+func TestRunFullChecksReportsASiteDataDirectoryThatCannotBeCreated(t *testing.T) {
 	comp := &fakeComposer{}
-	a, _ := appWithFullCheckDoubles(t.TempDir(), nil, comp, nil, errors.New("cache unavailable"))
+	inst := &fakeInstaller{}
+	a, _ := appWithFullCheckDoubles(t.TempDir(), nil, comp, inst)
+	t.Setenv("TMPDIR", filepath.Join(t.TempDir(), "missing"))
 
 	cfg := config.Config{RepositoryURL: "https://example.com/acme/site.git", Sites: []string{"default"}}
 	results := a.runFullChecks(t.Context(), zap.NewNop(), cfg, "")
@@ -134,13 +124,14 @@ func TestRunFullChecksReportsInstallerConstructionFailure(t *testing.T) {
 	assert.True(t, results[0].OK)
 	assert.Equal(t, "drush site-install --existing-config", results[1].Name)
 	assert.False(t, results[1].OK)
-	assert.Contains(t, results[1].Detail, "cache unavailable")
+	assert.Contains(t, results[1].Detail, "missing")
+	assert.Empty(t, inst.calls)
 }
 
 func TestRunFullChecksCollectsPerSiteFailures(t *testing.T) {
 	comp := &fakeComposer{}
 	inst := &fakeInstaller{failFor: map[string]error{"broken": errors.New("missing config")}}
-	a, _ := appWithFullCheckDoubles("/clone", nil, comp, inst, nil)
+	a, _ := appWithFullCheckDoubles("/clone", nil, comp, inst)
 
 	cfg := config.Config{
 		RepositoryURL: "https://example.com/acme/site.git",
@@ -160,7 +151,7 @@ func TestRunFullChecksCollectsPerSiteFailures(t *testing.T) {
 
 func TestRunFullChecksStopsAtCloneFailure(t *testing.T) {
 	comp := &fakeComposer{}
-	a, _ := appWithFullCheckDoubles("", errors.New("authentication failed"), comp, &fakeInstaller{}, nil)
+	a, _ := appWithFullCheckDoubles("", errors.New("authentication failed"), comp, &fakeInstaller{})
 
 	cfg := config.Config{RepositoryURL: "https://example.com/acme/site.git", Sites: []string{"default"}}
 	results := a.runFullChecks(t.Context(), zap.NewNop(), cfg, "")
@@ -176,7 +167,7 @@ func TestRunFullChecksRemovesTheCloneAndSiteData(t *testing.T) {
 	clone := filepath.Join(t.TempDir(), "repo123")
 	require.NoError(t, os.MkdirAll(clone, 0o755))
 	inst := &fakeInstaller{}
-	a, _ := appWithFullCheckDoubles(clone, nil, &fakeComposer{}, inst, nil)
+	a, _ := appWithFullCheckDoubles(clone, nil, &fakeComposer{}, inst)
 
 	cfg := config.Config{RepositoryURL: "https://example.com/acme/site.git", Sites: []string{"default"}}
 	a.runFullChecks(t.Context(), zap.NewNop(), cfg, "")
@@ -186,15 +177,4 @@ func TestRunFullChecksRemovesTheCloneAndSiteData(t *testing.T) {
 	assert.NotEqual(t, filepath.Dir(clone), filepath.Dir(inst.dataDir), "site data must not land beside the clone")
 	assert.NoDirExists(t, inst.dataDir)
 	assert.NoDirExists(t, clone)
-}
-
-func TestRunFullChecksGivesTheInstallerDrupdatersDrushCommands(t *testing.T) {
-	inst := &fakeInstaller{}
-	a, _ := appWithFullCheckDoubles(t.TempDir(), nil, &fakeComposer{}, inst, nil)
-
-	cfg := config.Config{RepositoryURL: "https://example.com/acme/site.git", Sites: []string{"default"}}
-	a.runFullChecks(t.Context(), zap.NewNop(), cfg, "")
-
-	assert.True(t, inst.commandsExisted)
-	assert.NoDirExists(t, inst.drushInclude, "the extracted scripts must be removed afterwards")
 }

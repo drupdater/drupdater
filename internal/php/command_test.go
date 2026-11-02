@@ -12,9 +12,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// Command is shared by drush, phpcs and rector, so its contracts are asserted here rather than
-// inferred from tests that exercise them by accident.
-
 // shellCommand runs script through sh instead of composer and records what Command asked for:
 // two halves of one question, what was requested and what the process saw.
 func shellCommand(script string, seen *[]string) CommandFactory {
@@ -29,20 +26,10 @@ func TestCommandBuild(t *testing.T) {
 		var seen []string
 		c := Command{New: shellCommand("true", &seen), Logger: zap.NewNop()}
 
-		_, err := c.Combined(t.Context(), "update", "--dry-run")
+		_, _, err := c.Split(t.Context(), "update", "--dry-run")
 		require.NoError(t, err)
 
 		assert.Equal(t, []string{"composer", "update", "--dry-run"}, seen)
-	})
-
-	t.Run("asks the factory for Program instead, when one is named", func(t *testing.T) {
-		var seen []string
-		c := Command{New: shellCommand("true", &seen), Logger: zap.NewNop(), Program: "/opt/tools/phpcs"}
-
-		_, err := c.Combined(t.Context(), "--report=json")
-		require.NoError(t, err)
-
-		assert.Equal(t, []string{"/opt/tools/phpcs", "--report=json"}, seen)
 	})
 
 	t.Run("runs in Dir", func(t *testing.T) {
@@ -50,7 +37,7 @@ func TestCommandBuild(t *testing.T) {
 		dir := t.TempDir()
 		c := Command{New: shellCommand("pwd -P", &seen), Logger: zap.NewNop(), Dir: dir}
 
-		out, err := c.Combined(t.Context(), "about")
+		out, _, err := c.Split(t.Context(), "about")
 		require.NoError(t, err)
 
 		resolved, err := filepath.EvalSymlinks(dir)
@@ -62,7 +49,7 @@ func TestCommandBuild(t *testing.T) {
 		var seen []string
 		c := Command{New: shellCommand("cat", &seen), Logger: zap.NewNop(), Stdin: strings.NewReader(`{"protocol":2}`)}
 
-		out, err := c.Combined(t.Context(), "drupdater:handshake")
+		out, _, err := c.Split(t.Context(), "drupdater:handshake")
 		require.NoError(t, err)
 
 		assert.Equal(t, `{"protocol":2}`, out)
@@ -78,7 +65,7 @@ func TestCommandBuild(t *testing.T) {
 			ExtraEnv: []string{"COMPOSER_PROCESS_TIMEOUT=99"},
 		}
 
-		out, err := c.Combined(t.Context(), "about")
+		out, _, err := c.Split(t.Context(), "about")
 		require.NoError(t, err)
 
 		assert.Equal(t, "99", out)
@@ -92,7 +79,7 @@ func TestCommandBuild(t *testing.T) {
 			ExtraEnv: []string{"SITE_NAME=second"},
 		}
 
-		out, err := c.Combined(t.Context(), "about")
+		out, _, err := c.Split(t.Context(), "about")
 		require.NoError(t, err)
 
 		assert.Equal(t, "1", out)
@@ -103,47 +90,10 @@ func TestCommandBuild(t *testing.T) {
 		var seen []string
 		c := Command{New: shellCommand(`printf %s "$DRUPDATER_EXEC_TEST"`, &seen), Logger: zap.NewNop()}
 
-		out, err := c.Combined(t.Context(), "about")
+		out, _, err := c.Split(t.Context(), "about")
 		require.NoError(t, err)
 
 		assert.Equal(t, "inherited", out)
-	})
-}
-
-func TestCommandCombined(t *testing.T) {
-	t.Run("merges stdout and stderr", func(t *testing.T) {
-		var seen []string
-		c := Command{New: shellCommand(`echo out; echo err >&2`, &seen), Logger: zap.NewNop()}
-
-		out, err := c.Combined(t.Context(), "about")
-		require.NoError(t, err)
-
-		assert.Contains(t, out, "out")
-		assert.Contains(t, out, "err")
-	})
-
-	t.Run("strips exactly one trailing newline", func(t *testing.T) {
-		// Callers compare this against bare strings, so the trailing newline must go — and
-		// only that one, or a deliberately blank last line comes back altered.
-		var seen []string
-		c := Command{New: shellCommand(`printf 'a\n\n'`, &seen), Logger: zap.NewNop()}
-
-		out, err := c.Combined(t.Context(), "about")
-		require.NoError(t, err)
-
-		assert.Equal(t, "a\n", out)
-	})
-
-	t.Run("returns the output alongside the error when the command fails", func(t *testing.T) {
-		// Every caller quotes this output in its error message, so a failing command must not
-		// come back empty-handed.
-		var seen []string
-		c := Command{New: shellCommand(`echo "why it failed"; exit 3`, &seen), Logger: zap.NewNop()}
-
-		out, err := c.Combined(t.Context(), "about")
-
-		require.Error(t, err)
-		assert.Equal(t, "why it failed", out)
 	})
 }
 
@@ -181,41 +131,6 @@ func TestCommandSplit(t *testing.T) {
 
 		assert.Equal(t, "o", stdout)
 		assert.Equal(t, "e", stderr)
-	})
-}
-
-func TestJSON(t *testing.T) {
-	t.Run("decodes stdout and ignores the notices on stderr", func(t *testing.T) {
-		var seen []string
-		c := Command{New: shellCommand(`echo "Deprecated: notice" >&2; echo '{"name": "drupal/core"}'`, &seen), Logger: zap.NewNop()}
-
-		value, err := JSON[struct {
-			Name string `json:"name"`
-		}](t.Context(), c, "show", "--format=json")
-
-		require.NoError(t, err)
-		assert.Equal(t, "drupal/core", value.Name)
-		assert.Equal(t, []string{"composer", "show", "--format=json"}, seen)
-	})
-
-	t.Run("a failed command carries its stderr", func(t *testing.T) {
-		var seen []string
-		c := Command{New: shellCommand(`echo '{}'; echo "Bootstrap failed" >&2; exit 1`, &seen), Logger: zap.NewNop()}
-
-		_, err := JSON[map[string]any](t.Context(), c)
-
-		var exitErr *exec.ExitError
-		require.ErrorAs(t, err, &exitErr)
-		assert.Contains(t, err.Error(), "output: Bootstrap failed")
-	})
-
-	t.Run("output that is not JSON", func(t *testing.T) {
-		var seen []string
-		c := Command{New: shellCommand(`echo "No database updates required."`, &seen), Logger: zap.NewNop()}
-
-		_, err := JSON[map[string]any](t.Context(), c)
-
-		require.ErrorContains(t, err, "failed to decode the JSON output")
 	})
 }
 

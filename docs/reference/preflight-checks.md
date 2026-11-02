@@ -156,12 +156,13 @@ that cannot be satisfied.
 
 ### `drush site-install --existing-config`
 
-Appears only on failure, when the Drush cache could not be initialised — so no site could
-be installed to check.
+Appears only on failure, when the directory the sites' throwaway databases go in could not be
+created — so no site could be installed to check.
 
 ### `site "<name>" installs from configuration`
 
-A real `drush site-install --existing-config` per site. **This is the definitive check**
+A real `drush site-install --existing-config` per site, through the agent's
+[`drupdater:site-install`](docker-images.md#drupdater-agent). **This is the definitive check**
 — it is exactly what the update's baseline install phase does, and the single most common
 reason a real run fails partway through.
 

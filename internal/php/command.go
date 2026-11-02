@@ -1,12 +1,10 @@
-// Package php runs the PHP tools drupdater drives — composer, drush, phpcs, rector — under the
-// environment composer needs.
+// Package php runs composer, which is how drupdater reaches its agent, under the environment
+// composer needs.
 package php
 
 import (
 	"bytes"
 	"context"
-	"encoding/json"
-	"fmt"
 	"io"
 	"os/exec"
 	"slices"
@@ -18,46 +16,23 @@ import (
 // CommandFactory builds the *exec.Cmd to run: exec.CommandContext, or a test's fake.
 type CommandFactory func(ctx context.Context, name string, args ...string) *exec.Cmd
 
-// Command is one composer invocation: run in Dir, under the environment Env guarantees. Shared
-// by drush, phpcs and rector too, which go through `composer exec` or name their own Program.
+// Command is one composer invocation: run in Dir, under the environment Env guarantees.
 type Command struct {
 	New    CommandFactory
 	Logger *zap.Logger
 	Dir    string
-	// Program runs instead of composer, for a tool drupdater bundles rather than the project.
-	Program string
-	// ExtraEnv is appended after Env, so it wins over anything inherited — drush's SITE_NAME.
+	// ExtraEnv is appended after Env, so it wins over anything inherited.
 	ExtraEnv []string
 	Stdin    io.Reader
 }
 
 func (c Command) build(ctx context.Context, args ...string) *exec.Cmd {
-	program := c.Program
-	if program == "" {
-		program = "composer"
-	}
-	command := c.New(ctx, program, args...)
+	command := c.New(ctx, "composer", args...)
 	command.Dir = c.Dir
 	command.Stdin = c.Stdin
 	// Environ() falls back to os.Environ(), layering on the deployment's environment.
 	command.Env = append(Env(command.Environ()), c.ExtraEnv...)
 	return command
-}
-
-// Combined merges stdout and stderr, and strips the output's trailing newline.
-func (c Command) Combined(ctx context.Context, args ...string) (string, error) {
-	command := c.build(ctx, args...)
-
-	// Hand-rolled because CombinedOutput refuses a command whose Stdout is already set.
-	var merged bytes.Buffer
-	command.Stdout = &merged
-	command.Stderr = &merged
-	err := command.Run()
-
-	output := strings.TrimSuffix(merged.String(), "\n")
-	c.Logger.Debug(command.String() + "\n" + output)
-
-	return output, err
 }
 
 // Split keeps the streams apart, so a PHP notice on stderr cannot corrupt a JSON payload.
@@ -74,20 +49,6 @@ func (c Command) Split(ctx context.Context, args ...string) (stdout string, stde
 	c.Logger.Debug(command.String() + "\nstdout: " + stdout + "\nstderr: " + stderr)
 
 	return stdout, stderr, err
-}
-
-// JSON decodes the command's stdout into T. stderr only reaches the error: PHP notices and
-// progress output land there and would corrupt the payload.
-func JSON[T any](ctx context.Context, c Command, args ...string) (T, error) {
-	var value T
-	stdout, stderr, err := c.Split(ctx, args...)
-	if err != nil {
-		return value, fmt.Errorf("%w, output: %s", err, stderr)
-	}
-	if err := json.Unmarshal([]byte(stdout), &value); err != nil {
-		return value, fmt.Errorf("failed to decode the JSON output: %w", err)
-	}
-	return value, nil
 }
 
 // requiredComposerEnv is forced on every invocation (see Env), not left to the Dockerfile, which

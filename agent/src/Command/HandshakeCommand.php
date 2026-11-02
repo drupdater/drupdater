@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 namespace Drupdater\Agent\Command;
 
+use Composer\Composer;
+
 /**
- * Answers with an empty result, so drupdater can confirm the agent is installed and agrees on
- * the protocol before a run depends on it.
+ * Lets drupdater confirm the agent is installed and agrees on the protocol before a run depends
+ * on it, and names the Composer and PHP it runs under, which a run's outcome depends on.
+ *
+ * Request: {}. Result: {composer_version, php_version}.
  */
 final class HandshakeCommand extends AgentCommand
 {
@@ -19,6 +23,6 @@ final class HandshakeCommand extends AgentCommand
 
     protected function handle(array $request): array
     {
-        return [];
+        return ['composer_version' => Composer::getVersion(), 'php_version' => PHP_VERSION];
     }
 }

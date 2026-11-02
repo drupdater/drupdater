@@ -9,7 +9,7 @@ namespace Drupdater\Agent;
  */
 final class Protocol
 {
-    public const VERSION = 3;
+    public const VERSION = 4;
 
     /**
      * @return array<string, mixed>
