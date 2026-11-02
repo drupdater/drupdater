@@ -1,0 +1,79 @@
+# 2026/11/02 02:24:04.661365 [TestPropertyValidateAddonsRejectsUnknownNamesInEitherRunType] [rapid] draw unknown: "vfdpg_cx_bcdea"
+# 2026/11/02 02:24:04.661371 [TestPropertyValidateAddonsRejectsUnknownNamesInEitherRunType] [rapid] draw known: []string{"code_beautifier", "composer_normalizer"}
+# 2026/11/02 02:24:04.661376 [TestPropertyValidateAddonsRejectsUnknownNamesInEitherRunType] [rapid] draw inSecurity: false
+# 2026/11/02 02:24:04.661426 [TestPropertyValidateAddonsRejectsUnknownNamesInEitherRunType] 
+# 	Error Trace:	/home/user/drupdater/cmd/root_property_test.go:189
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:458
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:467
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:292
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:207
+# 	            				/home/user/drupdater/cmd/root_property_test.go:168
+# 	Error:      	An error is expected but got nil.
+# 	Test:       	TestPropertyValidateAddonsRejectsUnknownNamesInEitherRunType
+# 
+v0.4.8#537651299730409562
+0x1fbaab0cd21ed4
+0x0
+0x1d0cfa65d83162
+0x16
+0x8182beab79060
+0x0
+0xa9916bb5d5cf3
+0x6
+0x1382d1a6776950
+0x0
+0x9c2ab67f40b8f
+0x4
+0xcc5d30bf56403
+0x0
+0x1acb8bd0a8dc4a
+0x10
+0x7ee103baa7f00
+0x0
+0xd761349169e6d
+0x7
+0xc5e6e94d8dc56
+0x0
+0x6118dc250691b
+0x0
+0x1a230e9bf3a064
+0x0
+0x1e24a10b979f72
+0x3
+0x12f32fd5761fae
+0x0
+0x1d5619972dceb7
+0x18
+0x1f0ca100e73abe
+0x0
+0x18175b5ff50f4b
+0x0
+0xac1aa3692071e
+0x0
+0x13b9267639f25b
+0x2
+0xbcd796bf633e5
+0x0
+0x6180adfaa93a0
+0x3
+0x183c81dfe9264e
+0x0
+0x7d157424831c1
+0x4
+0x1297123d00cd7f
+0x0
+0x157c1d2855f5a8
+0x5
+0x1aa3887aae01e2
+0x0
+0x1dc03cb7eede32
+0x1
+0x463a37eac116a
+0xcdcd885cce961
+0x1b52c1f7dce61e
+0x0
+0x1840e3cf9f17b1
+0x63e7f7456717d
+0x1
+0x1496a3431aee1
+0x0

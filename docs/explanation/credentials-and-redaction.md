@@ -67,6 +67,11 @@ The redactor **wraps the logging core**, not individual log calls. Every entry a
 level passes through it, including debug output under `--verbose`. There is no code path
 that can log around it.
 
+That includes what the addons log. They run in the [Drupdater
+agent](../reference/docker-images.md#drupdater-agent), a Composer process of its own, and hand
+their log entries back in the agent's reply rather than writing them anywhere; Drupdater logs
+each through the same core.
+
 ### Registered as early as possible
 
 Environment-carried secrets — `DRUPALCODE_ACCESS_TOKEN`, `COMPOSER_AUTH` — are registered

@@ -1,0 +1,37 @@
+# 2026/11/02 02:23:34.786791 [TestPropertyConfigurableAddonsMatchesTheCatalogue] 
+# 	Error Trace:	/home/user/drupdater/cmd/root_property_test.go:153
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:458
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:467
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:292
+# 	            				/root/go/pkg/mod/pgregory.net/rapid@v1.3.0/engine.go:207
+# 	            				/home/user/drupdater/cmd/root_property_test.go:142
+# 	            				/root/go/pkg/mod/golang.org/toolchain@v0.0.1-go1.27.1.linux-amd64/src/runtime/asm_amd64.s:1264
+# 	Error:      	elements differ
+# 	            	
+# 	            	extra elements in list A:
+# 	            	([]interface {}) (len=4) {
+# 	            	 (string) (len=15) "code_beautifier",
+# 	            	 (string) (len=20) "deprecations_remover",
+# 	            	 (string) (len=20) "translations_updater",
+# 	            	 (string) (len=19) "composer_normalizer"
+# 	            	}
+# 	            	
+# 	            	
+# 	            	listA:
+# 	            	([]string) (len=4) {
+# 	            	 (string) (len=15) "code_beautifier",
+# 	            	 (string) (len=20) "deprecations_remover",
+# 	            	 (string) (len=20) "translations_updater",
+# 	            	 (string) (len=19) "composer_normalizer"
+# 	            	}
+# 	            	
+# 	            	
+# 	            	listB:
+# 	            	([]string) <nil>
+# 	Test:       	TestPropertyConfigurableAddonsMatchesTheCatalogue
+# 2026/11/02 02:23:34.786799 [TestPropertyConfigurableAddonsMatchesTheCatalogue] [rapid] draw split: 0
+# 
+v0.4.8#8123351593011400303
+0x14bc6e46616814
+0x2fd5e5bd7d00b
+0x0

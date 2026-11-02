@@ -30,10 +30,11 @@ var stageNames = map[string]Stage{"prepare": Prepare, "change": Change, "format"
 // ParseStage reads a stage as the agent's catalogue names it.
 func ParseStage(name string) (Stage, error) {
 	stage, ok := stageNames[name]
+	var err error
 	if !ok {
-		return 0, fmt.Errorf("unknown stage %q", name)
+		err = fmt.Errorf("unknown stage %q", name)
 	}
-	return stage, nil
+	return stage, err
 }
 
 // The events addons hook into, in the order a run reaches them.

@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -71,6 +72,22 @@ func TestACatalogueThePipelineCannotRunIsRefused(t *testing.T) {
 	}
 }
 
+func TestAnUnknownStageKeepsWhyItIsUnknown(t *testing.T) {
+	_, err := newAddonCatalog([]agent.Addon{{Name: "a", Hooks: map[string]string{"post-code-update": "later"}}})
+
+	_, parseErr := workflow.ParseStage("later")
+	require.EqualError(t, errors.Unwrap(err), parseErr.Error())
+}
+
+func TestARepeatedNameIsSkippedWithoutDroppingTheNamesAfterIt(t *testing.T) {
+	addons, err := agentCatalog.create(config.Config{RunTypes: config.RunTypesConfig{Normal: config.RunTypeConfig{
+		Addons: []string{"composer_audit", "composer_normalizer"},
+	}}})
+
+	require.NoError(t, err)
+	assert.Equal(t, append(append([]string{}, agentCatalog.mandatory...), "composer_normalizer"), names(addons))
+}
+
 func TestANormalRunNamingNoAddonsGetsTheMandatoryOnesThenTheDefaults(t *testing.T) {
 	addons, err := agentCatalog.create(config.Config{})
 
@@ -117,18 +134,25 @@ func TestTheAddonsCommandListsTheConfigurableAddonsMarkingTheDefaults(t *testing
 	assert.Contains(t, out, "  code_beautifier (default)\n")
 	assert.Contains(t, out, "  composer_normalizer (default)\n")
 	assert.Contains(t, out, "Addons you can set under run_types.normal.addons")
+	assert.Contains(t, out, "(a normal run that sets none gets the ones marked default):\n", "what the marks mean")
 	for _, mandatory := range agentCatalog.mandatory {
 		assert.NotContains(t, out, mandatory, "a mandatory addon is not for the project to set")
 	}
 }
 
-func TestTheAddonsCommandFailsWithoutAnAgentToAsk(t *testing.T) {
+func TestTheAddonsCommandFailsWithoutAnAgentToAskAndWithoutItsUsage(t *testing.T) {
 	a := testApp()
-	a.addonCatalog = func(context.Context, *zap.Logger) (addonCatalog, error) { return addonCatalog{}, assert.AnError }
+	var asked context.Context
+	a.addonCatalog = func(ctx context.Context, _ *zap.Logger) (addonCatalog, error) {
+		asked = ctx
+		return addonCatalog{}, assert.AnError
+	}
 
-	_, err := executeTree(t, a, "addons")
+	out, err := executeTree(t, a, "addons")
 
 	require.ErrorIs(t, err, assert.AnError)
+	assert.NotNil(t, asked, "the command's context, so an interrupt reaches composer")
+	assert.NotContains(t, out, "Usage:", "an agent that cannot be asked is not a misuse of the command")
 }
 
 func TestTheAgentsCatalogueIsAskedOfComposer(t *testing.T) {

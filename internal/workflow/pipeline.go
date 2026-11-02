@@ -82,12 +82,12 @@ func (p *Pipeline) fire(ctx context.Context, dir string, committer Committer, e 
 func (p *Pipeline) Report(ctx context.Context, rec *report.Recorder) error {
 	p.mu.Lock()
 	changes := p.changes
-	request := agent.ReportRequest{Addons: make([]agent.AddonFindings, 0, len(p.addons))}
+	var request agent.ReportRequest
 	for i, a := range p.addons {
 		request.Addons = append(request.Addons, agent.AddonFindings{Addon: a.Name, Findings: slices.Clone(p.findings[i])})
 	}
 	p.mu.Unlock()
-	if changes == 0 || changes == p.reported {
+	if changes == p.reported {
 		return nil
 	}
 

@@ -37,6 +37,17 @@ func TestAddonsReportsAnAgentThatCannotAnswer(t *testing.T) {
 	require.ErrorContains(t, err, "failed to read the addon catalogue")
 }
 
+func TestAddonsKeepsTheAgentsFailure(t *testing.T) {
+	service, _ := fakeAgentCLI(t, `{"protocol":3,"command":"drupdater:addons","ok":false,`+
+		`"error":{"kind":"internal","reason":"the agent failed","message":"boom"}}`, 1)
+
+	_, err := service.Addons(t.Context())
+
+	agentErr, ok := errors.AsType[*agent.Error](err)
+	require.True(t, ok, "%v", err)
+	assert.Equal(t, agent.Internal, agentErr.Kind)
+}
+
 func TestRunHookSendsTheRequestFixtureAndDecodesItsReply(t *testing.T) {
 	service, sent := fakeAgentCLI(t, agentFixture(t, "hook/response.json"), 0)
 	var request struct {
@@ -93,4 +104,7 @@ func TestReportReportsTheAgentsFailure(t *testing.T) {
 	_, err := service.Report(t.Context(), agent.ReportRequest{})
 
 	require.ErrorContains(t, err, "failed to build the addons' report sections")
+	agentErr, ok := errors.AsType[*agent.Error](err)
+	require.True(t, ok, "%v", err)
+	assert.Equal(t, agent.Internal, agentErr.Kind)
 }

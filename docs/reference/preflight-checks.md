@@ -25,11 +25,12 @@ not hide every other problem in the project.
 
 ### `addon names resolve`
 
-Every addon name in **both** run type blocks is checked against the registry, regardless
-of which mode is active.
+Every addon name in **both** run type blocks is checked against the [Drupdater
+agent](docker-images.md#drupdater-agent)'s addon catalogue, regardless of which mode is active.
 
 **On failure:** `unknown addon "code_beautifer" (run "drupdater addons" to list valid
-names)`.
+names)`, or `failed to read the addon catalogue: …` when the agent cannot be asked — which the
+`drupdater agent installed in Composer` check below explains.
 
 ### `git history complete (not a shallow clone)`
 
@@ -57,8 +58,8 @@ Runs `composer drupdater:handshake`: is the [Drupdater
 agent](docker-images.md#drupdater-agent) installed, and does it speak the same protocol as
 this binary?
 
-**Why it matters:** the platform check below, the update itself, the audit and
-[`composer_patches`](addons/composer-patches.md)' patch tests all go through the agent.
+**Why it matters:** the platform check below, the update itself and every addon run in the
+agent.
 Without it none of them can run, so it is checked before anything that needs it. Almost always this means Drupdater is
 running outside its Docker image, or an image built from a different revision.
 

@@ -31,9 +31,11 @@ project ends up exactly where it started — same rules, same order — plus one
 per new plugin. A project that had no `allow-plugins` at all gets none back unless a new
 plugin needed an entry, and no empty `config` either.
 
-Both steps run in the project's own Composer, through the
-[Drupdater agent](../docker-images.md#drupdater-agent)'s `drupdater:allow-plugins`, and each
-edit is the one `composer config allow-plugins.<name>` would make.
+Both steps run in the project's own Composer, inside the
+[Drupdater agent](../docker-images.md#drupdater-agent), and each edit is the one
+`composer config allow-plugins.<name>` would make. Which plugins the project's rules already
+cover is decided with Composer's own matching — anchored, case-insensitive, `*` for any
+characters — so it cannot disagree with Composer about which plugin a rule names.
 
 The result is that new plugins are **not** silently trusted. They are recorded, disabled,
 and surfaced in the pull request for a human to decide on.

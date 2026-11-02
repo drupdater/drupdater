@@ -40,8 +40,6 @@ func defaultFileConfig() fileConfig {
 	return fileConfig{
 		Sites:   []string{"default"},
 		Timeout: "30m",
-		// No addons named: the agent's catalogue says which a normal run gets by default.
-		RunTypes: RunTypesConfig{},
 	}
 }
 

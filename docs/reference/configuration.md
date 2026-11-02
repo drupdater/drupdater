@@ -23,14 +23,15 @@ timeout: 30m          # overall run timeout (Go duration; 0 disables)
 
 run_types:            # per-run-type settings; --security picks which block applies
   normal:
-    addons:                      # configurable addons (mandatory ones always run)
+    addons:                      # configurable addons (mandatory ones always run); unset,
+                                 # the defaults `drupdater addons` marks, which are these:
       - code_beautifier          # phpcbf code-style fixes
       - deprecations_remover     # drupal-rector deprecation removal
       - translations_updater     # interface translations
       - composer_normalizer      # normalize composer.json
     auto_merge: false            # merge the request once its pipeline passes
   security:
-    addons: []                   # minimal by default — don't interfere with the fix
+    addons: []                   # unset, none — don't interfere with the fix
     auto_merge: false
 ```
 
@@ -98,16 +99,20 @@ otherwise `normal` applies.
 | | |
 |---|---|
 | Type | list of strings |
-| Default (`normal`) | `[code_beautifier, deprecations_remover, translations_updater, composer_normalizer]` |
-| Default (`security`) | `[]` |
+| Default (`normal`) | Unset: the addons [`drupdater addons`](cli/addons.md) marks `(default)` — `[code_beautifier, deprecations_remover, translations_updater, composer_normalizer]` |
+| Default (`security`) | Unset: none |
 
-The configurable addons to run. The six mandatory addons always run regardless. Naming one
+The configurable addons to run. The six mandatory addons always run regardless. Which addons
+are mandatory, and which a normal run gets when the key is unset, is the agent's catalogue to
+say, so `drupdater addons` always lists what the installed agent provides. An empty list,
+`addons: []`, is not the same as leaving the key out: it names none on purpose, and a normal
+run then runs the mandatory addons only. Naming one
 here is accepted but redundant — it changes nothing. Run [`drupdater
 addons`](cli/addons.md) to list the configurable names, or see the [addon
 reference](addons/index.md).
 
-The security default is empty on purpose: a security update should be a minimal, focused
-fix, so only the mandatory addons run.
+A security run that leaves the key unset runs no configurable addon, on purpose: a security
+update should be a minimal, focused fix, so only the mandatory addons run.
 
 Names in **both** blocks are validated at startup regardless of the active mode. An
 unknown name aborts the run:

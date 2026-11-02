@@ -22,7 +22,9 @@ drupdater
 
 A [Drupal.org GitLab](https://git.drupalcode.org) personal access token, used by the
 [`composer_patches`](addons/composer-patches.md) addon to query issue metadata and
-download updated patch files.
+download updated patch files. The addon runs in the [Drupdater
+agent](docker-images.md#drupdater-agent), which reads the variable from the environment
+Drupdater runs Composer in; it is never written into a request.
 
 **Without it, patch management is substantially degraded.** Drupdater can still detect
 patches for packages that are no longer installed, but it cannot tell whether an issue
@@ -94,16 +96,17 @@ Set on **every** Composer invocation, to `0` and `1` respectively. A value inher
 the surrounding environment is replaced; everything else in the environment — including
 `COMPOSER_AUTH` — is passed through untouched.
 
-That covers the tools Drupdater runs *through* Composer as well: Drush, and a project's own
-PHPCS/PHPCBF or Rector, are invoked as `composer exec -- <tool>`, which makes them subprocesses
-of Composer and so subject to the same process timeout. The [bundled
-tools](docker-images.md#bundled-tools) run directly, with the same environment. A `drush updatedb` on a large site
+That covers the tools Drupdater runs *through* Composer as well: Drush is invoked as
+`composer exec -- drush`, and the addons run PHPCS/PHPCBF, Rector and Drush from inside the
+[agent](docker-images.md#drupdater-agent), a Composer process, which they inherit the
+environment of. The agent runs them without a timeout of its own: the run's timeout bounds
+them. A `drush updatedb` on a large site
 is exactly the kind of call that outlasts the default.
 
 | Variable | Forced value | Why Drupdater requires it |
 |---|---|---|
 | `COMPOSER_PROCESS_TIMEOUT` | `0` | Composer's default caps every process it spawns at 300s. A `drupal/core` clone, a large `composer install` on a slow network, or a `drush site:install` exceeds that, and the run dies mid-phase with a message about a killed subprocess and no visible connection to a timeout nobody configured. |
-| `COMPOSER_NO_AUDIT` | `1` | Suppresses the implicit audit Composer runs after `update`, whose extra output the update parsing is not written against. Auditing is the [`composer_audit`](addons/composer-audit.md) addon's job, on its own schedule; the agent's `drupdater:audit` that addon runs is unaffected. |
+| `COMPOSER_NO_AUDIT` | `1` | Suppresses the implicit audit Composer runs after `update`, whose extra output the update parsing is not written against. Auditing is the [`composer_audit`](addons/composer-audit.md) addon's job, on its own schedule; its audit, which asks Composer's auditor directly, is unaffected. |
 
 These are forced in code rather than left to the image, so they hold however Drupdater was
 installed — the published image, `make build`, or a binary a CI job downloaded. The

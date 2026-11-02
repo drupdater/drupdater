@@ -17,10 +17,9 @@ Compares the working `composer.lock` with the one committed at `HEAD` when
 changed package. The same list is logged at info level, one line per package, without the
 links.
 
-It is the first addon whose hook runs in the [agent](../docker-images.md#drupdater-agent)
-rather than in the binary: Drupdater reads the committed lock through git and sends it to
-`composer drupdater:addon`, which diffs it against the working lock inside the project's own
-Composer. The comparison and the links come from
+Drupdater reads the committed lock through git and hands it to the hook, which diffs it
+against the working lock inside the project's own Composer, in the
+[agent](../docker-images.md#drupdater-agent). The comparison and the links come from
 [`ion-bazan/composer-diff`](https://github.com/IonBazan/composer-diff)'s library, so they are
 the same as `composer diff --with-links` would produce. A GitLab host other than `gitlab.com`
 gets links when it is listed in the project's `config.gitlab-domains`.

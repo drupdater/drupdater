@@ -45,9 +45,10 @@ apply alone but conflict with each other are caught. The set is applied in the o
 `composer.json` declares it, which is the order `composer-patches` applies it in, so patches
 that only apply one after another are checked that way.
 
-When the addon rewrites `extra.patches`, it writes them through the
-[Drupdater agent](../docker-images.md#drupdater-agent)'s `drupdater:write-patches`, which also
-updates `composer.lock`'s `content-hash` to match and changes nothing else in the lock. Every
+When the addon rewrites `extra.patches`, it also updates `composer.lock`'s `content-hash` to
+match, since the hash covers `extra`, and changes nothing else in the lock. `composer.json`
+keeps its formatting, except where Composer's own JSON editor cannot write the patches
+faithfully: then the whole file is written out again in Composer's format. Every
 package and patch keeps its place, and an empty patch list stays an empty object. A rewritten
 description takes the place of the one it replaces. Two patches for the same issue keep their
 own descriptions rather than both being renamed to `Issue #…`, which would leave one key for
@@ -55,9 +56,9 @@ two patches.
 
 ### How a patch is tested
 
-The test runs inside your project's own Composer, through `composer drupdater:patch-check`
-— a command of the [Drupdater agent](../docker-images.md#drupdater-agent) the image
-installs. It looks the package up at the new version in **the repositories your project
+The test runs inside your project's own Composer, in the
+[Drupdater agent](../docker-images.md#drupdater-agent) the image installs, where the addon
+itself runs. It looks the package up at the new version in **the repositories your project
 declares**, in their order and with your credentials, downloads it into a temporary
 directory, and applies the patches to it in order. Nothing is installed into your project,
 and no Composer installer event fires, so your own plugins never act on the download.

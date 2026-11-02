@@ -17,6 +17,33 @@ The payoff is that the set of addons is genuinely configurable. A project can ru
 them or none, in either of two run types, and no addon needs a code path for "what if the
 other one is disabled" — because none of them ever depended on another being there.
 
+## Where an addon runs
+
+Every addon lives in the [agent](../reference/docker-images.md#drupdater-agent), the Composer
+plugin the image installs: its hooks, the stage each runs at, and its report section are PHP,
+in `agent/src/Addon/`. Most of what an addon does is a question for Composer — what the update
+resolves to, whether a patch applies, which advisories the lock has — and there it has
+Composer's own API, the project's repositories and credentials, rather than a wrapper around
+Composer's console output.
+
+The binary keeps what is about the run rather than about an addon:
+
+- **Which addons there are.** It asks the agent once, with `drupdater:addons`: each addon's
+  name, whether it is [mandatory](#mandatory-versus-configurable) or a normal run's default,
+  and the stage it hooks each event at.
+- **When each hook runs.** On each event the binary orders the hooks by [stage](#stages) and
+  runs each as its own `composer drupdater:hook` call, so it can commit what one hook changed
+  before the next one runs.
+- **Git, the plan and the findings.** It makes the [commits](#committing-changes), merges the
+  [proposals](#steering-the-update-through-proposals), and keeps what each hook found. A hook
+  gets its own addon's earlier findings with every call, so the agent keeps no state between
+  calls — each runs in a process of its own.
+- **The report.** Once the addons have finished, `drupdater:report` turns their findings into
+  their [report sections](#reporting).
+
+A hook that logs something has it logged by the binary, at the same level and through the same
+redaction as the binary's own log.
+
 ## The events
 
 | Event | Fired | Payload |
@@ -31,10 +58,10 @@ A site's facts — config sync directory, translation path, enabled modules, pen
 unsupported modules — are read from the site, so an addon asks the event rather than Drush.
 `pre-site-update` carries them as they were before the update hooks ran; `post-site-update`
 carries them read again afterwards, since a hook can enable a module or move a path, and
-without the unsupported modules, which only `pre-site-update` asks drupal.org for. Each call to
-`Facts()` returns a copy, so no hook can change what the next one reads.
+without the unsupported modules, which only `pre-site-update` asks drupal.org for. Every hook
+gets the facts as drush printed them, and none can change what the next one reads.
 
-Each carries the run context, the working directory path, and a way to commit: see
+What a hook changes reaches git only through the commits it returns: see
 [Committing changes](#committing-changes).
 
 There is no event for the merge request. It is rendered from the [run
@@ -81,37 +108,22 @@ description](#rendering-the-request-description).
 
 ## Committing changes
 
-Addons never touch git. A hook that changes files returns them as `Commits` in its
-`workflow.Result`, and the pipeline commits exactly those paths — files or directories,
+Addons never touch git. A hook that changes files returns them as commits in its result, and
+the binary commits exactly those paths — files or directories,
 deletions included — under each message, in order, before the next hook runs. A later stage
 therefore sees an earlier stage's change already committed.
 
 Two rules make that safe without any addon knowing about the others:
 
-- **Paths without a change are not committed.** No commit is made, and the hook's finding
-  records which of its commits were, so an addon need not check first whether its tool
-  changed anything.
+- **Paths without a change are not committed.** No commit is made, and the binary records with
+  the hook's finding which of its commits were, so an addon need not check first whether its
+  tool changed anything. `code_beautifier` and `translations_updater` read that back in their
+  report sections.
 - **A commit never carries someone else's change.** If anything outside the named paths is
   already staged, the commit is refused with an error naming it. A half-staged change from
   one addon cannot end up under another's message, whatever order they ran in.
 
 Changes nobody names stay in the working tree, uncommitted.
-
-## Hooks that run in the agent
-
-A hook can do its work in the [agent](../reference/docker-images.md#drupdater-agent) instead
-of in the binary. The addon is still a Go type, with its own tool interface, stages and report
-section, but its hook only sends the event to `composer drupdater:addon` and returns what comes
-back: the same `Commits` and finding any other hook returns. Everything above holds unchanged —
-the agent commits nothing, the pipeline commits the paths, and the finding reaches the report
-through the addon's `ReportData` alone.
-
-The finding is decoded into the addon's type in `internal/addon/report.go`, refusing any field
-that type does not declare, so a field added on the PHP side cannot reach the published report
-without a change to its schema.
-
-[`composer_diff`](../reference/addons/composer-diff.md) works this way. Logic that is about
-Composer belongs where Composer's own API is, rather than behind a wrapper around its console.
 
 ## Stages
 
@@ -170,12 +182,14 @@ Six addons always run:
   request description shows their findings as one list, which only works if both run on
   every update.
 
-`composer_audit` is also what makes `--security` mean anything; it is handed the flag rather
-than being switched on by it, so that a normal run still gets the audit's report without the
+`composer_audit` is also what makes `--security` mean anything; every hook is told whether the
+run is a security run, rather than the flag switching the audit on, so that a normal run still gets the audit's report without the
 audit taking over the update.
 
-The rest are listed per run type in [`.drupdater.yaml`](../reference/configuration.md), and
-an unknown name aborts the run rather than being ignored. A typo that silently disabled an
+Which addons are mandatory, and which a normal run gets when it names none, is the agent's
+catalogue to say. The rest are listed per run type in
+[`.drupdater.yaml`](../reference/configuration.md), and an unknown name aborts the run rather
+than being ignored. A typo that silently disabled an
 addon would look exactly like an addon with nothing to do.
 
 ## Rendering the request description
@@ -204,13 +218,15 @@ cannot be affected by the project being updated. If the description would exceed
 
 ## Reporting
 
-An addon contributes its report section by implementing two methods. This is satisfied
-structurally, so no addon imports the report package — an addon that does not implement
-them is simply absent from the report, and from the request description.
+An addon's report section is a function of its findings alone: what its hooks returned, and
+which of their commits were made. The agent builds every section in one `drupdater:report`
+call, which needs no project, so a run that fails late still reports what its addons found
+before it failed. An addon with nothing to report returns no section, and is absent from the
+report and the request description.
 
-All of these methods live together in one file rather than beside each addon's other code.
-Together they *are* the report's `addons` schema, which is a published contract; scattered
-across nine files, it is very easy to rename a field without noticing that a consumer
-depends on it.
+The sections are a published contract, and two golden files keep a rename from shipping
+unnoticed: the agent's suite pins the sections it builds for an example of every addon's
+findings, and `internal/report` pins the whole report built from those sections — the one the
+[run report reference](../reference/run-report.md) shows.
 
 See [Why a run report](why-a-run-report.md).
