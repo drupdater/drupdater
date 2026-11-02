@@ -84,7 +84,9 @@ Neither variable is consulted in `--clone` mode, where `--branch` applies instea
 
 ### `SITE_NAME`
 
-Set on **every** Drush invocation, to the name of the site currently being processed.
+Set on **every** Drush invocation, to the name of the site currently being processed. The
+[agent](docker-images.md#drupdater-agent) runs drush, and sets it from the `site` each of its
+site commands is asked about.
 
 This is the hook a multi-site project uses to resolve which site Drush is operating on.
 Your `web/sites/sites.php` reads it to map the current request onto a site directory. See
@@ -96,10 +98,10 @@ Set on **every** Composer invocation, to `0` and `1` respectively. A value inher
 the surrounding environment is replaced; everything else in the environment — including
 `COMPOSER_AUTH` — is passed through untouched.
 
-That covers the tools Drupdater runs *through* Composer as well: Drush is invoked as
-`composer exec -- drush`, and the addons run PHPCS/PHPCBF, Rector and Drush from inside the
-[agent](docker-images.md#drupdater-agent), a Composer process, which they inherit the
-environment of. The agent runs them without a timeout of its own: the run's timeout bounds
+That covers the tools Drupdater runs *through* Composer as well: Drush, PHPCS/PHPCBF and
+Rector all run from inside the [agent](docker-images.md#drupdater-agent), a Composer process,
+whose environment they inherit, with the project's `bin-dir` first on `PATH` as under
+`composer exec`. The agent runs them without a timeout of its own: the run's timeout bounds
 them. A `drush updatedb` on a large site
 is exactly the kind of call that outlasts the default.
 

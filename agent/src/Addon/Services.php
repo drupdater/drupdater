@@ -142,7 +142,7 @@ final class Services
 
     public function drush(): Drush
     {
-        return new Drush(new ProcessRunner(), $this->projectBin(), $this->projectDir());
+        return new Drush(new ProcessRunner(), $this->projectBin(), $this->projectDir(), Drush::include());
     }
 
     public function composerCli(): ComposerCli

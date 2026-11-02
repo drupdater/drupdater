@@ -4,16 +4,14 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
-	"regexp"
 
+	"github.com/drupdater/drupdater/internal/agent"
 	"github.com/drupdater/drupdater/internal/php"
 
-	"github.com/spf13/afero"
 	"go.uber.org/zap"
 )
 
 type CLI struct {
-	fs         afero.Fs
 	logger     *zap.Logger
 	newCommand php.CommandFactory
 	// extraEnv is added to every invocation; see WithoutBlocking.
@@ -22,7 +20,6 @@ type CLI struct {
 
 func NewCLI(logger *zap.Logger, opts ...Option) *CLI {
 	s := &CLI{
-		fs:         afero.NewOsFs(),
 		logger:     logger,
 		newCommand: exec.CommandContext,
 	}
@@ -48,47 +45,27 @@ func (s *CLI) command(dir string) php.Command {
 	return php.Command{New: s.newCommand, Logger: s.logger, Dir: dir, ExtraEnv: s.extraEnv}
 }
 
-func (s *CLI) execComposer(ctx context.Context, dir string, args ...string) (string, error) {
-	return s.command(dir).Combined(ctx, args...)
-}
-
 // Versions are the tool versions a run's outcome depends on.
 type Versions struct {
 	Composer string
 	PHP      string
 }
 
-// composer --version puts its version on stdout and PHP's on stderr — hence the merged output.
-var (
-	composerVersionRe = regexp.MustCompile(`(?m)^Composer version (\S+)`)
-	phpVersionRe      = regexp.MustCompile(`(?m)^PHP version (\S+)`)
-)
-
-// Version reports the composer and PHP versions in play. Not tied to a project, hence no dir.
+// Version reports the Composer and PHP the agent runs under. Not tied to a project.
 func (s *CLI) Version(ctx context.Context) (Versions, error) {
-	out, err := s.command("").Combined(ctx, "--version", "--no-ansi")
+	reply, err := withoutProject(func(dir string) (handshakeResult, error) {
+		return agent.Call[handshakeResult](ctx, s.command(dir), "drupdater:handshake", struct{}{})
+	})
 	if err != nil {
-		return Versions{}, fmt.Errorf("failed to determine composer version: %w, output: %s", err, out)
+		return Versions{}, fmt.Errorf("failed to determine the composer version: %w", err)
 	}
-
-	match := composerVersionRe.FindStringSubmatch(out)
-	if match == nil {
-		return Versions{}, fmt.Errorf("failed to parse composer version from output: %s", out)
-	}
-	versions := Versions{Composer: match[1]}
-
-	// Composer only started reporting the PHP version in 2.5, so its absence is not an error.
-	if phpMatch := phpVersionRe.FindStringSubmatch(out); phpMatch != nil {
-		versions.PHP = phpMatch[1]
-	}
-
-	return versions, nil
+	return Versions{Composer: reply.ComposerVersion, PHP: reply.PHPVersion}, nil
 }
 
+// Install brings vendor/ to composer.lock.
 func (s *CLI) Install(ctx context.Context, dir string) error {
-	out, err := s.execComposer(ctx, dir, "install", "--no-interaction", "--no-progress", "--optimize-autoloader", "--ignore-platform-reqs")
-	if err != nil {
-		return fmt.Errorf("failed to install dependencies: %w, output: %s", err, out)
+	if _, err := agent.Call[struct{}](ctx, s.command(dir), "drupdater:install", struct{}{}); err != nil {
+		return fmt.Errorf("failed to install dependencies: %w", err)
 	}
 	return nil
 }

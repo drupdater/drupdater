@@ -45,8 +45,11 @@ final class EndToEndTest extends TestCase
 
     public function testHandshake(): void
     {
-        $reply = $this->ask('drupdater:handshake', $this->scratchDir(), ['protocol' => 3, 'request' => []]);
+        $reply = $this->ask('drupdater:handshake', $this->scratchDir(), ['protocol' => 4, 'request' => []]);
 
+        self::assertMatchesRegularExpression('/^2\.\d+\.\d+/', $reply['result']['composer_version'], 'the global Composer, not the agent\'s dev copy');
+        self::assertSame(PHP_VERSION, $reply['result']['php_version']);
+        $reply['result'] = self::fixture('handshake/response.json')['result'];
         self::assertEquals(self::fixture('handshake/response.json'), $reply);
     }
 
@@ -58,6 +61,43 @@ final class EndToEndTest extends TestCase
         $reply = $this->ask('drupdater:project', $project, self::fixture('project/request.json'));
 
         self::assertEquals(self::fixture('project/response.json'), $reply);
+    }
+
+    public function testInstallBringsVendorToTheLock(): void
+    {
+        [$project] = $this->pathProject();
+
+        $reply = $this->ask('drupdater:install', $project, self::fixture('install/request.json'));
+
+        self::assertEquals(self::fixture('install/response.json'), $reply);
+        self::assertFileExists($project . '/vendor/fixture/lib/src/greeting.txt');
+        self::assertFileExists($project . '/vendor/autoload.php');
+    }
+
+    public function testAnInstallThatCannotFetchAPackageFails(): void
+    {
+        [$project, $package] = $this->pathProject();
+        (new Filesystem())->removeDirectory($package);
+
+        $reply = $this->ask('drupdater:install', $project, self::fixture('install/request.json'));
+
+        self::assertSame(['failed', 'composer install failed'], [$reply['error']['kind'], $reply['error']['reason']]);
+        self::assertStringContainsString($package, $reply['error']['message']);
+    }
+
+    public function testSiteFactsRunTheProjectsDrushWithTheCommandsTheAgentShips(): void
+    {
+        $project = $this->scratchDir();
+        $this->writeFiles($project, [
+            'composer.json' => json_encode(['name' => 'fixture/site', 'repositories' => [['packagist.org' => false]]]),
+            // Answers drupdater:facts only when the agent's own drush commands are where it says.
+            'vendor/bin/drush' => "#!/bin/sh\ninclude=\"\${1#--include=}\"\n[ -f \"\$include/Commands/DrupdaterCommands.php\" ] || exit 1\nprintf '{\"site\":\"%s\"}' \"\$SITE_NAME\"\n",
+        ]);
+        chmod($project . '/vendor/bin/drush', 0755);
+
+        $reply = $this->ask('drupdater:site-facts', $project, self::fixture('site-facts/request.json'));
+
+        self::assertSame(['facts' => ['site' => 'default']], $reply['result'] ?? $reply);
     }
 
     public function testResolveWritesTheUpdateAndBumpsTheConstraints(): void
@@ -77,10 +117,10 @@ final class EndToEndTest extends TestCase
     {
         $project = $this->lockedProject();
 
-        $pinned = $this->ask('drupdater:resolve', $project, ['protocol' => 3, 'request' => [
+        $pinned = $this->ask('drupdater:resolve', $project, ['protocol' => 4, 'request' => [
             'packages' => [], 'keep' => [['package' => 'fixture/a', 'version' => '1.0.0']], 'minimal_changes' => false,
         ]]);
-        $only = $this->ask('drupdater:resolve', $this->lockedProject(), ['protocol' => 3, 'request' => [
+        $only = $this->ask('drupdater:resolve', $this->lockedProject(), ['protocol' => 4, 'request' => [
             'packages' => ['fixture/a'], 'keep' => [], 'minimal_changes' => false,
         ]]);
 
@@ -93,7 +133,7 @@ final class EndToEndTest extends TestCase
         $project = $this->lockedProject();
         $lock = file_get_contents($project . '/composer.lock');
 
-        [$reply, $stderr] = $this->askWithErrors('drupdater:resolve', $project, ['protocol' => 3, 'request' => [
+        [$reply, $stderr] = $this->askWithErrors('drupdater:resolve', $project, ['protocol' => 4, 'request' => [
             'packages' => [], 'keep' => [['package' => 'fixture/a', 'version' => '9.9.9']], 'minimal_changes' => false,
         ]]);
 
@@ -229,7 +269,7 @@ final class EndToEndTest extends TestCase
      */
     private function hook(string $project, string $addon, array $event, array $earlier = [], bool $security = false): array
     {
-        $reply = $this->ask('drupdater:hook', $project, ['protocol' => 3, 'request' => [
+        $reply = $this->ask('drupdater:hook', $project, ['protocol' => 4, 'request' => [
             'addon' => $addon, 'event' => $event, 'earlier' => $earlier, 'run' => ['security' => $security],
         ]]);
         self::assertTrue($reply['ok'], json_encode($reply));
@@ -254,6 +294,26 @@ final class EndToEndTest extends TestCase
         $process = self::composer(['--working-dir=' . $project, $command, '--no-interaction', '--no-ansi'], json_encode($request));
         $lines = explode("\n", trim($process->getOutput()));
         return [json_decode(end($lines), true, 512, JSON_THROW_ON_ERROR), $process->getErrorOutput()];
+    }
+
+    /**
+     * A project locked to a package from a path repository, copied rather than linked.
+     *
+     * @return array{string, string} the project and the package
+     */
+    private function pathProject(): array
+    {
+        $package = $this->scratchDir();
+        $this->writeFiles($package, self::PACKAGE_FILES + ['composer.json' => json_encode(['name' => 'fixture/lib', 'version' => '1.0.0'])]);
+        $project = $this->scratchDir();
+        $this->writeFiles($project, ['composer.json' => json_encode([
+            'name' => 'fixture/site',
+            'repositories' => [['type' => 'path', 'url' => $package, 'options' => ['symlink' => false]], ['packagist.org' => false]],
+            'require' => ['fixture/lib' => '1.0.0'],
+        ], JSON_UNESCAPED_SLASHES)]);
+        $lock = self::composer(['--working-dir=' . $project, 'update', '--no-install', '--no-interaction']);
+        self::assertSame(0, $lock->getExitCode(), $lock->getErrorOutput());
+        return [$project, $package];
     }
 
     /**

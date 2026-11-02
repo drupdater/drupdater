@@ -1,0 +1,8 @@
+{
+  "protocol": 4,
+  "command": "drupdater:config-export",
+  "ok": true,
+  "result": {
+    "path": "config/sync"
+  }
+}

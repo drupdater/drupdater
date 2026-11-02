@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 
 	"github.com/drupdater/drupdater/internal/agent"
-	"github.com/drupdater/drupdater/internal/drush"
 )
 
 // event is one point of a run the addons hook into, and what it hands their hooks.
@@ -16,7 +15,7 @@ type event struct {
 	plan UpdatePlan
 	// baseLock is composer.lock as committed when the event fired; post-composer-update only.
 	baseLock json.RawMessage
-	// facts are the site's facts as drush printed them; per-site events only.
+	// facts are the site's facts as the agent read them; per-site events only.
 	facts json.RawMessage
 }
 
@@ -33,14 +32,14 @@ func postCodeUpdate() event {
 }
 
 // preSiteUpdate carries the site's facts as they were before its update hooks ran.
-func preSiteUpdate(site string, facts drush.Facts) event {
-	return event{name: EventPreSiteUpdate, site: site, facts: facts.Raw}
+func preSiteUpdate(site string, facts json.RawMessage) event {
+	return event{name: EventPreSiteUpdate, site: site, facts: facts}
 }
 
 // postSiteUpdate carries the site's facts read again after its update hooks ran: a hook can
 // enable a module or move a path.
-func postSiteUpdate(site string, facts drush.Facts) event {
-	return event{name: EventPostSiteUpdate, site: site, facts: facts.Raw}
+func postSiteUpdate(site string, facts json.RawMessage) event {
+	return event{name: EventPostSiteUpdate, site: site, facts: facts}
 }
 
 // payload is the event as a hook sees it, with the plan its stage settled.

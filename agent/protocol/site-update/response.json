@@ -1,0 +1,20 @@
+{
+  "protocol": 4,
+  "command": "drupdater:site-update",
+  "ok": true,
+  "result": {
+    "facts": {
+      "config_sync_directory": "/project/web/../config/sync",
+      "translation_path": "/project/web/../translations",
+      "modules": [
+        "locale",
+        "locale_deploy",
+        "node",
+        "system"
+      ],
+      "update_hooks": {},
+      "unsupported_modules": [],
+      "unsupported_modules_error": ""
+    }
+  }
+}

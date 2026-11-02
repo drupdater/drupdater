@@ -102,7 +102,8 @@ every site first.
 ### 5. `baseline site install`
 
 Installs each configured site via Drush, at the **old** code, building a baseline
-database. `vendor/` still holds it: the update so far exists only in the lock.
+database, one [`drupdater:site-install`](../reference/docker-images.md#drupdater-agent) call
+per site. `vendor/` still holds it: the update so far exists only in the lock.
 
 This is what makes the update hooks in phase 7 meaningful. Running `updatedb` requires a
 database at the pre-update schema; without a baseline there would be nothing for the
@@ -137,8 +138,9 @@ The sites are updated in two steps, the second starting once every site has fini
 first:
 
 1. **Concurrently, across sites:** configure the database, read the site's facts, fire
-   **`pre-site-update`**, run the update hooks, resave configuration and read the facts
-   again. This step touches only the site's database.
+   **`pre-site-update`**, then run the update hooks, resave configuration and read the facts
+   again, which the agent does in one `drupdater:site-update` call. This step touches only the
+   site's database.
 2. **One site at a time, in `--sites` order:** fire **`post-site-update`**, export
    configuration, and commit the site's config sync directory as `Update configuration
    <site>`.
@@ -146,13 +148,14 @@ first:
 Then every site's `settings.php` is put back.
 
 The facts are everything drupdater reads from a site, gathered by one call to its own
-`drupdater:facts` Drush command, which ships inside the binary and is loaded with `drush
+`drupdater:facts` Drush command, which ships with the agent and is loaded with `drush
 --include`: the config sync directory, the translation path, the enabled modules, the pending
 update hooks and the unsupported modules. One Drupal bootstrap per site answers all of them,
 under Drush's update kernel, because the code is already updated and the schema is not. Both
 site events carry them: `pre-site-update` the facts from before the update hooks,
 `post-site-update` the ones read after them, without the drupal.org request for unsupported
-modules. The config export is committed from the directory the second read names.
+modules. The binary hands them to the hooks unread. The config export is committed from the
+directory `drupdater:config-export` names, relative to the project.
 
 The second step writes into the working tree. Sites share that working tree and its git
 index, and two sites can name the same config or translation directory, so it is a plain

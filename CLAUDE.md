@@ -109,16 +109,14 @@ Where things live. For *how they work*, read `docs/explanation/` rather than dup
 | `internal/report/` | The published JSON report schema and its atomic writer |
 | `internal/logging/redact.go` | Value-based secret redaction, wrapping the zap core |
 | `internal/golden/` | Golden-file comparison and the `-update` flag; imported only from tests |
-| `internal/composer/`, `drush/`, `repo/` | One directory per wrapped external tool: `repo` is the git CLI |
-| `internal/drupal/` | Making drush-reported absolute paths relative to the project |
-| `internal/siteinstall/` | Installs a throwaway SQLite site for the `check --full` tier |
-| `internal/php/` | What the PHP wrappers share: running a command under Composer's environment, decoding JSON output, and the `CommandFactory` each wrapper holds as its test seam |
-| `scripts/` | PHP embedded in the binary, extracted per run: the `drupdater:*` Drush commands (`drush --include`) |
+| `internal/composer/`, `repo/` | One directory per wrapped external tool: `composer` reaches everything PHP through the agent, `composer.Sites` a site; `repo` is the git CLI |
+| `internal/php/` | Running a composer command under Composer's environment, and the `CommandFactory` each wrapper holds as its test seam |
 | `agent/` | `drupdater/agent`, the global Composer plugin the image installs: every addon, the `composer drupdater:*` commands, its PHPUnit suite, and `protocol/`, the request/reply fixtures both sides test against |
 | `agent/src/Addon/` | **The ten addons**, their contract (`Addon`, `Event`, `HookResult`, `Findings`), `Catalogue::builtin()` — which addons exist, mandatory and default — and `Services`, the composition root `create()` builds each from |
-| `agent/src/Command/` | `drupdater:addons`, `drupdater:hook`, `drupdater:report`, and the runner's own `project`, `resolve`, `platform-check`, `handshake` |
+| `agent/src/Command/` | `drupdater:addons`, `drupdater:hook`, `drupdater:report`, and the runner's own `project`, `install`, `resolve`, `platform-check`, `handshake` and the site commands (`site-facts`, `site-update`, `config-export`, `site-install`, `site-database`, `site-restore`) |
 | `agent/src/Tools/`, `DrupalOrg/`, `Patches/`, `PatchCheck/`, `Resolve/`, `Audit/`, `Plugins/`, `Project/` | What the addons run: phpcs, Rector, drush, Composer again; drupal.org and git.drupalcode.org; the patches; the update; the audit; allow-plugins; the project |
-| `agent/resources/` | The Rector config `deprecations_remover` runs with |
+| `agent/src/Site/` | A site's throwaway SQLite database: the `settings.php` block and the `core.extension.yml` edits |
+| `agent/resources/` | The Rector config `deprecations_remover` runs with; `drush/`, the `drupdater:*` Drush commands loaded with `drush --include` |
 | `internal/agent/` | `agent.Call`: runs a `composer drupdater:*` command, decodes its envelope, returns an `*agent.Error` with a `Kind` |
 | `internal/composer/project.go` | `composer.Project`, what the runner reads of the project: web root and lock hash. Ask again after anything rewrites `composer.json` or the lock |
 | `tools/` | The PHPCS and Rector the image installs to `/opt/drupdater/tools`, so addons install nothing into the project |
@@ -134,7 +132,7 @@ Where things live. For *how they work*, read `docs/explanation/` rather than dup
 - **A new event** is its name in `workflow.Events` and `EventName`, its payload in `workflow/events.go` and `Event::fromRequest()`, and the `fire` call in the runner.
 - **Hook stages are load-bearing** on `pre-composer-update` and `post-code-update`. See `docs/explanation/addon-architecture.md` before changing one.
 - **The MR is rendered from the report**, through its JSON. An addon reaches the description only via its report section; findings from two addons are joined there, never handed between them.
-- **A new question for Composer goes to the agent, not to its console output.** The agent answers in JSON with a closed error `Kind`, decided from the exception it caught. A change to a request or reply changes `agent/protocol/` and both sides' tests; a breaking one bumps `protocol` in `agent/src/Protocol.php` and `internal/agent/agent.go` together.
+- **A new question for Composer or drush goes to the agent, not to its console output.** Go runs no PHP tool itself. The agent answers in JSON with a closed error `Kind`, decided from the exception it caught. A change to a request or reply changes `agent/protocol/` and both sides' tests; a breaking one bumps `protocol` in `agent/src/Protocol.php` and `internal/agent/agent.go` together.
 - **The addons' report sections are a published contract.** Renaming a field in an addon's `report()` is a breaking change to `schema_version`. `agent/protocol/report/` pins the sections the agent builds for an example of every addon's findings, and `internal/report/testdata/run_report.json` embeds them, so such a rename fails rather than ships. A new reporting addon belongs in both.
 - **Report types mirror rather than reuse internal types** (`report.PackageChange` vs `composer.PackageChange`) so an internal refactor can't rename a published field.
 - **The report's deferred write is registered first**, so it runs last and is emitted on every exit path.

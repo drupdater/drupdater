@@ -53,7 +53,7 @@ final class CatalogueCommandsTest extends TestCase
             return null;
         };
 
-        [, $reply, $output] = self::ask(new ReportCommand(new Catalogue([new CatalogueEntry(ScriptedAddon::class)])), ['protocol' => 3, 'request' => ['addons' => [
+        [, $reply, $output] = self::ask(new ReportCommand(new Catalogue([new CatalogueEntry(ScriptedAddon::class)])), ['protocol' => 4, 'request' => ['addons' => [
             ['addon' => 'scripted', 'findings' => [['event' => 'post-code-update', 'site' => '', 'finding' => 7, 'committed' => ['c']]]],
         ]]]);
 
@@ -79,7 +79,7 @@ final class CatalogueCommandsTest extends TestCase
     #[DataProvider('invalidReportRequests')]
     public function testReportRefusesAnInvalidRequest(array $request, string $reason): void
     {
-        [$status, $reply] = self::ask(new ReportCommand(), ['protocol' => 3, 'request' => $request]);
+        [$status, $reply] = self::ask(new ReportCommand(), ['protocol' => 4, 'request' => $request]);
 
         self::assertSame(1, $status);
         self::assertSame(['kind' => 'invalid_request', 'reason' => $reason, 'message' => ''], $reply['error']);

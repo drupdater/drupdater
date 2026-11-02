@@ -77,12 +77,12 @@ func TestRunSiteFailureDoesNotPublish(t *testing.T) {
 	h.worktree.EXPECT().StageGlob(anyCtx, mock.Anything).Return(nil)
 	h.worktree.EXPECT().Unstaged(anyCtx).Return(nil, nil).Maybe()
 	h.worktree.EXPECT().Staged(anyCtx).Return(nil, nil).Maybe()
-	h.installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil)
-	h.installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil)
-	h.installer.EXPECT().RestoreSettings(anyCtx, testCheckout, "site1").Return(nil)
+	h.sites.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil)
+	h.sites.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil)
+	h.sites.EXPECT().RestoreSettings(anyCtx, testCheckout, "site1").Return(nil)
 	updateErr := errors.New("drush updatedb crashed")
-	h.drush.EXPECT().Facts(anyCtx, testCheckout, "site1").Return(syncFacts(testCheckout+"/config/sync"), nil)
-	h.drush.EXPECT().UpdateSite(anyCtx, testCheckout, "site1").Return(updateErr)
+	h.sites.EXPECT().Facts(anyCtx, testCheckout, "site1").Return(siteFacts, nil)
+	h.sites.EXPECT().Update(anyCtx, testCheckout, "site1").Return(nil, updateErr)
 
 	require.ErrorIs(t, h.run(t), updateErr)
 }
@@ -113,7 +113,7 @@ func TestRunPlatformReqsFail(t *testing.T) {
 	h.composer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).
 		Return("php 8.1.0 failed", errors.New("unmet platform requirements"))
 	// The baseline site install may start before the cancel propagates.
-	h.installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil).Maybe()
+	h.sites.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil).Maybe()
 
 	require.ErrorContains(t, h.run(t), "PHP platform requirements not satisfied")
 }
@@ -200,11 +200,11 @@ func TestRunInstallsSitesAtTheOldCode(t *testing.T) {
 			steps = append(steps, "composer update")
 			return []composer.PackageChange{{Action: "Upgrade", Package: "drupal/core", From: "9.0.0", To: "9.1.0"}}, nil
 		})
-	h.installer.EXPECT().Install(anyCtx, testCheckout, "site1").RunAndReturn(func(context.Context, string, string) error {
+	h.sites.EXPECT().Install(anyCtx, testCheckout, "site1").RunAndReturn(func(context.Context, string, string) error {
 		steps = append(steps, "site install")
 		return nil
 	})
-	h.installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").RunAndReturn(func(context.Context, string, string) error {
+	h.sites.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").RunAndReturn(func(context.Context, string, string) error {
 		steps = append(steps, "site update")
 		return nil
 	})
@@ -347,20 +347,11 @@ func TestRunFailsWhenComposerInstallFails(t *testing.T) {
 	assert.Equal(t, "composer install", h.got.FailedPhase)
 }
 
-func TestRunConfigResaveError(t *testing.T) {
-	h := newRunHarness(t, false)
-	h.expectFullRun()
-	resaveErr := errors.New("drush config:resave failed")
-	h.drush.EXPECT().ConfigResave(anyCtx, testCheckout, "site1").Return(resaveErr)
-
-	require.ErrorIs(t, h.run(t), resaveErr)
-}
-
 func TestRunExportConfigurationError(t *testing.T) {
 	h := newRunHarness(t, false)
 	h.expectFullRun()
 	exportErr := errors.New("drush config:export failed")
-	h.drush.EXPECT().ExportConfiguration(anyCtx, testCheckout, "site1").Return(exportErr)
+	h.sites.EXPECT().ExportConfiguration(anyCtx, testCheckout, "site1").Return("", exportErr)
 
 	require.ErrorIs(t, h.run(t), exportErr)
 }
@@ -544,7 +535,7 @@ func TestRunOnlyWarnsWhenItsWorktreeCannotBeRemoved(t *testing.T) {
 // Cancelling the run must not stop it from removing its worktree.
 func TestRunRemovesItsWorktreeEvenWhenCancelled(t *testing.T) {
 	source := t.TempDir()
-	installer := NewMockInstaller(t)
+	sites := NewMockSites(t)
 	repositoryService := NewMockGitService(t)
 	mockComposer := NewMockComposer(t)
 	expectVersionLookup(mockComposer)
@@ -559,7 +550,7 @@ func TestRunRemovesItsWorktreeEvenWhenCancelled(t *testing.T) {
 	repositoryService.EXPECT().RemoveWorktree(mock.MatchedBy(func(ctx context.Context) bool { return ctx.Err() == nil }), source, testCheckout).Return(nil)
 
 	config := config.Config{Branch: "main", WorkingDir: source, Sites: []string{"site1"}, DryRun: true}
-	err := New(zap.NewNop(), config, NewMockDrush(t), nil, repositoryService, installer, mockComposer).Run(ctx, nil)
+	err := New(zap.NewNop(), config, sites, nil, repositoryService, mockComposer).Run(ctx, nil)
 
 	require.Error(t, err)
 }

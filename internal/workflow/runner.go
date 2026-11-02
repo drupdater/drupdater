@@ -32,12 +32,11 @@ type Runner struct {
 type services struct {
 	logger   *zap.Logger
 	config   config.Config
-	drush    Drush
+	sites    Sites
 	platform Platform
 	// git works on repositories in general; each run holds its own GitRepository.
-	git       GitService
-	installer Installer
-	composer  Composer
+	git      GitService
+	composer Composer
 }
 
 // run is one call to Run from its working copy on. Everything in it is fixed by newRun.
@@ -80,21 +79,19 @@ func WithReportSink(sink func(report.Report)) Option {
 func New(
 	logger *zap.Logger,
 	cfg config.Config,
-	drush Drush,
+	sites Sites,
 	platform Platform,
 	gitService GitService,
-	installer Installer,
 	composerService Composer,
 	opts ...Option,
 ) *Runner {
 	r := &Runner{services: services{
-		logger:    logger,
-		config:    cfg,
-		drush:     drush,
-		platform:  platform,
-		git:       gitService,
-		installer: installer,
-		composer:  composerService,
+		logger:   logger,
+		config:   cfg,
+		sites:    sites,
+		platform: platform,
+		git:      gitService,
+		composer: composerService,
 	}}
 	for _, opt := range opts {
 		opt(r)
@@ -202,7 +199,7 @@ func (r *run) execute(ctx context.Context) (branch string, err error) {
 	// Install each site at the current (old) code to create the baseline database.
 	if err := r.rec.Run("baseline site install", func() error {
 		return r.forEachSite(ctx, func(ctx context.Context, _ int, site string) error {
-			if err := r.installer.Install(ctx, r.path, site); err != nil {
+			if err := r.sites.Install(ctx, r.path, site); err != nil {
 				return fmt.Errorf("site %s installation failed: %w", site, err)
 			}
 			return nil

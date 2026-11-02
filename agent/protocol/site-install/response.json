@@ -1,0 +1,6 @@
+{
+  "protocol": 4,
+  "command": "drupdater:site-install",
+  "ok": true,
+  "result": {}
+}

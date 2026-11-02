@@ -125,6 +125,89 @@ final class ToolsTest extends TestCase
         self::assertFailure('drush locale-deploy:localize-translations failed', static fn () => (new Drush(new FakeProcessRunner([new ProcessResult(1, '', 'no db')]), new Bin('/bin'), '/p'))->localizeTranslations('default'));
     }
 
+    public function testDrushReadsTheFactsThroughDrupdatersOwnCommandKeepingObjects(): void
+    {
+        $runner = new FakeProcessRunner([new ProcessResult(0, '{"modules":["node"],"update_hooks":{}}', 'PHP Notice: noise'), new ProcessResult(0, '{}', '')]);
+        $drush = new Drush($runner, new Bin('/p/vendor/bin'), '/p', '/agent/resources/drush');
+
+        $facts = $drush->facts('example.com', true);
+        $drush->facts('example.com', false);
+
+        self::assertSame('{"modules":["node"],"update_hooks":{}}', json_encode($facts));
+        self::assertSame(['/p/vendor/bin/drush', '--include=/agent/resources/drush', 'drupdater:facts'], $runner->runs[0]['command']);
+        self::assertSame(['/p/vendor/bin/drush', '--include=/agent/resources/drush', 'drupdater:facts', '--skip-update-status'], $runner->runs[1]['command']);
+        self::assertSame(['/p', 'example.com'], [$runner->runs[0]['cwd'], $runner->runs[0]['env']['SITE_NAME']]);
+    }
+
+    public function testDrushFactsThatAreNoObjectAreAFailure(): void
+    {
+        self::assertFailure('drush drupdater:facts printed no JSON object', static fn () => (new Drush(new FakeProcessRunner([new ProcessResult(0, '[]', 'x')]), new Bin('/bin'), '/p'))->facts('default', true));
+        self::assertFailure('drush drupdater:facts printed no JSON report', static fn () => (new Drush(new FakeProcessRunner([new ProcessResult(0, 'Notice', '')]), new Bin('/bin'), '/p'))->facts('default', true));
+    }
+
+    public function testAFailedDrushIsNamedWithoutTheIncludePath(): void
+    {
+        self::assertFailure('drush drupdater:config-resave failed', static fn () => (new Drush(new FakeProcessRunner([new ProcessResult(1, '', 'no db')]), new Bin('/bin'), '/p', '/agent/resources/drush'))->resaveConfig('default'));
+    }
+
+    public function testDrushRunsTheSitesUpdateExportAndInstall(): void
+    {
+        $runner = new FakeProcessRunner(array_fill(0, 4, new ProcessResult(0, '', '')));
+        $drush = new Drush($runner, new Bin('/bin'), '/p', '/inc');
+
+        $drush->updateDatabase('a');
+        $drush->resaveConfig('a');
+        $drush->exportConfig('a');
+        $drush->installSite('a');
+
+        self::assertSame([
+            ['/bin/drush', 'updatedb', '--yes'],
+            ['/bin/drush', '--include=/inc', 'drupdater:config-resave'],
+            ['/bin/drush', 'config:export', '--yes'],
+            ['/bin/drush', '--existing-config', '--yes', 'site:install', '--sites-subdir=a', '--verbose'],
+        ], array_column($runner->runs, 'command'));
+    }
+
+    /**
+     * @return iterable<string, array{string, string}>
+     */
+    public static function statuses(): iterable
+    {
+        yield 'relative to the root' => ['{"config-sync":"../config/sync","root":"/p/web"}', '/p/web/../config/sync'];
+        yield 'absolute' => ['{"config-sync":"/config/sync","root":"/p/web"}', '/config/sync'];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('statuses')]
+    public function testDrushNamesTheConfigSyncDirectoryAbsolute(string $status, string $directory): void
+    {
+        $runner = new FakeProcessRunner([new ProcessResult(0, $status, '')]);
+
+        self::assertSame($directory, (new Drush($runner, new Bin('/bin'), '/p'))->configSyncDir('a'));
+        self::assertSame(['/bin/drush', 'status', '--fields=config-sync,root', '--format=json'], $runner->runs[0]['command']);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function statusesWithoutSync(): iterable
+    {
+        yield 'missing' => ['{"root":"/p/web"}'];
+        yield 'empty' => ['{"config-sync":"","root":"/p/web"}'];
+        yield 'not a string' => ['{"config-sync":["x"],"root":"/p/web"}'];
+        yield 'not an object' => ['[]'];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('statusesWithoutSync')]
+    public function testASiteWithoutAConfigSyncDirectoryIsAFailure(string $status): void
+    {
+        self::assertFailure('site a has no config sync directory', static fn () => (new Drush(new FakeProcessRunner([new ProcessResult(0, $status, 'x')]), new Bin('/bin'), '/p'))->configSyncDir('a'));
+    }
+
+    public function testDrushIncludesTheCommandsTheAgentShips(): void
+    {
+        self::assertFileExists(Drush::include() . '/Commands/DrupdaterCommands.php');
+    }
+
     public function testComposerNormalizeRunsComposerAgainAsAScriptsComposerWould(): void
     {
         $runner = new FakeProcessRunner([new ProcessResult(0, '', ''), new ProcessResult(1, '', 'invalid')]);

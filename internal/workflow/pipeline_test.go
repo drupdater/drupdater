@@ -15,7 +15,6 @@ import (
 
 	"github.com/drupdater/drupdater/internal/agent"
 	"github.com/drupdater/drupdater/internal/buildinfo"
-	"github.com/drupdater/drupdater/internal/drush"
 	"github.com/drupdater/drupdater/internal/report"
 )
 
@@ -116,7 +115,7 @@ func TestHooksStopAtTheFirstFailure(t *testing.T) {
 		addon("later", map[string]Stage{EventPreSiteUpdate: Inspect}),
 	}, s, false)
 
-	_, err := p.fire(t.Context(), "/p", &fakeCommitter{}, preSiteUpdate("default", drush.Facts{Raw: json.RawMessage(`{}`)}))
+	_, err := p.fire(t.Context(), "/p", &fakeCommitter{}, preSiteUpdate("default", json.RawMessage(`{}`)))
 
 	require.ErrorIs(t, err, assert.AnError)
 	require.EqualError(t, err, "pre-site-update hook failed: broken: "+assert.AnError.Error())
@@ -124,7 +123,7 @@ func TestHooksStopAtTheFirstFailure(t *testing.T) {
 }
 
 func TestEachEventHandsItsHooksItsOwnPayload(t *testing.T) {
-	facts := drush.Facts{ConfigSyncDirectory: "/p/config", Raw: json.RawMessage(`{"modules":["locale_deploy"]}`)}
+	facts := json.RawMessage(`{"modules":["locale_deploy"]}`)
 	for _, tt := range []struct {
 		event event
 		want  string
@@ -278,7 +277,7 @@ func TestAFailedCommitStopsTheEventAndRecordsNothing(t *testing.T) {
 	}}
 	p := NewPipeline([]Addon{addon("a", map[string]Stage{EventPostSiteUpdate: Change}), addon("b", map[string]Stage{EventPostSiteUpdate: Inspect})}, s, false)
 
-	_, err := p.fire(t.Context(), "/p", &fakeCommitter{err: assert.AnError}, postSiteUpdate("default", drush.Facts{}))
+	_, err := p.fire(t.Context(), "/p", &fakeCommitter{err: assert.AnError}, postSiteUpdate("default", nil))
 
 	require.ErrorIs(t, err, assert.AnError)
 	assert.Equal(t, []string{"a"}, s.called())
@@ -299,7 +298,7 @@ func TestAHookReadsBackOnlyItsOwnAddonsEarlierFindingsInEventAndSiteOrder(t *tes
 	_, err := p.fire(t.Context(), "/p", committer, preComposerUpdate(UpdatePlan{}))
 	require.NoError(t, err)
 	for _, site := range []string{"zeta", "alpha"} {
-		_, err = p.fire(t.Context(), "/p", committer, preSiteUpdate(site, drush.Facts{}))
+		_, err = p.fire(t.Context(), "/p", committer, preSiteUpdate(site, nil))
 		require.NoError(t, err)
 	}
 	_, err = p.fire(t.Context(), "/p", committer, postCodeUpdate())
@@ -338,7 +337,7 @@ func TestConcurrentSitesAllRecordTheirFinding(t *testing.T) {
 	var wg sync.WaitGroup
 	for i := range 20 {
 		wg.Go(func() {
-			_, err := p.fire(t.Context(), "/p", &fakeCommitter{}, preSiteUpdate(fmt.Sprintf("site%d", i), drush.Facts{}))
+			_, err := p.fire(t.Context(), "/p", &fakeCommitter{}, preSiteUpdate(fmt.Sprintf("site%d", i), nil))
 			assert.NoError(t, err)
 		})
 	}

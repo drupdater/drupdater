@@ -89,10 +89,9 @@ Built on `php:<version>-cli-trixie`, with:
 - Plus a globally-required Composer plugin,
   [`mglaman/composer-drupal-lenient`](https://github.com/mglaman/composer-drupal-lenient),
   pre-allow-listed.
-- **Helper scripts**, embedded in the binary and extracted per run — drupdater's Drush commands:
-  the site facts query and the configuration resave.
 - **The Drupdater agent** at `/opt/drupdater/agent/`, a second global plugin, which holds every
-  addon — see below. It brings
+  addon and everything drupdater does to a site — see below. It ships drupdater's own Drush
+  commands, the site facts query and the configuration resave, and brings
   [`ion-bazan/composer-diff`](https://github.com/IonBazan/composer-diff) with it as a library;
   that package's own plugin, and with it the `composer diff` command, is disabled.
 - **Bundled tools** at `/opt/drupdater/tools/` — see below.
@@ -110,10 +109,14 @@ installing anything into it.
 | `drupdater:addons` | Reading `.drupdater.yaml`, the `addons` command and the `addon names resolve` check: the addon catalogue |
 | `drupdater:hook` | Every addon hook of every run, one call per hook |
 | `drupdater:report` | The [run report](run-report.md#addons)'s addon sections, and so the merge request description |
-| `drupdater:handshake` | The [`drupdater agent installed in Composer`](preflight-checks.md#drupdater-agent-installed-in-composer) preflight check |
+| `drupdater:handshake` | The [`drupdater agent installed in Composer`](preflight-checks.md#drupdater-agent-installed-in-composer) preflight check, and the report's [tool versions](run-report.md#composer_version-and-php_version) |
 | `drupdater:platform-check` | The [`PHP platform requirements satisfied`](preflight-checks.md#php-platform-requirements-satisfied) preflight check |
 | `drupdater:project` | Staging the scaffold files an update rewrote, naming the update branch, and the site checks |
+| `drupdater:install` | The `composer install` phase, and the update's install in `update shared code` |
 | `drupdater:resolve` | The run's [`resolve update`](../explanation/how-a-run-works.md) phase |
+| `drupdater:site-install` | The `baseline site install` phase, and `check --full` |
+| `drupdater:site-database`, `drupdater:site-restore` | Pointing each site at its throwaway database for the `site update` phase, and taking that off again |
+| `drupdater:site-facts`, `drupdater:site-update`, `drupdater:config-export` | The `site update` phase: a site's facts, its update hooks, its configuration export |
 
 `drupdater:addons` lists the catalogue: each addon, whether every run needs it, whether a
 normal run gets it when the project names none, and the stage it hooks each event at. It needs
@@ -151,6 +154,28 @@ on it. The project's `config.platform` is ignored, so the answer is about the re
 a trailing slash — and the lock's `content-hash`, which names the
 [update branch](cli/drupdater.md). It is asked again whenever `composer.json` or the lock may
 have changed, so a reader never sees a stale answer.
+
+`drupdater:install` runs Composer's own `install --optimize-autoloader --ignore-platform-reqs`
+in its process, so the project's plugins and scripts run as in any `composer install`.
+
+The site commands each take the `site` they are about — its directory under `sites/`, and the
+`SITE_NAME` drush runs with — and run the project's own `vendor/bin/drush`, with drupdater's
+Drush commands loaded through `--include`:
+
+- `drupdater:site-facts` reads what drupdater and the addons read of a site in one bootstrap:
+  its config sync and translation directories, its modules, its pending update hooks and, with
+  `update_status`, the modules drupal.org no longer supports.
+- `drupdater:site-update` runs `drush updatedb`, saves every configuration object again so the
+  export carries the update's new defaults, and reads the facts once more, without asking
+  drupal.org.
+- `drupdater:config-export` runs `drush config:export` and names the directory it wrote,
+  relative to the project, for drupdater to commit.
+- `drupdater:site-database` appends a block to the site's `settings.php` that points it at a
+  SQLite database in a directory drupdater owns, and enables the `sqlite` module in
+  `core.extension.yml` — excluded from the export — when the project does not use it itself.
+  `drupdater:site-restore` cuts the block off again, leaving `settings.php` byte for byte as the
+  project has it. `drupdater:site-install` does both around `drush site:install
+  --existing-config`, without the `standard` profile.
 
 Each command reads one JSON request on stdin and prints one JSON reply on stdout, versioned
 by a `protocol` number the binary and the agent must agree on, with what the command logged.

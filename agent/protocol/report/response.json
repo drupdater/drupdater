@@ -1,5 +1,5 @@
 {
-  "protocol": 3,
+  "protocol": 4,
   "command": "drupdater:report",
   "ok": true,
   "result": {

@@ -1,6 +1,9 @@
 {
-  "protocol": 3,
+  "protocol": 4,
   "command": "drupdater:handshake",
   "ok": true,
-  "result": {}
+  "result": {
+    "composer_version": "2.10.1",
+    "php_version": "8.3.0"
+  }
 }

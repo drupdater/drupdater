@@ -24,27 +24,36 @@ final class CommandsTest extends TestCase
         $names = array_map(fn (AgentCommand $c) => $c->getName(), (new CommandProvider())->getCommands());
         self::assertSame([
             'drupdater:addons',
+            'drupdater:config-export',
             'drupdater:handshake',
             'drupdater:hook',
+            'drupdater:install',
             'drupdater:platform-check',
             'drupdater:project',
             'drupdater:report',
             'drupdater:resolve',
+            'drupdater:site-database',
+            'drupdater:site-facts',
+            'drupdater:site-install',
+            'drupdater:site-restore',
+            'drupdater:site-update',
         ], $names);
     }
 
-    public function testHandshakeAnswersTheFixture(): void
+    public function testHandshakeAnswersTheFixtureWithTheComposerAndPhpItRunsUnder(): void
     {
         [$status, $reply] = $this->ask(new HandshakeCommand(), self::fixture('handshake/request.json'));
 
         self::assertSame(0, $status);
-        self::assertEquals(self::fixture('handshake/response.json'), $reply);
+        $expected = self::fixture('handshake/response.json');
+        $expected['result'] = ['composer_version' => \Composer\Composer::getVersion(), 'php_version' => PHP_VERSION];
+        self::assertSame($expected, $reply);
     }
 
     public function testAMismatchedProtocolIsRefused(): void
     {
         $request = self::fixture('handshake/request.json');
-        $request['protocol'] = 4;
+        $request['protocol'] = 5;
 
         [$status, $reply] = $this->ask(new HandshakeCommand(), $request);
 
@@ -58,7 +67,7 @@ final class CommandsTest extends TestCase
     public static function unreadableBodies(): iterable
     {
         yield 'not JSON' => ['{', 'the request is not JSON'];
-        yield 'no request object' => ['{"protocol":3}', 'the request has no request object'];
+        yield 'no request object' => ['{"protocol":4}', 'the request has no request object'];
         yield 'not an object' => ['"x"', 'the request has no request object'];
     }
 

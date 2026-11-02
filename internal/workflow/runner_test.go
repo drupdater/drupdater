@@ -20,7 +20,6 @@ import (
 	"github.com/drupdater/drupdater/internal/buildinfo"
 	"github.com/drupdater/drupdater/internal/composer"
 	"github.com/drupdater/drupdater/internal/config"
-	"github.com/drupdater/drupdater/internal/drush"
 	"github.com/drupdater/drupdater/internal/repo"
 	"github.com/drupdater/drupdater/internal/report"
 )
@@ -294,25 +293,21 @@ func TestCleanup(t *testing.T) {
 }
 
 func TestSiteHooksSeeTheFactsReadBeforeAndAfterTheUpdateHooks(t *testing.T) {
-	installer := NewMockInstaller(t)
-	drushMock := NewMockDrush(t)
+	sites := NewMockSites(t)
 	committer := NewMockCommitter(t)
 	mockComposer := NewMockComposer(t)
 	s := &scriptedAgent{}
 	s.serve(mockComposer)
-	ws := testRun(services{logger: zap.NewNop(), installer: installer, drush: drushMock, composer: mockComposer}, repo.Checkout{Path: "/project"},
+	ws := testRun(services{logger: zap.NewNop(), sites: sites, composer: mockComposer}, repo.Checkout{Path: "/project"},
 		addon("observer", map[string]Stage{EventPreSiteUpdate: Inspect, EventPostSiteUpdate: Inspect}))
 	ws.committer = committer
 
-	installer.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(nil)
-	drushMock.EXPECT().Facts(anyCtx, "/project", "site1").Return(drush.Facts{ConfigSyncDirectory: "/project/config/before", Raw: json.RawMessage(`{"when":"before"}`)}, nil)
-	drushMock.EXPECT().UpdateSite(anyCtx, "/project", "site1").Return(nil)
-	drushMock.EXPECT().ConfigResave(anyCtx, "/project", "site1").Return(nil)
-	after := drush.Facts{ConfigSyncDirectory: "/project/config/after", Raw: json.RawMessage(`{"when":"after"}`)}
-	drushMock.EXPECT().LocalFacts(anyCtx, "/project", "site1").Return(after, nil)
-	drushMock.EXPECT().ExportConfiguration(anyCtx, "/project", "site1").Return(nil)
-	committer.EXPECT().Commit(anyCtx, "Update configuration site1", []string{"config/after"}).Return(true, nil)
-	installer.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(nil)
+	sites.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(nil)
+	sites.EXPECT().Facts(anyCtx, "/project", "site1").Return(json.RawMessage(`{"when":"before"}`), nil)
+	sites.EXPECT().Update(anyCtx, "/project", "site1").Return(json.RawMessage(`{"when":"after"}`), nil)
+	sites.EXPECT().ExportConfiguration(anyCtx, "/project", "site1").Return("config/sync", nil)
+	committer.EXPECT().Commit(anyCtx, "Update configuration site1", []string{"config/sync"}).Return(true, nil)
+	sites.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(nil)
 
 	require.NoError(t, updateSite1(t.Context(), ws))
 	require.Len(t, s.requests, 2)
@@ -322,23 +317,22 @@ func TestSiteHooksSeeTheFactsReadBeforeAndAfterTheUpdateHooks(t *testing.T) {
 
 func TestUpdateSiteRestoresSettings(t *testing.T) {
 	// newRunner's run has an addon whose hook of failOn fails; none for "".
-	newRunner := func(t *testing.T, failOn ...string) (*run, *MockInstaller, *MockDrush) {
+	newRunner := func(t *testing.T, failOn ...string) (*run, *MockSites) {
 		t.Helper()
-		installer := NewMockInstaller(t)
-		drush := NewMockDrush(t)
+		sites := NewMockSites(t)
 		mockComposer := NewMockComposer(t)
 		var addons []Addon
 		for _, event := range failOn {
 			addons = append(addons, failingOn(mockComposer, event))
 		}
-		return testRun(services{logger: zap.NewNop(), installer: installer, drush: drush, composer: mockComposer}, repo.Checkout{Path: "/project"}, addons...), installer, drush
+		return testRun(services{logger: zap.NewNop(), sites: sites, composer: mockComposer}, repo.Checkout{Path: "/project"}, addons...), sites
 	}
 
 	t.Run("after a failed pre-site-update hook, which stops the update", func(t *testing.T) {
-		ws, installer, drush := newRunner(t, EventPreSiteUpdate)
-		installer.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(nil)
-		drush.EXPECT().Facts(anyCtx, "/project", "site1").Return(syncFacts("/project/config/sync"), nil)
-		installer.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(nil).Once()
+		ws, sites := newRunner(t, EventPreSiteUpdate)
+		sites.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(nil)
+		sites.EXPECT().Facts(anyCtx, "/project", "site1").Return(siteFacts, nil)
+		sites.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(nil).Once()
 
 		err := updateSite1(t.Context(), ws)
 		require.ErrorIs(t, err, assert.AnError)
@@ -346,10 +340,10 @@ func TestUpdateSiteRestoresSettings(t *testing.T) {
 	})
 
 	t.Run("after its facts cannot be read, which stops the update before any hook", func(t *testing.T) {
-		ws, installer, drush := newRunner(t, EventPreSiteUpdate)
-		installer.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(nil)
-		drush.EXPECT().Facts(anyCtx, "/project", "site1").Return(syncFacts(""), assert.AnError)
-		installer.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(nil).Once()
+		ws, sites := newRunner(t, EventPreSiteUpdate)
+		sites.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(nil)
+		sites.EXPECT().Facts(anyCtx, "/project", "site1").Return(nil, assert.AnError)
+		sites.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(nil).Once()
 
 		err := updateSite1(t.Context(), ws)
 		require.ErrorIs(t, err, assert.AnError)
@@ -357,38 +351,23 @@ func TestUpdateSiteRestoresSettings(t *testing.T) {
 	})
 
 	t.Run("after a failed post-site-update hook, which stops the export", func(t *testing.T) {
-		ws, installer, drush := newRunner(t, EventPostSiteUpdate)
-		installer.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(nil)
-		drush.EXPECT().Facts(anyCtx, "/project", "site1").Return(syncFacts("/project/config/sync"), nil)
-		drush.EXPECT().UpdateSite(anyCtx, "/project", "site1").Return(nil)
-		drush.EXPECT().ConfigResave(anyCtx, "/project", "site1").Return(nil)
-		drush.EXPECT().LocalFacts(anyCtx, "/project", "site1").Return(syncFacts("/project/config/sync"), nil)
-		installer.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(nil).Once()
+		ws, sites := newRunner(t, EventPostSiteUpdate)
+		sites.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(nil)
+		sites.EXPECT().Facts(anyCtx, "/project", "site1").Return(siteFacts, nil)
+		sites.EXPECT().Update(anyCtx, "/project", "site1").Return(siteFacts, nil)
+		sites.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(nil).Once()
 
 		err := updateSite1(t.Context(), ws)
 		require.ErrorIs(t, err, assert.AnError)
 		assert.Contains(t, err.Error(), "post-site-update hook failed")
 	})
 
-	t.Run("after its facts cannot be read again, which stops the update before the export", func(t *testing.T) {
-		ws, installer, drush := newRunner(t)
-		installer.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(nil)
-		drush.EXPECT().Facts(anyCtx, "/project", "site1").Return(syncFacts("/project/config/sync"), nil)
-		drush.EXPECT().UpdateSite(anyCtx, "/project", "site1").Return(nil)
-		drush.EXPECT().ConfigResave(anyCtx, "/project", "site1").Return(nil)
-		drush.EXPECT().LocalFacts(anyCtx, "/project", "site1").Return(syncFacts(""), assert.AnError)
-		installer.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(nil).Once()
-
-		err := updateSite1(t.Context(), ws)
-		require.ErrorIs(t, err, assert.AnError)
-	})
-
-	t.Run("after a failed update hook", func(t *testing.T) {
-		ws, installer, drush := newRunner(t)
-		installer.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(nil)
-		drush.EXPECT().Facts(anyCtx, "/project", "site1").Return(syncFacts("/project/config/sync"), nil)
-		drush.EXPECT().UpdateSite(anyCtx, "/project", "site1").Return(assert.AnError)
-		installer.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(nil).Once()
+	t.Run("after a failed update, which stops it before the export", func(t *testing.T) {
+		ws, sites := newRunner(t)
+		sites.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(nil)
+		sites.EXPECT().Facts(anyCtx, "/project", "site1").Return(siteFacts, nil)
+		sites.EXPECT().Update(anyCtx, "/project", "site1").Return(nil, assert.AnError)
+		sites.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(nil).Once()
 
 		err := updateSite1(t.Context(), ws)
 		require.ErrorIs(t, err, assert.AnError)
@@ -396,31 +375,29 @@ func TestUpdateSiteRestoresSettings(t *testing.T) {
 	})
 
 	t.Run("with a context another site cancelled", func(t *testing.T) {
-		ws, installer, drush := newRunner(t)
+		ws, sites := newRunner(t)
 		ctx, cancel := context.WithCancel(t.Context())
-		installer.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(nil)
-		drush.EXPECT().Facts(anyCtx, "/project", "site1").Return(syncFacts("/project/config/sync"), nil)
-		drush.EXPECT().UpdateSite(anyCtx, "/project", "site1").RunAndReturn(func(context.Context, string, string) error {
+		sites.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(nil)
+		sites.EXPECT().Facts(anyCtx, "/project", "site1").Return(siteFacts, nil)
+		sites.EXPECT().Update(anyCtx, "/project", "site1").RunAndReturn(func(context.Context, string, string) (json.RawMessage, error) {
 			cancel()
-			return context.Canceled
+			return nil, context.Canceled
 		})
-		installer.EXPECT().RestoreSettings(mock.MatchedBy(func(ctx context.Context) bool { return ctx.Err() == nil }), "/project", "site1").Return(nil).Once()
+		sites.EXPECT().RestoreSettings(mock.MatchedBy(func(ctx context.Context) bool { return ctx.Err() == nil }), "/project", "site1").Return(nil).Once()
 
 		require.ErrorIs(t, updateSite1(ctx, ws), context.Canceled)
 	})
 
 	t.Run("a failed restore fails the site", func(t *testing.T) {
-		ws, installer, drush := newRunner(t)
-		installer.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(nil)
-		drush.EXPECT().Facts(anyCtx, "/project", "site1").Return(syncFacts("/project/config/sync"), nil)
-		drush.EXPECT().UpdateSite(anyCtx, "/project", "site1").Return(nil)
-		drush.EXPECT().ConfigResave(anyCtx, "/project", "site1").Return(nil)
-		drush.EXPECT().LocalFacts(anyCtx, "/project", "site1").Return(syncFacts("/project/config/sync"), nil)
-		drush.EXPECT().ExportConfiguration(anyCtx, "/project", "site1").Return(nil)
+		ws, sites := newRunner(t)
+		sites.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(nil)
+		sites.EXPECT().Facts(anyCtx, "/project", "site1").Return(siteFacts, nil)
+		sites.EXPECT().Update(anyCtx, "/project", "site1").Return(siteFacts, nil)
+		sites.EXPECT().ExportConfiguration(anyCtx, "/project", "site1").Return("config/sync", nil)
 		committer := NewMockCommitter(t)
 		committer.EXPECT().Commit(anyCtx, "Update configuration site1", []string{"config/sync"}).Return(true, nil)
 		ws.committer = committer
-		installer.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(assert.AnError)
+		sites.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(assert.AnError)
 
 		err := updateSite1(t.Context(), ws)
 		require.ErrorIs(t, err, assert.AnError)
@@ -428,30 +405,30 @@ func TestUpdateSiteRestoresSettings(t *testing.T) {
 	})
 
 	t.Run("not when configuring failed", func(t *testing.T) {
-		ws, installer, _ := newRunner(t)
-		installer.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(assert.AnError)
+		ws, sites := newRunner(t)
+		sites.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(assert.AnError)
 
 		require.ErrorIs(t, updateSite1(t.Context(), ws), assert.AnError)
 	})
 
 	t.Run("of every configured site after another failed to configure, naming each failure", func(t *testing.T) {
-		ws, installer, drushMock := newRunner(t)
+		ws, sites := newRunner(t)
 		ws.config.Sites = []string{"site1", "site2"}
 		ws.config.Concurrency = 2
 		site2Configured := make(chan struct{})
-		installer.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").RunAndReturn(func(context.Context, string, string) error {
+		sites.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").RunAndReturn(func(context.Context, string, string) error {
 			<-site2Configured
 			return assert.AnError
 		})
-		installer.EXPECT().ConfigureDatabase(anyCtx, "/project", "site2").RunAndReturn(func(context.Context, string, string) error {
+		sites.EXPECT().ConfigureDatabase(anyCtx, "/project", "site2").RunAndReturn(func(context.Context, string, string) error {
 			close(site2Configured)
 			return nil
 		})
-		drushMock.EXPECT().Facts(anyCtx, "/project", "site2").RunAndReturn(func(ctx context.Context, _, _ string) (drush.Facts, error) {
+		sites.EXPECT().Facts(anyCtx, "/project", "site2").RunAndReturn(func(ctx context.Context, _, _ string) (json.RawMessage, error) {
 			<-ctx.Done()
-			return drush.Facts{}, ctx.Err()
+			return nil, ctx.Err()
 		})
-		installer.EXPECT().RestoreSettings(anyCtx, "/project", "site2").Return(errors.New("site2 unwritable")).Once()
+		sites.EXPECT().RestoreSettings(anyCtx, "/project", "site2").Return(errors.New("site2 unwritable")).Once()
 
 		err := ws.updateSites(t.Context())
 		require.ErrorIs(t, err, assert.AnError)
@@ -462,35 +439,41 @@ func TestUpdateSiteRestoresSettings(t *testing.T) {
 // Drupdater commits the exported configuration itself, as it does an addon's changes: Drush's own
 // --commit would run git, its hooks and its identity, in the user's repository.
 func TestCommitSiteChangesCommitsTheExportedConfiguration(t *testing.T) {
-	newRunner := func(t *testing.T) (*run, *MockCommitter) {
+	newRunner := func(t *testing.T, exported string, exportErr error) (*run, *MockCommitter) {
 		t.Helper()
-		drush := NewMockDrush(t)
+		sites := NewMockSites(t)
 		committer := NewMockCommitter(t)
-		drush.EXPECT().ExportConfiguration(anyCtx, "/project", "site1").Return(nil)
-		r := testRun(services{logger: zap.NewNop(), drush: drush}, repo.Checkout{Path: "/project"})
+		sites.EXPECT().ExportConfiguration(anyCtx, "/project", "site1").Return(exported, exportErr)
+		r := testRun(services{logger: zap.NewNop(), sites: sites}, repo.Checkout{Path: "/project"})
 		r.committer = committer
 		return r, committer
 	}
 
-	t.Run("the site's sync directory, under its own message", func(t *testing.T) {
-		ws, committer := newRunner(t)
+	t.Run("the directory it exported into, under the site's own message", func(t *testing.T) {
+		ws, committer := newRunner(t, "config/site1", nil)
 		committer.EXPECT().Commit(anyCtx, "Update configuration site1", []string{"config/site1"}).Return(true, nil)
 
-		require.NoError(t, ws.commitSiteChanges(t.Context(), "site1", syncFacts("/project/config/site1")))
+		require.NoError(t, ws.commitSiteChanges(t.Context(), "site1", siteFacts))
 	})
 
-	t.Run("no sync directory at all", func(t *testing.T) {
-		ws, _ := newRunner(t)
+	t.Run("no directory at all", func(t *testing.T) {
+		ws, _ := newRunner(t, "", nil)
 
-		err := ws.commitSiteChanges(t.Context(), "site1", syncFacts(""))
+		err := ws.commitSiteChanges(t.Context(), "site1", siteFacts)
 		require.ErrorContains(t, err, "site site1 has no config sync directory")
 	})
 
+	t.Run("a failed export", func(t *testing.T) {
+		ws, _ := newRunner(t, "", assert.AnError)
+
+		require.ErrorIs(t, ws.commitSiteChanges(t.Context(), "site1", siteFacts), assert.AnError)
+	})
+
 	t.Run("a refused commit", func(t *testing.T) {
-		ws, committer := newRunner(t)
+		ws, committer := newRunner(t, "config/site1", nil)
 		committer.EXPECT().Commit(anyCtx, "Update configuration site1", []string{"config/site1"}).Return(false, assert.AnError)
 
-		err := ws.commitSiteChanges(t.Context(), "site1", syncFacts("/project/config/site1"))
+		err := ws.commitSiteChanges(t.Context(), "site1", siteFacts)
 		require.ErrorIs(t, err, assert.AnError)
 		require.ErrorContains(t, err, "failed to commit the exported configuration")
 	})
@@ -714,14 +697,13 @@ func TestRunFailsWhenScaffoldChangesCannotBeStaged(t *testing.T) {
 	// Staging what the update rewrote is part of producing the commit, not a nicety: if it
 	// fails, the run must fail rather than push a branch missing the scaffold changes.
 	logger := zap.NewNop()
-	installer := NewMockInstaller(t)
+	sites := NewMockSites(t)
 	repositoryService := NewMockGitService(t)
 	vcsProvider := NewMockPlatform(t)
 	repository := NewMockGitRepository(t)
 	expectUpdateBranch(repository)
 	mockComposer := NewMockComposer(t)
 	expectVersionLookup(mockComposer)
-	drush := NewMockDrush(t)
 
 	config := config.Config{
 		RepositoryURL: "https://example.com/repo.git",
@@ -736,7 +718,7 @@ func TestRunFailsWhenScaffoldChangesCannotBeStaged(t *testing.T) {
 	worktree.EXPECT().StageGlob(anyCtx, mock.Anything).Return(nil)
 	worktree.EXPECT().Unstaged(anyCtx).Return(nil, assert.AnError)
 
-	installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil)
+	sites.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil)
 
 	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).
 		Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
@@ -753,7 +735,7 @@ func TestRunFailsWhenScaffoldChangesCannotBeStaged(t *testing.T) {
 	mockComposer.EXPECT().Project(anyCtx, testCheckout).Return(composer.Project{WebRoot: "web", LockHash: "dummy-hash"}, nil)
 	repository.EXPECT().RemoteBranchExists(anyCtx, "update-dummy-hash", "token").Return(false, nil)
 
-	workflowService := New(logger, config, drush, vcsProvider, repositoryService, installer, mockComposer)
+	workflowService := New(logger, config, sites, vcsProvider, repositoryService, mockComposer)
 	err := workflowService.Run(t.Context(), nil)
 
 	require.ErrorIs(t, err, assert.AnError)
@@ -763,14 +745,13 @@ func TestRunFailsWhenScaffoldChangesCannotBeStaged(t *testing.T) {
 type runKey struct{}
 
 func TestRunHandsAddonsTheRunsContextAndCommitter(t *testing.T) {
-	installer := NewMockInstaller(t)
+	sites := NewMockSites(t)
 	repositoryService := NewMockGitService(t)
 	vcsProvider := NewMockPlatform(t)
 	repository := NewMockGitRepository(t)
 	expectUpdateBranch(repository)
 	mockComposer := NewMockComposer(t)
 	expectVersionLookup(mockComposer)
-	drush := NewMockDrush(t)
 
 	config := config.Config{RepositoryURL: "https://example.com/repo.git", Branch: "main", Token: "token", Clone: true, Sites: []string{"site1"}, DryRun: true}
 
@@ -796,14 +777,12 @@ func TestRunHandsAddonsTheRunsContextAndCommitter(t *testing.T) {
 	mockComposer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false).
 		Return([]composer.PackageChange{{Action: "Upgrade", Package: "drupal/core", From: "9.0.0", To: "9.1.0"}}, nil)
 	mockComposer.EXPECT().Project(anyCtx, testCheckout).Return(composer.Project{WebRoot: "web", LockHash: "dummy-hash"}, nil)
-	installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil)
-	installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil)
-	installer.EXPECT().RestoreSettings(anyCtx, testCheckout, "site1").Return(nil)
-	drush.EXPECT().Facts(anyCtx, testCheckout, "site1").Return(syncFacts(testCheckout+"/config/sync"), nil)
-	drush.EXPECT().UpdateSite(anyCtx, testCheckout, "site1").Return(nil)
-	drush.EXPECT().ConfigResave(anyCtx, testCheckout, "site1").Return(nil)
-	drush.EXPECT().LocalFacts(anyCtx, testCheckout, "site1").Return(syncFacts(testCheckout+"/config/sync"), nil)
-	drush.EXPECT().ExportConfiguration(anyCtx, testCheckout, "site1").Return(nil)
+	sites.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil)
+	sites.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil)
+	sites.EXPECT().RestoreSettings(anyCtx, testCheckout, "site1").Return(nil)
+	sites.EXPECT().Facts(anyCtx, testCheckout, "site1").Return(siteFacts, nil)
+	sites.EXPECT().Update(anyCtx, testCheckout, "site1").Return(siteFacts, nil)
+	sites.EXPECT().ExportConfiguration(anyCtx, testCheckout, "site1").Return("config/sync", nil)
 
 	ctx := context.WithValue(t.Context(), runKey{}, "this run")
 	seen := map[string]bool{}
@@ -820,7 +799,7 @@ func TestRunHandsAddonsTheRunsContextAndCommitter(t *testing.T) {
 		EventPreSiteUpdate: Change, EventPostSiteUpdate: Change,
 	})
 
-	err := New(zap.NewNop(), config, drush, vcsProvider, repositoryService, installer, mockComposer).Run(ctx, []Addon{observer})
+	err := New(zap.NewNop(), config, sites, vcsProvider, repositoryService, mockComposer).Run(ctx, []Addon{observer})
 
 	require.NoError(t, err)
 	assert.Equal(t, map[string]bool{
