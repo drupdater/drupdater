@@ -184,20 +184,20 @@ sections: `go test ./internal/report -update`.
 
 ## 5. Add a description section
 
-The pull request description is rendered from the report by `internal/mergerequest`, so an
-addon appears in it through its report section. To give it one:
+The agent renders the pull request description from the report (`agent/src/MergeRequest/`),
+so an addon appears in it through its report section. To give it one:
 
-1. Add `internal/mergerequest/templates/your_addon.go.tmpl`.
-2. In `internal/mergerequest/mergerequest.go`, read your section into `sections` — declaring
-   only the fields the template shows, by their JSON names — and add it to
-   `sectionsInOrder`, where the order of the description is decided.
-3. Regenerate the goldens: `go test ./internal/mergerequest -update`.
+1. Add a class implementing `Section` in `agent/src/MergeRequest/`: `name()` is your addon's,
+   `render()` reads your section from the report's addons through `Read` and returns its
+   markdown, or `null` when there is nothing to show.
+2. Add it to `MergeRequest::builtin()`, where the order of the description is decided.
+3. Add its golden, `agent/tests/MergeRequest/testdata/your_addon.md`, the section as the
+   example report renders it, and its name to the order the published example reaches.
 
 The renderer reads the report through its JSON, like any consumer, so it can only show what
 your section publishes. Follow the conventions in [Development
-setup](development.md#description-templates). The section's golden file in
-`internal/mergerequest/testdata/` is embedded straight into the [addon
-reference](../reference/addons/index.md), so a good one becomes the published example.
+setup](development.md#description-sections). The section's golden file is embedded straight into
+the [addon reference](../reference/addons/index.md), so a good one becomes the published example.
 
 ## 6. Test it
 

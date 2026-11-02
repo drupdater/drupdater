@@ -3,6 +3,8 @@ package composer
 import (
 	"encoding/json"
 	"errors"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -38,7 +40,7 @@ func TestAddonsReportsAnAgentThatCannotAnswer(t *testing.T) {
 }
 
 func TestAddonsKeepsTheAgentsFailure(t *testing.T) {
-	service, _ := fakeAgentCLI(t, `{"protocol":4,"command":"drupdater:addons","ok":false,`+
+	service, _ := fakeAgentCLI(t, `{"protocol":5,"command":"drupdater:addons","ok":false,`+
 		`"error":{"kind":"internal","reason":"the agent failed","message":"boom"}}`, 1)
 
 	_, err := service.Addons(t.Context())
@@ -71,7 +73,7 @@ func TestRunHookSendsTheRequestFixtureAndDecodesItsReply(t *testing.T) {
 }
 
 func TestRunHookReportsTheAgentsRefusal(t *testing.T) {
-	service, _ := fakeAgentCLI(t, `{"protocol":4,"command":"drupdater:hook","ok":false,`+
+	service, _ := fakeAgentCLI(t, `{"protocol":5,"command":"drupdater:hook","ok":false,`+
 		`"error":{"kind":"invalid_request","reason":"no addon \"nope\" is in the catalogue","message":""}}`, 1)
 
 	_, err := service.RunHook(t.Context(), t.TempDir(), agent.HookRequest{Addon: "nope"})
@@ -98,7 +100,7 @@ func TestReportSendsTheRequestFixtureAndDecodesTheSections(t *testing.T) {
 }
 
 func TestReportReportsTheAgentsFailure(t *testing.T) {
-	service, _ := fakeAgentCLI(t, `{"protocol":4,"command":"drupdater:report","ok":false,`+
+	service, _ := fakeAgentCLI(t, `{"protocol":5,"command":"drupdater:report","ok":false,`+
 		`"error":{"kind":"internal","reason":"the agent failed","message":"boom"}}`, 1)
 
 	_, err := service.Report(t.Context(), agent.ReportRequest{})
@@ -107,4 +109,50 @@ func TestReportReportsTheAgentsFailure(t *testing.T) {
 	agentErr, ok := errors.AsType[*agent.Error](err)
 	require.True(t, ok, "%v", err)
 	assert.Equal(t, agent.Internal, agentErr.Kind)
+}
+
+func TestMergeRequestSendsTheRequestFixtureAndDecodesTheMergeRequest(t *testing.T) {
+	service, sent := fakeAgentCLI(t, agentFixture(t, "merge-request/response.json"), 0)
+	var request struct {
+		Request agent.MergeRequestRequest `json:"request"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(agentFixture(t, "merge-request/request.json")), &request))
+
+	reply, err := service.MergeRequest(t.Context(), request.Request)
+
+	require.NoError(t, err)
+	body, args := sent()
+	assert.JSONEq(t, agentFixture(t, "merge-request/request.json"), body)
+	assert.Contains(t, args, "drupdater:merge-request")
+	assert.Equal(t, "2026-03-14: Drupal Security Updates", reply.Title)
+	assert.True(t, strings.HasPrefix(reply.Description, "This automated merge request by [Drupdater]"), reply.Description)
+	assert.Contains(t, reply.Description, "\n## 🛡️ Security Report\n")
+}
+
+// The fixture renders the example the run report's reference page shows, so the description the
+// addon pages embed is the one that report gets.
+func TestTheMergeRequestFixtureRendersThePublishedExampleReport(t *testing.T) {
+	var request struct {
+		Request struct {
+			Report json.RawMessage `json:"report"`
+		} `json:"request"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(agentFixture(t, "merge-request/request.json")), &request))
+	published, err := os.ReadFile("../report/testdata/run_report.json")
+	require.NoError(t, err)
+
+	assert.JSONEq(t, string(published), string(request.Request.Report))
+}
+
+func TestMergeRequestReportsTheAgentsFailure(t *testing.T) {
+	service, _ := fakeAgentCLI(t, `{"protocol":5,"command":"drupdater:merge-request","ok":false,`+
+		`"error":{"kind":"invalid_request","reason":"the report's composer_audit section is unreadable: fixed must be a list","message":""}}`, 1)
+
+	_, err := service.MergeRequest(t.Context(), agent.MergeRequestRequest{Report: json.RawMessage(`{}`)})
+
+	require.ErrorContains(t, err, "failed to render the merge request")
+	agentErr, ok := errors.AsType[*agent.Error](err)
+	require.True(t, ok, "%v", err)
+	assert.Equal(t, agent.InvalidRequest, agentErr.Kind)
+	assert.Contains(t, agentErr.Reason, "composer_audit section is unreadable")
 }

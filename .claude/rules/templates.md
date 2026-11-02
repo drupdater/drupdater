@@ -1,12 +1,13 @@
 ---
 paths:
-  - "internal/mergerequest/templates/**"
+  - "agent/src/MergeRequest/**"
 ---
 
-Templates render the run report into the MR/PR description. Each reads only what its report
-section publishes, via `sections` in `internal/mergerequest/mergerequest.go`. Keep them consistent with the existing style:
+The sections render the run report into the MR/PR description. Each reads only what its report
+section publishes, through `Read`. Keep them consistent with the existing style:
 
-- Section headers: `## {emoji} **{Title}**`
-- Table cells: always use the `{{ cell }}` helper to escape pipe characters
-- Wrap long sections in `<details>` / `<summary>` like the existing templates do
-- Always verify output with `--dry-run` before shipping a new template
+- Section headers: `## {emoji} {Title}`
+- Table cells: always go through `Markdown::cell()` to escape pipe characters and newlines
+- Wrap long sections in `<details>` / `<summary>` like the existing sections do
+- Keep each section's golden in `agent/tests/MergeRequest/testdata/` byte for byte: the addon pages embed it
+- Always verify output with `--dry-run` before shipping a new section

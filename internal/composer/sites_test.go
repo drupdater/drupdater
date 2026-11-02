@@ -50,9 +50,9 @@ func TestSiteUpdateReturnsTheFactsAfterwards(t *testing.T) {
 
 func TestFactsThatAreNoObjectAreRefused(t *testing.T) {
 	for name, reply := range map[string]string{
-		"missing": `{"protocol":4,"command":"drupdater:site-facts","ok":true,"result":{}}`,
-		"null":    `{"protocol":4,"command":"drupdater:site-facts","ok":true,"result":{"facts":null}}`,
-		"a list":  `{"protocol":4,"command":"drupdater:site-facts","ok":true,"result":{"facts":[]}}`,
+		"missing": `{"protocol":5,"command":"drupdater:site-facts","ok":true,"result":{}}`,
+		"null":    `{"protocol":5,"command":"drupdater:site-facts","ok":true,"result":{"facts":null}}`,
+		"a list":  `{"protocol":5,"command":"drupdater:site-facts","ok":true,"result":{"facts":[]}}`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			service, _ := fakeAgentCLI(t, reply, 0)
@@ -66,7 +66,7 @@ func TestFactsThatAreNoObjectAreRefused(t *testing.T) {
 
 func TestSiteCallsNameTheSiteTheyFailedFor(t *testing.T) {
 	failure := func(command string) string {
-		return `{"protocol":4,"command":"` + command + `","ok":false,"error":{"kind":"failed","reason":"drush updatedb --yes failed","message":""}}`
+		return `{"protocol":5,"command":"` + command + `","ok":false,"error":{"kind":"failed","reason":"drush updatedb --yes failed","message":""}}`
 	}
 	for _, tt := range []struct {
 		command string
@@ -130,7 +130,7 @@ func TestTheDatabaseCallsSendTheSiteAndTheDataDirectory(t *testing.T) {
 }
 
 func TestADatabaseCallReportsTheAgentsFailure(t *testing.T) {
-	service, _ := fakeAgentCLI(t, `{"protocol":4,"command":"drupdater:site-install","ok":false,`+
+	service, _ := fakeAgentCLI(t, `{"protocol":5,"command":"drupdater:site-install","ok":false,`+
 		`"error":{"kind":"failed","reason":"failed to read settings file","message":""}}`, 1)
 
 	err := service.Sites(fixtureDataDir).Install(t.Context(), t.TempDir(), "default")

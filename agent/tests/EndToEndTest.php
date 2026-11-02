@@ -45,7 +45,7 @@ final class EndToEndTest extends TestCase
 
     public function testHandshake(): void
     {
-        $reply = $this->ask('drupdater:handshake', $this->scratchDir(), ['protocol' => 4, 'request' => []]);
+        $reply = $this->ask('drupdater:handshake', $this->scratchDir(), ['protocol' => 5, 'request' => []]);
 
         self::assertMatchesRegularExpression('/^2\.\d+\.\d+/', $reply['result']['composer_version'], 'the global Composer, not the agent\'s dev copy');
         self::assertSame(PHP_VERSION, $reply['result']['php_version']);
@@ -117,10 +117,10 @@ final class EndToEndTest extends TestCase
     {
         $project = $this->lockedProject();
 
-        $pinned = $this->ask('drupdater:resolve', $project, ['protocol' => 4, 'request' => [
+        $pinned = $this->ask('drupdater:resolve', $project, ['protocol' => 5, 'request' => [
             'packages' => [], 'keep' => [['package' => 'fixture/a', 'version' => '1.0.0']], 'minimal_changes' => false,
         ]]);
-        $only = $this->ask('drupdater:resolve', $this->lockedProject(), ['protocol' => 4, 'request' => [
+        $only = $this->ask('drupdater:resolve', $this->lockedProject(), ['protocol' => 5, 'request' => [
             'packages' => ['fixture/a'], 'keep' => [], 'minimal_changes' => false,
         ]]);
 
@@ -133,7 +133,7 @@ final class EndToEndTest extends TestCase
         $project = $this->lockedProject();
         $lock = file_get_contents($project . '/composer.lock');
 
-        [$reply, $stderr] = $this->askWithErrors('drupdater:resolve', $project, ['protocol' => 4, 'request' => [
+        [$reply, $stderr] = $this->askWithErrors('drupdater:resolve', $project, ['protocol' => 5, 'request' => [
             'packages' => [], 'keep' => [['package' => 'fixture/a', 'version' => '9.9.9']], 'minimal_changes' => false,
         ]]);
 
@@ -269,7 +269,7 @@ final class EndToEndTest extends TestCase
      */
     private function hook(string $project, string $addon, array $event, array $earlier = [], bool $security = false): array
     {
-        $reply = $this->ask('drupdater:hook', $project, ['protocol' => 4, 'request' => [
+        $reply = $this->ask('drupdater:hook', $project, ['protocol' => 5, 'request' => [
             'addon' => $addon, 'event' => $event, 'earlier' => $earlier, 'run' => ['security' => $security],
         ]]);
         self::assertTrue($reply['ok'], json_encode($reply));

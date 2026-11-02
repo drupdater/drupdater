@@ -48,6 +48,10 @@ type runHarness struct {
 	versions    composer.Versions
 	versionsErr error
 
+	// mergeRequests are the reports the run sent to be rendered; mergeRequestErr fails the render.
+	mergeRequests   []json.RawMessage
+	mergeRequestErr error
+
 	update, fullRun, publish bool
 
 	got *report.Report
@@ -127,6 +131,9 @@ func (h *runHarness) identity() repo.Identity {
 	return repo.Identity{Name: "user", Email: "mail"}
 }
 
+// testTitle is the title the harness's agent renders every merge request with.
+const testTitle = "Drupal updates"
+
 // expectDefaults lets every run get as far as resolving its update.
 func (h *runHarness) expectDefaults() {
 	checkout := repo.Checkout{Repository: h.repository, Worktree: h.worktree, Path: h.path, Author: testAuthor}
@@ -145,6 +152,11 @@ func (h *runHarness) expectDefaults() {
 	h.composer.EXPECT().CheckPlatformReqs(anyCtx, h.path).Return("", nil).Maybe()
 	h.composer.EXPECT().CheckAgent(anyCtx, h.path).Return(nil).Maybe()
 	h.composer.EXPECT().Install(anyCtx, h.path).Return(nil).Maybe()
+	h.composer.EXPECT().MergeRequest(anyCtx, mock.Anything).
+		RunAndReturn(func(_ context.Context, request agent.MergeRequestRequest) (agent.MergeRequestReply, error) {
+			h.mergeRequests = append(h.mergeRequests, request.Report)
+			return agent.MergeRequestReply{Title: testTitle, Description: "rendered from " + string(request.Report)}, h.mergeRequestErr
+		}).Maybe()
 
 	if h.update {
 		h.composer.EXPECT().Update(anyCtx, h.path, mock.Anything, mock.Anything, false).

@@ -10,6 +10,7 @@ use Drupdater\Agent\Command\ConfigExportCommand;
 use Drupdater\Agent\Command\HandshakeCommand;
 use Drupdater\Agent\Command\HookCommand;
 use Drupdater\Agent\Command\InstallCommand;
+use Drupdater\Agent\Command\MergeRequestCommand;
 use Drupdater\Agent\Command\PlatformCheckCommand;
 use Drupdater\Agent\Command\ProjectCommand;
 use Drupdater\Agent\Command\ReportCommand;
@@ -30,6 +31,7 @@ final class CommandProvider implements CommandProviderCapability
             new HandshakeCommand(),
             new HookCommand(),
             new InstallCommand(),
+            new MergeRequestCommand(),
             new PlatformCheckCommand(),
             new ProjectCommand(),
             new ReportCommand(),

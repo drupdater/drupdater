@@ -45,7 +45,7 @@ Verify with `make docs-build` (runs `mkdocs build --strict`, which fails on brok
 
 Some pages embed files from the repo via `pymdownx.snippets`, so they cannot drift:
 
-- `internal/mergerequest/testdata/*.md` → the "pull request section" examples on addon pages,
+- `agent/tests/MergeRequest/testdata/*.md` → the "pull request section" examples on addon pages,
   rendered from the example report
 - `internal/report/testdata/run_report.json` → the example report on `docs/reference/run-report.md`
 - `.github/assert-report.jq`, `.github/assert-lock-matches-report.jq` → `docs/how-to/consume-the-run-report.md`
@@ -102,7 +102,6 @@ Where things live. For *how they work*, read `docs/explanation/` rather than dup
 | `internal/workflow/addon.go`, `events.go` | `Addon` (a name and a stage per event), `Stage`, the five events and what each hands its hooks, `AbortError` |
 | `internal/workflow/pipeline.go` | Runs each hook in the agent in stage order, commits between hooks, merges the plan, keeps the findings, asks the agent for the report sections |
 | `internal/workflow/preflight.go` | Checks shared between `check` and the run's own `preflight` phase |
-| `internal/mergerequest/` | The MR title and description, rendered from the run report; its templates |
 | `internal/config/` | `Config`; `file.go` loads `.drupdater.yaml`: defaults, strict decode, legacy-layout rejection |
 | `internal/buildinfo/` | `Version`, set by `-ldflags` |
 | `internal/codehosting/` | GitHub and GitLab implementations, provider factory |
@@ -113,9 +112,10 @@ Where things live. For *how they work*, read `docs/explanation/` rather than dup
 | `internal/php/` | Running a composer command under Composer's environment, and the `CommandFactory` each wrapper holds as its test seam |
 | `agent/` | `drupdater/agent`, the global Composer plugin the image installs: every addon, the `composer drupdater:*` commands, its PHPUnit suite, and `protocol/`, the request/reply fixtures both sides test against |
 | `agent/src/Addon/` | **The ten addons**, their contract (`Addon`, `Event`, `HookResult`, `Findings`), `Catalogue::builtin()` — which addons exist, mandatory and default — and `Services`, the composition root `create()` builds each from |
-| `agent/src/Command/` | `drupdater:addons`, `drupdater:hook`, `drupdater:report`, and the runner's own `project`, `install`, `resolve`, `platform-check`, `handshake` and the site commands (`site-facts`, `site-update`, `config-export`, `site-install`, `site-database`, `site-restore`) |
+| `agent/src/Command/` | `drupdater:addons`, `drupdater:hook`, `drupdater:report`, `drupdater:merge-request`, and the runner's own `project`, `install`, `resolve`, `platform-check`, `handshake` and the site commands (`site-facts`, `site-update`, `config-export`, `site-install`, `site-database`, `site-restore`) |
 | `agent/src/Tools/`, `DrupalOrg/`, `Patches/`, `PatchCheck/`, `Resolve/`, `Audit/`, `Plugins/`, `Project/` | What the addons run: phpcs, Rector, drush, Composer again; drupal.org and git.drupalcode.org; the patches; the update; the audit; allow-plugins; the project |
 | `agent/src/Site/` | A site's throwaway SQLite database: the `settings.php` block and the `core.extension.yml` edits |
+| `agent/src/MergeRequest/` | The MR title and description, rendered from the run report by `drupdater:merge-request`: one `Section` per section |
 | `agent/resources/` | The Rector config `deprecations_remover` runs with; `drush/`, the `drupdater:*` Drush commands loaded with `drush --include` |
 | `internal/agent/` | `agent.Call`: runs a `composer drupdater:*` command, decodes its envelope, returns an `*agent.Error` with a `Kind` |
 | `internal/composer/project.go` | `composer.Project`, what the runner reads of the project: web root and lock hash. Ask again after anything rewrites `composer.json` or the lock |
@@ -131,7 +131,7 @@ Where things live. For *how they work*, read `docs/explanation/` rather than dup
 - **One hook, one agent process.** The pipeline runs each hook as its own `drupdater:hook` call and sends the addon's own earlier findings with it, so an addon keeps no state, and two hooks never share a process. An addon's tools are constructor arguments built by `create(Services)`, so tests build it with doubles.
 - **A new event** is its name in `workflow.Events` and `EventName`, its payload in `workflow/events.go` and `Event::fromRequest()`, and the `fire` call in the runner.
 - **Hook stages are load-bearing** on `pre-composer-update` and `post-code-update`. See `docs/explanation/addon-architecture.md` before changing one.
-- **The MR is rendered from the report**, through its JSON. An addon reaches the description only via its report section; findings from two addons are joined there, never handed between them.
+- **The MR is rendered from the report**, through its JSON, by the agent. An addon reaches the description only via its report section; findings from two addons are joined there, never handed between them.
 - **A new question for Composer or drush goes to the agent, not to its console output.** Go runs no PHP tool itself. The agent answers in JSON with a closed error `Kind`, decided from the exception it caught. A change to a request or reply changes `agent/protocol/` and both sides' tests; a breaking one bumps `protocol` in `agent/src/Protocol.php` and `internal/agent/agent.go` together.
 - **The addons' report sections are a published contract.** Renaming a field in an addon's `report()` is a breaking change to `schema_version`. `agent/protocol/report/` pins the sections the agent builds for an example of every addon's findings, and `internal/report/testdata/run_report.json` embeds them, so such a rename fails rather than ships. A new reporting addon belongs in both.
 - **Report types mirror rather than reuse internal types** (`report.PackageChange` vs `composer.PackageChange`) so an internal refactor can't rename a published field.

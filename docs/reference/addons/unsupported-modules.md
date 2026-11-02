@@ -85,7 +85,7 @@ table.
 
 ## Pull request section
 
---8<-- "internal/mergerequest/testdata/unsupported_modules.md"
+--8<-- "agent/tests/MergeRequest/testdata/unsupported_modules.md"
 
 ## A note on silent failure
 

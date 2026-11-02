@@ -1,5 +1,5 @@
 {
-  "protocol": 4,
+  "protocol": 5,
   "command": "drupdater:site-facts",
   "ok": true,
   "result": {

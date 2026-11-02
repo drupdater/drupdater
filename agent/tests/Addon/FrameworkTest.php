@@ -206,9 +206,9 @@ final class FrameworkTest extends TestCase
 
     public function testTheEnvelopeCarriesTheLogOnlyWhenThereIsOne(): void
     {
-        self::assertSame('{"protocol":4,"command":"c","ok":true,"result":{}}', Protocol::success('c', []));
+        self::assertSame('{"protocol":5,"command":"c","ok":true,"result":{}}', Protocol::success('c', []));
         self::assertSame(
-            '{"protocol":4,"command":"c","ok":true,"result":{},"log":[{"level":"info","message":"é → ü","context":{}}]}',
+            '{"protocol":5,"command":"c","ok":true,"result":{},"log":[{"level":"info","message":"é → ü","context":{}}]}',
             Protocol::success('c', [], [['level' => 'info', 'message' => 'é → ü', 'context' => []]]),
             'unescaped, as Go writes JSON, and an empty context still an object',
         );

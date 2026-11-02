@@ -14,6 +14,7 @@ type Composer interface {
 	Install(ctx context.Context, dir string) error
 	Update(ctx context.Context, dir string, packagesToUpdate []string, packagesToKeep []string, minimalChanges bool) ([]composer.PackageChange, error)
 	AddonAgent
+	MergeRequestRenderer
 	PlatformReqsChecker
 	AgentChecker
 	ProjectReader

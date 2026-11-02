@@ -10,6 +10,7 @@ use Drupdater\Agent\Addon\CatalogueEntry;
 use Drupdater\Agent\Addon\Findings;
 use Drupdater\Agent\Command\AddonsCommand;
 use Drupdater\Agent\Command\AgentCommand;
+use Drupdater\Agent\Command\MergeRequestCommand;
 use Drupdater\Agent\Command\ReportCommand;
 use Drupdater\Agent\Tests\Addon\ScriptedAddon;
 use Drupdater\Agent\Tests\Scratch;
@@ -18,7 +19,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Tester\CommandTester;
 
 /**
- * drupdater:addons and drupdater:report, the two commands that need no project.
+ * drupdater:addons, drupdater:report and drupdater:merge-request, the commands that need no project.
  */
 final class CatalogueCommandsTest extends TestCase
 {
@@ -53,7 +54,7 @@ final class CatalogueCommandsTest extends TestCase
             return null;
         };
 
-        [, $reply, $output] = self::ask(new ReportCommand(new Catalogue([new CatalogueEntry(ScriptedAddon::class)])), ['protocol' => 4, 'request' => ['addons' => [
+        [, $reply, $output] = self::ask(new ReportCommand(new Catalogue([new CatalogueEntry(ScriptedAddon::class)])), ['protocol' => 5, 'request' => ['addons' => [
             ['addon' => 'scripted', 'findings' => [['event' => 'post-code-update', 'site' => '', 'finding' => 7, 'committed' => ['c']]]],
         ]]]);
 
@@ -79,7 +80,48 @@ final class CatalogueCommandsTest extends TestCase
     #[DataProvider('invalidReportRequests')]
     public function testReportRefusesAnInvalidRequest(array $request, string $reason): void
     {
-        [$status, $reply] = self::ask(new ReportCommand(), ['protocol' => 4, 'request' => $request]);
+        [$status, $reply] = self::ask(new ReportCommand(), ['protocol' => 5, 'request' => $request]);
+
+        self::assertSame(1, $status);
+        self::assertSame(['kind' => 'invalid_request', 'reason' => $reason, 'message' => ''], $reply['error']);
+    }
+
+    public function testMergeRequestAnswersTheFixture(): void
+    {
+        [$status, $reply] = self::askVerbatim(new MergeRequestCommand(), 'merge-request/request.json');
+
+        self::assertSame(0, $status);
+        self::assertEquals(self::fixture('merge-request/response.json'), $reply);
+    }
+
+    public function testAReportWithoutAddonsGetsADescriptionWithoutSections(): void
+    {
+        [$status, $reply] = self::ask(new MergeRequestCommand(), ['protocol' => 5, 'request' => ['report' => ['mode' => 'normal', 'started_at' => '2026-07-25T09:00:00Z']]]);
+
+        self::assertSame(0, $status);
+        self::assertSame('July 2026: Drupal Maintenance Updates', $reply['result']['title']);
+        self::assertStringNotContainsString('##', $reply['result']['description']);
+    }
+
+    /**
+     * @return iterable<string, array{array<string, mixed>, string}>
+     */
+    public static function invalidMergeRequestRequests(): iterable
+    {
+        yield 'no report' => [[], 'report must be an object'];
+        yield 'a report that is no object' => [['report' => ['x']], 'report must be an object'];
+        yield 'addons that are no object' => [['report' => ['started_at' => '2026-07-25T09:00:00Z', 'addons' => ['x']]], 'the report\'s addons must be an object'];
+        yield 'no start' => [['report' => ['addons' => ['composer_diff' => []]]], 'the report\'s started_at must be an RFC 3339 time'];
+        yield 'an unreadable section' => [['report' => ['started_at' => '2026-07-25T09:00:00Z', 'addons' => ['composer_diff' => 'x']]], 'the report\'s composer_diff section is unreadable: the section must be a list'];
+    }
+
+    /**
+     * @param array<string, mixed> $request
+     */
+    #[DataProvider('invalidMergeRequestRequests')]
+    public function testMergeRequestRefusesAnInvalidRequest(array $request, string $reason): void
+    {
+        [$status, $reply] = self::ask(new MergeRequestCommand(), ['protocol' => 5, 'request' => $request]);
 
         self::assertSame(1, $status);
         self::assertSame(['kind' => 'invalid_request', 'reason' => $reason, 'message' => ''], $reply['error']);

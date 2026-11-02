@@ -23,7 +23,7 @@ func TestProjectDecodesTheResponseFixture(t *testing.T) {
 }
 
 func TestProjectLeavesUnsetSettingsNil(t *testing.T) {
-	service, _ := fakeAgentCLI(t, `{"protocol":4,"command":"drupdater:project","ok":true,"result":`+
+	service, _ := fakeAgentCLI(t, `{"protocol":5,"command":"drupdater:project","ok":true,"result":`+
 		`{"web_root":null,"lock_hash":null}}`, 0)
 
 	project, err := service.Project(t.Context(), t.TempDir())
@@ -36,7 +36,7 @@ func TestProjectLeavesUnsetSettingsNil(t *testing.T) {
 }
 
 func TestProjectReportsTheAgentsFailure(t *testing.T) {
-	service, _ := fakeAgentCLI(t, `{"protocol":4,"command":"drupdater:project","ok":false,`+
+	service, _ := fakeAgentCLI(t, `{"protocol":5,"command":"drupdater:project","ok":false,`+
 		`"error":{"kind":"internal","reason":"the agent failed","message":"composer.json is broken"}}`, 1)
 
 	_, err := service.Project(t.Context(), t.TempDir())

@@ -108,7 +108,8 @@ installing anything into it.
 |---|---|
 | `drupdater:addons` | Reading `.drupdater.yaml`, the `addons` command and the `addon names resolve` check: the addon catalogue |
 | `drupdater:hook` | Every addon hook of every run, one call per hook |
-| `drupdater:report` | The [run report](run-report.md#addons)'s addon sections, and so the merge request description |
+| `drupdater:report` | The [run report](run-report.md#addons)'s addon sections |
+| `drupdater:merge-request` | The `render merge request` phase: the title and description, from the run report |
 | `drupdater:handshake` | The [`drupdater agent installed in Composer`](preflight-checks.md#drupdater-agent-installed-in-composer) preflight check, and the report's [tool versions](run-report.md#composer_version-and-php_version) |
 | `drupdater:platform-check` | The [`PHP platform requirements satisfied`](preflight-checks.md#php-platform-requirements-satisfied) preflight check |
 | `drupdater:project` | Staging the scaffold files an update rewrote, naming the update branch, and the site checks |
@@ -133,6 +134,12 @@ agent commits nothing itself; drupdater makes the commits before it calls the ne
 `drupdater:report` builds the addons' sections of the run report from what their hooks found.
 A section depends on its findings alone, so this too needs no project, and the final report
 can ask for it after the working copy is gone.
+
+`drupdater:merge-request` renders the merge request from the run report as it stands once
+every addon has finished: the title from its `mode` and `started_at`, the description from its
+addon sections. It too needs no project. A section it renders but cannot read fails the request
+rather than being left out; a section it has no renderer for is passed over. Over GitHub's
+65,536-byte limit, it renders the description again without the dependency table's links.
 
 `drupdater:resolve` runs `composer update --no-install --with-all-dependencies
 --ignore-platform-reqs --bump-after-update` with the run's package restriction, pins and

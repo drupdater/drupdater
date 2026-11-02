@@ -17,6 +17,11 @@ type AddonAgent interface {
 	Report(ctx context.Context, request agent.ReportRequest) (agent.ReportReply, error)
 }
 
+// MergeRequestRenderer renders the merge request from the report: the Composer agent too.
+type MergeRequestRenderer interface {
+	MergeRequest(ctx context.Context, request agent.MergeRequestRequest) (agent.MergeRequestReply, error)
+}
+
 // Pipeline runs a set of addons' hooks: in stage order, each in the agent, committing what each
 // asks for before the next runs, and keeping what each found for its addon's later hooks and its
 // report section. It stops at the first failing hook, so a later one never sees a half-done event.

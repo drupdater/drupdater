@@ -1,9 +1,0 @@
-## ⚠️ Unsupported modules and abandoned packages
-
-The following are no longer maintained: an unsupported module has no supported release on Drupal.org, an abandoned package has been marked as such by its maintainers. Neither will receive further fixes, including security ones, and no update will resolve it. Each needs a decision — replace it, adopt it, or accept the risk.
-
-| Name | Status | Installed version | Recommendation |
-| ---- | ------ | ----------------- | -------------- |
-{{ range . -}}
-| {{ .Name | cell }} | {{ .Status | cell }} | {{ if .InstalledVersion }}{{ .InstalledVersion | cell }}{{ else }}—{{ end }} | {{ .Recommendation | cell }} |
-{{ end -}}

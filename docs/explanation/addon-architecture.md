@@ -196,8 +196,8 @@ addon would look exactly like an addon with nothing to do.
 
 Addons do not render anything. An addon that has something to tell a reviewer contributes
 a section to the [run report](../reference/run-report.md), and once every addon has
-finished, the title and description are rendered from that report by
-`internal/mergerequest`.
+finished, the agent's `drupdater:merge-request` renders the title and description from that
+report (`agent/src/MergeRequest/`).
 
 The renderer reads the report the way any consumer does: through its JSON. So the
 description cannot say anything the report does not publish, the two cannot disagree, and
@@ -212,8 +212,8 @@ A section with nothing in it is absent from the report, and so from the descript
 which is why a request for a small update is short rather than full of empty headings. The
 sections appear in a fixed order: what needs a decision first, the logs last.
 
-Templates are embedded in the binary, so the rendered output is fixed at build time and
-cannot be affected by the project being updated. If the description would exceed GitHub's
+The renderer is part of the agent the image installs, and is asked from an empty directory, so
+the rendered output cannot be affected by the project being updated. If the description would exceed GitHub's
 65,536-byte limit, it is rendered again without the dependency table's links.
 
 ## Reporting
