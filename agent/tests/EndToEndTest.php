@@ -24,10 +24,15 @@ final class EndToEndTest extends TestCase
         file_put_contents(self::$home . '/composer.json', json_encode([
             'repositories' => [
                 ['type' => 'path', 'url' => dirname(__DIR__), 'options' => ['symlink' => true, 'versions' => ['drupdater/agent' => '1.0.0']]],
+                // Offline: the agent's one dependency comes from its own vendor/.
+                ['type' => 'path', 'url' => dirname(__DIR__) . '/vendor/ion-bazan/composer-diff', 'options' => [
+                    'symlink' => true, 'versions' => ['ion-bazan/composer-diff' => self::lockedVersion('ion-bazan/composer-diff')],
+                ]],
                 ['packagist.org' => false],
             ],
             'require' => ['drupdater/agent' => '1.0.0'],
-            'config' => ['allow-plugins' => ['drupdater/agent' => true]],
+            // As in the image: the agent only uses composer-diff's classes, never its command.
+            'config' => ['allow-plugins' => ['drupdater/agent' => true, 'ion-bazan/composer-diff' => false]],
         ]));
         $install = self::composer(['global', 'update', '--no-interaction', '--no-progress']);
         self::assertSame(0, $install->getExitCode(), $install->getErrorOutput());
@@ -40,7 +45,7 @@ final class EndToEndTest extends TestCase
 
     public function testHandshake(): void
     {
-        $reply = $this->ask('drupdater:handshake', $this->project(), ['protocol' => 2, 'request' => []]);
+        $reply = $this->ask('drupdater:handshake', $this->scratchDir(), ['protocol' => 3, 'request' => []]);
 
         self::assertEquals(self::fixture('handshake/response.json'), $reply);
     }
@@ -55,24 +60,13 @@ final class EndToEndTest extends TestCase
         self::assertEquals(self::fixture('project/response.json'), $reply);
     }
 
-    public function testResolveReportsTheUpdateAndPutsTheFilesBack(): void
+    public function testResolveWritesTheUpdateAndBumpsTheConstraints(): void
     {
         $project = $this->lockedProject();
-        $files = [file_get_contents($project . '/composer.json'), file_get_contents($project . '/composer.lock')];
 
         $reply = $this->ask('drupdater:resolve', $project, self::fixture('resolve/request.json'));
 
         self::assertEquals(self::fixture('resolve/response.json'), $reply);
-        self::assertSame($files, [file_get_contents($project . '/composer.json'), file_get_contents($project . '/composer.lock')]);
-    }
-
-    public function testResolveWithWriteKeepsTheUpdateAndBumpsTheConstraints(): void
-    {
-        $project = $this->lockedProject();
-
-        $reply = $this->ask('drupdater:resolve', $project, ['protocol' => 2, 'request' => ['packages' => [], 'keep' => [], 'minimal_changes' => false, 'write' => true]]);
-
-        self::assertCount(2, $reply['result']['changes']);
         $lock = json_decode((string) file_get_contents($project . '/composer.lock'), true);
         self::assertSame(['1.1.0', '2.1.0'], array_column($lock['packages'], 'version'));
         $manifest = json_decode((string) file_get_contents($project . '/composer.json'), true);
@@ -83,24 +77,24 @@ final class EndToEndTest extends TestCase
     {
         $project = $this->lockedProject();
 
-        $pinned = $this->ask('drupdater:resolve', $project, ['protocol' => 2, 'request' => [
-            'packages' => [], 'keep' => [['package' => 'fixture/a', 'version' => '1.0.0']], 'minimal_changes' => false, 'write' => false,
+        $pinned = $this->ask('drupdater:resolve', $project, ['protocol' => 3, 'request' => [
+            'packages' => [], 'keep' => [['package' => 'fixture/a', 'version' => '1.0.0']], 'minimal_changes' => false,
         ]]);
-        $only = $this->ask('drupdater:resolve', $project, ['protocol' => 2, 'request' => [
-            'packages' => ['fixture/a'], 'keep' => [], 'minimal_changes' => false, 'write' => false,
+        $only = $this->ask('drupdater:resolve', $this->lockedProject(), ['protocol' => 3, 'request' => [
+            'packages' => ['fixture/a'], 'keep' => [], 'minimal_changes' => false,
         ]]);
 
         self::assertSame(['fixture/b'], array_column($pinned['result']['changes'], 'package'));
         self::assertSame(['fixture/a'], array_column($only['result']['changes'], 'package'));
     }
 
-    public function testResolveReportsAnUnresolvableUpdateAndPutsTheFilesBack(): void
+    public function testResolveReportsAnUnresolvableUpdateAndLeavesTheLock(): void
     {
         $project = $this->lockedProject();
         $lock = file_get_contents($project . '/composer.lock');
 
-        [$reply, $stderr] = $this->askWithErrors('drupdater:resolve', $project, ['protocol' => 2, 'request' => [
-            'packages' => [], 'keep' => [['package' => 'fixture/a', 'version' => '9.9.9']], 'minimal_changes' => false, 'write' => false,
+        [$reply, $stderr] = $this->askWithErrors('drupdater:resolve', $project, ['protocol' => 3, 'request' => [
+            'packages' => [], 'keep' => [['package' => 'fixture/a', 'version' => '9.9.9']], 'minimal_changes' => false,
         ]]);
 
         self::assertFalse($reply['ok']);
@@ -119,11 +113,41 @@ final class EndToEndTest extends TestCase
         self::assertSame(['failed', 'the project has no composer.lock'], [$reply['error']['kind'], $reply['error']['reason']]);
     }
 
-    public function testAuditOfACleanLockFindsNothing(): void
+    public function testAddonsListsTheCatalogueWithoutAProject(): void
     {
-        $reply = $this->ask('drupdater:audit', $this->lockedProject(), self::fixture('audit/request.json'));
+        $reply = $this->ask('drupdater:addons', $this->scratchDir(), self::fixture('addons/request.json'));
 
-        self::assertSame(['advisories' => [], 'abandoned' => []], $reply['result']);
+        self::assertEquals(self::fixture('addons/response.json'), $reply);
+    }
+
+    public function testComposerDiffReportsWhatTheUpdateChangedSinceTheBaseLock(): void
+    {
+        $project = $this->lockedProject();
+        $base = json_decode((string) file_get_contents($project . '/composer.lock'), true);
+        $update = self::composer(['--working-dir=' . $project, 'update', '--no-install', '--no-interaction', 'fixture/a']);
+        self::assertSame(0, $update->getExitCode(), $update->getErrorOutput());
+
+        $reply = $this->hook($project, 'composer_diff', ['name' => 'post-composer-update', 'base_lock' => $base]);
+
+        self::assertSame(
+            [['package' => 'fixture/a', 'operation' => 'upgrade', 'from' => '1.0.0', 'to' => '1.1.0', 'dev' => false, 'direct' => true]],
+            $reply['result']['finding'],
+        );
+        self::assertSame('info', $reply['log'][0]['level'], 'the agent logs through its envelope, never its own output');
+    }
+
+    public function testComposerAuditOfACleanLockFindsNothing(): void
+    {
+        $reply = $this->hook($this->lockedProject(), 'composer_audit', ['name' => 'pre-composer-update', 'plan' => []]);
+
+        self::assertSame(['advisories' => [], 'abandoned' => []], $reply['result']['finding']);
+    }
+
+    public function testASecurityRunWithNothingToFixEndsWithoutAFailure(): void
+    {
+        $reply = $this->hook($this->lockedProject(), 'composer_audit', ['name' => 'pre-composer-update', 'plan' => []], security: true);
+
+        self::assertSame('No security advisories found', $reply['result']['abort']);
     }
 
     public function testPlatformCheckFindsThisPhpMeetsALockWithoutRequirements(): void
@@ -133,67 +157,83 @@ final class EndToEndTest extends TestCase
         self::assertSame(['unmet' => []], $reply['result']);
     }
 
-    public function testWritePatchesLeavesALockComposerAgreesIsUpToDate(): void
-    {
-        $project = $this->lockedProject();
-        $lock = (string) file_get_contents($project . '/composer.lock');
-
-        $reply = $this->askVerbatim('drupdater:write-patches', $project, 'write-patches/request.json');
-
-        self::assertTrue($reply['ok']);
-        $validate = self::composer(['--working-dir=' . $project, 'validate', '--no-check-publish', '--no-check-all']);
-        self::assertSame(0, $validate->getExitCode(), $validate->getOutput() . $validate->getErrorOutput());
-        $hash = json_decode((string) file_get_contents($project . '/composer.lock'), true)['content-hash'];
-        $before = json_decode($lock, true)['content-hash'];
-        self::assertSame(str_replace($before, $hash, $lock), file_get_contents($project . '/composer.lock'));
-    }
-
-    public function testAllowPluginsOpenedAndClosedLeavesComposerJsonAsItWas(): void
+    public function testComposerAllowPluginsOpenedAndClosedLeavesComposerJsonAsItWas(): void
     {
         $project = $this->lockedProject();
         // Composer ends every file it writes with a newline; so does a project's own.
         file_put_contents($project . '/composer.json', file_get_contents($project . '/composer.json') . "\n");
         $manifest = (string) file_get_contents($project . '/composer.json');
 
-        $opened = $this->ask('drupdater:allow-plugins', $project, self::fixture('allow-plugins/open-request.json'));
-        self::assertSame(['original' => null, 'opened' => true], $opened['result']);
-        $closed = $this->ask('drupdater:allow-plugins', $project, ['protocol' => 2, 'request' => ['step' => 'close'] + $opened['result']]);
+        $opened = $this->hook($project, 'composer_allow_plugins', ['name' => 'pre-composer-update', 'plan' => []]);
+        self::assertSame(['original' => null, 'opened' => true], $opened['result']['finding']);
+        $closed = $this->hook($project, 'composer_allow_plugins', ['name' => 'post-composer-update', 'base_lock' => []], [
+            ['event' => 'pre-composer-update', 'site' => '', 'finding' => $opened['result']['finding'], 'committed' => []],
+        ]);
 
-        self::assertSame(['denied' => []], $closed['result']);
+        self::assertSame([], $closed['result']['finding']);
         self::assertSame($manifest, file_get_contents($project . '/composer.json'));
     }
 
-    public function testAPatchThatFitsApplies(): void
+    public function testComposerPatchesLeavesAPatchThatStillAppliesAndTheFilesAsTheyWere(): void
     {
-        $project = $this->project();
-        $this->writeFiles($project, ['patches/greeting.patch' => self::GREETING_PATCH]);
+        $project = $this->patchedProject(self::GREETING_PATCH);
+        $files = [file_get_contents($project . '/composer.json'), file_get_contents($project . '/composer.lock')];
 
-        $reply = $this->ask('drupdater:patch-check', $project, $this->request([$project . '/patches/greeting.patch']));
+        $reply = $this->hook($project, 'composer_patches', ['name' => 'pre-composer-update', 'plan' => []]);
 
-        self::assertSame(['outcome' => 'applies'], $reply['result']);
+        self::assertSame(['removed' => [], 'updated' => [], 'conflicts' => []], $reply['result']['finding']);
+        self::assertSame([], $reply['result']['commits']);
+        self::assertSame($files, [file_get_contents($project . '/composer.json'), file_get_contents($project . '/composer.lock')], 'the dry run is put back');
     }
 
-    public function testAPatchThatDoesNotFitIsRejected(): void
+    public function testComposerPatchesHoldsBackAPackageWhosePatchNoLongerApplies(): void
     {
-        $project = $this->project();
-        $this->writeFiles($project, ['patches/greeting.patch' => str_replace('hello', 'bonjour', self::GREETING_PATCH)]);
+        $project = $this->patchedProject(str_replace('hello', 'bonjour', self::GREETING_PATCH));
 
-        $reply = $this->ask('drupdater:patch-check', $project, $this->request([$project . '/patches/greeting.patch']));
+        $reply = $this->hook($project, 'composer_patches', ['name' => 'pre-composer-update', 'plan' => []]);
 
-        self::assertSame(['outcome' => 'rejected', 'patch' => $project . '/patches/greeting.patch'], $reply['result']);
+        self::assertSame([[
+            'package' => 'fixture/greeting',
+            'fixed_version' => '1.0.0',
+            'patch_path' => 'patches/greeting.patch',
+            'patch_description' => 'Greet the world',
+            'new_version' => '1.1.0',
+        ]], $reply['result']['finding']['conflicts']);
+        self::assertSame([['package' => 'fixture/greeting', 'version' => '1.0.0']], $reply['result']['plan']['keep']);
     }
 
-    public function testAVersionNoRepositoryHasIsUnobtainable(): void
+    public function testComposerPatchesLeavesALockComposerAgreesIsUpToDate(): void
     {
-        $project = $this->project();
-        $this->writeFiles($project, ['patches/greeting.patch' => self::GREETING_PATCH]);
-        $request = $this->request([$project . '/patches/greeting.patch']);
-        $request['request']['version'] = '2.0.0';
+        $project = $this->patchedProject(self::GREETING_PATCH, ['fixture/gone' => ['Gone' => 'https://example.com/gone.patch']]);
 
-        $reply = $this->ask('drupdater:patch-check', $project, $request);
+        $reply = $this->hook($project, 'composer_patches', ['name' => 'pre-composer-update', 'plan' => []]);
 
-        self::assertFalse($reply['ok']);
-        self::assertSame(['unobtainable', 'not available from any configured repository'], [$reply['error']['kind'], $reply['error']['reason']]);
+        self::assertSame(['fixture/gone'], array_column($reply['result']['finding']['removed'], 'package'));
+        self::assertSame([['message' => 'Update patches', 'paths' => ['composer.json', 'composer.lock']]], $reply['result']['commits']);
+        self::assertObjectNotHasProperty('fixture/gone', $this->manifestOf($project)->extra->patches);
+        $validate = self::composer(['--working-dir=' . $project, 'validate', '--no-check-publish', '--no-check-all']);
+        self::assertSame(0, $validate->getExitCode(), $validate->getOutput() . $validate->getErrorOutput());
+    }
+
+    public function testReportBuildsTheSectionsWithoutAProject(): void
+    {
+        $reply = $this->ask('drupdater:report', $this->scratchDir(), self::fixture('report/request.json'));
+
+        self::assertEquals(self::fixture('report/response.json'), $reply);
+    }
+
+    /**
+     * @param array<string, mixed> $event
+     * @param list<array<string, mixed>> $earlier
+     * @return array<string, mixed>
+     */
+    private function hook(string $project, string $addon, array $event, array $earlier = [], bool $security = false): array
+    {
+        $reply = $this->ask('drupdater:hook', $project, ['protocol' => 3, 'request' => [
+            'addon' => $addon, 'event' => $event, 'earlier' => $earlier, 'run' => ['security' => $security],
+        ]]);
+        self::assertTrue($reply['ok'], json_encode($reply));
+        return $reply;
     }
 
     /**
@@ -203,19 +243,6 @@ final class EndToEndTest extends TestCase
     private function ask(string $command, string $project, array $request): array
     {
         return $this->askWithErrors($command, $project, $request)[0];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function askVerbatim(string $command, string $project, string $fixture): array
-    {
-        $process = self::composer(
-            ['--working-dir=' . $project, $command, '--no-interaction', '--no-ansi'],
-            (string) file_get_contents(dirname(__DIR__) . '/protocol/' . $fixture),
-        );
-        $lines = explode("\n", trim($process->getOutput()));
-        return json_decode(end($lines), true, 512, JSON_THROW_ON_ERROR);
     }
 
     /**
@@ -253,29 +280,48 @@ final class EndToEndTest extends TestCase
     }
 
     /**
-     * @param list<string> $patches
-     * @return array<string, mixed>
+     * A project locked at fixture/greeting 1.0.0, which 1.1.0 updates, with one patch for it. Both
+     * versions come from path repositories, so the patch is checked against a real download.
+     *
+     * @param array<string, array<string, string>> $morePatches
      */
-    private function request(array $patches): array
+    private function patchedProject(string $patch, array $morePatches = []): string
     {
-        return ['protocol' => 2, 'request' => ['package' => 'fixture/greeting', 'version' => '1.0.0', 'reference' => '', 'patches' => $patches]];
+        $repositories = [];
+        foreach (['1.0.0', '1.1.0'] as $version) {
+            $package = $this->scratchDir();
+            $this->writeFiles($package, self::PACKAGE_FILES + ['composer.json' => json_encode(['name' => 'fixture/greeting', 'version' => $version])]);
+            $repositories[] = ['type' => 'path', 'url' => $package, 'canonical' => false, 'options' => ['symlink' => false]];
+        }
+        $project = $this->scratchDir();
+        $this->writeFiles($project, [
+            'composer.json' => json_encode([
+                'name' => 'fixture/project',
+                'repositories' => [...$repositories, ['packagist.org' => false]],
+                'require' => ['fixture/greeting' => '^1.0'],
+                'extra' => ['patches' => ['fixture/greeting' => ['Greet the world' => 'patches/greeting.patch']] + $morePatches],
+            ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
+            'patches/greeting.patch' => $patch,
+        ]);
+        $lock = self::composer(['--working-dir=' . $project, 'update', '--no-install', '--no-interaction', '--with=fixture/greeting:1.0.0']);
+        self::assertSame(0, $lock->getExitCode(), $lock->getErrorOutput());
+        return $project;
     }
 
-    private function project(): string
+    private function manifestOf(string $project): \stdClass
     {
-        $package = $this->scratchDir();
-        $this->writeFiles($package, self::PACKAGE_FILES + [
-            'composer.json' => json_encode(['name' => 'fixture/greeting', 'version' => '1.0.0']),
-        ]);
-        $project = $this->scratchDir();
-        $this->writeFiles($project, ['composer.json' => json_encode([
-            'name' => 'fixture/project',
-            'repositories' => [
-                ['type' => 'path', 'url' => $package, 'options' => ['symlink' => false]],
-                ['packagist.org' => false],
-            ],
-        ])]);
-        return $project;
+        return json_decode((string) file_get_contents($project . '/composer.json'), false, 512, JSON_THROW_ON_ERROR);
+    }
+
+    private static function lockedVersion(string $package): string
+    {
+        $lock = json_decode((string) file_get_contents(dirname(__DIR__) . '/composer.lock'), true, 512, JSON_THROW_ON_ERROR);
+        foreach ($lock['packages'] as $locked) {
+            if ($locked['name'] === $package) {
+                return $locked['version'];
+            }
+        }
+        throw new \LogicException($package . ' is not in the agent\'s composer.lock');
     }
 
     /**

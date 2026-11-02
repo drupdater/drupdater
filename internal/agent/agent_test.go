@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/drupdater/drupdater/internal/php"
 )
@@ -100,16 +101,46 @@ func TestCallSendsTheRequestFixture(t *testing.T) {
 }
 
 func TestCallDecodesTheResult(t *testing.T) {
-	f := &fakeAgent{stdout: fixture(t, "patch-check/rejected.json")}
+	f := &fakeAgent{stdout: fixture(t, "project/response.json")}
 
 	result, err := Call[struct {
-		Outcome string `json:"outcome"`
-		Patch   string `json:"patch"`
-	}](t.Context(), f.command(t), "drupdater:patch-check", struct{}{})
+		WebRoot  string `json:"web_root"`
+		LockHash string `json:"lock_hash"`
+	}](t.Context(), f.command(t), "drupdater:project", struct{}{})
 
 	require.NoError(t, err)
-	assert.Equal(t, "rejected", result.Outcome)
-	assert.Equal(t, "https://www.drupal.org/files/issues/3200000-8.patch", result.Patch)
+	assert.Equal(t, "web", result.WebRoot)
+	assert.Equal(t, "4b2f0e1c9a7d3e5f6a8b0c1d2e3f4a5b", result.LockHash)
+}
+
+func TestCallLogsWhatTheAgentLoggedAtItsLevelOnSuccessAndFailureAlike(t *testing.T) {
+	log := `"log":[` +
+		`{"level":"debug","message":"d","context":{"addon":"composer_patches","b":2,"a":1}},` +
+		`{"level":"info","message":"i","context":{}},` +
+		`{"level":"warning","message":"w","context":{}},` +
+		`{"level":"error","message":"e","context":{}}]`
+	for name, f := range map[string]*fakeAgent{
+		"success": {stdout: `{"protocol":3,"command":"drupdater:hook","ok":true,"result":{},` + log + `}`},
+		"failure": {stdout: `{"protocol":3,"command":"drupdater:hook","ok":false,"error":{"kind":"failed","reason":"r","message":""},` + log + `}`, status: 1},
+	} {
+		t.Run(name, func(t *testing.T) {
+			core, logs := observer.New(zap.DebugLevel)
+			command := f.command(t)
+			command.Logger = zap.New(core)
+
+			_, _ = Call[struct{}](t.Context(), command, "drupdater:hook", struct{}{})
+
+			var got []string
+			for _, entry := range logs.FilterMessageSnippet("").All() {
+				if entry.Message == "d" || entry.Message == "i" || entry.Message == "w" || entry.Message == "e" {
+					got = append(got, entry.Level.String()+" "+entry.Message)
+				}
+			}
+			assert.Equal(t, []string{"debug d", "info i", "warn w", "error e"}, got)
+			fields := logs.FilterMessage("d").All()[0].Context
+			assert.Equal(t, []string{"a", "addon", "b"}, []string{fields[0].Key, fields[1].Key, fields[2].Key}, "fields in name order")
+		})
+	}
 }
 
 func TestCallReadsOnlyTheLastLine(t *testing.T) {
@@ -122,19 +153,21 @@ func TestCallReadsOnlyTheLastLine(t *testing.T) {
 }
 
 func TestCallReturnsTheAgentsFailure(t *testing.T) {
-	f := &fakeAgent{stdout: fixture(t, "patch-check/unobtainable.json"), status: 1}
+	f := &fakeAgent{stdout: `{"protocol":3,"command":"drupdater:hook","ok":false,"error":{"kind":"unobtainable",` +
+		`"reason":"repository authentication failed",` +
+		`"message":"The \"https://packages.example.com/packages.json\" file could not be downloaded (HTTP/2 401 )"}}`, status: 1}
 
-	_, err := f.callCommand(t, "drupdater:patch-check")
+	_, err := f.callCommand(t, "drupdater:hook")
 
 	var agentErr *Error
 	require.ErrorAs(t, err, &agentErr)
 	assert.Equal(t, &Error{
-		Command: "drupdater:patch-check",
+		Command: "drupdater:hook",
 		Kind:    Unobtainable,
 		Reason:  "repository authentication failed",
 		Message: `The "https://packages.example.com/packages.json" file could not be downloaded (HTTP/2 401 )`,
 	}, agentErr)
-	assert.Equal(t, `drupdater:patch-check: unobtainable (repository authentication failed): `+
+	assert.Equal(t, `drupdater:hook: unobtainable (repository authentication failed): `+
 		`The "https://packages.example.com/packages.json" file could not be downloaded (HTTP/2 401 )`, err.Error())
 }
 
@@ -146,21 +179,21 @@ func TestCallReturnsTheAgentsProtocolMismatch(t *testing.T) {
 	var agentErr *Error
 	require.ErrorAs(t, err, &agentErr)
 	assert.Equal(t, ProtocolMismatch, agentErr.Kind)
-	assert.Equal(t, "drupdater:handshake: protocol_mismatch (drupdater speaks protocol 3, the agent speaks 2)", err.Error())
+	assert.Equal(t, "drupdater:handshake: protocol_mismatch (drupdater speaks protocol 4, the agent speaks 3)", err.Error())
 }
 
 func TestCallRefusesAReplyInAnotherProtocol(t *testing.T) {
-	f := &fakeAgent{stdout: `{"protocol":3,"command":"drupdater:handshake","ok":true,"result":{}}`}
+	f := &fakeAgent{stdout: `{"protocol":4,"command":"drupdater:handshake","ok":true,"result":{}}`}
 
 	_, err := f.call(t)
 
 	var agentErr *Error
 	require.ErrorAs(t, err, &agentErr)
-	assert.Equal(t, &Error{Command: "drupdater:handshake", Kind: ProtocolMismatch, Reason: "agent speaks protocol 3, drupdater speaks 2"}, agentErr)
+	assert.Equal(t, &Error{Command: "drupdater:handshake", Kind: ProtocolMismatch, Reason: "agent speaks protocol 4, drupdater speaks 3"}, agentErr)
 }
 
 func TestCallTreatsAFailureWithoutDetailAsInternal(t *testing.T) {
-	f := &fakeAgent{stdout: `{"protocol":2,"command":"drupdater:handshake","ok":false}`, status: 1}
+	f := &fakeAgent{stdout: `{"protocol":3,"command":"drupdater:handshake","ok":false}`, status: 1}
 
 	_, err := f.call(t)
 
@@ -175,7 +208,7 @@ func TestCallWithoutAnEnvelopeFails(t *testing.T) {
 		"composer does not know the command": {stderr: `Command "drupdater:handshake" is not defined.`, status: 1},
 		"the output is not an envelope":      {stdout: `{"something":"else"}`},
 		"no output at all":                   {},
-		"the reply answers another command":  {stdout: fixture(t, "patch-check/applies.json")},
+		"the reply answers another command":  {stdout: fixture(t, "project/response.json")},
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, err := f.call(t)
@@ -201,7 +234,7 @@ func TestCallDistrustsASuccessThatExitedNonZero(t *testing.T) {
 }
 
 func TestCallRejectsAResultOfTheWrongShape(t *testing.T) {
-	f := &fakeAgent{stdout: `{"protocol":2,"command":"drupdater:handshake","ok":true,"result":[1]}`}
+	f := &fakeAgent{stdout: `{"protocol":3,"command":"drupdater:handshake","ok":true,"result":[1]}`}
 
 	_, err := f.call(t)
 
@@ -223,7 +256,7 @@ func TestCallRejectsAnUnencodableRequest(t *testing.T) {
 
 func TestCallKeepsComposersExplanationOfAFailure(t *testing.T) {
 	f := &fakeAgent{
-		stdout: `{"protocol":2,"command":"drupdater:resolve","ok":false,"error":{"kind":"failed","reason":"composer update failed","message":"exit code 2"}}`,
+		stdout: `{"protocol":3,"command":"drupdater:resolve","ok":false,"error":{"kind":"failed","reason":"composer update failed","message":"exit code 2"}}`,
 		stderr: "Your requirements could not be resolved to an installable set of packages.",
 		status: 1,
 	}

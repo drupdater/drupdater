@@ -250,6 +250,23 @@ func TestStage(t *testing.T) {
 		assert.Equal(t, []string{"tracked.txt"}, unstaged)
 	})
 
+	t.Run("Committed reads HEAD's content, not the working tree's", func(t *testing.T) {
+		checkout := setup(t)
+		writeFile(t, checkout.Path, "tracked.txt", "changed")
+
+		content, err := checkout.Worktree.Committed(t.Context(), "tracked.txt")
+		require.NoError(t, err)
+		assert.Equal(t, "a", string(content))
+	})
+
+	t.Run("Committed fails for a path HEAD does not have", func(t *testing.T) {
+		checkout := setup(t)
+		writeFile(t, checkout.Path, "untracked.txt", "b")
+
+		_, err := checkout.Worktree.Committed(t.Context(), "untracked.txt")
+		assert.ErrorContains(t, err, "git show")
+	})
+
 	t.Run("StageGlob matches from the root only", func(t *testing.T) {
 		checkout := setup(t)
 		writeFile(t, checkout.Path, "composer.json", "{}")

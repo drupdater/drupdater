@@ -19,7 +19,6 @@ type resolveRequest struct {
 	Packages       []string     `json:"packages"`
 	Keep           []resolvePin `json:"keep"`
 	MinimalChanges bool         `json:"minimal_changes"`
-	Write          bool         `json:"write"`
 }
 
 type resolvePin struct {
@@ -37,12 +36,12 @@ type resolveResult struct {
 }
 
 // Update resolves into composer.json and composer.lock only, through the agent's drupdater:resolve;
-// Install brings vendor/ to the result. A dry run leaves both files as it found them.
+// Install brings vendor/ to the result.
 //
 // packagesToKeep are "package:version" pins, the version as the lock prints it. The changes come
 // sorted by action, Upgrade, Downgrade, Remove, Install, then by package.
-func (s *CLI) Update(ctx context.Context, dir string, packages []string, packagesToKeep []string, minimalChanges bool, dryRun bool) ([]PackageChange, error) {
-	request := resolveRequest{Packages: packages, Keep: []resolvePin{}, MinimalChanges: minimalChanges, Write: !dryRun}
+func (s *CLI) Update(ctx context.Context, dir string, packages []string, packagesToKeep []string, minimalChanges bool) ([]PackageChange, error) {
+	request := resolveRequest{Packages: packages, Keep: []resolvePin{}, MinimalChanges: minimalChanges}
 	if request.Packages == nil {
 		request.Packages = []string{}
 	}

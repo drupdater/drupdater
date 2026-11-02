@@ -11,10 +11,11 @@ import (
 
 	"github.com/drupdater/drupdater/internal/repo"
 
-	"github.com/drupdater/drupdater/internal/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+
+	"github.com/drupdater/drupdater/internal/config"
 )
 
 // occupancyProbe counts how many goroutines are inside a mocked call at once, so a phase can

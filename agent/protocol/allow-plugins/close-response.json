@@ -1,8 +1,0 @@
-{
-  "protocol": 2,
-  "command": "drupdater:allow-plugins",
-  "ok": true,
-  "result": {
-    "denied": ["dealerdirect/phpcodesniffer-composer-installer"]
-  }
-}

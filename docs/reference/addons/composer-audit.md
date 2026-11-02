@@ -1,7 +1,7 @@
 # `composer_audit`
 
-Audits `composer.lock` through the [Drupdater agent](../docker-images.md#drupdater-agent)'s
-`drupdater:audit`, which asks Composer's own auditor, and reports what it found. On a `--security` run it also drives the
+Audits `composer.lock` inside the [Drupdater agent](../docker-images.md#drupdater-agent), with
+Composer's own auditor, and reports what it found. On a `--security` run it also drives the
 update: it decides which packages may be touched.
 
 | | |

@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -9,29 +10,37 @@ import (
 	"testing"
 	"testing/synctest"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
+
+	"github.com/drupdater/drupdater/internal/agent"
 	"github.com/drupdater/drupdater/internal/buildinfo"
 	"github.com/drupdater/drupdater/internal/composer"
 	"github.com/drupdater/drupdater/internal/config"
 	"github.com/drupdater/drupdater/internal/drush"
 	"github.com/drupdater/drupdater/internal/repo"
 	"github.com/drupdater/drupdater/internal/report"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zaptest/observer"
 )
 
 func TestUpdateSharedCodeFailures(t *testing.T) {
-	newRunner := func(t *testing.T, hooks Hooks) (*run, *MockComposer, *MockWorktree) {
+	// newRunner's run has an addon whose hook of failOn fails; none for "".
+	newRunner := func(t *testing.T, failOn string) (*run, *MockComposer, *MockWorktree) {
 		t.Helper()
 		mockComposer := NewMockComposer(t)
 		worktree := NewMockWorktree(t)
-		return testRun(services{logger: zap.NewNop(), composer: mockComposer}, repo.Checkout{Worktree: worktree, Path: testCheckout}, hookAddon{hooks}), mockComposer, worktree
+		worktree.EXPECT().Committed(anyCtx, "composer.lock").Return([]byte(testBaseLock), nil).Maybe()
+		var addons []Addon
+		if failOn != "" {
+			addons = append(addons, failingOn(mockComposer, failOn))
+		}
+		return testRun(services{logger: zap.NewNop(), composer: mockComposer}, repo.Checkout{Worktree: worktree, Path: testCheckout}, addons...), mockComposer, worktree
 	}
 
 	t.Run("installing the resolved lock", func(t *testing.T) {
-		ws, mockComposer, _ := newRunner(t, Hooks{})
+		ws, mockComposer, _ := newRunner(t, "")
 		mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(assert.AnError)
 
 		err := ws.updateSharedCode(t.Context())
@@ -39,8 +48,20 @@ func TestUpdateSharedCodeFailures(t *testing.T) {
 		assert.Contains(t, err.Error(), "failed to install updated dependencies")
 	})
 
+	t.Run("reading the committed lock", func(t *testing.T) {
+		mockComposer := NewMockComposer(t)
+		worktree := NewMockWorktree(t)
+		ws := testRun(services{logger: zap.NewNop(), composer: mockComposer}, repo.Checkout{Worktree: worktree, Path: testCheckout})
+		mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
+		worktree.EXPECT().Committed(anyCtx, "composer.lock").Return(nil, assert.AnError)
+
+		err := ws.updateSharedCode(t.Context())
+		require.ErrorIs(t, err, assert.AnError)
+		assert.Contains(t, err.Error(), "failed to read the committed composer.lock")
+	})
+
 	t.Run("post-composer-update", func(t *testing.T) {
-		ws, mockComposer, _ := newRunner(t, Hooks{PostComposerUpdate: On(Change, failing[*PostComposerUpdateEvent])})
+		ws, mockComposer, _ := newRunner(t, EventPostComposerUpdate)
 		mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
 
 		err := ws.updateSharedCode(t.Context())
@@ -49,7 +70,7 @@ func TestUpdateSharedCodeFailures(t *testing.T) {
 	})
 
 	t.Run("staging composer files", func(t *testing.T) {
-		ws, mockComposer, worktree := newRunner(t, Hooks{})
+		ws, mockComposer, worktree := newRunner(t, "")
 		mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
 		worktree.EXPECT().StageGlob(anyCtx, "composer.*").Return(assert.AnError)
 
@@ -59,7 +80,7 @@ func TestUpdateSharedCodeFailures(t *testing.T) {
 	})
 
 	t.Run("committing", func(t *testing.T) {
-		ws, mockComposer, worktree := newRunner(t, Hooks{})
+		ws, mockComposer, worktree := newRunner(t, "")
 		mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
 		worktree.EXPECT().StageGlob(anyCtx, "composer.*").Return(nil)
 		worktree.EXPECT().Unstaged(anyCtx).Return(nil, nil)
@@ -71,7 +92,7 @@ func TestUpdateSharedCodeFailures(t *testing.T) {
 	})
 
 	t.Run("post-code-update", func(t *testing.T) {
-		ws, mockComposer, worktree := newRunner(t, Hooks{PostCodeUpdate: On(Change, failing[*PostCodeUpdateEvent])})
+		ws, mockComposer, worktree := newRunner(t, EventPostCodeUpdate)
 		mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
 		worktree.EXPECT().StageGlob(anyCtx, "composer.*").Return(nil)
 		worktree.EXPECT().Unstaged(anyCtx).Return(nil, nil)
@@ -119,12 +140,31 @@ func TestCreateUpdateBranch(t *testing.T) {
 	})
 }
 
+func TestPostComposerUpdateCarriesTheLockAsCommittedBeforeTheUpdate(t *testing.T) {
+	mockComposer := NewMockComposer(t)
+	worktree := NewMockWorktree(t)
+	s := &scriptedAgent{}
+	s.serve(mockComposer)
+	ws := testRun(services{logger: zap.NewNop(), composer: mockComposer}, repo.Checkout{Worktree: worktree, Path: testCheckout},
+		addon("observer", map[string]Stage{EventPostComposerUpdate: Inspect}))
+	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
+	worktree.EXPECT().Committed(anyCtx, "composer.lock").Return([]byte(testBaseLock), nil)
+	worktree.EXPECT().StageGlob(anyCtx, "composer.*").Return(nil)
+	worktree.EXPECT().Unstaged(anyCtx).Return(nil, nil)
+	worktree.EXPECT().Commit(anyCtx, mock.Anything, mock.Anything).Return(nil)
+
+	require.NoError(t, ws.updateSharedCode(t.Context()))
+	require.Len(t, s.requests, 1)
+	assert.JSONEq(t, testBaseLock, string(s.requests[0].Event.BaseLock))
+}
+
 // The runner's own commit is signed explicitly, so no identity has to be in git config.
 func TestUpdateSharedCodeSignsItsCommit(t *testing.T) {
 	mockComposer := NewMockComposer(t)
 	worktree := NewMockWorktree(t)
 	ws := testRun(services{logger: zap.NewNop(), composer: mockComposer}, repo.Checkout{Worktree: worktree, Path: testCheckout, Author: testAuthor})
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
+	worktree.EXPECT().Committed(anyCtx, "composer.lock").Return([]byte(testBaseLock), nil)
 	worktree.EXPECT().StageGlob(anyCtx, "composer.*").Return(nil)
 	worktree.EXPECT().Unstaged(anyCtx).Return(nil, nil)
 	worktree.EXPECT().Commit(anyCtx, "Update composer.json and composer.lock", testAuthor).Return(nil)
@@ -253,43 +293,49 @@ func TestCleanup(t *testing.T) {
 	})
 }
 
-func TestPostSiteUpdateSeesTheFactsReadAfterTheUpdateHooks(t *testing.T) {
+func TestSiteHooksSeeTheFactsReadBeforeAndAfterTheUpdateHooks(t *testing.T) {
 	installer := NewMockInstaller(t)
 	drushMock := NewMockDrush(t)
 	committer := NewMockCommitter(t)
-	var seen drush.Facts
-	record := func(e *PostSiteUpdateEvent) error {
-		seen = e.Facts()
-		return nil
-	}
-	ws := testRun(services{logger: zap.NewNop(), installer: installer, drush: drushMock}, repo.Checkout{Path: "/project"},
-		hookAddon{Hooks{PostSiteUpdate: On(Inspect, record)}})
+	mockComposer := NewMockComposer(t)
+	s := &scriptedAgent{}
+	s.serve(mockComposer)
+	ws := testRun(services{logger: zap.NewNop(), installer: installer, drush: drushMock, composer: mockComposer}, repo.Checkout{Path: "/project"},
+		addon("observer", map[string]Stage{EventPreSiteUpdate: Inspect, EventPostSiteUpdate: Inspect}))
 	ws.committer = committer
 
 	installer.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(nil)
-	drushMock.EXPECT().Facts(anyCtx, "/project", "site1").Return(syncFacts("/project/config/before"), nil)
+	drushMock.EXPECT().Facts(anyCtx, "/project", "site1").Return(drush.Facts{ConfigSyncDirectory: "/project/config/before", Raw: json.RawMessage(`{"when":"before"}`)}, nil)
 	drushMock.EXPECT().UpdateSite(anyCtx, "/project", "site1").Return(nil)
 	drushMock.EXPECT().ConfigResave(anyCtx, "/project", "site1").Return(nil)
-	after := drush.Facts{ConfigSyncDirectory: "/project/config/after", Modules: []string{"locale_deploy"}}
+	after := drush.Facts{ConfigSyncDirectory: "/project/config/after", Raw: json.RawMessage(`{"when":"after"}`)}
 	drushMock.EXPECT().LocalFacts(anyCtx, "/project", "site1").Return(after, nil)
 	drushMock.EXPECT().ExportConfiguration(anyCtx, "/project", "site1").Return(nil)
 	committer.EXPECT().Commit(anyCtx, "Update configuration site1", []string{"config/after"}).Return(true, nil)
 	installer.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(nil)
 
 	require.NoError(t, updateSite1(t.Context(), ws))
-	assert.Equal(t, after, seen)
+	require.Len(t, s.requests, 2)
+	assert.Equal(t, agent.Event{Name: EventPreSiteUpdate, Site: "site1", Facts: json.RawMessage(`{"when":"before"}`)}, s.requests[0].Event)
+	assert.Equal(t, agent.Event{Name: EventPostSiteUpdate, Site: "site1", Facts: json.RawMessage(`{"when":"after"}`)}, s.requests[1].Event)
 }
 
 func TestUpdateSiteRestoresSettings(t *testing.T) {
-	newRunner := func(t *testing.T, addons ...Addon) (*run, *MockInstaller, *MockDrush) {
+	// newRunner's run has an addon whose hook of failOn fails; none for "".
+	newRunner := func(t *testing.T, failOn ...string) (*run, *MockInstaller, *MockDrush) {
 		t.Helper()
 		installer := NewMockInstaller(t)
 		drush := NewMockDrush(t)
-		return testRun(services{logger: zap.NewNop(), installer: installer, drush: drush}, repo.Checkout{Path: "/project"}, addons...), installer, drush
+		mockComposer := NewMockComposer(t)
+		var addons []Addon
+		for _, event := range failOn {
+			addons = append(addons, failingOn(mockComposer, event))
+		}
+		return testRun(services{logger: zap.NewNop(), installer: installer, drush: drush, composer: mockComposer}, repo.Checkout{Path: "/project"}, addons...), installer, drush
 	}
 
 	t.Run("after a failed pre-site-update hook, which stops the update", func(t *testing.T) {
-		ws, installer, drush := newRunner(t, hookAddon{Hooks{PreSiteUpdate: On(Inspect, failing[*PreSiteUpdateEvent])}})
+		ws, installer, drush := newRunner(t, EventPreSiteUpdate)
 		installer.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(nil)
 		drush.EXPECT().Facts(anyCtx, "/project", "site1").Return(syncFacts("/project/config/sync"), nil)
 		installer.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(nil).Once()
@@ -300,7 +346,7 @@ func TestUpdateSiteRestoresSettings(t *testing.T) {
 	})
 
 	t.Run("after its facts cannot be read, which stops the update before any hook", func(t *testing.T) {
-		ws, installer, drush := newRunner(t, hookAddon{Hooks{PreSiteUpdate: On(Inspect, failing[*PreSiteUpdateEvent])}})
+		ws, installer, drush := newRunner(t, EventPreSiteUpdate)
 		installer.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(nil)
 		drush.EXPECT().Facts(anyCtx, "/project", "site1").Return(syncFacts(""), assert.AnError)
 		installer.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(nil).Once()
@@ -311,7 +357,7 @@ func TestUpdateSiteRestoresSettings(t *testing.T) {
 	})
 
 	t.Run("after a failed post-site-update hook, which stops the export", func(t *testing.T) {
-		ws, installer, drush := newRunner(t, hookAddon{Hooks{PostSiteUpdate: On(Change, failing[*PostSiteUpdateEvent])}})
+		ws, installer, drush := newRunner(t, EventPostSiteUpdate)
 		installer.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(nil)
 		drush.EXPECT().Facts(anyCtx, "/project", "site1").Return(syncFacts("/project/config/sync"), nil)
 		drush.EXPECT().UpdateSite(anyCtx, "/project", "site1").Return(nil)
@@ -519,10 +565,12 @@ func TestEnsureUpdateBranchAvailable(t *testing.T) {
 // Outside the temp dir, so a mutant of cleanup's guard has nothing real to delete.
 const testCheckout = "/drupdater-test/checkout"
 
+const testBaseLock = `{"packages":[{"name":"drupal/core","version":"9.0.0"}]}`
+
 // testRun is a run over checkout with s, built by newRun as Run builds one.
 func testRun(s services, checkout repo.Checkout, addons ...Addon) *run {
 	rec := report.NewRecorder(buildinfo.Version, report.ModeNormal, false, "", "", nil)
-	return newRun(s, checkout, NewPipeline(addons), rec)
+	return newRun(s, checkout, NewPipeline(addons, s.composer, false), rec)
 }
 
 // anyCtx matches any non-nil context.Context: the errgroup derives a child, so the exact value
@@ -684,6 +732,7 @@ func TestRunFailsWhenScaffoldChangesCannotBeStaged(t *testing.T) {
 	}
 
 	worktree := NewMockWorktree(t)
+	worktree.EXPECT().Committed(anyCtx, "composer.lock").Return([]byte(testBaseLock), nil)
 	worktree.EXPECT().StageGlob(anyCtx, mock.Anything).Return(nil)
 	worktree.EXPECT().Unstaged(anyCtx).Return(nil, assert.AnError)
 
@@ -699,7 +748,7 @@ func TestRunFailsWhenScaffoldChangesCannotBeStaged(t *testing.T) {
 
 	mockComposer.EXPECT().CheckAgent(anyCtx, testCheckout).Return(nil)
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
-	mockComposer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).
+	mockComposer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false).
 		Return([]composer.PackageChange{{Package: "drupal/core", From: "9.0.0", To: "9.1.0"}}, nil)
 	mockComposer.EXPECT().Project(anyCtx, testCheckout).Return(composer.Project{WebRoot: "web", LockHash: "dummy-hash"}, nil)
 	repository.EXPECT().RemoteBranchExists(anyCtx, "update-dummy-hash", "token").Return(false, nil)
@@ -726,6 +775,7 @@ func TestRunHandsAddonsTheRunsContextAndCommitter(t *testing.T) {
 	config := config.Config{RepositoryURL: "https://example.com/repo.git", Branch: "main", Token: "token", Clone: true, Sites: []string{"site1"}, DryRun: true}
 
 	worktree := NewMockWorktree(t)
+	worktree.EXPECT().Committed(anyCtx, "composer.lock").Return([]byte(testBaseLock), nil)
 	worktree.EXPECT().Stage(anyCtx, []string{"config/sync"}).Return(nil).Maybe()
 	worktree.EXPECT().StageGlob(anyCtx, mock.Anything).Return(nil)
 	worktree.EXPECT().Unstaged(anyCtx).Return(nil, nil).Once()
@@ -743,7 +793,7 @@ func TestRunHandsAddonsTheRunsContextAndCommitter(t *testing.T) {
 	mockComposer.EXPECT().CheckPlatformReqs(anyCtx, testCheckout).Return("", nil)
 	mockComposer.EXPECT().CheckAgent(anyCtx, testCheckout).Return(nil)
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
-	mockComposer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).
+	mockComposer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false).
 		Return([]composer.PackageChange{{Action: "Upgrade", Package: "drupal/core", From: "9.0.0", To: "9.1.0"}}, nil)
 	mockComposer.EXPECT().Project(anyCtx, testCheckout).Return(composer.Project{WebRoot: "web", LockHash: "dummy-hash"}, nil)
 	installer.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil)
@@ -757,31 +807,18 @@ func TestRunHandsAddonsTheRunsContextAndCommitter(t *testing.T) {
 
 	ctx := context.WithValue(t.Context(), runKey{}, "this run")
 	seen := map[string]bool{}
-	carriesRun := func(name string, e interface{ Context() context.Context }) {
-		seen[name] = e.Context().Value(runKey{}) == "this run"
-	}
-	observer := hookAddon{Hooks{
-		PreComposerUpdate: propose(Change, func(e *PreComposerUpdateEvent) (UpdatePlan, error) {
-			carriesRun("pre-composer-update", e)
-			return UpdatePlan{}, nil
-		}),
-		PostComposerUpdate: On(Change, func(e *PostComposerUpdateEvent) error {
-			carriesRun("post-composer-update", e)
-			return nil
-		}),
-		PostCodeUpdate: Produce(Change, func(e *PostCodeUpdateEvent) (Result[struct{}], error) {
-			carriesRun("post-code-update", e)
-			return Result[struct{}]{Commits: []Commit{{"Remove deprecations", []string{"web/modules/custom/a.php"}}}}, nil
-		}),
-		PreSiteUpdate: On(Change, func(e *PreSiteUpdateEvent) error {
-			carriesRun("pre-site-update", e)
-			return nil
-		}),
-		PostSiteUpdate: On(Change, func(e *PostSiteUpdateEvent) error {
-			carriesRun("post-site-update", e)
-			return nil
-		}),
-	}}
+	mockComposer.EXPECT().RunHook(anyCtx, testCheckout, mock.Anything).RunAndReturn(func(ctx context.Context, _ string, r agent.HookRequest) (agent.HookReply, error) {
+		seen[r.Event.Name] = ctx.Value(runKey{}) == "this run"
+		if r.Event.Name == EventPostCodeUpdate {
+			return agent.HookReply{Commits: []agent.Commit{{Message: "Remove deprecations", Paths: []string{"web/modules/custom/a.php"}}}}, nil
+		}
+		return agent.HookReply{}, nil
+	})
+	mockComposer.EXPECT().Report(anyCtx, mock.Anything).Return(agent.ReportReply{}, nil)
+	observer := addon("observer", map[string]Stage{
+		EventPreComposerUpdate: Change, EventPostComposerUpdate: Change, EventPostCodeUpdate: Change,
+		EventPreSiteUpdate: Change, EventPostSiteUpdate: Change,
+	})
 
 	err := New(zap.NewNop(), config, drush, vcsProvider, repositoryService, installer, mockComposer).Run(ctx, []Addon{observer})
 

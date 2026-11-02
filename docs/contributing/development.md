@@ -76,7 +76,7 @@ go run . --working-dir /path/to/a/drupal/checkout --dry-run --verbose
 provides. That is supported: the two Composer settings the tool's own correctness depends
 on (`COMPOSER_PROCESS_TIMEOUT`, `COMPOSER_NO_AUDIT`) are forced by `composer.Env` on every
 invocation rather than inherited from the image — including the `composer exec` calls that
-`internal/drush`, `internal/phpcs` and `internal/rector` make. The image's remaining Composer variables
+`internal/drush` makes, and the agent's commands, whose tools inherit them. The image's remaining Composer variables
 are deployment policy and need no local equivalent — see [environment
 variables](../reference/environment-variables.md#set-by-drupdater).
 
@@ -145,7 +145,7 @@ byte for byte.
 ```bash
 go test ./...                       # compare
 go test ./... -update               # rewrite every golden file
-go test ./internal/addon -update    # just one package's
+go test ./internal/report -update   # just one package's
 ```
 
 `-update` is registered by `internal/golden`, which every golden assertion goes through. Always
@@ -157,22 +157,24 @@ which is the one way a golden file can make tests worse rather than better.
 | `internal/mergerequest/testdata/description.md` | The description rendered from the example report |
 | `internal/mergerequest/testdata/<section>.md` | Each section of that description, from its template |
 | `internal/workflow/testdata/dependency_update.md` | The description a full run with no addon sections produces |
-| `internal/addon/testdata/run_report.json` | The whole `--report` document, every reporting addon at once |
+| `internal/report/testdata/run_report.json` | The whole `--report` document, every reporting addon at once |
+| `agent/protocol/report/response.json` | The sections the agent builds for an example of every reporting addon's findings, which `run_report.json` embeds |
 
 Most of these are embedded into this documentation with `pymdownx.snippets`, so the published
 examples cannot drift from what the code emits. Changing a golden file changes the docs.
 
 ### Why the report has one
 
-`internal/addon/report.go` and `internal/report/report.go` are a published schema, and struct tags
+The addons' sections and `internal/report/report.go` are a published schema, and its field names
 are invisible to everything else: coverage sees a line that ran, mutation testing does not mutate
 tags, and the property tests assert values rather than names. Before `run_report.json` existed,
 renaming `fixable` to `fixable_count` and `remaining` to `still_open` broke **no test at all**.
 `.github/assert-report.jq` does check field names, but only in the label-triggered integration
 run — never on a pull request.
 
-The golden is built through the real `report.Recorder`, so it also pins how each section is
-keyed. Everything a clock produced is overwritten with fixed values first — otherwise the file
+The golden is built through the real `report.Recorder` from the sections in the agent's report
+fixture, which the agent's suite asserts it builds, so a rename on either side fails a golden. It
+also pins how each section is keyed. Everything a clock produced is overwritten with fixed values first — otherwise the file
 would differ on every run — which is the one thing the golden deliberately does not check.
 
 ### When not to write one
@@ -186,9 +188,9 @@ contract, not when it is merely large.
 ## The race detector
 
 Drupdater runs the per-site phases concurrently — an `errgroup` bounded by `--concurrency`, one
-goroutine per site — and what the per-site hooks find is gathered across those goroutines. The
-hooks return it and the pipeline records it in a `workflow.Findings`, which does the locking;
-`TestAddonsKeepNoStateOfTheirOwn` rejects an addon that keeps a map, slice or mutex of its own. The race detector checks the rest: coverage proves a line ran,
+goroutine per site — and what the per-site hooks find is gathered across those goroutines. Each
+hook runs in an agent process of its own, so no addon can share state between them; the
+`workflow.Pipeline` records what each returns, under its own lock. The race detector checks the rest: coverage proves a line ran,
 mutation testing proves a test would notice a *changed* line, and both are blind to two
 goroutines touching the same memory.
 
@@ -219,11 +221,11 @@ So the concurrency tests and the detector are one tool, not two:
 | Test | Drives |
 |---|---|
 | `TestRunWithConcurrentSites` | The real workflow with four sites, asserting the baseline installs overlap and the commits do not |
-| `TestConcurrentSitesAllRecordTheirFinding` | `workflow.Fire` recording a per-site hook's finding from many sites at once |
+| `TestConcurrentSitesAllRecordTheirFinding` | The pipeline recording a per-site hook's finding from many sites at once |
 | `TestForEachSite` | The fan-out itself: the concurrency bound, and cancellation on first error |
 | `TestUpdateSites…` | Commits land in `--sites` order however the sites finish, with one site at a time too, and none after any site fails |
 
-Deleting the lock from `Findings` makes these tests fail under `-race` and **pass without it**.
+Deleting the pipeline's lock makes these tests fail under `-race` and **pass without it**.
 
 Where the shared resource is not memory, the detector cannot help and the test has to assert
 directly. `Runner.updateSites` commits the sites one at a time because
@@ -256,7 +258,7 @@ That takes 25–35 minutes — the module produces roughly 3000 mutants and each
 tests for its package. To iterate on one package, pass it directly:
 
 ```bash
-RAPID_NOFAILFILE=1 go tool mutago --config mutago.yaml --coverage ./internal/phpcs
+RAPID_NOFAILFILE=1 go tool mutago --config mutago.yaml --coverage ./internal/workflow
 ```
 
 (`RAPID_NOFAILFILE=1` keeps the property tests from littering `testdata/rapid` — see
@@ -403,7 +405,7 @@ The mutation gate is blocking and the seed is random, which do not mix: a mutant
 because that run happened to generate the right input would pass on one pull request and fail on
 the next. So when a property finds a real bug, fix the code **and** add an ordinary test naming
 the concrete counterexample. The property is the net; the example test is what reliably kills
-the mutant. Both fixes in `internal/logging` and `internal/addon` are written that way.
+the mutant. The fixes in `internal/logging` are written that way.
 
 Keep properties cheap for the same reason — mutation testing re-runs the suite once per mutant,
 so a property that takes a second at 100 cases costs an hour across the module.
@@ -581,23 +583,35 @@ first. Any mock the harness was not asked to cover stays strict.
 ## The agent
 
 `agent/` is the PHP half of Drupdater: `drupdater/agent`, a Composer plugin the image installs
-globally. It adds `composer drupdater:*` commands that answer what Drupdater can only learn
-from inside the project's own Composer: [`drupdater:project`](../reference/docker-images.md#drupdater-agent),
-the project's layout, plugins, patches and lock;
-[`drupdater:resolve`](../reference/docker-images.md#drupdater-agent), the update itself;
-[`drupdater:audit`](../reference/docker-images.md#drupdater-agent) and
-[`drupdater:platform-check`](../reference/docker-images.md#drupdater-agent), the audit and the
-platform requirements; [`drupdater:allow-plugins`](../reference/docker-images.md#drupdater-agent)
-and [`drupdater:write-patches`](../reference/docker-images.md#drupdater-agent), the two edits
-to `composer.json`; and
-[`drupdater:patch-check`](../reference/addons/composer-patches.md#how-a-patch-is-tested). The
+globally. It holds [every addon](../explanation/addon-architecture.md#where-an-addon-runs), and
+adds the `composer drupdater:*` commands the binary runs them and asks the project's own
+Composer through: [`drupdater:addons`](../reference/docker-images.md#drupdater-agent), the
+addon catalogue; [`drupdater:hook`](../reference/docker-images.md#drupdater-agent), one addon's
+hook for one event; [`drupdater:report`](../reference/docker-images.md#drupdater-agent), the
+addons' report sections; [`drupdater:project`](../reference/docker-images.md#drupdater-agent),
+the web root and lock hash; [`drupdater:resolve`](../reference/docker-images.md#drupdater-agent),
+the update itself; and [`drupdater:platform-check`](../reference/docker-images.md#drupdater-agent)
+and [`drupdater:handshake`](../reference/docker-images.md#drupdater-agent) for the preflight. The
 Go side calls them through `internal/agent`, and `internal/composer` wraps each in a method.
+
+| Path | Contains |
+|---|---|
+| `agent/src/Addon/` | The addons, their contract (`Addon`, `Event`, `HookResult`, `Findings`), the catalogue, and `Services`, which builds them from the real tools |
+| `agent/src/Command/` | The commands, each answering one request with one envelope |
+| `agent/src/Tools/`, `Process/` | phpcs, Rector, drush and Composer run as processes |
+| `agent/src/DrupalOrg/` | drupal.org's node API and git.drupalcode.org's GitLab API, over Composer's HTTP |
+| `agent/src/Patches/`, `PatchCheck/` | `extra.patches` read, rewritten and test-applied |
+| `agent/src/Resolve/`, `Audit/`, `Plugins/`, `Project/`, `Platform/` | The update, the audit, allow-plugins, the project and the platform, through Composer's own API |
+| `agent/resources/` | The Rector config `deprecations_remover` runs with |
 
 Each command reads one JSON request on stdin and prints one JSON envelope on stdout:
 
 ```json
-{"protocol": 2, "command": "drupdater:patch-check", "ok": true, "result": {"outcome": "applies"}}
+{"protocol": 3, "command": "drupdater:hook", "ok": true, "result": {"finding": null, "commits": [], "plan": null, "abort": null}, "log": [{"level": "info", "message": "updating coding styles", "context": {"addon": "code_beautifier"}}]}
 ```
+
+`log` holds what the command logged, on success and failure alike, and `agent.Call` logs each
+entry at its level: nothing the agent prints reaches drupdater's log any other way.
 
 A failure carries an `error` with a closed `kind` — `unobtainable`, `invalid_request`,
 `protocol_mismatch`, `failed` (Composer ran and reported failure), `internal` — decided in PHP
@@ -616,7 +630,8 @@ make test-agent
 ```
 
 The suite includes an end-to-end test that installs the agent as a global plugin into a
-throwaway `COMPOSER_HOME`, as the image does, and runs the commands through a real Composer.
+throwaway `COMPOSER_HOME`, as the image does, and runs the commands through a real Composer —
+`composer_patches`' dry run and patch checks included, against packages from path repositories.
 `agent.yml` runs it on the lowest and highest published PHP. `composer/composer` in its
 `require-dev` stays on the Dockerfile's minor, so the tests exercise the Composer the image
 ships.
@@ -625,22 +640,20 @@ ships.
 
 | Path | Contains |
 |---|---|
-| `main.go` → `cmd/` | Cobra commands, flag parsing, service construction, the addon registry |
-| `internal/workflow/` | The workflow runner, its phases, events, the `Addon` contract, and preflight checks |
-| `internal/addon/` | The addons, their report data, and their description templates |
+| `main.go` → `cmd/` | Cobra commands, flag parsing, service construction, the agent's addon catalogue |
+| `internal/workflow/` | The workflow runner, its phases, events, the pipeline that runs the addons' hooks in the agent, and preflight checks |
 | `internal/codehosting/` | The GitHub and GitLab implementations and the provider factory |
 | `internal/report/` | The published JSON report schema and its writer |
 | `internal/logging/` | The redactor |
-| `internal/composer/`, `drush/`, `repo/`, `phpcs/`, `rector/`, `drupalorg/`, `php/` | Thin wrappers around external tools |
+| `internal/composer/`, `drush/`, `repo/`, `php/` | Thin wrappers around external tools |
 | `internal/drupal/`, `internal/siteinstall/` | Relating drush-reported paths to the project; installing a throwaway site |
-| `scripts/` | PHP embedded in the binary and extracted per run: Rector's config and drupdater's Drush commands |
+| `scripts/` | PHP embedded in the binary and extracted per run: drupdater's Drush commands |
 | `agent/`, `internal/agent/` | [The agent](#the-agent): drupdater's Composer plugin, and the Go client for it |
 
-Where the project keeps things — its web root, custom code, plugins and patches — comes from
+Where the project keeps its web root, and the lock hash that names the update branch, comes from
 the agent, as `composer.Project`, not from a Go reader of `composer.json` or the lock.
 
-The wrappers take one external tool per directory: `composer`, `drush`, `repo` (the git CLI),
-`phpcs`, `rector` and `drupalorg` (Drupal.org issues, and the git.drupalcode.org GitLab).
+The wrappers take one external tool per directory: `composer`, `drush` and `repo` (the git CLI).
 `drupal` relates the absolute paths drush reports to the project, and
 `siteinstall` installs a site for the `check --full` tier. `php` holds what the PHP wrappers share: running a command under
 the environment Composer needs, and decoding its JSON output. Each wrapper takes the
@@ -662,7 +675,7 @@ description. Keep them consistent with the existing style:
 - **Always verify the output with `--dry-run` before shipping a new template**
 
 Each template has a golden file in `internal/mergerequest/testdata/`, rendered from the
-example report in `internal/addon/testdata/run_report.json`. Those files are embedded
+example report in `internal/report/testdata/run_report.json`. Those files are embedded
 directly into this documentation, so updating one updates the published example too.
 
 ## Docker image

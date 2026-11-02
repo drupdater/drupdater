@@ -18,7 +18,7 @@ A `--security` run with every reporting addon contributing. Embedded from the te
 golden file, so this example cannot drift from what the code emits:
 
 ```json
---8<-- "internal/addon/testdata/run_report.json"
+--8<-- "internal/report/testdata/run_report.json"
 ```
 
 ## Fields

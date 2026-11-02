@@ -3,10 +3,11 @@ package workflow
 import (
 	"testing"
 
-	"github.com/drupdater/drupdater/internal/composer"
-	"github.com/drupdater/drupdater/internal/report"
 	"github.com/stretchr/testify/assert"
 	"pgregory.net/rapid"
+
+	"github.com/drupdater/drupdater/internal/composer"
+	"github.com/drupdater/drupdater/internal/report"
 )
 
 // report.PackageChange mirrors composer.PackageChange so a refactor cannot rename a published

@@ -4,12 +4,13 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/drupdater/drupdater/internal/composer"
-	"github.com/drupdater/drupdater/internal/report"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
+
+	"github.com/drupdater/drupdater/internal/composer"
+	"github.com/drupdater/drupdater/internal/report"
 )
 
 func TestLookupToolVersions(t *testing.T) {

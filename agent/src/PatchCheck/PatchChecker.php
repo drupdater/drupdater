@@ -9,7 +9,7 @@ use Composer\Util\Filesystem;
 /**
  * Fetches a package at a version into a scratch directory and applies patches to it in order.
  */
-final class PatchChecker
+class PatchChecker
 {
     /**
      * @param array<mixed> $patchLevels the project's extra.patchLevel: one level per package

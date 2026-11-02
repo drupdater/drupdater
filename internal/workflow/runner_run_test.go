@@ -6,16 +6,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/drupdater/drupdater/internal/codehosting"
-	"github.com/drupdater/drupdater/internal/composer"
-	"github.com/drupdater/drupdater/internal/config"
-	"github.com/drupdater/drupdater/internal/golden"
-	"github.com/drupdater/drupdater/internal/repo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest/observer"
+
+	"github.com/drupdater/drupdater/internal/agent"
+	"github.com/drupdater/drupdater/internal/codehosting"
+	"github.com/drupdater/drupdater/internal/composer"
+	"github.com/drupdater/drupdater/internal/config"
+	"github.com/drupdater/drupdater/internal/golden"
+	"github.com/drupdater/drupdater/internal/repo"
 )
 
 // captureDescription records the description the run opens its merge request with.
@@ -95,8 +97,8 @@ func TestRunTimeout(t *testing.T) {
 		<-ctx.Done()
 		return ctx.Err()
 	})
-	h.composer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).
-		RunAndReturn(func(ctx context.Context, _ string, _ []string, _ []string, _ bool, _ bool) ([]composer.PackageChange, error) {
+	h.composer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false).
+		RunAndReturn(func(ctx context.Context, _ string, _ []string, _ []string, _ bool) ([]composer.PackageChange, error) {
 			<-ctx.Done()
 			return nil, ctx.Err()
 		}).Maybe()
@@ -132,7 +134,7 @@ func TestRunAbortsWithoutTheAgent(t *testing.T) {
 // An update that changes nothing aborts before installing any site.
 func TestRunNoChanges(t *testing.T) {
 	h := newRunHarness(t, false)
-	h.composer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).Return([]composer.PackageChange{}, nil)
+	h.composer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false).Return([]composer.PackageChange{}, nil)
 
 	_, aborted := errors.AsType[AbortError](h.run(t))
 	require.True(t, aborted)
@@ -142,9 +144,9 @@ func TestRunNoChanges(t *testing.T) {
 // before the baseline install, the most expensive step of a run.
 func TestRunAbortedByAnAddonInstallsNoSite(t *testing.T) {
 	h := newRunHarness(t, false)
-	h.withAddons(hookAddon{Hooks{PreComposerUpdate: propose(Prepare, func(*PreComposerUpdateEvent) (UpdatePlan, error) {
-		return UpdatePlan{}, AbortError{Msg: "No security advisories found"}
-	})}})
+	h.withHook("composer_audit", Prepare, func(agent.HookRequest) (agent.HookReply, error) {
+		return agent.HookReply{Abort: "No security advisories found"}, nil
+	})
 
 	err := h.run(t)
 
@@ -152,17 +154,27 @@ func TestRunAbortedByAnAddonInstallsNoSite(t *testing.T) {
 	require.True(t, aborted, "got %v", err)
 }
 
+func TestASecurityRunTellsEveryHookItIsOne(t *testing.T) {
+	h := newRunHarness(t, false)
+	h.config.Security = true
+	var told []bool
+	h.withHook("composer_audit", Prepare, func(r agent.HookRequest) (agent.HookReply, error) {
+		told = append(told, r.Run.Security)
+		return agent.HookReply{Abort: "No security advisories found"}, nil
+	})
+
+	_, aborted := errors.AsType[AbortError](h.run(t))
+
+	require.True(t, aborted)
+	assert.Equal(t, []bool{true}, told)
+}
+
 func TestRunUpdatesAsTheAddonsPlanned(t *testing.T) {
 	h := newRunHarness(t, false)
-	h.composer.EXPECT().Update(anyCtx, testCheckout, []string{"drupal/core"}, []string{"drupal/core:10.2.0"}, true, false).
+	h.composer.EXPECT().Update(anyCtx, testCheckout, []string{"drupal/core"}, []string{"drupal/core:10.2.0"}, true).
 		Return(nil, nil)
-	narrows := hookAddon{Hooks{PreComposerUpdate: propose(Prepare, func(*PreComposerUpdateEvent) (UpdatePlan, error) {
-		return UpdatePlan{Only: []string{"drupal/core"}, MinimalChanges: true}, nil
-	})}}
-	pins := hookAddon{Hooks{PreComposerUpdate: propose(Change, func(*PreComposerUpdateEvent) (UpdatePlan, error) {
-		return UpdatePlan{Keep: []Pin{{Package: "drupal/core", Version: "10.2.0"}}}, nil
-	})}}
-	h.withAddons(pins, narrows)
+	h.withHook("pins", Change, proposing(agent.Plan{Keep: []agent.Pin{{Package: "drupal/core", Version: "10.2.0"}}}))
+	h.withHook("narrows", Prepare, proposing(agent.Plan{Only: []string{"drupal/core"}, MinimalChanges: true}))
 
 	err := h.run(t)
 
@@ -183,8 +195,8 @@ func TestRunInstallsSitesAtTheOldCode(t *testing.T) {
 		steps = append(steps, "composer install")
 		return nil
 	})
-	h.composer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).
-		RunAndReturn(func(context.Context, string, []string, []string, bool, bool) ([]composer.PackageChange, error) {
+	h.composer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false).
+		RunAndReturn(func(context.Context, string, []string, []string, bool) ([]composer.PackageChange, error) {
 			steps = append(steps, "composer update")
 			return []composer.PackageChange{{Action: "Upgrade", Package: "drupal/core", From: "9.0.0", To: "9.1.0"}}, nil
 		})
@@ -296,7 +308,7 @@ func TestRunBranchExistsError(t *testing.T) {
 
 func TestRunProjectReadErrorAfterTheUpdate(t *testing.T) {
 	h := newRunHarness(t, false)
-	h.composer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).
+	h.composer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false).
 		Return([]composer.PackageChange{{Package: "drupal/core", From: "9.0.0", To: "9.1.0"}}, nil)
 	hashErr := errors.New("composer.lock not found")
 	h.composer.EXPECT().Project(anyCtx, testCheckout).Return(composer.Project{}, hashErr)
@@ -357,9 +369,9 @@ func TestRunFireEventError(t *testing.T) {
 	h := newRunHarness(t, false)
 	// The baseline site install may run before the hook's failure cancels the run.
 	h.expectFullRun()
-	h.withAddons(hookAddon{Hooks{PreComposerUpdate: propose(Change, func(*PreComposerUpdateEvent) (UpdatePlan, error) {
-		return UpdatePlan{}, errors.New("audit unavailable")
-	})}})
+	h.withHook("composer_audit", Change, func(agent.HookRequest) (agent.HookReply, error) {
+		return agent.HookReply{}, errors.New("audit unavailable")
+	})
 
 	err := h.run(t)
 
@@ -449,13 +461,13 @@ func TestASecondRunLeavesTheFirstRunsBranchAlone(t *testing.T) {
 	h.expectFullRun()
 	// The second run fails resolving its update, before it creates a branch of its own.
 	runs := 0
-	h.withAddons(hookAddon{Hooks{PreComposerUpdate: propose(Prepare, func(*PreComposerUpdateEvent) (UpdatePlan, error) {
+	h.withHook("flaky", Prepare, func(agent.HookRequest) (agent.HookReply, error) {
 		runs++
 		if runs == 2 {
-			return UpdatePlan{}, assert.AnError
+			return agent.HookReply{}, assert.AnError
 		}
-		return UpdatePlan{}, nil
-	})}})
+		return agent.HookReply{}, nil
+	})
 	runner := h.runner()
 
 	require.NoError(t, runner.Run(t.Context(), h.addons))

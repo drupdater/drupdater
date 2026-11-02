@@ -4,8 +4,82 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "1fb8e1d1e02efa05b0df7384c6ea77db",
-    "packages": [],
+    "content-hash": "1a71527f7cca3d392ae88d084bb691a1",
+    "packages": [
+        {
+            "name": "ion-bazan/composer-diff",
+            "version": "v2.4.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/IonBazan/composer-diff.git",
+                "reference": "2be6cff4e05988ae683b7221dfe43b2854382a61"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/IonBazan/composer-diff/zipball/2be6cff4e05988ae683b7221dfe43b2854382a61",
+                "reference": "2be6cff4e05988ae683b7221dfe43b2854382a61",
+                "shasum": ""
+            },
+            "require": {
+                "composer-plugin-api": "^2.0",
+                "ext-json": "*",
+                "php": ">=7.2"
+            },
+            "require-dev": {
+                "composer/composer": "^2.0",
+                "symfony/console": "^5.4 || ^6.0 || ^7.0 || ^8.0",
+                "symfony/phpunit-bridge": "^5.4.33 || ^6.0 || ^7.0 || ^8.0"
+            },
+            "suggest": {
+                "composer/composer": "To use the binary without composer runtime",
+                "symfony/console": "To use the binary without composer runtime"
+            },
+            "bin": [
+                "composer-diff"
+            ],
+            "type": "composer-plugin",
+            "extra": {
+                "class": "IonBazan\\ComposerDiff\\Composer\\Plugin"
+            },
+            "autoload": {
+                "psr-4": {
+                    "IonBazan\\ComposerDiff\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Ion Bazan",
+                    "email": "ion.bazan@gmail.com"
+                }
+            ],
+            "description": "Compares composer.lock changes and generates Markdown report so you can use it in PR description.",
+            "keywords": [
+                "PullRequest",
+                "composer",
+                "composer.lock",
+                "diff",
+                "github",
+                "markdown",
+                "packages",
+                "packagist"
+            ],
+            "support": {
+                "issues": "https://github.com/IonBazan/composer-diff/issues",
+                "source": "https://github.com/IonBazan/composer-diff/tree/v2.4.0"
+            },
+            "funding": [
+                {
+                    "url": "https://github.com/IonBazan",
+                    "type": "github"
+                }
+            ],
+            "time": "2026-10-05T10:51:37+00:00"
+        }
+    ],
     "packages-dev": [
         {
             "name": "composer/ca-bundle",

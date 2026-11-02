@@ -1,9 +1,8 @@
 {
-  "protocol": 2,
+  "protocol": 3,
   "request": {
     "packages": [],
     "keep": [],
-    "minimal_changes": false,
-    "write": false
+    "minimal_changes": false
   }
 }

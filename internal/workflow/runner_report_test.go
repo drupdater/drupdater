@@ -2,20 +2,22 @@ package workflow
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
 
 	"github.com/drupdater/drupdater/internal/repo"
 
-	"github.com/drupdater/drupdater/internal/buildinfo"
-	"github.com/drupdater/drupdater/internal/codehosting"
-	"github.com/drupdater/drupdater/internal/composer"
-	"github.com/drupdater/drupdater/internal/report"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+
+	"github.com/drupdater/drupdater/internal/buildinfo"
+	"github.com/drupdater/drupdater/internal/codehosting"
+	"github.com/drupdater/drupdater/internal/composer"
+	"github.com/drupdater/drupdater/internal/report"
 )
 
 func TestReportWrittenOnSuccessfulRun(t *testing.T) {
@@ -127,12 +129,12 @@ func TestReportOfARunFailingBeforeRenderingCarriesTheAddonSections(t *testing.T)
 	h.expectUpdate()
 	h.repository.EXPECT().BranchExists(anyCtx, mock.Anything).Return(false, nil)
 	h.repository.EXPECT().RemoteBranchExists(anyCtx, "update-dummy-hash", mock.Anything).Return(false, nil)
-	h.withAddons(&reportingAddon{key: "composer_patches", data: "conflicts"})
+	h.withSections(map[string]string{"composer_patches": `"conflicts"`})
 
 	require.ErrorIs(t, h.run(t), assert.AnError)
 
 	require.NotNil(t, h.got)
-	assert.Equal(t, map[string]any{"composer_patches": "conflicts"}, h.got.Addons)
+	assert.Equal(t, map[string]any{"composer_patches": json.RawMessage(`"conflicts"`)}, h.got.Addons)
 }
 
 // Acquiring the working copy is the first thing that can fail, and the case that "written on
@@ -162,7 +164,7 @@ func TestReportNoChangesIsNotAFailure(t *testing.T) {
 	h.installer.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil).Maybe()
 	h.installer.EXPECT().RestoreSettings(anyCtx, testCheckout, "site1").Return(nil).Maybe()
 	h.repository.EXPECT().Head(anyCtx).Return("", assert.AnError).Maybe()
-	h.composer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false, false).
+	h.composer.EXPECT().Update(anyCtx, testCheckout, mock.Anything, mock.Anything, false).
 		Return([]composer.PackageChange{}, nil)
 
 	err := h.run(t)
@@ -186,16 +188,9 @@ func TestRunWithoutReportSinkIsUnaffected(t *testing.T) {
 	assert.Nil(t, h.got)
 }
 
-// quietAddon hooks nothing and reports nothing.
-type quietAddon struct{}
-
-func (quietAddon) Hooks() Hooks { return Hooks{} }
-
-// advisoryAddon reports one remaining advisory, which the description renders as its own section.
-func advisoryAddon() *reportingAddon {
-	return &reportingAddon{key: "composer_audit", data: map[string]any{
-		"remaining": []map[string]string{{"cve": "CVE-2026-1", "title": "XSS", "severity": "high", "packageName": "drupal/core"}},
-	}}
+// advisorySection is one remaining advisory, which the description renders as its own section.
+var advisorySection = map[string]string{
+	"composer_audit": `{"remaining":[{"cve":"CVE-2026-1","title":"XSS","severity":"high","packageName":"drupal/core"}]}`,
 }
 
 // A --dry-run assembles a merge request without opening one, which is what makes a broken
@@ -203,7 +198,7 @@ func advisoryAddon() *reportingAddon {
 func TestReportRecordsMergeRequestContentOnDryRun(t *testing.T) {
 	h := newRunHarness(t, true)
 	h.expectFullRun()
-	h.withAddons(advisoryAddon())
+	h.withSections(advisorySection)
 
 	require.NoError(t, h.run(t))
 
@@ -220,7 +215,7 @@ func TestReportRecordsMergeRequestContentOnDryRun(t *testing.T) {
 func TestReportedMergeRequestContentIsWhatWasPublished(t *testing.T) {
 	h := newRunHarness(t, false)
 	h.expectPublish()
-	h.withAddons(advisoryAddon())
+	h.withSections(advisorySection)
 
 	var publishedTitle, publishedDescription string
 	h.vcsProvider.EXPECT().CreateMergeRequest(anyCtx, mock.Anything, mock.Anything, mock.Anything, "main").
@@ -243,7 +238,7 @@ func TestReportedMergeRequestContentIsWhatWasPublished(t *testing.T) {
 func TestReportNamesTheRenderPhaseWhenAssemblyFails(t *testing.T) {
 	h := newRunHarness(t, true)
 	h.expectFullRun()
-	h.withAddons(&reportingAddon{key: "composer_audit", data: "not an object"})
+	h.withSections(map[string]string{"composer_audit": `"not an object"`})
 
 	err := h.run(t)
 
@@ -310,26 +305,14 @@ func TestReportRecordsAutoMergeOutcome(t *testing.T) {
 	})
 }
 
-type reportingAddon struct {
-	quietAddon
-	key  string
-	data any
-}
-
-func (a *reportingAddon) ReportKey() string        { return a.key }
-func (a *reportingAddon) ReportData(*Findings) any { return a.data }
-
-func TestReportCollectsSectionsOnlyFromReporters(t *testing.T) {
+func TestReportCarriesTheSectionsTheAgentBuilt(t *testing.T) {
 	h := newRunHarness(t, true)
 	h.expectFullRun()
-	h.withAddons(
-		&reportingAddon{key: "translations_updater", data: map[string]int{"fixed": 2}},
-		&reportingAddon{key: "quiet_addon"},
-		quietAddon{},
-	)
+	h.withSections(map[string]string{"translations_updater": `{"fixed":2}`})
+	h.withAddons(append(h.addons, addon("quiet_addon", map[string]Stage{EventPostCodeUpdate: Inspect}))...)
 
 	require.NoError(t, h.run(t))
 
 	require.NotNil(t, h.got)
-	assert.Equal(t, map[string]any{"translations_updater": map[string]int{"fixed": 2}}, h.got.Addons)
+	assert.Equal(t, map[string]any{"translations_updater": json.RawMessage(`{"fixed":2}`)}, h.got.Addons)
 }

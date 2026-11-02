@@ -9,9 +9,11 @@ import (
 )
 
 // renderMergeRequest renders from the report as it stands, so the merge request says what the
-// report says. Every addon has finished by now; the final report re-reads the same sections.
-func (r *run) renderMergeRequest() (string, string, error) {
-	r.hooks.Report(r.rec)
+// report says. Every addon has finished by now, so the final report's sections are these.
+func (r *run) renderMergeRequest(ctx context.Context) (string, string, error) {
+	if err := r.pipeline.Report(ctx, r.rec); err != nil {
+		return "", "", err
+	}
 	snapshot := r.rec.Snapshot()
 
 	description, err := mergerequest.Description(snapshot)

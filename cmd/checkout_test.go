@@ -6,12 +6,13 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/drupdater/drupdater/internal/config"
-	"github.com/drupdater/drupdater/internal/repo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest/observer"
+
+	"github.com/drupdater/drupdater/internal/config"
+	"github.com/drupdater/drupdater/internal/repo"
 )
 
 // initCheckout creates a repo with one commit and an origin remote.

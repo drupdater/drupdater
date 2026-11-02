@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Project Does
 
-**Drupdater** is a Go CLI tool that automates Drupal site updates: it runs against an existing checkout (or clones one with `--clone` for testing), runs Composer updates, applies code quality fixes (PHPCBF, Rector), updates Drupal config/translations, and opens a merge/pull request on GitHub or GitLab with a detailed changelog.
+**Drupdater** is a Go CLI tool, with its addons in a PHP Composer plugin (`agent/`), that automates Drupal site updates: it runs against an existing checkout (or clones one with `--clone` for testing), runs Composer updates, applies code quality fixes (PHPCBF, Rector), updates Drupal config/translations, and opens a merge/pull request on GitHub or GitLab with a detailed changelog.
 
 Drupdater itself runs as a step in the project's CI pipeline, which already runs the project's test suite (PHPUnit/Behat/etc.) on the resulting MR/branch. Don't propose or add test-running functionality inside Drupdater — that responsibility belongs to CI, not this tool.
 
@@ -47,7 +47,7 @@ Some pages embed files from the repo via `pymdownx.snippets`, so they cannot dri
 
 - `internal/mergerequest/testdata/*.md` → the "pull request section" examples on addon pages,
   rendered from the example report
-- `internal/addon/testdata/run_report.json` → the example report on `docs/reference/run-report.md`
+- `internal/report/testdata/run_report.json` → the example report on `docs/reference/run-report.md`
 - `.github/assert-report.jq`, `.github/assert-lock-matches-report.jq` → `docs/how-to/consume-the-run-report.md`
 
 Changing a golden file changes the published example.
@@ -95,15 +95,13 @@ Where things live. For *how they work*, read `docs/explanation/` rather than dup
 | Path | Contains |
 |---|---|
 | `main.go` → `cmd/root.go` | Cobra commands built per call by `app`, which holds every outside dependency |
-| `cmd/addons.go` | `builtinAddons()`, the addon catalogue, and the `addonComposer`/`addonDrush` unions |
+| `cmd/addons.go` | The agent's addon catalogue: validating `.drupdater.yaml` and building the run's addons from it; the `addons` command |
 | `cmd/secrets.go`, `cmd/checkout.go` | Token resolution and secret registration; checkout URL/branch and `safe.directory` |
 | `cmd/check.go` | The `check` command and its cheap/full check tiers |
 | `internal/workflow/runner.go` | `Runner.Run` and the nine phases; their bodies in `update.go`, `sites.go`, `branch.go`, `publish.go` |
-| `internal/workflow/event.go` | The five workflow events and `AbortError` |
-| `internal/workflow/hooks.go` | Addon hooks, their stages, and the order they run in |
+| `internal/workflow/addon.go`, `events.go` | `Addon` (a name and a stage per event), `Stage`, the five events and what each hands its hooks, `AbortError` |
+| `internal/workflow/pipeline.go` | Runs each hook in the agent in stage order, commits between hooks, merges the plan, keeps the findings, asks the agent for the report sections |
 | `internal/workflow/preflight.go` | Checks shared between `check` and the run's own `preflight` phase |
-| `internal/addon/` | The ten addons |
-| `internal/addon/report.go` | **Every addon's report contribution, together** — this file *is* the report's `addons` schema |
 | `internal/mergerequest/` | The MR title and description, rendered from the run report; its templates |
 | `internal/config/` | `Config`; `file.go` loads `.drupdater.yaml`: defaults, strict decode, legacy-layout rejection |
 | `internal/buildinfo/` | `Version`, set by `-ldflags` |
@@ -111,14 +109,18 @@ Where things live. For *how they work*, read `docs/explanation/` rather than dup
 | `internal/report/` | The published JSON report schema and its atomic writer |
 | `internal/logging/redact.go` | Value-based secret redaction, wrapping the zap core |
 | `internal/golden/` | Golden-file comparison and the `-update` flag; imported only from tests |
-| `internal/composer/`, `drush/`, `repo/`, `phpcs/`, `rector/`, `drupalorg/` | One directory per wrapped external tool: `repo` is the git CLI, `drupalorg` is drupal.org issues and its GitLab at git.drupalcode.org |
+| `internal/composer/`, `drush/`, `repo/` | One directory per wrapped external tool: `repo` is the git CLI |
 | `internal/drupal/` | Making drush-reported absolute paths relative to the project |
 | `internal/siteinstall/` | Installs a throwaway SQLite site for the `check --full` tier |
 | `internal/php/` | What the PHP wrappers share: running a command under Composer's environment, decoding JSON output, and the `CommandFactory` each wrapper holds as its test seam |
-| `scripts/` | PHP embedded in the binary, extracted per run: `rector.php` and the `drupdater:*` Drush commands (`drush --include`) |
-| `agent/` | `drupdater/agent`, the global Composer plugin the image installs: the `composer drupdater:*` commands, its PHPUnit suite, and `protocol/`, the request/reply fixtures both sides test against |
+| `scripts/` | PHP embedded in the binary, extracted per run: the `drupdater:*` Drush commands (`drush --include`) |
+| `agent/` | `drupdater/agent`, the global Composer plugin the image installs: every addon, the `composer drupdater:*` commands, its PHPUnit suite, and `protocol/`, the request/reply fixtures both sides test against |
+| `agent/src/Addon/` | **The ten addons**, their contract (`Addon`, `Event`, `HookResult`, `Findings`), `Catalogue::builtin()` — which addons exist, mandatory and default — and `Services`, the composition root `create()` builds each from |
+| `agent/src/Command/` | `drupdater:addons`, `drupdater:hook`, `drupdater:report`, and the runner's own `project`, `resolve`, `platform-check`, `handshake` |
+| `agent/src/Tools/`, `DrupalOrg/`, `Patches/`, `PatchCheck/`, `Resolve/`, `Audit/`, `Plugins/`, `Project/` | What the addons run: phpcs, Rector, drush, Composer again; drupal.org and git.drupalcode.org; the patches; the update; the audit; allow-plugins; the project |
+| `agent/resources/` | The Rector config `deprecations_remover` runs with |
 | `internal/agent/` | `agent.Call`: runs a `composer drupdater:*` command, decodes its envelope, returns an `*agent.Error` with a `Kind` |
-| `internal/composer/project.go` | `composer.Project`, the agent's snapshot of the project: web root, custom code, `extra.patches` as written, locked packages, dependency patches, lock hash. Ask again after anything rewrites `composer.json` or the lock |
+| `internal/composer/project.go` | `composer.Project`, what the runner reads of the project: web root and lock hash. Ask again after anything rewrites `composer.json` or the lock |
 | `tools/` | The PHPCS and Rector the image installs to `/opt/drupdater/tools`, so addons install nothing into the project |
 
 ### Invariants worth knowing before editing
@@ -126,18 +128,19 @@ Where things live. For *how they work*, read `docs/explanation/` rather than dup
 - **Addons never call each other.** On `pre-composer-update` they return a `workflow.UpdatePlan` proposal and read the merged plan of earlier stages (`internal/workflow/plan.go`); no event is mutable.
 - **A run never touches the user's checkout.** Checkout mode works in a linked worktree (`repo.AddWorktree`), commits are signed explicitly, and nothing writes the repository's git config; the update branch is the only thing a run leaves behind.
 - **Every git operation goes through `repo.Git`**, the git CLI with `commonArgs` (`internal/repo/repo.go`): ownership check off, no hooks, no signing. A token reaches git only through the credential helper's environment, never argv or a config file.
-- **Addons never touch git.** A `workflow.Produce` (or, on `pre-composer-update`, `workflow.ProduceProposal`) hook returns the paths it changed as `Commits`, and an `On` hook can commit nothing; the runner's committer (`internal/workflow/commit.go`) commits exactly those, and refuses when something else is already staged.
-- **Each addon declares the tool interfaces it uses**, in its own file, with only the methods it calls (`AuditComposer`, `UpdateHooksDrush`). No two addons share one — `TestNoTwoAddonsShareAToolInterface` fails otherwise — and `cmd`'s `addonComposer`/`addonDrush` embed them all.
-- **An event type names itself and its `Hooks` field** (`name()`, `hook()` in `internal/workflow/event.go`), so `workflow.Fire` runs any event and `Pipeline` has no per-event code. A new event is that type, its `Hooks` field, and the `Fire` call in the runner.
+- **Addons live in the agent; the binary has no code per addon.** An addon is a PHP class in `agent/src/Addon/` with its hooks, stages and `report()`; Go only knows the catalogue `drupdater:addons` answers. A new capability is a new addon there, never a Go wrapper.
+- **Addons never touch git.** A hook returns the paths it changed as commits in its `HookResult`; the runner's committer (`internal/workflow/commit.go`) commits exactly those, between hooks, and refuses when something else is already staged.
+- **One hook, one agent process.** The pipeline runs each hook as its own `drupdater:hook` call and sends the addon's own earlier findings with it, so an addon keeps no state, and two hooks never share a process. An addon's tools are constructor arguments built by `create(Services)`, so tests build it with doubles.
+- **A new event** is its name in `workflow.Events` and `EventName`, its payload in `workflow/events.go` and `Event::fromRequest()`, and the `fire` call in the runner.
 - **Hook stages are load-bearing** on `pre-composer-update` and `post-code-update`. See `docs/explanation/addon-architecture.md` before changing one.
 - **The MR is rendered from the report**, through its JSON. An addon reaches the description only via its report section; findings from two addons are joined there, never handed between them.
 - **A new question for Composer goes to the agent, not to its console output.** The agent answers in JSON with a closed error `Kind`, decided from the exception it caught. A change to a request or reply changes `agent/protocol/` and both sides' tests; a breaking one bumps `protocol` in `agent/src/Protocol.php` and `internal/agent/agent.go` together.
-- **`internal/addon/report.go` is a published contract.** Renaming a field there is a breaking change to `schema_version`, and `internal/addon/testdata/run_report.json` is what makes such a rename fail rather than ship. A new reporting addon belongs in that golden's `reportingAddons()`.
+- **The addons' report sections are a published contract.** Renaming a field in an addon's `report()` is a breaking change to `schema_version`. `agent/protocol/report/` pins the sections the agent builds for an example of every addon's findings, and `internal/report/testdata/run_report.json` embeds them, so such a rename fails rather than ships. A new reporting addon belongs in both.
 - **Report types mirror rather than reuse internal types** (`report.PackageChange` vs `composer.PackageChange`) so an internal refactor can't rename a published field.
 - **The report's deferred write is registered first**, so it runs last and is emitted on every exit path.
 - **`cmd` has no mutable package state.** Everything that reaches outside the process — building the runner and the platform, the `--full` tier's clone, trusting a checkout in the global git config — is a field of `app`, and commands are built per call by `app.newRootCmd()`. A test overrides a field on its own `testApp()`; it never swaps a package variable.
 - **A `workflow.Runner` holds only its shared `services`.** Per-run state lives on `run`, built complete by `newRun` once the working copy exists; nothing on it is assigned later.
-- **Sites update in two steps.** `pre-site-update` and the database update run from a goroutine per site, concurrently; once every site is done, `post-site-update`, config export and the site's commit run in a plain loop in `--sites` order (`Runner.updateSites`). Like every hook, a per-site hook *returns* its finding; the pipeline records it in the addon's `workflow.Findings`, which `ReportData(*workflow.Findings)` and the addon's later `workflow.ProduceFrom` hooks read. No addon has a map, slice or mutex field of its own — `TestAddonsKeepNoStateOfTheirOwn` fails the build otherwise.
+- **Sites update in two steps.** `pre-site-update` and the database update run from a goroutine per site, concurrently; once every site is done, `post-site-update`, config export and the site's commit run in a plain loop in `--sites` order (`Runner.updateSites`). Like every hook, a per-site hook *returns* its finding; the pipeline records it per site under its own lock, and hands it back to the addon's later hooks and to `drupdater:report`.
 
 ## Comments
 
@@ -148,7 +151,7 @@ Hard rules:
 
 - **One line. Under ~100 characters.** If it doesn't fit, the comment is explaining too much — cut it
   to the single non-obvious fact, or delete it. Multi-line blocks are reserved for doc comments on
-  exported API and for `internal/addon/report.go`'s published schema.
+  exported API, and docblocks on PHP classes and the published report shapes they return.
 - **Say *why*, never *what*.** The code already says what. `// lock the mutex`, `// returns an error
   if the path is empty`, `// loop over the packages` — all deleted.
 - **No signature restating**, no `// Foo does X` on unexported helpers whose name already says X.

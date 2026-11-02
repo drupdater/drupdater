@@ -3,12 +3,13 @@ package cmd
 import (
 	"testing"
 
-	"github.com/drupdater/drupdater/internal/config"
-	"github.com/drupdater/drupdater/internal/logging"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest/observer"
+
+	"github.com/drupdater/drupdater/internal/config"
+	"github.com/drupdater/drupdater/internal/logging"
 )
 
 func TestResolveToken(t *testing.T) {

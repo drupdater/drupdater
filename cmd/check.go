@@ -115,7 +115,8 @@ func (a app) runCheapChecks(
 	resolveErr error,
 ) []workflow.CheckResult {
 	var results []workflow.CheckResult
-	results = append(results, checkConfigAndAddons(a.addons, cfgFilePath, cfg)...)
+	catalog, catalogErr := a.addonCatalog(ctx, logger)
+	results = append(results, checkConfigAndAddons(catalog, catalogErr, cfgFilePath, cfg)...)
 	results = append(results, workflow.CheckGitHistoryComplete(ctx, repository, cfg.WorkingDir))
 	results = append(results, workflow.CheckComposerAgent(ctx, composerSvc, cfg.WorkingDir))
 	results = append(results, workflow.CheckPlatformRequirements(ctx, composerSvc, cfg.WorkingDir))
@@ -158,8 +159,9 @@ func checkToken(args []string) string {
 	return os.Getenv("DRUPDATER_TOKEN")
 }
 
-// checkConfigAndAddons validates .drupdater.yaml and its addon names, and fills cfg for the rest.
-func checkConfigAndAddons(catalog addonCatalog, path string, cfg *config.Config) []workflow.CheckResult {
+// checkConfigAndAddons validates .drupdater.yaml and its addon names against the agent's
+// catalogue, catalogErr when it could not be read, and fills cfg for the rest.
+func checkConfigAndAddons(catalog addonCatalog, catalogErr error, path string, cfg *config.Config) []workflow.CheckResult {
 	if _, err := config.LoadFile(path, cfg); err != nil {
 		return []workflow.CheckResult{workflow.CheckFailed(".drupdater.yaml valid", err.Error())}
 	}
@@ -169,6 +171,9 @@ func checkConfigAndAddons(catalog addonCatalog, path string, cfg *config.Config)
 	}
 
 	const addonsName = "addon names resolve"
+	if catalogErr != nil {
+		return append(results, workflow.CheckFailed(addonsName, catalogErr.Error()))
+	}
 	if err := catalog.validate(*cfg); err != nil {
 		return append(results, workflow.CheckFailed(addonsName, err.Error()))
 	}

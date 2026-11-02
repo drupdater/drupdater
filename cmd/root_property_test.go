@@ -5,11 +5,13 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/drupdater/drupdater/internal/config"
-	"github.com/drupdater/drupdater/internal/logging"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"pgregory.net/rapid"
+
+	"github.com/drupdater/drupdater/internal/config"
+	"github.com/drupdater/drupdater/internal/logging"
+	"github.com/drupdater/drupdater/internal/workflow"
 )
 
 // COMPOSER_AUTH's shape is Composer's to extend, so the walk that finds its secrets has to hold
@@ -136,16 +138,16 @@ func TestPropertyRegisterComposerAuthFallsBackToTheRawValue(t *testing.T) {
 	})
 }
 
-func TestPropertyConfigurableAddonsMatchesTheRegistry(t *testing.T) {
+func TestPropertyConfigurableAddonsMatchesTheCatalogue(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
-		names := builtinAddons().configurable()
+		names := agentCatalog.configurable()
 
-		// What `drupdater addons` prints is what a user may write, so a new registry entry
+		// What `drupdater addons` prints is what a user may write, so a new catalogue entry
 		// must not be able to go unlisted.
-		want := make([]string, 0, len(builtinAddons().factories))
-		for name := range builtinAddons().factories {
-			if name != "composer_audit" && !slices.Contains(builtinAddons().mandatory, name) {
-				want = append(want, name)
+		want := make([]string, 0, len(agentCatalog.addons))
+		for _, a := range agentCatalog.addons {
+			if !slices.Contains(agentCatalog.mandatory, a.Name) {
+				want = append(want, a.Name)
 			}
 		}
 		assert.ElementsMatch(t, want, names)
@@ -155,7 +157,7 @@ func TestPropertyConfigurableAddonsMatchesTheRegistry(t *testing.T) {
 		// Round-trip: every name it offers is a name validateAddons accepts, under either run
 		// type, since a typo in one block aborts a run in the other too.
 		split := rapid.IntRange(0, len(names)).Draw(t, "split")
-		assert.NoError(t, builtinAddons().validate(config.Config{RunTypes: config.RunTypesConfig{
+		assert.NoError(t, agentCatalog.validate(config.Config{RunTypes: config.RunTypesConfig{
 			Normal:   config.RunTypeConfig{Addons: names[:split]},
 			Security: config.RunTypeConfig{Addons: names[split:]},
 		}}))
@@ -165,9 +167,11 @@ func TestPropertyConfigurableAddonsMatchesTheRegistry(t *testing.T) {
 func TestPropertyValidateAddonsRejectsUnknownNamesInEitherRunType(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		unknown := rapid.StringMatching(`[a-z_]{1,20}`).
-			Filter(func(s string) bool { _, ok := builtinAddons().factories[s]; return !ok }).
+			Filter(func(s string) bool {
+				return !slices.ContainsFunc(agentCatalog.addons, func(a workflow.Addon) bool { return a.Name == s })
+			}).
 			Draw(t, "unknown")
-		known := rapid.SliceOfNDistinct(rapid.SampledFrom(builtinAddons().configurable()), 0, 3, rapid.ID).Draw(t, "known")
+		known := rapid.SliceOfNDistinct(rapid.SampledFrom(agentCatalog.configurable()), 0, 3, rapid.ID).Draw(t, "known")
 		inSecurity := rapid.Bool().Draw(t, "inSecurity")
 
 		config := config.Config{RunTypes: config.RunTypesConfig{
@@ -181,7 +185,7 @@ func TestPropertyValidateAddonsRejectsUnknownNamesInEitherRunType(t *testing.T) 
 		}
 
 		// Symmetric on purpose, so a typo surfaces the first time the tool runs at all.
-		err := builtinAddons().validate(config)
+		err := agentCatalog.validate(config)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), unknown)
 	})

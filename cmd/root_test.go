@@ -6,23 +6,22 @@ import (
 	"testing"
 	"time"
 
-	"github.com/drupdater/drupdater/internal/config"
-	"github.com/drupdater/drupdater/internal/logging"
-	"github.com/drupdater/drupdater/internal/repo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest"
 	"go.uber.org/zap/zaptest/observer"
 
+	"github.com/drupdater/drupdater/internal/config"
+	"github.com/drupdater/drupdater/internal/logging"
+	"github.com/drupdater/drupdater/internal/repo"
+
 	"bytes"
 	"errors"
-	"slices"
 
-	"github.com/drupdater/drupdater/internal/composer"
-	"github.com/drupdater/drupdater/internal/workflow"
-	mock "github.com/stretchr/testify/mock"
 	"go.uber.org/zap/zapcore"
+
+	"github.com/drupdater/drupdater/internal/workflow"
 )
 
 func TestNewLogger(t *testing.T) {
@@ -121,78 +120,18 @@ func TestHandleWorkflowError(t *testing.T) {
 	})
 }
 
-func TestCreateAddons(t *testing.T) {
-	logger := zaptest.NewLogger(t)
-
-	t.Run("mandatory addons plus the normal list", func(t *testing.T) {
-		config := config.Config{
-			RunTypes: config.RunTypesConfig{Normal: config.RunTypeConfig{Addons: []string{"code_beautifier"}}},
-		}
-		addons, err := builtinAddons().create(config, addonDeps{logger: logger})
-		require.NoError(t, err)
-		assert.Len(t, addons, len(builtinAddons().mandatory)+1)
-	})
-
-	t.Run("composer_audit and unsupported_modules run on a normal update", func(t *testing.T) {
-		// Both are mandatory: the description joins them into one list, so either alone shows half of it.
-		config := config.Config{RunTypes: config.RunTypesConfig{Normal: config.RunTypeConfig{}}}
-		addons, err := builtinAddons().create(config, addonDeps{logger: logger})
-		require.NoError(t, err)
-		assert.Len(t, addons, len(builtinAddons().mandatory))
-		assert.Contains(t, builtinAddons().mandatory, "composer_audit")
-		assert.Contains(t, builtinAddons().mandatory, "unsupported_modules")
-	})
-
-	// composer_audit runs in both modes, so --security must reach it some other way. Pinned on
-	// the one difference visible here: only a security run aborts when nothing is vulnerable.
-	for name, tt := range map[string]struct {
-		security bool
-		aborts   bool
-	}{
-		"security mode lets composer_audit abort a run with no advisories": {security: true, aborts: true},
-		"a normal run is not narrowed to advisories":                       {security: false, aborts: false},
-	} {
-		t.Run(name, func(t *testing.T) {
-			config := config.Config{Security: tt.security}
-			cleanAudit := newMockaddonComposer(t)
-			cleanAudit.EXPECT().Audit(mock.Anything, "/repo").Return(composer.Audit{}, nil)
-			addons, err := builtinAddons().create(config, addonDeps{logger: logger, composer: cleanAudit})
-			require.NoError(t, err)
-
-			audit := addons[slices.Index(builtinAddons().mandatory, "composer_audit")]
-			_, err = workflow.Settle(workflow.NewPipeline([]workflow.Addon{audit}), workflow.NewPreComposerUpdateEvent(t.Context(), "/repo", nil, workflow.UpdatePlan{}))
-
-			_, aborted := errors.AsType[workflow.AbortError](err)
-			assert.Equal(t, tt.aborts, aborted, "error: %v", err)
-		})
-	}
-
-	t.Run("a mandatory addon listed in the YAML is not duplicated", func(t *testing.T) {
-		config := config.Config{RunTypes: config.RunTypesConfig{Normal: config.RunTypeConfig{Addons: []string{"update_hooks"}}}}
-		addons, err := builtinAddons().create(config, addonDeps{logger: logger})
-		require.NoError(t, err)
-		assert.Len(t, addons, len(builtinAddons().mandatory)) // update_hooks is already mandatory
-	})
-
-	t.Run("an unknown addon name is an error", func(t *testing.T) {
-		config := config.Config{RunTypes: config.RunTypesConfig{Normal: config.RunTypeConfig{Addons: []string{"does_not_exist"}}}}
-		_, err := builtinAddons().create(config, addonDeps{logger: logger})
-		require.Error(t, err)
-	})
-}
-
 func TestValidateAddons(t *testing.T) {
 	t.Run("known names pass, including mandatory ones", func(t *testing.T) {
 		config := config.Config{RunTypes: config.RunTypesConfig{
 			Normal:   config.RunTypeConfig{Addons: []string{"code_beautifier", "update_hooks"}},
 			Security: config.RunTypeConfig{Addons: []string{"composer_normalizer"}},
 		}}
-		require.NoError(t, builtinAddons().validate(config))
+		require.NoError(t, agentCatalog.validate(config))
 	})
 
 	t.Run("unknown name in the normal list is an error", func(t *testing.T) {
 		config := config.Config{RunTypes: config.RunTypesConfig{Normal: config.RunTypeConfig{Addons: []string{"nope"}}}}
-		err := builtinAddons().validate(config)
+		err := agentCatalog.validate(config)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "nope")
 	})
@@ -200,12 +139,12 @@ func TestValidateAddons(t *testing.T) {
 	t.Run("unknown name in the security list is caught regardless of mode", func(t *testing.T) {
 		// Security: false, yet a bad security-list name must still be rejected.
 		config := config.Config{RunTypes: config.RunTypesConfig{Security: config.RunTypeConfig{Addons: []string{"typo"}}}}
-		require.Error(t, builtinAddons().validate(config))
+		require.Error(t, agentCatalog.validate(config))
 	})
 }
 
 func TestConfigurableAddons(t *testing.T) {
-	names := builtinAddons().configurable()
+	names := agentCatalog.configurable()
 
 	// Exactly the four configurable addons, sorted, and nothing mandatory.
 	assert.Equal(t, []string{
@@ -215,23 +154,9 @@ func TestConfigurableAddons(t *testing.T) {
 		"translations_updater",
 	}, names)
 
-	for _, mandatory := range append(builtinAddons().mandatory, "composer_audit") {
+	for _, mandatory := range append(agentCatalog.mandatory, "composer_audit") {
 		assert.NotContains(t, names, mandatory)
 	}
-}
-
-func TestAddonsCommand(t *testing.T) {
-	var buf bytes.Buffer
-	addons := testApp().newAddonsCmd()
-	addons.SetOut(&buf)
-	addons.Run(addons, nil)
-	out := buf.String()
-
-	assert.Contains(t, out, "Addons you can set under run_types.normal.addons")
-	assert.Contains(t, out, "code_beautifier")
-	// Mandatory addons must not be listed as settable.
-	assert.NotContains(t, out, "composer_patches")
-	assert.NotContains(t, out, "composer_audit")
 }
 
 func TestResolveCheckoutBranch(t *testing.T) {
@@ -349,7 +274,7 @@ func TestLoadProjectConfig(t *testing.T) {
 
 	t.Run("a missing file applies the defaults", func(t *testing.T) {
 		cfg := config.Config{}
-		require.NoError(t, loadProjectConfig(logger, builtinAddons(), filepath.Join(t.TempDir(), ".drupdater.yaml"), &cfg))
+		require.NoError(t, loadProjectConfig(logger, agentCatalog, filepath.Join(t.TempDir(), ".drupdater.yaml"), &cfg))
 
 		assert.Equal(t, []string{"default"}, cfg.Sites)
 		assert.Equal(t, 30*time.Minute, cfg.Timeout)
@@ -360,7 +285,7 @@ func TestLoadProjectConfig(t *testing.T) {
 		require.NoError(t, os.WriteFile(path, []byte("sites: [default, sub]\ntimeout: 90s\n"), 0o600))
 
 		cfg := config.Config{}
-		require.NoError(t, loadProjectConfig(logger, builtinAddons(), path, &cfg))
+		require.NoError(t, loadProjectConfig(logger, agentCatalog, path, &cfg))
 		assert.Equal(t, []string{"default", "sub"}, cfg.Sites)
 		assert.Equal(t, 90*time.Second, cfg.Timeout)
 	})
@@ -370,7 +295,7 @@ func TestLoadProjectConfig(t *testing.T) {
 		require.NoError(t, os.WriteFile(path, []byte("timeout: nope\n"), 0o600))
 
 		cfg := config.Config{}
-		require.Error(t, loadProjectConfig(logger, builtinAddons(), path, &cfg))
+		require.Error(t, loadProjectConfig(logger, agentCatalog, path, &cfg))
 	})
 
 	t.Run("an unknown addon name is an error", func(t *testing.T) {
@@ -378,7 +303,7 @@ func TestLoadProjectConfig(t *testing.T) {
 		require.NoError(t, os.WriteFile(path, []byte("run_types:\n  normal:\n    addons: [no_such_addon]\n"), 0o600))
 
 		cfg := config.Config{}
-		err := loadProjectConfig(logger, builtinAddons(), path, &cfg)
+		err := loadProjectConfig(logger, agentCatalog, path, &cfg)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no_such_addon")
 	})

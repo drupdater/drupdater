@@ -19,6 +19,11 @@ flowchart LR
 Phases run linearly. Their names are exactly the strings that appear in the [run
 report](../reference/run-report.md)'s `phases` list.
 
+Each time the run fires an event, it runs every hook of it in stage order, each as its own
+call to the [Drupdater agent](../reference/docker-images.md#drupdater-agent), where the addons
+live, and commits what a hook asks for before it calls the next — see [Where an addon
+runs](addon-architecture.md#where-an-addon-runs).
+
 ### 1. `acquire working copy`
 
 Adds a [linked worktree](https://git-scm.com/docs/git-worktree) of the existing checkout in
@@ -163,7 +168,8 @@ the configuration commits.
 ### 8. `render merge request`
 
 Render the title and description from the [run report](../reference/run-report.md) as
-it stands, every addon's section included. A security run is titled by its date, a normal
+it stands, every addon's section included: the agent builds the sections from what the addons'
+hooks found. A security run is titled by its date, a normal
 one by its month.
 
 This is a phase of its own, ahead of `publish`, so that it happens under `--dry-run` too.

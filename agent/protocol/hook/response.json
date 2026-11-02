@@ -1,0 +1,55 @@
+{
+  "protocol": 3,
+  "command": "drupdater:hook",
+  "ok": true,
+  "result": {
+    "finding": [
+      {
+        "package": "fixture/a",
+        "operation": "upgrade",
+        "from": "1.0.0",
+        "to": "1.1.0",
+        "dev": false,
+        "direct": true,
+        "compare_url": "https://github.com/fixture/a/compare/1.0.0...1.1.0",
+        "project_url": "https://github.com/fixture/a"
+      },
+      {
+        "package": "fixture/gone",
+        "operation": "remove",
+        "from": "1.0.0",
+        "dev": false,
+        "direct": false
+      },
+      {
+        "package": "fixture/new",
+        "operation": "install",
+        "to": "3.0.0",
+        "dev": false,
+        "direct": false
+      },
+      {
+        "package": "fixture/tool",
+        "operation": "downgrade",
+        "from": "2.1.0",
+        "to": "2.0.0",
+        "dev": true,
+        "direct": true,
+        "compare_url": "https://github.com/fixture/tool/compare/2.1.0...2.0.0",
+        "project_url": "https://github.com/fixture/tool"
+      }
+    ],
+    "commits": [],
+    "plan": null,
+    "abort": null
+  },
+  "log": [
+    {
+      "level": "info",
+      "message": "dependency diff\nupgrade fixture/a: 1.0.0 → 1.1.0\nremove fixture/gone: 1.0.0 → -\ninstall fixture/new: - → 3.0.0\ndowngrade fixture/tool (dev): 2.1.0 → 2.0.0\n",
+      "context": {
+        "addon": "composer_diff"
+      }
+    }
+  ]
+}

@@ -8,13 +8,15 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/drupdater/drupdater/internal/codehosting"
 	"go.uber.org/zap"
 
-	"github.com/drupdater/drupdater/internal/config"
+	"github.com/drupdater/drupdater/internal/codehosting"
+
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/drupdater/drupdater/internal/config"
 )
 
 // runCheckCmd runs a's check command body the way cobra does, capturing its output.

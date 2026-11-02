@@ -1,0 +1,44 @@
+{
+  "protocol": 3,
+  "request": {
+    "addon": "composer_diff",
+    "event": {
+      "name": "post-composer-update",
+      "base_lock": {
+        "packages": [
+          {
+            "name": "fixture/a",
+            "version": "1.0.0",
+            "type": "library",
+            "source": {
+              "type": "git",
+              "url": "https://github.com/fixture/a.git",
+              "reference": "1.0.0"
+            }
+          },
+          {
+            "name": "fixture/gone",
+            "version": "1.0.0",
+            "type": "library"
+          }
+        ],
+        "packages-dev": [
+          {
+            "name": "fixture/tool",
+            "version": "2.1.0",
+            "type": "library",
+            "source": {
+              "type": "git",
+              "url": "https://github.com/fixture/tool.git",
+              "reference": "2.1.0"
+            }
+          }
+        ]
+      }
+    },
+    "earlier": [],
+    "run": {
+      "security": false
+    }
+  }
+}

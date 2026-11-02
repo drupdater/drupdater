@@ -22,7 +22,7 @@ func TestCheckPlatformReqsListsUnmetRequirementsButNotExtensions(t *testing.T) {
 }
 
 func TestCheckPlatformReqsPassesWhenOnlyExtensionsAreUnmet(t *testing.T) {
-	service, _ := fakeAgentCLI(t, `{"protocol":2,"command":"drupdater:platform-check","ok":true,"result":{"unmet":[`+
+	service, _ := fakeAgentCLI(t, `{"protocol":3,"command":"drupdater:platform-check","ok":true,"result":{"unmet":[`+
 		`{"name":"ext-gd","version":null,"constraint":"*","required_by":"drupal/core"}]}}`, 0)
 
 	out, err := service.CheckPlatformReqs(t.Context(), t.TempDir())
@@ -32,7 +32,7 @@ func TestCheckPlatformReqsPassesWhenOnlyExtensionsAreUnmet(t *testing.T) {
 }
 
 func TestCheckPlatformReqsNamesAMissingPlatformPackage(t *testing.T) {
-	service, _ := fakeAgentCLI(t, `{"protocol":2,"command":"drupdater:platform-check","ok":true,"result":{"unmet":[`+
+	service, _ := fakeAgentCLI(t, `{"protocol":3,"command":"drupdater:platform-check","ok":true,"result":{"unmet":[`+
 		`{"name":"php-64bit","version":null,"constraint":"*","required_by":"drupal/core"},`+
 		`{"name":"php","version":"8.1.0","constraint":">=8.3","required_by":"drupal/core"}]}}`, 0)
 
@@ -43,7 +43,7 @@ func TestCheckPlatformReqsNamesAMissingPlatformPackage(t *testing.T) {
 }
 
 func TestCheckPlatformReqsReportsTheAgentsFailureAsTheDetail(t *testing.T) {
-	service, _ := fakeAgentCLI(t, `{"protocol":2,"command":"drupdater:platform-check","ok":false,`+
+	service, _ := fakeAgentCLI(t, `{"protocol":3,"command":"drupdater:platform-check","ok":false,`+
 		`"error":{"kind":"failed","reason":"the project has no composer.lock","message":""}}`, 1)
 
 	out, err := service.CheckPlatformReqs(t.Context(), t.TempDir())

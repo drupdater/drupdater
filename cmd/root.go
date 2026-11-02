@@ -13,7 +13,6 @@ import (
 	"github.com/drupdater/drupdater/internal/codehosting"
 	"github.com/drupdater/drupdater/internal/composer"
 	"github.com/drupdater/drupdater/internal/config"
-	"github.com/drupdater/drupdater/internal/drupalorg"
 	"github.com/drupdater/drupdater/internal/drush"
 	"github.com/drupdater/drupdater/internal/logging"
 	"github.com/drupdater/drupdater/internal/repo"
@@ -35,7 +34,8 @@ type app struct {
 	newFullCheckDeps func(logger *zap.Logger) fullCheckDeps
 	// trustCheckout is the one write a run makes outside its checkout: git's global config.
 	trustCheckout func(ctx context.Context, logger *zap.Logger, dir string)
-	addons        addonCatalog
+	// addonCatalog asks the agent which addons there are.
+	addonCatalog func(ctx context.Context, logger *zap.Logger) (addonCatalog, error)
 }
 
 func productionApp() app {
@@ -46,7 +46,7 @@ func productionApp() app {
 		newPlatform:      codehosting.New,
 		newFullCheckDeps: realFullCheckDeps,
 		trustCheckout:    ensureGitSafeDirectory,
-		addons:           builtinAddons(),
+		addonCatalog:     agentAddonCatalog,
 	}
 }
 
@@ -150,7 +150,12 @@ func (a app) runUpdate(cmd *cobra.Command, args []string, opts options) error {
 	}
 	redactor.Register(cfg.Token)
 
-	if err := loadProjectConfig(logger, a.addons, configFilePath(opts.configFile, cfg.WorkingDir), &cfg); err != nil {
+	catalog, err := a.addonCatalog(cmd.Context(), logger)
+	if err != nil {
+		logger.Error("failed to read the addon catalogue", zap.Error(err))
+		return err
+	}
+	if err := loadProjectConfig(logger, catalog, configFilePath(opts.configFile, cfg.WorkingDir), &cfg); err != nil {
 		return err
 	}
 
@@ -163,7 +168,6 @@ func (a app) runUpdate(cmd *cobra.Command, args []string, opts options) error {
 
 	drush := drush.NewCLI(logger, scripts.DrushInclude(scriptsDir))
 	composer := composer.NewCLI(logger, composerOptions(cfg)...)
-	drupalOrg := drupalorg.NewHTTPClient(logger)
 	siteData, err := os.MkdirTemp("", "drupdater-sites-")
 	if err != nil {
 		logger.Error("failed to create the site database directory", zap.Error(err))
@@ -195,7 +199,7 @@ func (a app) runUpdate(cmd *cobra.Command, args []string, opts options) error {
 		}
 	}
 
-	addons, err := a.addons.create(cfg, newAddonDeps(logger, drush, composer, drupalOrg, scripts.RectorConfig(scriptsDir)))
+	addons, err := catalog.create(cfg)
 	if err != nil {
 		return err
 	}

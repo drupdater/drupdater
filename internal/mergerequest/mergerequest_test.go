@@ -8,20 +8,18 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/drupdater/drupdater/internal/addon"
-	"github.com/drupdater/drupdater/internal/composer"
-	"github.com/drupdater/drupdater/internal/drush"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/drupdater/drupdater/internal/golden"
 	"github.com/drupdater/drupdater/internal/mergerequest"
 	"github.com/drupdater/drupdater/internal/report"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // publishedExample is the report docs/reference/run-report.md shows, every section populated.
 func publishedExample(t *testing.T) report.Report {
 	t.Helper()
-	encoded, err := os.ReadFile("../addon/testdata/run_report.json")
+	encoded, err := os.ReadFile("../report/testdata/run_report.json")
 	require.NoError(t, err)
 	var rep report.Report
 	require.NoError(t, json.Unmarshal(encoded, &rep))
@@ -30,6 +28,18 @@ func publishedExample(t *testing.T) report.Report {
 
 func withSections(sections map[string]any) report.Report {
 	return report.Report{Addons: sections}
+}
+
+// dependencyChange is one row of composer_diff's section, as the run report publishes it.
+type dependencyChange struct {
+	Package    string `json:"package"`
+	Operation  string `json:"operation"`
+	From       string `json:"from,omitempty"`
+	To         string `json:"to,omitempty"`
+	Dev        bool   `json:"dev"`
+	Direct     bool   `json:"direct"`
+	CompareURL string `json:"compare_url,omitempty"`
+	ProjectURL string `json:"project_url,omitempty"`
 }
 
 // The description rendered from the published example report. The section goldens are the
@@ -101,7 +111,7 @@ func TestAFailingSectionTemplateFailsTheDescription(t *testing.T) {
 	tmpl := template.Must(template.New("").Parse(`{{ define "composer_allow_plugins.go.tmpl" }}{{ .Missing }}{{ end }}`))
 
 	description, err := mergerequest.DescribeWith(tmpl, withSections(map[string]any{
-		"composer_allow_plugins": addon.PluginAllowlist{Added: []string{"acme/plugin"}},
+		"composer_allow_plugins": map[string]any{"added": []string{"acme/plugin"}},
 	}))
 
 	require.ErrorContains(t, err, "failed to execute template composer_allow_plugins.go.tmpl")
@@ -118,7 +128,7 @@ func TestAPluginListRendersOnlyWhenSomethingWasAdded(t *testing.T) {
 	assert.NotContains(t, empty, "New Composer plugins")
 
 	one, err := mergerequest.Description(withSections(map[string]any{
-		"composer_allow_plugins": addon.PluginAllowlist{Added: []string{"acme/plugin"}},
+		"composer_allow_plugins": map[string]any{"added": []string{"acme/plugin"}},
 	}))
 	require.NoError(t, err)
 	assert.Contains(t, one, "## 🔌 New Composer plugins")
@@ -128,7 +138,7 @@ func TestAPluginListRendersOnlyWhenSomethingWasAdded(t *testing.T) {
 // One site needs no per-site heading; the published example covers several.
 func TestASingleSiteListsItsHooksWithoutASiteHeading(t *testing.T) {
 	description, err := mergerequest.Description(withSections(map[string]any{
-		"update_hooks": map[string]map[string]drush.UpdateHook{"default": {"token_update_8002": {Description: "Rebuild"}}},
+		"update_hooks": map[string]any{"default": map[string]any{"token_update_8002": map[string]any{"description": "Rebuild"}}},
 	}))
 
 	require.NoError(t, err)
@@ -139,7 +149,7 @@ func TestASingleSiteListsItsHooksWithoutASiteHeading(t *testing.T) {
 // Sections the description does not render are read past, not rejected: the report may grow.
 func TestSectionsWithoutATemplateAreIgnored(t *testing.T) {
 	description, err := mergerequest.Description(withSections(map[string]any{
-		"code_beautifier": addon.CodingStyleFixes{Files: []string{"a.php"}, Fixable: 1},
+		"code_beautifier": map[string]any{"files": []string{"a.php"}, "fixable": 1},
 	}))
 
 	require.NoError(t, err)
@@ -147,8 +157,8 @@ func TestSectionsWithoutATemplateAreIgnored(t *testing.T) {
 }
 
 func TestAdvisoryCellsCannotBreakTheTable(t *testing.T) {
-	description, err := mergerequest.Description(withSections(map[string]any{"composer_audit": addon.SecurityAdvisories{
-		Remaining: []composer.Advisory{{PackageName: "drupal/foo", CVE: "CVE-1", Title: "XSS via a|b\nsecond line"}},
+	description, err := mergerequest.Description(withSections(map[string]any{"composer_audit": map[string]any{
+		"remaining": []map[string]any{{"packageName": "drupal/foo", "cve": "CVE-1", "title": "XSS via a|b\nsecond line"}},
 	}}))
 
 	require.NoError(t, err)
@@ -159,8 +169,8 @@ func TestAdvisoryCellsCannotBreakTheTable(t *testing.T) {
 
 // A run that closed every advisory still has something to say.
 func TestASecurityRunThatFixedEverythingSaysSo(t *testing.T) {
-	description, err := mergerequest.Description(withSections(map[string]any{"composer_audit": addon.SecurityAdvisories{
-		Fixed: []composer.Advisory{{PackageName: "drupal/core", CVE: "CVE-1", Title: "Closed"}},
+	description, err := mergerequest.Description(withSections(map[string]any{"composer_audit": map[string]any{
+		"fixed": []map[string]any{{"packageName": "drupal/core", "cve": "CVE-1", "title": "Closed"}},
 	}}))
 
 	require.NoError(t, err)
@@ -170,8 +180,8 @@ func TestASecurityRunThatFixedEverythingSaysSo(t *testing.T) {
 
 // Abandoned packages belong to the end-of-life table; the security section shows advisories only.
 func TestAbandonedPackagesAloneGetTheEndOfLifeTableNotTheSecuritySection(t *testing.T) {
-	description, err := mergerequest.Description(withSections(map[string]any{"composer_audit": addon.SecurityAdvisories{
-		Abandoned: []composer.AbandonedPackage{{PackageName: "patchwork/jsqueeze"}},
+	description, err := mergerequest.Description(withSections(map[string]any{"composer_audit": map[string]any{
+		"abandoned": []map[string]any{{"packageName": "patchwork/jsqueeze", "replacement": ""}},
 	}}))
 
 	require.NoError(t, err)
@@ -183,14 +193,14 @@ func TestAbandonedPackagesAloneGetTheEndOfLifeTableNotTheSecuritySection(t *test
 // literal "None" is a status, not a version to update to.
 func TestEndOfLifeTableJoinsBothSourcesByName(t *testing.T) {
 	description, err := mergerequest.Description(withSections(map[string]any{
-		"unsupported_modules": []drush.UnsupportedModule{
-			{Name: "upgrade", InstalledVersion: "2.0.0", RecommendedVersion: "3.0.0"},
-			{Name: "none", InstalledVersion: "1.0.0", RecommendedVersion: "None"},
-			{Name: "empty"},
+		"unsupported_modules": []map[string]any{
+			{"name": "upgrade", "installed_version": "2.0.0", "recommended_version": "3.0.0"},
+			{"name": "none", "installed_version": "1.0.0", "recommended_version": "None"},
+			{"name": "empty"},
 		},
-		"composer_audit": addon.SecurityAdvisories{Abandoned: []composer.AbandonedPackage{
-			{PackageName: "b/orphan"},
-			{PackageName: "a/replaced", Replacement: "a/next"},
+		"composer_audit": map[string]any{"abandoned": []map[string]any{
+			{"packageName": "b/orphan", "replacement": ""},
+			{"packageName": "a/replaced", "replacement": "a/next"},
 		}},
 	}))
 
@@ -206,10 +216,10 @@ func TestEndOfLifeTableJoinsBothSourcesByName(t *testing.T) {
 
 // Each kind of patch change alone produces the section.
 func TestAnyPatchChangeRendersThePatchSection(t *testing.T) {
-	for name, patches := range map[string]addon.Patches{
-		"only removals":  {Removed: []addon.RemovedPatch{{Package: "drupal/core", PatchPath: "p.patch", Reason: "fixed"}}},
-		"only updates":   {Updated: []addon.UpdatedPatch{{Package: "drupal/core", PreviousPatchPath: "old.patch", NewPatchPath: "new.patch"}}},
-		"only conflicts": {Conflicts: []addon.ConflictPatch{{Package: "drupal/core", FixedVersion: "1.0", NewVersion: "1.1"}}},
+	for name, patches := range map[string]map[string]any{
+		"only removals":  {"removed": []map[string]any{{"package": "drupal/core", "patch_path": "p.patch", "reason": "fixed"}}, "updated": []any{}, "conflicts": []any{}},
+		"only updates":   {"removed": []any{}, "updated": []map[string]any{{"package": "drupal/core", "previous_patch_path": "old.patch", "new_patch_path": "new.patch"}}, "conflicts": []any{}},
+		"only conflicts": {"removed": []any{}, "updated": []any{}, "conflicts": []map[string]any{{"package": "drupal/core", "fixed_version": "1.0", "new_version": "1.1"}}},
 	} {
 		t.Run(name, func(t *testing.T) {
 			description, err := mergerequest.Description(withSections(map[string]any{"composer_patches": patches}))
@@ -222,7 +232,7 @@ func TestAnyPatchChangeRendersThePatchSection(t *testing.T) {
 }
 
 func TestDependencyTablesSplitProdFromDev(t *testing.T) {
-	description, err := mergerequest.Description(withSections(map[string]any{"composer_diff": []addon.DependencyChange{
+	description, err := mergerequest.Description(withSections(map[string]any{"composer_diff": []dependencyChange{
 		{Package: "drupal/core", Operation: "change", From: "dev-main abc", To: "dev-main def"},
 		{Package: "acme/tool", Operation: "downgrade", From: "2.0", To: "1.9", Dev: true},
 		{Package: "acme/odd", Operation: "renamed|", From: "1.0", To: "1.1"},
@@ -238,7 +248,7 @@ func TestDependencyTablesSplitProdFromDev(t *testing.T) {
 }
 
 func TestOnlyDevChangesRenderOnlyTheDevTable(t *testing.T) {
-	description, err := mergerequest.Description(withSections(map[string]any{"composer_diff": []addon.DependencyChange{
+	description, err := mergerequest.Description(withSections(map[string]any{"composer_diff": []dependencyChange{
 		{Package: "acme/tool", Operation: "install", To: "1.0", Dev: true},
 	}}))
 
@@ -250,9 +260,9 @@ func TestOnlyDevChangesRenderOnlyTheDevTable(t *testing.T) {
 // GitHub rejects a longer body outright, which would fail the run after the branch was pushed.
 func TestAnOversizedDescriptionDropsTheDependencyLinks(t *testing.T) {
 	url := "https://github.com/acme/" + strings.Repeat("x", 300)
-	changes := make([]addon.DependencyChange, 0, 300)
+	changes := make([]dependencyChange, 0, 300)
 	for i := range 300 {
-		changes = append(changes, addon.DependencyChange{
+		changes = append(changes, dependencyChange{
 			Package: "acme/p" + strings.Repeat("y", i%10), Operation: "upgrade", From: "1.0", To: "1.1",
 			CompareURL: url, ProjectURL: url,
 		})
@@ -270,7 +280,7 @@ func TestAnOversizedDescriptionDropsTheDependencyLinks(t *testing.T) {
 // The limit is inclusive: a description of exactly MaxDescriptionBytes is accepted as it is.
 func TestADescriptionAtExactlyTheLimitKeepsItsLinks(t *testing.T) {
 	withName := func(name string) report.Report {
-		return withSections(map[string]any{"composer_diff": []addon.DependencyChange{
+		return withSections(map[string]any{"composer_diff": []dependencyChange{
 			{Package: name, Operation: "upgrade", From: "1.0", To: "1.1", CompareURL: "https://c"},
 		}})
 	}
@@ -285,7 +295,7 @@ func TestADescriptionAtExactlyTheLimitKeepsItsLinks(t *testing.T) {
 }
 
 func TestADescriptionWithinTheLimitKeepsItsLinks(t *testing.T) {
-	description, err := mergerequest.Description(withSections(map[string]any{"composer_diff": []addon.DependencyChange{
+	description, err := mergerequest.Description(withSections(map[string]any{"composer_diff": []dependencyChange{
 		{Package: "drupal/core", Operation: "upgrade", From: "1.0", To: "1.1", CompareURL: "https://c", ProjectURL: "https://p"},
 	}}))
 

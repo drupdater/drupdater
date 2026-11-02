@@ -14,8 +14,7 @@ custom code to rewrite APIs deprecated by the new Drupal version.
 ## What it does
 
 1. It picks a Rector:
-    - A project that depends on `palantirnet/drupal-rector` runs its own, through
-      `composer exec`.
+    - A project that depends on `palantirnet/drupal-rector` runs its own, from its `bin-dir`.
     - A project with no Rector at all runs the copy [bundled in the Docker
       image](../docker-images.md#bundled-tools), which loads the project's code through its
       `vendor/autoload.php`, wherever `vendor-dir` points. Nothing is installed into the
@@ -24,8 +23,8 @@ custom code to rewrite APIs deprecated by the new Drupal version.
       **skipped with a warning**. Two Rector versions cannot load into one process, so the
       bundled one cannot run beside the project's. Add `palantirnet/drupal-rector` to
       `require-dev` to have its own Rector used instead.
-2. Rector runs over the project's custom code directories, using the `scripts/rector.php`
-   configuration shipped in the Docker image. Rector imports the classes its rewrites
+2. Rector runs over the project's custom code directories, using the `resources/rector.php`
+   configuration the [Drupdater agent](../docker-images.md#drupdater-agent) ships with. Rector imports the classes its rewrites
    name, adding `use` statements.
 3. In each file Rector changed, a `@file` docblock Rector's new imports ended up under is
    moved back to the top. In a file without a namespace — a `.module` or `.install` file —
@@ -87,7 +86,7 @@ Omitted when Rector changed nothing.
 
 ## Configuration
 
-The Rector rule set comes from `scripts/rector.php` inside the Docker image:
+The Rector rule set comes from the agent's `resources/rector.php`:
 
 - Drupal Rector's **composer-based sets**, chosen from the installed `drupal/core` version.
   They cover the installed major up to the installed minor, including the renames that

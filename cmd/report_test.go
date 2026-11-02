@@ -6,14 +6,15 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/drupdater/drupdater/internal/logging"
-	"github.com/drupdater/drupdater/internal/report"
-	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
+
+	"github.com/drupdater/drupdater/internal/logging"
+	"github.com/drupdater/drupdater/internal/report"
+	"github.com/drupdater/drupdater/internal/workflow"
 )
 
 func TestReportSinkWritesRedactedReport(t *testing.T) {

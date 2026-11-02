@@ -29,8 +29,8 @@ Two cases stop it short:
 
 ### Picks a PHPCS
 
-A project that depends on `drupal/coder` runs its own `phpcs` and `phpcbf`, through
-`composer exec`: its `phpcs.xml` was written for that coder version and may name standards
+A project that depends on `drupal/coder` runs its own `phpcs` and `phpcbf`, from its
+`bin-dir`: its `phpcs.xml` was written for that coder version and may name standards
 only the project installs.
 
 Any other project runs the copies [bundled in the Docker image](../docker-images.md#bundled-tools).

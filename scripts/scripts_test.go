@@ -11,13 +11,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestExtractWritesTheFilesWhereTheirPathsPointDrushAndRector(t *testing.T) {
+func TestExtractWritesTheFilesWhereTheirPathsPointDrush(t *testing.T) {
 	dir, err := Extract()
 	require.NoError(t, err)
 	t.Cleanup(func() { os.RemoveAll(dir) })
 
-	assert.FileExists(t, RectorConfig(dir))
-	assert.FileExists(t, filepath.Join(dir, "phpstan-drupal-bootstrap.php"), "rector.php includes it by __DIR__")
 	// drush --include discovers Commands/*Commands.php under the directory it is given.
 	assert.FileExists(t, filepath.Join(DrushInclude(dir), "Commands", "DrupdaterCommands.php"))
 }
@@ -25,7 +23,7 @@ func TestExtractWritesTheFilesWhereTheirPathsPointDrushAndRector(t *testing.T) {
 func TestExtractRemovesWhatItWroteWhenACopyFails(t *testing.T) {
 	t.Setenv("TMPDIR", t.TempDir())
 	unreadable := fstest.MapFS{
-		"rector.php": {Data: []byte("<?php\n")},
+		"drush.php": {Data: []byte("<?php\n")},
 		"pipe.php":   {Mode: fs.ModeNamedPipe},
 	}
 

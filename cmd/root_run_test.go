@@ -7,16 +7,14 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/drupdater/drupdater/internal/composer"
-	"github.com/drupdater/drupdater/internal/drupalorg"
-	"github.com/drupdater/drupdater/internal/drush"
 	"github.com/spf13/cobra"
 
-	"github.com/drupdater/drupdater/internal/config"
-	"github.com/drupdater/drupdater/internal/workflow"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+
+	"github.com/drupdater/drupdater/internal/config"
+	"github.com/drupdater/drupdater/internal/workflow"
 )
 
 // runUpdateWith calls a's runUpdate the way cobra would, with its output discarded so a failing
@@ -189,58 +187,6 @@ func TestExecutePassesTheContextOn(t *testing.T) {
 		return nil
 	}))
 	assert.Equal(t, "this run", got, "the signal-cancelled context has to reach the run")
-}
-
-func TestCreateAddonsPassesEveryDependency(t *testing.T) {
-	// Nothing downstream reports a missing dependency: it surfaces as a nil-pointer panic
-	// mid-run.
-	var got, second addonDeps
-	// Real factories, and two of them, so the same struct is shown to reach every addon.
-	realFactory := builtinAddons().factories["composer_diff"]
-	require.NotNil(t, realFactory)
-	catalog := addonCatalog{
-		factories: map[string]func(addonDeps) workflow.Addon{
-			"probe":       func(d addonDeps) workflow.Addon { got = d; return realFactory(d) },
-			"probe_other": func(d addonDeps) workflow.Addon { second = d; return realFactory(d) },
-		},
-		mandatory: []string{"probe", "probe_other"},
-	}
-
-	logger := zap.NewNop()
-	composerSvc := composer.NewCLI(logger)
-	deps := addonDeps{
-		logger:       logger,
-		drush:        drush.NewCLI(logger, "/scripts/drush"),
-		composer:     composerSvc,
-		drupalOrg:    drupalorg.NewHTTPClient(logger),
-		drupalCode:   drupalorg.NewDrupalCode("token"),
-		rectorConfig: "/scripts/rector.php",
-	}
-
-	_, err := catalog.create(config.Config{Security: true}, deps)
-	require.NoError(t, err)
-
-	want := deps
-	want.security = true
-	assert.Equal(t, want, got, "the factories get the dependencies as given, plus the run type")
-	assert.Equal(t, got, second, "every addon receives the same dependency set")
-}
-
-func TestNewAddonDepsBuildsADrupalCodeClientOnlyWithAToken(t *testing.T) {
-	logger := zap.NewNop()
-	drushSvc, composerSvc := newMockaddonDrush(t), newMockaddonComposer(t)
-	drupalOrgSvc := drupalorg.NewHTTPClient(logger)
-
-	t.Setenv("DRUPALCODE_ACCESS_TOKEN", "")
-	deps := newAddonDeps(logger, drushSvc, composerSvc, drupalOrgSvc, "/scripts/rector.php")
-	assert.Equal(t, addonDeps{logger: logger, drush: drushSvc, composer: composerSvc, drupalOrg: drupalOrgSvc, rectorConfig: "/scripts/rector.php"}, deps)
-	assert.Nil(t, deps.drupalCode, "composer_patches tells a missing client by nil, so no typed nil may slip in")
-
-	t.Setenv("DRUPALCODE_ACCESS_TOKEN", "secret")
-	deps = newAddonDeps(logger, drushSvc, composerSvc, drupalOrgSvc, "/scripts/rector.php")
-	assert.IsType(t, &drupalorg.DrupalCode{}, deps.drupalCode)
-	deps.drupalCode = nil
-	assert.Equal(t, addonDeps{logger: logger, drush: drushSvc, composer: composerSvc, drupalOrg: drupalOrgSvc, rectorConfig: "/scripts/rector.php"}, deps)
 }
 
 func TestNewRunnerBuildsTheWorkflowRunner(t *testing.T) {

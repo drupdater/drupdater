@@ -49,20 +49,22 @@ COPY --from=composer /usr/bin/composer /usr/local/bin/composer
 
 # Add mglaman/composer-drupal-lenient as a global composer plugin.
 RUN composer global config --no-plugins allow-plugins.mglaman/composer-drupal-lenient true; \
-    composer global config --no-plugins allow-plugins.ion-bazan/composer-diff true; \
-    composer global require mglaman/composer-drupal-lenient ion-bazan/composer-diff;
+    composer global require mglaman/composer-drupal-lenient;
 
 # PHPCS and Rector for the addons, installed here so they never touch the project's composer.json.
 COPY tools/composer.json tools/composer.lock /opt/drupdater/tools/
 RUN composer install --working-dir=/opt/drupdater/tools --no-dev --no-interaction --no-progress \
     && composer clear-cache
 
-# drupdater's agent (agent/): the `composer drupdater:*` commands, global so no project is touched.
+# drupdater's agent (agent/): the addons and the `composer drupdater:*` commands, global so no
+# project is touched. resources/ is the Rector config deprecations_remover runs with.
 COPY agent/composer.json /opt/drupdater/agent/
 COPY agent/src /opt/drupdater/agent/src
+COPY agent/resources /opt/drupdater/agent/resources
 RUN composer global config --no-plugins repositories.drupdater-agent \
         '{"type": "path", "url": "/opt/drupdater/agent", "options": {"versions": {"drupdater/agent": "1.0.0"}}}'; \
     composer global config --no-plugins allow-plugins.drupdater/agent true; \
+    composer global config --no-plugins allow-plugins.ion-bazan/composer-diff false; \
     composer global require drupdater/agent:1.0.0
 
 COPY --from=build /build/drupdater /opt/drupdater/bin

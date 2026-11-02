@@ -9,7 +9,6 @@ use Composer\Factory;
 use Composer\IO\NullIO;
 use Composer\Repository\PlatformRepository;
 use Drupdater\Agent\Command\AgentCommand;
-use Drupdater\Agent\Command\AuditCommand;
 use Drupdater\Agent\Command\PlatformCheckCommand;
 use Drupdater\Agent\Platform\PlatformCheck;
 use Drupdater\Agent\Tests\Scratch;
@@ -17,47 +16,13 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Tester\CommandTester;
 
 /**
- * drupdater:audit and drupdater:platform-check, against an offline project whose package
- * repository carries its own security advisories.
+ * drupdater:platform-check, against an offline project.
  */
 final class LockQuestionsTest extends TestCase
 {
     use Scratch {
         tearDown as scratchTearDown;
     }
-
-    private const ADVISORY_RCE = [
-        'advisoryId' => 'PKSA-aaaa-bbbb-cccc',
-        'packageName' => 'fixture/a',
-        'affectedVersions' => '<1.1.0',
-        'title' => 'Remote code execution',
-        'cve' => 'CVE-2025-0001',
-        'link' => 'https://example.com/advisories/CVE-2025-0001',
-        'reportedAt' => '2025-01-29T06:52:00+00:00',
-        'sources' => [
-            ['name' => 'GitHub', 'remoteId' => 'GHSA-aaaa-bbbb-cccc'],
-            ['name' => 'FriendsOfPHP/security-advisories', 'remoteId' => 'fixture/a/CVE-2025-0001.yaml'],
-        ],
-        'severity' => 'high',
-    ];
-
-    private const ADVISORY_XSS = [
-        'advisoryId' => 'PKSA-dddd-eeee-ffff',
-        'packageName' => 'fixture/a',
-        'affectedVersions' => '>=1.0.0,<1.0.5',
-        'title' => 'Cross-site scripting',
-        'reportedAt' => '2025-02-01T00:00:00+00:00',
-        'sources' => [['name' => 'GitHub', 'remoteId' => 'GHSA-dddd-eeee-ffff']],
-    ];
-
-    private const ADVISORY_OLDER = [
-        'advisoryId' => 'PKSA-gggg-hhhh-iiii',
-        'packageName' => 'fixture/a',
-        'affectedVersions' => '<0.9',
-        'title' => 'Fixed long ago',
-        'reportedAt' => '2020-01-01T00:00:00+00:00',
-        'sources' => [['name' => 'GitHub', 'remoteId' => 'GHSA-gggg-hhhh-iiii']],
-    ];
 
     private string|false $composerHome;
     private string $cwd;
@@ -74,44 +39,6 @@ final class LockQuestionsTest extends TestCase
         chdir($this->cwd);
         putenv($this->composerHome === false ? 'COMPOSER_HOME' : 'COMPOSER_HOME=' . $this->composerHome);
         $this->scratchTearDown();
-    }
-
-    public function testAuditAnswersTheFixture(): void
-    {
-        [$status, $reply] = $this->ask(new AuditCommand(), $this->project(), self::fixture('audit/request.json'));
-
-        self::assertSame(0, $status);
-        self::assertEquals(self::fixture('audit/response.json'), $reply);
-    }
-
-    public function testAuditLeavesOutWhatTheProjectIgnores(): void
-    {
-        $project = $this->project(['audit' => ['ignore' => ['CVE-2025-0001'], 'abandoned' => 'ignore']]);
-
-        [, $reply] = $this->ask(new AuditCommand(), $project, self::fixture('audit/request.json'));
-
-        self::assertSame(['PKSA-dddd-eeee-ffff'], array_column($reply['result']['advisories'], 'advisory_id'));
-        self::assertSame([], $reply['result']['abandoned']);
-    }
-
-    public function testAuditLeavesOutAnIgnoredSeverity(): void
-    {
-        $project = $this->project(['audit' => ['ignore-severity' => ['high']]]);
-
-        [, $reply] = $this->ask(new AuditCommand(), $project, self::fixture('audit/request.json'));
-
-        self::assertSame(['PKSA-dddd-eeee-ffff'], array_column($reply['result']['advisories'], 'advisory_id'));
-    }
-
-    public function testAuditOfAnEmptyLockFindsNothing(): void
-    {
-        $project = $this->project();
-        $this->writeFiles($project, ['composer.lock' => json_encode(['packages' => [], 'packages-dev' => []])]);
-
-        [$status, $reply] = $this->ask(new AuditCommand(), $project, self::fixture('audit/request.json'));
-
-        self::assertSame(0, $status);
-        self::assertSame(['advisories' => [], 'abandoned' => []], $reply['result']);
     }
 
     public function testPlatformCheckAnswersTheFixture(): void
@@ -153,7 +80,6 @@ final class LockQuestionsTest extends TestCase
      */
     public static function lockCommands(): iterable
     {
-        yield 'audit' => [new AuditCommand()];
         yield 'platform-check' => [new PlatformCheckCommand()];
     }
 
@@ -163,7 +89,7 @@ final class LockQuestionsTest extends TestCase
         $project = $this->project();
         unlink($project . '/composer.lock');
 
-        [$status, $reply] = $this->ask($command, $project, ['protocol' => 2, 'request' => []]);
+        [$status, $reply] = $this->ask($command, $project, ['protocol' => 3, 'request' => []]);
 
         self::assertSame(1, $status);
         self::assertSame(['kind' => 'failed', 'reason' => 'the project has no composer.lock', 'message' => ''], $reply['error']);
@@ -191,12 +117,7 @@ final class LockQuestionsTest extends TestCase
         $this->writeFiles($project, [
             'composer.json' => json_encode([
                 'name' => 'fixture/site',
-                'repositories' => [
-                    ['type' => 'package', 'package' => $locked, 'security-advisories' => [
-                        'fixture/a' => [self::ADVISORY_XSS, self::ADVISORY_OLDER, self::ADVISORY_RCE],
-                    ]],
-                    ['packagist.org' => false],
-                ],
+                'repositories' => [['type' => 'package', 'package' => $locked], ['packagist.org' => false]],
                 'require' => ['php' => '>=8.3'] + array_fill_keys(array_column($locked, 'name'), '*'),
                 'config' => (object) $config,
             ], JSON_UNESCAPED_SLASHES),

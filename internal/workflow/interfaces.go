@@ -9,17 +9,11 @@ import (
 	"github.com/drupdater/drupdater/internal/repo"
 )
 
-// Addon hooks into workflow events. What it found reaches the merge request only through its
-// report section: the description is rendered from the report.
-type Addon interface {
-	// Hooks is read once per run, before the first event fires.
-	Hooks() Hooks
-}
-
 // Composer is what the phases call, plus what they hand to the preflight checks and the report.
 type Composer interface {
 	Install(ctx context.Context, dir string) error
-	Update(ctx context.Context, dir string, packagesToUpdate []string, packagesToKeep []string, minimalChanges bool, dryRun bool) ([]composer.PackageChange, error)
+	Update(ctx context.Context, dir string, packagesToUpdate []string, packagesToKeep []string, minimalChanges bool) ([]composer.PackageChange, error)
+	AddonAgent
 	PlatformReqsChecker
 	AgentChecker
 	ProjectReader

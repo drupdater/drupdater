@@ -92,7 +92,3 @@ func (s *CLI) Install(ctx context.Context, dir string) error {
 	}
 	return nil
 }
-
-func (s *CLI) Normalize(ctx context.Context, dir string) (string, error) {
-	return s.execComposer(ctx, dir, "normalize")
-}
