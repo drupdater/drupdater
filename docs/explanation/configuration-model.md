@@ -83,7 +83,7 @@ several places, and they would eventually disagree.
 
 ## Why unknown keys are rejected
 
-The file is decoded strictly. A key Drupdater does not recognise fails the run.
+The file is read strictly. A key Drupdater does not recognise fails the run.
 
 The alternative is silently ignoring it, which means `site: [default]` — singular, a
 plausible typo — behaves exactly like an empty file. The project would keep updating only

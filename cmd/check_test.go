@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/drupdater/drupdater/internal/agent"
 	"github.com/drupdater/drupdater/internal/composer"
 
 	"github.com/spf13/afero"
@@ -37,51 +37,31 @@ func TestCheckToken(t *testing.T) {
 	})
 }
 
-func TestCheckConfigAndAddons(t *testing.T) {
-	t.Run("a missing file applies the defaults and passes", func(t *testing.T) {
+func TestCheckConfig(t *testing.T) {
+	t.Run("a configuration the agent answers passes and names its sites", func(t *testing.T) {
+		reply := defaultProjectConfig()
+		reply.Sites = []string{"default", "second"}
+		var asked string
 		cfg := config.Config{}
-		results := checkConfigAndAddons(agentCatalog, nil, filepath.Join(t.TempDir(), ".drupdater.yaml"), &cfg)
 
-		require.Len(t, results, 2)
-		assert.True(t, results[0].OK)
-		assert.Contains(t, results[0].Name, "sites: default")
-		assert.True(t, results[1].OK)
-		assert.Equal(t, "addon names resolve", results[1].Name)
+		result := answering(testApp(), reply, &asked).checkConfig(t.Context(), zap.NewNop(), "/project/.drupdater.yaml", &cfg)
+
+		assert.Equal(t, workflow.CheckOK(".drupdater.yaml valid (sites: default, second)"), result)
+		assert.Equal(t, "/project/.drupdater.yaml", asked)
+		assert.Equal(t, []string{"default", "second"}, cfg.Sites)
 	})
 
-	t.Run("an invalid file stops at the first check", func(t *testing.T) {
-		path := filepath.Join(t.TempDir(), ".drupdater.yaml")
-		require.NoError(t, os.WriteFile(path, []byte("timeout: nope\n"), 0o600))
-
+	t.Run("a file the agent refuses fails with its reason, the addon names included", func(t *testing.T) {
+		a := testApp()
+		a.projectConfig = func(context.Context, *zap.Logger, string) (agent.ConfigReply, error) {
+			return agent.ConfigReply{}, &composer.InvalidConfigError{Reason: `unknown addon "no_such_addon" (run "drupdater addons" to list valid names)`}
+		}
 		cfg := config.Config{}
-		results := checkConfigAndAddons(agentCatalog, nil, path, &cfg)
 
-		require.Len(t, results, 1)
-		assert.False(t, results[0].OK)
-		assert.Equal(t, ".drupdater.yaml valid", results[0].Name)
-	})
+		result := a.checkConfig(t.Context(), zap.NewNop(), "/project/.drupdater.yaml", &cfg)
 
-	t.Run("a catalogue that cannot be read fails the second check", func(t *testing.T) {
-		cfg := config.Config{}
-		results := checkConfigAndAddons(addonCatalog{}, assert.AnError, filepath.Join(t.TempDir(), ".drupdater.yaml"), &cfg)
-
-		require.Len(t, results, 2)
-		assert.True(t, results[0].OK)
-		assert.False(t, results[1].OK)
-		assert.Equal(t, assert.AnError.Error(), results[1].Detail)
-	})
-
-	t.Run("an unknown addon name fails the second check only", func(t *testing.T) {
-		path := filepath.Join(t.TempDir(), ".drupdater.yaml")
-		require.NoError(t, os.WriteFile(path, []byte("run_types:\n  normal:\n    addons: [no_such_addon]\n"), 0o600))
-
-		cfg := config.Config{}
-		results := checkConfigAndAddons(agentCatalog, nil, path, &cfg)
-
-		require.Len(t, results, 2)
-		assert.True(t, results[0].OK)
-		assert.False(t, results[1].OK)
-		assert.Contains(t, results[1].Detail, "no_such_addon")
+		assert.Equal(t, workflow.CheckFailed(".drupdater.yaml valid", `unknown addon "no_such_addon" (run "drupdater addons" to list valid names)`), result)
+		assert.Empty(t, cfg.Sites, "nothing of a refused file is applied")
 	})
 }
 
@@ -213,8 +193,8 @@ func TestRunCheapChecks(t *testing.T) {
 		results := testApp().runCheapChecks(ctx, logger, filepath.Join(t.TempDir(), ".drupdater.yaml"), cfg, repository, composerSvc, newFS(t, "/project", "default"), "", nil)
 
 		require.False(t, anyCheckFailed(results))
-		// config valid, addons resolve, git history, platform reqs, agent, site settings, VCS host.
-		assert.Len(t, results, 7)
+		// config valid, git history, platform reqs, agent, site settings, VCS host.
+		assert.Len(t, results, 6)
 	})
 
 	t.Run("a shallow clone and unmet platform reqs both surface as failures", func(t *testing.T) {
@@ -253,16 +233,15 @@ func TestRunCheapChecks(t *testing.T) {
 	})
 
 	t.Run("one result per configured site", func(t *testing.T) {
-		// The sites come from the config file, not a pre-set cfg.Sites. Only "default" has
-		// a settings.php.
-		cfgPath := filepath.Join(t.TempDir(), ".drupdater.yaml")
-		require.NoError(t, os.WriteFile(cfgPath, []byte("sites: [default, extra]\n"), 0o600))
+		// The sites come from the config, not a pre-set cfg.Sites. Only "default" has a settings.php.
+		reply := defaultProjectConfig()
+		reply.Sites = []string{"default", "extra"}
 
 		cfg := &config.Config{WorkingDir: "/project", RepositoryURL: "https://github.com/acme/site.git"}
 		repository := fakeShallowCloneChecker{}
 		composerSvc := fakeCheapChecksComposer{webRoot: "web"}
 
-		results := testApp().runCheapChecks(ctx, logger, cfgPath, cfg, repository, composerSvc, newFS(t, "/project", "default"), "", nil)
+		results := answering(testApp(), reply, nil).runCheapChecks(ctx, logger, "/project/.drupdater.yaml", cfg, repository, composerSvc, newFS(t, "/project", "default"), "", nil)
 
 		var siteFailures int
 		for _, r := range results {

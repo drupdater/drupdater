@@ -146,7 +146,7 @@ final class HookCommandTest extends TestCase
     {
         ScriptedAddon::$hook = static fn (): HookResult => throw new \LogicException('the hook ran');
 
-        [$status, $reply] = $this->ask($this->scripted(), ['protocol' => 5, 'request' => $request]);
+        [$status, $reply] = $this->ask($this->scripted(), ['protocol' => 6, 'request' => $request]);
 
         self::assertSame(1, $status);
         self::assertSame(['kind' => 'invalid_request', 'reason' => $reason, 'message' => ''], $reply['error']);
@@ -166,7 +166,7 @@ final class HookCommandTest extends TestCase
      */
     private static function request(array $event, array $earlier = [], bool $security = false): array
     {
-        return ['protocol' => 5, 'request' => ['addon' => 'scripted', 'event' => $event, 'earlier' => $earlier, 'run' => ['security' => $security]]];
+        return ['protocol' => 6, 'request' => ['addon' => 'scripted', 'event' => $event, 'earlier' => $earlier, 'run' => ['security' => $security]]];
     }
 
     /**

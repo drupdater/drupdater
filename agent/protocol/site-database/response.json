@@ -1,5 +1,5 @@
 {
-  "protocol": 5,
+  "protocol": 6,
   "command": "drupdater:site-database",
   "ok": true,
   "result": {}

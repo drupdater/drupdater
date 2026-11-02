@@ -81,7 +81,6 @@ drupdater check
 
 ```text
 ✓ .drupdater.yaml valid (sites: default)
-✓ addon names resolve
 ```
 
 That is the whole verification: `check` loads the file exactly as a run does, in about a
@@ -101,12 +100,12 @@ global.
 
 ## Why the error message exists
 
-The file is decoded strictly, so the old keys were already rejected — but only as:
+The file is read strictly, so the old keys would be rejected anyway — but only as:
 
 ```text
-field addons not found in type internal.fileConfig
+unknown key "addons"
 ```
 
 Which is accurate and completely unhelpful. The dedicated check runs before the strict
-decode purely so the error can name the replacement. See [The configuration
+read purely so the error can name the replacement. See [The configuration
 model](../explanation/configuration-model.md).

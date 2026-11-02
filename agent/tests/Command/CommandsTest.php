@@ -24,6 +24,7 @@ final class CommandsTest extends TestCase
         $names = array_map(fn (AgentCommand $c) => $c->getName(), (new CommandProvider())->getCommands());
         self::assertSame([
             'drupdater:addons',
+            'drupdater:config',
             'drupdater:config-export',
             'drupdater:handshake',
             'drupdater:hook',
@@ -54,7 +55,7 @@ final class CommandsTest extends TestCase
     public function testAMismatchedProtocolIsRefused(): void
     {
         $request = self::fixture('handshake/request.json');
-        $request['protocol'] = 6;
+        $request['protocol'] = 7;
 
         [$status, $reply] = $this->ask(new HandshakeCommand(), $request);
 
@@ -68,7 +69,7 @@ final class CommandsTest extends TestCase
     public static function unreadableBodies(): iterable
     {
         yield 'not JSON' => ['{', 'the request is not JSON'];
-        yield 'no request object' => ['{"protocol":5}', 'the request has no request object'];
+        yield 'no request object' => ['{"protocol":6}', 'the request has no request object'];
         yield 'not an object' => ['"x"', 'the request has no request object'];
     }
 

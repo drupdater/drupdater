@@ -12,6 +12,8 @@ import (
 	"go.uber.org/zap/zaptest"
 	"go.uber.org/zap/zaptest/observer"
 
+	"github.com/drupdater/drupdater/internal/agent"
+	"github.com/drupdater/drupdater/internal/composer"
 	"github.com/drupdater/drupdater/internal/config"
 	"github.com/drupdater/drupdater/internal/logging"
 	"github.com/drupdater/drupdater/internal/repo"
@@ -117,29 +119,6 @@ func TestHandleWorkflowError(t *testing.T) {
 		abortErr := workflow.AbortError{Msg: "no changes detected"}
 		require.NoError(t, errors.Unwrap(abortErr), "AbortError has no wrapped error, so Unwrap returns nil")
 		assert.Equal(t, "no changes detected", abortErr.Error())
-	})
-}
-
-func TestValidateAddons(t *testing.T) {
-	t.Run("known names pass, including mandatory ones", func(t *testing.T) {
-		config := config.Config{RunTypes: config.RunTypesConfig{
-			Normal:   config.RunTypeConfig{Addons: []string{"code_beautifier", "update_hooks"}},
-			Security: config.RunTypeConfig{Addons: []string{"composer_normalizer"}},
-		}}
-		require.NoError(t, agentCatalog.validate(config))
-	})
-
-	t.Run("unknown name in the normal list is an error", func(t *testing.T) {
-		config := config.Config{RunTypes: config.RunTypesConfig{Normal: config.RunTypeConfig{Addons: []string{"nope"}}}}
-		err := agentCatalog.validate(config)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "nope")
-	})
-
-	t.Run("unknown name in the security list is caught regardless of mode", func(t *testing.T) {
-		// Security: false, yet a bad security-list name must still be rejected.
-		config := config.Config{RunTypes: config.RunTypesConfig{Security: config.RunTypeConfig{Addons: []string{"typo"}}}}
-		require.Error(t, agentCatalog.validate(config))
 	})
 }
 
@@ -272,40 +251,36 @@ func TestConfigFilePath(t *testing.T) {
 func TestLoadProjectConfig(t *testing.T) {
 	logger := zaptest.NewLogger(t)
 
-	t.Run("a missing file applies the defaults", func(t *testing.T) {
+	t.Run("what the agent answers is applied", func(t *testing.T) {
+		reply := defaultProjectConfig()
+		reply.Sites = []string{"default", "sub"}
+		reply.TimeoutNS = int64(90 * time.Second)
+		reply.RunTypes.Normal = agent.RunType{Addons: []string{"composer_audit"}, AutoMerge: true}
+		reply.RunTypes.Security = agent.RunType{Addons: []string{"composer_diff"}, AutoMerge: true}
+		var asked string
 		cfg := config.Config{}
-		require.NoError(t, loadProjectConfig(logger, agentCatalog, filepath.Join(t.TempDir(), ".drupdater.yaml"), &cfg))
 
-		assert.Equal(t, []string{"default"}, cfg.Sites)
-		assert.Equal(t, 30*time.Minute, cfg.Timeout)
-	})
+		require.NoError(t, answering(testApp(), reply, &asked).loadProjectConfig(t.Context(), logger, "/work/.drupdater.yaml", &cfg))
 
-	t.Run("a file's values are applied", func(t *testing.T) {
-		path := filepath.Join(t.TempDir(), ".drupdater.yaml")
-		require.NoError(t, os.WriteFile(path, []byte("sites: [default, sub]\ntimeout: 90s\n"), 0o600))
-
-		cfg := config.Config{}
-		require.NoError(t, loadProjectConfig(logger, agentCatalog, path, &cfg))
+		assert.Equal(t, "/work/.drupdater.yaml", asked)
 		assert.Equal(t, []string{"default", "sub"}, cfg.Sites)
 		assert.Equal(t, 90*time.Second, cfg.Timeout)
+		assert.Equal(t, config.RunTypesConfig{
+			Normal:   config.RunTypeConfig{Addons: []string{"composer_audit"}, AutoMerge: true},
+			Security: config.RunTypeConfig{Addons: []string{"composer_diff"}, AutoMerge: true},
+		}, cfg.RunTypes)
 	})
 
-	t.Run("an invalid file is an error", func(t *testing.T) {
+	t.Run("a refused file is an error, and nothing of it is applied", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), ".drupdater.yaml")
 		require.NoError(t, os.WriteFile(path, []byte("timeout: nope\n"), 0o600))
+		cfg := config.Config{Sites: []string{"kept"}}
 
-		cfg := config.Config{}
-		require.Error(t, loadProjectConfig(logger, agentCatalog, path, &cfg))
-	})
+		err := testApp().loadProjectConfig(t.Context(), logger, path, &cfg)
 
-	t.Run("an unknown addon name is an error", func(t *testing.T) {
-		path := filepath.Join(t.TempDir(), ".drupdater.yaml")
-		require.NoError(t, os.WriteFile(path, []byte("run_types:\n  normal:\n    addons: [no_such_addon]\n"), 0o600))
-
-		cfg := config.Config{}
-		err := loadProjectConfig(logger, agentCatalog, path, &cfg)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "no_such_addon")
+		var invalid *composer.InvalidConfigError
+		require.ErrorAs(t, err, &invalid)
+		assert.Equal(t, []string{"kept"}, cfg.Sites)
 	})
 }
 

@@ -106,7 +106,8 @@ installing anything into it.
 
 | Command | Used by |
 |---|---|
-| `drupdater:addons` | Reading `.drupdater.yaml`, the `addons` command and the `addon names resolve` check: the addon catalogue |
+| `drupdater:addons` | The `addons` command, and the hooks of the addons a run builds: the addon catalogue |
+| `drupdater:config` | Reading and checking [`.drupdater.yaml`](configuration.md), for a run and the `.drupdater.yaml valid` check |
 | `drupdater:hook` | Every addon hook of every run, one call per hook |
 | `drupdater:report` | The [run report](run-report.md#addons)'s addon sections |
 | `drupdater:merge-request` | The `render merge request` phase: the title and description, from the run report |
@@ -122,6 +123,14 @@ installing anything into it.
 `drupdater:addons` lists the catalogue: each addon, whether every run needs it, whether a
 normal run gets it when the project names none, and the stage it hooks each event at. It needs
 no project, so drupdater asks it from an empty directory.
+
+`drupdater:config` reads the `.drupdater.yaml` at the absolute path drupdater sends, layers it
+over the defaults, and checks it whole: its keys and their types, the `timeout`, the `sites`,
+and every addon name in both run types against the catalogue. It answers the sites, the timeout
+in nanoseconds, and for each run type the addons it runs — the mandatory ones first, then the
+configured ones or, for a normal run that names none, the defaults — and `auto_merge`. A file
+that fails a check is answered with a `failed` error whose reason says what to fix. It too
+needs no project.
 
 `drupdater:hook` runs one addon's hook for one workflow event. The request names the addon and
 carries the event — its name, plus what that event hands its hooks: the update plan on

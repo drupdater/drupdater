@@ -445,12 +445,11 @@ why `make fuzz` loops rather than passing `./...`.
 
 ### The targets
 
-Three, on the code that parses input drupdater does not control:
+Two, on the code that parses input drupdater does not control:
 
 | Target | Covers |
 |---|---|
 | `FuzzParseGitURL` | The repository URL, in both the HTTP and the SCP shape, straight from a CI variable |
-| `FuzzLoadFile` | `.drupdater.yaml`, including that a rejected file leaves the `Config` untouched |
 | `FuzzRedact` | That a registered secret never survives redaction, on bytes no generator would write |
 
 ### The convention
@@ -586,7 +585,8 @@ first. Any mock the harness was not asked to cover stays strict.
 globally. It holds [every addon](../explanation/addon-architecture.md#where-an-addon-runs), and
 adds the `composer drupdater:*` commands the binary runs them and asks the project's own
 Composer through: [`drupdater:addons`](../reference/docker-images.md#drupdater-agent), the
-addon catalogue; [`drupdater:hook`](../reference/docker-images.md#drupdater-agent), one addon's
+addon catalogue; [`drupdater:config`](../reference/docker-images.md#drupdater-agent),
+`.drupdater.yaml` read and checked; [`drupdater:hook`](../reference/docker-images.md#drupdater-agent), one addon's
 hook for one event; [`drupdater:report`](../reference/docker-images.md#drupdater-agent), the
 addons' report sections; [`drupdater:merge-request`](../reference/docker-images.md#drupdater-agent),
 the merge request's title and description; [`drupdater:project`](../reference/docker-images.md#drupdater-agent),
@@ -606,6 +606,7 @@ each in a method: `composer.Sites` the site commands.
 | `agent/src/Command/` | The commands, each answering one request with one envelope |
 | `agent/src/Tools/`, `Process/` | phpcs, Rector, drush and Composer run as processes |
 | `agent/src/Site/` | A site's throwaway SQLite database: the `settings.php` block and `core.extension.yml` |
+| `agent/src/Config/` | `.drupdater.yaml`: the defaults, the strict read, the checks, Go's duration syntax |
 | `agent/src/MergeRequest/` | The merge request's title and description, rendered from the run report, one class per section |
 | `agent/src/DrupalOrg/` | drupal.org's node API and git.drupalcode.org's GitLab API, over Composer's HTTP |
 | `agent/src/Patches/`, `PatchCheck/` | `extra.patches` read, rewritten and test-applied |
@@ -615,7 +616,7 @@ each in a method: `composer.Sites` the site commands.
 Each command reads one JSON request on stdin and prints one JSON envelope on stdout:
 
 ```json
-{"protocol": 5, "command": "drupdater:hook", "ok": true, "result": {"finding": null, "commits": [], "plan": null, "abort": null}, "log": [{"level": "info", "message": "updating coding styles", "context": {"addon": "code_beautifier"}}]}
+{"protocol": 6, "command": "drupdater:hook", "ok": true, "result": {"finding": null, "commits": [], "plan": null, "abort": null}, "log": [{"level": "info", "message": "updating coding styles", "context": {"addon": "code_beautifier"}}]}
 ```
 
 `log` holds what the command logged, on success and failure alike, and `agent.Call` logs each

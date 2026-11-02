@@ -17,7 +17,6 @@ This runs only the cheap checks — they take about a second. Output:
 
 ```text
 ✓ .drupdater.yaml valid (sites: default)
-✓ addon names resolve
 ✓ git history complete (not a shallow clone)
 ✓ PHP platform requirements satisfied
 ✓ drupdater agent installed in Composer
@@ -138,11 +137,11 @@ checks](../reference/preflight-checks.md) reference page. The most common:
 
 | Failure | Fix |
 |---|---|
+| `.drupdater.yaml valid` | The detail says what to fix; an unknown addon name is a typo — run [`drupdater addons`](../reference/cli/addons.md) |
 | `git history complete` | Set `fetch-depth: 0` (GitHub) or `GIT_DEPTH: "0"` (GitLab) |
 | `PHP platform requirements satisfied` | Wrong image — pick the `drupdater-php*` variant matching the project |
 | `drupdater agent installed in Composer` | Drupdater is running outside its image, or an image of a different build — run the published image |
 | `site "…": settings.php` | The site was never installed in this checkout, or `sites` in `.drupdater.yaml` names a directory that does not exist |
-| `addon names resolve` | Typo in `.drupdater.yaml` — run [`drupdater addons`](../reference/cli/addons.md) |
 | `token authenticates` | Token expired, or lacks API scope |
 
 See also [Troubleshoot a run](troubleshoot.md).

@@ -54,7 +54,6 @@ docker run -v "$(pwd)":/app -w /app \
 
 ```text
 ✓ .drupdater.yaml valid (sites: default)
-✓ addon names resolve
 ```
 
 Commit it.

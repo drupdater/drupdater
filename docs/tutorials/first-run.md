@@ -33,7 +33,6 @@ You should see something like:
 
 ```text
 ✓ .drupdater.yaml valid (sites: default)
-✓ addon names resolve
 ✓ git history complete (not a shallow clone)
 ✓ PHP platform requirements satisfied
 ✓ drupdater agent installed in Composer

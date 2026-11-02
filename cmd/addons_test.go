@@ -79,49 +79,31 @@ func TestAnUnknownStageKeepsWhyItIsUnknown(t *testing.T) {
 	require.EqualError(t, errors.Unwrap(err), parseErr.Error())
 }
 
-func TestARepeatedNameIsSkippedWithoutDroppingTheNamesAfterIt(t *testing.T) {
-	addons, err := agentCatalog.create(config.Config{RunTypes: config.RunTypesConfig{Normal: config.RunTypeConfig{
-		Addons: []string{"composer_audit", "composer_normalizer"},
-	}}})
+func TestARunCreatesTheAddonsItsRunTypeRunsInTheirOrder(t *testing.T) {
+	cfg := config.Config{RunTypes: config.RunTypesConfig{
+		Normal:   config.RunTypeConfig{Addons: []string{"composer_normalizer", "composer_audit"}},
+		Security: config.RunTypeConfig{Addons: []string{"code_beautifier"}},
+	}}
 
+	normal, err := agentCatalog.create(cfg)
 	require.NoError(t, err)
-	assert.Equal(t, append(append([]string{}, agentCatalog.mandatory...), "composer_normalizer"), names(addons))
+	cfg.Security = true
+	security, err := agentCatalog.create(cfg)
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"composer_normalizer", "composer_audit"}, names(normal))
+	assert.Equal(t, []string{"code_beautifier"}, names(security))
+	assert.Equal(t, map[string]workflow.Stage{workflow.EventPostComposerUpdate: workflow.Format}, normal[0].Hooks, "with the hooks the catalogue gives it")
 }
 
-func TestANormalRunNamingNoAddonsGetsTheMandatoryOnesThenTheDefaults(t *testing.T) {
+func TestARunTypeThatRunsNoneCreatesNone(t *testing.T) {
 	addons, err := agentCatalog.create(config.Config{})
 
 	require.NoError(t, err)
-	assert.Equal(t, append(append([]string{}, agentCatalog.mandatory...), agentCatalog.defaults...), names(addons))
+	assert.Empty(t, addons)
 }
 
-func TestASecurityRunNamingNoAddonsGetsTheMandatoryOnesOnly(t *testing.T) {
-	addons, err := agentCatalog.create(config.Config{Security: true})
-
-	require.NoError(t, err)
-	assert.Equal(t, agentCatalog.mandatory, names(addons))
-}
-
-func TestARunGetsTheAddonsItsRunTypeNamesAfterTheMandatoryOnesOnceEach(t *testing.T) {
-	cfg := config.Config{Security: true, RunTypes: config.RunTypesConfig{
-		Normal:   config.RunTypeConfig{Addons: []string{"code_beautifier"}},
-		Security: config.RunTypeConfig{Addons: []string{"composer_normalizer", "composer_audit", "composer_normalizer"}},
-	}}
-
-	addons, err := agentCatalog.create(cfg)
-
-	require.NoError(t, err)
-	assert.Equal(t, append(append([]string{}, agentCatalog.mandatory...), "composer_normalizer"), names(addons))
-}
-
-func TestARunNamingNoneOnPurposeGetsTheMandatoryOnesOnly(t *testing.T) {
-	addons, err := agentCatalog.create(config.Config{RunTypes: config.RunTypesConfig{Normal: config.RunTypeConfig{Addons: []string{}}}})
-
-	require.NoError(t, err)
-	assert.Equal(t, agentCatalog.mandatory, names(addons))
-}
-
-func TestCreatingAnUnknownAddonFails(t *testing.T) {
+func TestCreatingAnAddonTheCatalogueLacksFails(t *testing.T) {
 	_, err := agentCatalog.create(config.Config{RunTypes: config.RunTypesConfig{Normal: config.RunTypeConfig{Addons: []string{"nope"}}}})
 
 	require.EqualError(t, err, `unknown addon "nope"`)
@@ -161,5 +143,14 @@ func TestTheAgentsCatalogueIsAskedOfComposer(t *testing.T) {
 	_, err := agentAddonCatalog(t.Context(), zap.NewNop())
 
 	require.ErrorContains(t, err, "failed to read the addon catalogue")
+	assert.Contains(t, err.Error(), "composer")
+}
+
+func TestTheProjectConfigIsAskedOfComposer(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+
+	_, err := productionApp().projectConfig(t.Context(), zap.NewNop(), "/project/.drupdater.yaml")
+
+	require.ErrorContains(t, err, "failed to read the configuration")
 	assert.Contains(t, err.Error(), "composer")
 }
