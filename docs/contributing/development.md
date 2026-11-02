@@ -353,7 +353,9 @@ It needs a coverage driver, pcov or Xdebug. To iterate on one file, filter it:
 cd agent && vendor/bin/infection --threads=max --filter=src/Json.php
 ```
 
-Survivors are in `agent/build/infection/infection.log`, each with its diff. An equivalent mutant
+The agent scored 86 % MSI (2731 mutants) when Infection was introduced, so the 75 % gate is again
+a standard the code already meets. Survivors are in `agent/build/infection/infection.log`, each
+with its diff. An equivalent mutant
 is ignored in `infection.json5`, by mutator and method, with a comment saying why — the same rule
 as the Go side.
 
