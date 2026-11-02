@@ -1,8 +1,8 @@
 name: Mutation Testing
 
 # Scores the whole module with mutation testing: a surviving mutant is a line the tests execute
-# but do not check. Informational only -- the blocking gates are go.yml's and agent.yml's
-# `mutation` jobs. The `agent` job scores agent/ with Infection.
+# but do not check. Informational only -- the blocking gates are the `mutation` jobs of go.yml,
+# agent.yml and app.yml. The `php` job scores agent/ and app/ with Infection.
 #
 # One leg per package, not a single `./...` run: ~3000 mutants is over half an hour serially,
 # and `fail-fast: false` keeps one bad package from discarding the others.
@@ -153,13 +153,17 @@ jobs:
               "| `\(.package)` | \(.msi * 10000 | round / 100)% | \(.escapedCount) | \(.totalMutantsCount) |")
           ' "${files[@]}" >> "$GITHUB_STEP_SUMMARY"
 
-  agent:
-    name: agent
+  php:
+    name: ${{ matrix.package }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [ agent, app ]
     defaults:
       run:
-        working-directory: agent
+        working-directory: ${{ matrix.package }}
     steps:
       - uses: actions/checkout@v7
 
@@ -179,7 +183,7 @@ jobs:
       - name: Summary
         if: always()
         run: |
-          echo "## Mutation Testing (agent)" >> "$GITHUB_STEP_SUMMARY"
+          echo "## Mutation Testing (${{ matrix.package }})" >> "$GITHUB_STEP_SUMMARY"
           if [ ! -f build/infection/summary.json ]; then
             echo "No summary produced." >> "$GITHUB_STEP_SUMMARY"
             exit 0
@@ -199,7 +203,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: agent-mutation-report
-          path: agent/build/infection/
+          name: ${{ matrix.package }}-mutation-report
+          path: ${{ matrix.package }}/build/infection/
           if-no-files-found: warn
           retention-days: 30

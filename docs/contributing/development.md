@@ -22,6 +22,9 @@ make test-race      # the suite under the race detector
 make test-agent     # the agent's PHPUnit suite (agent/; needs PHP and Composer)
 make lint-agent     # PHPStan over the agent, at its strictest level
 make mutate-agent   # Infection over the agent (needs pcov or Xdebug)
+make test-app       # the app's PHPUnit suite (app/; needs PHP, Composer and git)
+make lint-app       # PHPStan over the app, at its strictest level
+make mutate-app     # Infection over the app (needs pcov or Xdebug)
 make test-property  # only the property tests, with far more generated cases
 make fuzz           # fuzz every target (FUZZTIME=30s each by default)
 make mutate         # mutation testing over the whole module (mutago)
@@ -359,6 +362,11 @@ with its diff. An equivalent mutant
 is ignored in `infection.json5`, by mutator and method, with a comment saying why — the same rule
 as the Go side.
 
+`app/` has the same gate, `app/infection.json5` and `make mutate-app`. It scored 96 % covered-code
+MSI when it was introduced. The survivors that are left are mostly in what only a separate process
+reaches: Infection mutates the code PHPUnit loads, not the code a test's child process loads, so
+the committer's lock is tested by eight processes committing at once, which a mutant cannot fail.
+
 ## Property-based testing
 
 Mutation testing asks whether a test would notice if the code changed. Property-based testing
@@ -676,17 +684,48 @@ throwaway `COMPOSER_HOME`, as the image does, and runs the commands through a re
 `require-dev` stays on the Dockerfile's minor, so the tests exercise the Composer the image
 ships.
 
+## The app
+
+`app/` is `drupdater/app`, drupdater's own PHP console application: the start of moving the
+runner out of Go. It is not a Composer plugin. It has its own `vendor/`, and reaches a project's
+Composer only through the agent, one `composer drupdater:*` process per call, so every call loads
+the project's autoloader as it stands. The binary calls its [`internal:*`
+commands](../reference/docker-images.md#drupdater-app) through `agent.Call`, in the same
+envelope, and `internal/composer` wraps each: `Fire` and `Commit`.
+
+| Path | Contains |
+|---|---|
+| `app/src/Pipeline/` | Firing one event: the hooks in stage order, the plan merge, the findings recorded |
+| `app/src/Git/` | The git CLI with drupdater's fixed arguments, and the committer, locked per working copy |
+| `app/src/Agent/` | The agent client: one process per call, its envelope and log read back |
+| `app/src/Command/` | The commands, each answering one request with one envelope |
+
+`app/protocol/` holds an example of each request the binary sends and each reply; PHPUnit asserts
+the app answers each, `internal/composer` that the binary sends and decodes each. What the app
+sends the agent is `agent/protocol/hook/`, which the app's suite asserts too. All three speak one
+`protocol` version: a breaking change bumps it in `app/src/Protocol.php`, `agent/src/Protocol.php`
+and `internal/agent/agent.go` together.
+
+```bash
+make test-app
+make lint-app
+```
+
+PHPStan runs at `max` with no baseline, as for the agent, and the app reads JSON through its own
+`Drupdater\App\Json`: the app and the agent share no PHP code, only the protocol.
+
 ## Code layout
 
 | Path | Contains |
 |---|---|
 | `main.go` → `cmd/` | Cobra commands, flag parsing, service construction, the agent's addon catalogue |
-| `internal/workflow/` | The workflow runner, its phases, events, the pipeline that runs the addons' hooks in the agent, and preflight checks |
+| `internal/workflow/` | The workflow runner, its phases, events, the pipeline that fires them through the app and keeps the findings, and preflight checks |
 | `internal/codehosting/` | The GitHub and GitLab implementations and the provider factory |
 | `internal/report/` | The published JSON report schema and its writer |
 | `internal/logging/` | The redactor |
 | `internal/composer/`, `repo/`, `php/` | Thin wrappers around external tools |
 | `agent/`, `internal/agent/` | [The agent](#the-agent): drupdater's Composer plugin, and the Go client for it |
+| `app/` | [The app](#the-app): the hook pipeline and the commits, in PHP |
 
 Where the project keeps its web root, and the lock hash that names the update branch, comes from
 the agent, as `composer.Project`, not from a Go reader of `composer.json` or the lock.

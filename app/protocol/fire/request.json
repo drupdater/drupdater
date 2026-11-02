@@ -1,0 +1,44 @@
+{
+  "protocol": 6,
+  "request": {
+    "event": {
+      "name": "pre-composer-update",
+      "plan": {
+        "only": [],
+        "keep": [],
+        "minimal_changes": false
+      }
+    },
+    "addons": [
+      {
+        "name": "composer_patches",
+        "hooks": {
+          "pre-composer-update": "change",
+          "post-composer-update": "change"
+        },
+        "findings": []
+      },
+      {
+        "name": "composer_audit",
+        "hooks": {
+          "pre-composer-update": "prepare"
+        },
+        "findings": [
+          {
+            "event": "post-site-update",
+            "site": "default",
+            "finding": {},
+            "committed": []
+          }
+        ]
+      }
+    ],
+    "run": {
+      "security": true
+    },
+    "author": {
+      "name": "drupdater",
+      "email": "drupdater@localhost"
+    }
+  }
+}

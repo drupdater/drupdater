@@ -18,8 +18,8 @@ import (
 	"github.com/drupdater/drupdater/internal/php"
 )
 
-// Protocol is the envelope version this binary speaks. Bump it, here and in agent/src/Protocol.php,
-// whenever a request or result changes shape.
+// Protocol is the envelope version this binary speaks. Bump it, here, in agent/src/Protocol.php and
+// in app/src/Protocol.php, whenever a request or result changes shape.
 const Protocol = 6
 
 // Kind classifies a failure the agent reported. The agent decides it, from the exception it

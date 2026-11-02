@@ -68,7 +68,6 @@ func TestRunWithConcurrentSites(t *testing.T) {
 			h.sites.EXPECT().ExportConfiguration(anyCtx, testCheckout, site).RunAndReturn(func(ctx context.Context, dir string, site string) (string, error) {
 				return "config/" + site, commitTail.probe(ctx, dir, site)
 			}).Once()
-			h.worktree.EXPECT().Stage(anyCtx, []string{"config/" + site}).Return(nil).Once()
 		}
 
 		require.NoError(t, h.run(t))
@@ -84,7 +83,7 @@ func TestRunWithConcurrentSites(t *testing.T) {
 
 // sitesRunner is a Runner whose sites each export to config/<site>, and which records the order
 // the exports happen in. stub sets what each site's update hooks do.
-func sitesRunner(t *testing.T, sites []string, concurrency int, stub func(site string) error) (*run, *fakeCommitter, func() []string) {
+func sitesRunner(t *testing.T, sites []string, concurrency int, stub func(site string) error) (*run, *scriptedApp, func() []string) {
 	t.Helper()
 	mockSites := NewMockSites(t)
 	var mu sync.Mutex
@@ -105,26 +104,20 @@ func sitesRunner(t *testing.T, sites []string, concurrency int, stub func(site s
 		}).Maybe()
 	}
 
-	committer := &fakeCommitter{result: true}
+	app := &scriptedApp{}
+	mockComposer := NewMockComposer(t)
+	app.serve(mockComposer)
 	r := testRun(services{
-		logger: zap.NewNop(),
-		config: config.Config{Sites: sites, Concurrency: concurrency},
-		sites:  mockSites,
+		logger:   zap.NewNop(),
+		config:   config.Config{Sites: sites, Concurrency: concurrency},
+		sites:    mockSites,
+		composer: mockComposer,
 	}, repo.Checkout{Path: testCheckout})
-	r.committer = committer
-	return r, committer, func() []string {
+	return r, app, func() []string {
 		mu.Lock()
 		defer mu.Unlock()
 		return slices.Clone(exported)
 	}
-}
-
-func commitMessages(c *fakeCommitter) []string {
-	messages := make([]string, 0, len(c.commits))
-	for _, commit := range c.commits {
-		messages = append(messages, commit.message)
-	}
-	return messages
 }
 
 func TestUpdateSitesCommitsInSiteOrderHoweverTheSitesFinish(t *testing.T) {
@@ -137,7 +130,7 @@ func TestUpdateSitesCommitsInSiteOrderHoweverTheSitesFinish(t *testing.T) {
 		for _, site := range sites {
 			finished[site] = make(chan struct{})
 		}
-		r, committer, exported := sitesRunner(t, sites, len(sites), func(site string) error {
+		r, app, exported := sitesRunner(t, sites, len(sites), func(site string) error {
 			defer close(finished[site])
 			if i := slices.Index(sites, site); i+1 < len(sites) {
 				<-finished[sites[i+1]]
@@ -148,7 +141,7 @@ func TestUpdateSitesCommitsInSiteOrderHoweverTheSitesFinish(t *testing.T) {
 		require.NoError(t, r.updateSites(t.Context()))
 
 		assert.Equal(t, sites, exported())
-		assert.Equal(t, []string{"Update configuration site1", "Update configuration site2", "Update configuration site3"}, commitMessages(committer))
+		assert.Equal(t, []string{"Update configuration site1", "Update configuration site2", "Update configuration site3"}, app.committed())
 	})
 }
 
@@ -156,12 +149,12 @@ func TestUpdateSitesRunsInOrderWithOneSiteAtATime(t *testing.T) {
 	// synctest fails a deadlock of the sites at once rather than hanging the suite.
 	synctest.Test(t, func(t *testing.T) {
 		sites := []string{"site1", "site2", "site3"}
-		r, committer, exported := sitesRunner(t, sites, 1, func(string) error { return nil })
+		r, app, exported := sitesRunner(t, sites, 1, func(string) error { return nil })
 
 		require.NoError(t, r.updateSites(t.Context()))
 
 		assert.Equal(t, sites, exported())
-		assert.Len(t, committer.commits, len(sites))
+		assert.Len(t, app.committed(), len(sites))
 	})
 }
 
@@ -172,7 +165,7 @@ func TestUpdateSitesWritesNothingAfterAnySiteFails(t *testing.T) {
 		// site1 fails only once the later sites have finished their database work, so a later site
 		// writing regardless would show up as an export.
 		waiting := make(chan struct{}, len(sites))
-		r, committer, exported := sitesRunner(t, sites, len(sites), func(site string) error {
+		r, app, exported := sitesRunner(t, sites, len(sites), func(site string) error {
 			if site != "site1" {
 				waiting <- struct{}{}
 				return nil
@@ -186,6 +179,6 @@ func TestUpdateSitesWritesNothingAfterAnySiteFails(t *testing.T) {
 
 		require.ErrorIs(t, err, assert.AnError)
 		assert.Empty(t, exported(), "a site exported although another failed")
-		assert.Empty(t, committer.commits)
+		assert.Empty(t, app.committed())
 	})
 }

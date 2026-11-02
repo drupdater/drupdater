@@ -1,0 +1,45 @@
+{
+  "protocol": 6,
+  "command": "internal:fire",
+  "ok": true,
+  "result": {
+    "recorded": [
+      {
+        "addon": "composer_audit",
+        "finding": {
+          "event": "pre-composer-update",
+          "site": "",
+          "finding": {
+            "advisories": 1
+          },
+          "committed": []
+        }
+      },
+      {
+        "addon": "composer_patches",
+        "finding": {
+          "event": "pre-composer-update",
+          "site": "",
+          "finding": null,
+          "committed": [
+            "Pin drupal/core"
+          ]
+        }
+      }
+    ],
+    "plan": {
+      "only": [
+        "drupal/core"
+      ],
+      "keep": [
+        {
+          "package": "drupal/core",
+          "version": "10.3.1"
+        }
+      ],
+      "minimal_changes": true
+    },
+    "abort": "",
+    "failure": ""
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "protocol": 6,
+  "command": "internal:commit",
+  "ok": true,
+  "result": {
+    "committed": [
+      "Update configuration default"
+    ]
+  }
+}

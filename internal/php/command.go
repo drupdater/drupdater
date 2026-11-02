@@ -4,6 +4,7 @@ package php
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"io"
 	"os/exec"
@@ -16,18 +17,21 @@ import (
 // CommandFactory builds the *exec.Cmd to run: exec.CommandContext, or a test's fake.
 type CommandFactory func(ctx context.Context, name string, args ...string) *exec.Cmd
 
-// Command is one composer invocation: run in Dir, under the environment Env guarantees.
+// Command is one invocation of composer, or of drupdater's PHP app, which runs composer itself:
+// run in Dir, under the environment Env guarantees.
 type Command struct {
 	New    CommandFactory
 	Logger *zap.Logger
-	Dir    string
+	// Program is what runs; "" is composer.
+	Program string
+	Dir     string
 	// ExtraEnv is appended after Env, so it wins over anything inherited.
 	ExtraEnv []string
 	Stdin    io.Reader
 }
 
 func (c Command) build(ctx context.Context, args ...string) *exec.Cmd {
-	command := c.New(ctx, "composer", args...)
+	command := c.New(ctx, cmp.Or(c.Program, "composer"), args...)
 	command.Dir = c.Dir
 	command.Stdin = c.Stdin
 	// Environ() falls back to os.Environ(), layering on the deployment's environment.

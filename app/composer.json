@@ -1,0 +1,37 @@
+{
+    "name": "drupdater/app",
+    "description": "drupdater itself: the run, its hook pipeline and the git it does, calling the agent for everything inside a project's Composer.",
+    "type": "project",
+    "license": "Apache-2.0",
+    "require": {
+        "php": ">=8.3",
+        "symfony/console": "^7.4",
+        "symfony/process": "^7.4"
+    },
+    "require-dev": {
+        "infection/infection": "^0.32.7",
+        "phpstan/phpstan": "^2.3",
+        "phpstan/phpstan-phpunit": "^2.1",
+        "phpunit/phpunit": "^11.5"
+    },
+    "autoload": {
+        "psr-4": {
+            "Drupdater\\App\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Drupdater\\App\\Tests\\": "tests/"
+        }
+    },
+    "bin": ["bin/drupdater"],
+    "config": {
+        "allow-plugins": {
+            "infection/extension-installer": true
+        },
+        "platform": {
+            "php": "8.3.0"
+        },
+        "sort-packages": true
+    }
+}

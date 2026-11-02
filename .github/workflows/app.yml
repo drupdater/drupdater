@@ -1,0 +1,115 @@
+name: App
+
+# drupdater's PHP app: app/, the `internal:*` commands the binary calls, which call the agent in
+# turn. Its suite runs against agent/protocol/'s fixtures too, and app/protocol's are shared with
+# internal/composer, whose side go.yml tests on every push.
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "app/**"
+      - "agent/protocol/**"
+      - ".github/workflows/app.yml"
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - "app/**"
+      - "agent/protocol/**"
+      - ".github/workflows/app.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  phpunit:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The lowest and the highest PHP the image is published for.
+        php: [ "8.3", "8.5" ]
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          tools: composer:2.10
+          coverage: none
+
+      - name: Validate composer.json
+        run: composer validate --strict
+
+      - name: Install
+        run: composer install --no-interaction --no-progress
+
+      - name: PHPStan
+        run: vendor/bin/phpstan analyse --no-progress --memory-limit=1G
+
+      - name: PHPUnit
+        run: vendor/bin/phpunit
+
+  # The app's counterpart of go.yml's `mutation` job: Infection on the lines the pull request
+  # changes, blocking below the same 75 % MSI. mutation.yml scores all of it weekly.
+  mutation:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # --git-diff-lines diffs against the merge base, which needs history.
+          fetch-depth: 0
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.5"
+          tools: composer:2.10
+          coverage: pcov
+
+      - name: Install
+        run: composer install --no-interaction --no-progress
+
+      # diff.relative: Infection runs in app/ but would read git's paths from the repository root.
+      - name: Mutation testing on changed lines
+        env:
+          GIT_CONFIG_COUNT: "1"
+          GIT_CONFIG_KEY_0: diff.relative
+          GIT_CONFIG_VALUE_0: "true"
+        run: |
+          vendor/bin/infection \
+            --threads=max \
+            --git-diff-lines \
+            --git-diff-base=origin/${{ github.base_ref }} \
+            --ignore-msi-with-no-mutations \
+            --min-msi=75 \
+            --logger-github \
+            --no-progress
+
+      - name: Mutation Summary
+        if: always()
+        run: |
+          echo "## Mutation Testing, app (changed lines)" >> $GITHUB_STEP_SUMMARY
+          if [ ! -f build/infection/summary.json ]; then
+            echo "No summary produced." >> $GITHUB_STEP_SUMMARY
+            exit 0
+          fi
+          jq -r '
+            if .stats.totalMutantsCount == 0 then
+              "No mutable lines changed."
+            else
+              "**MSI:** \(.stats.msi | floor)% "
+              + "(\(.stats.killedCount) killed, \(.stats.escapedCount) escaped, "
+              + "\(.stats.notCoveredCount) not covered, \(.stats.totalMutantsCount) total)"
+            end
+          ' build/infection/summary.json >> $GITHUB_STEP_SUMMARY

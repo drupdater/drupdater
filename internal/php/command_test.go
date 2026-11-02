@@ -32,6 +32,14 @@ func TestCommandBuild(t *testing.T) {
 		assert.Equal(t, []string{"composer", "update", "--dry-run"}, seen)
 	})
 
+	t.Run("runs Program instead when one is named", func(t *testing.T) {
+		var seen []string
+		c := Command{New: shellCommand("true", &seen), Logger: zap.NewNop(), Program: "/opt/app"}
+		_, _, err := c.Split(t.Context(), "internal:fire")
+		require.NoError(t, err)
+		assert.Equal(t, []string{"/opt/app", "internal:fire"}, seen)
+	})
+
 	t.Run("runs in Dir", func(t *testing.T) {
 		var seen []string
 		dir := t.TempDir()

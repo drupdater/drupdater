@@ -1,0 +1,23 @@
+{
+  "protocol": 6,
+  "command": "internal:fire",
+  "ok": true,
+  "result": {
+    "recorded": [
+      {
+        "addon": "composer_audit",
+        "finding": {
+          "event": "pre-composer-update",
+          "site": "",
+          "finding": {
+            "advisories": 1
+          },
+          "committed": []
+        }
+      }
+    ],
+    "plan": null,
+    "abort": "",
+    "failure": "pre-composer-update hook failed: composer_patches: drupdater:hook: failed (the patch does not apply)"
+  }
+}

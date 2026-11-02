@@ -42,11 +42,11 @@ func postSiteUpdate(site string, facts json.RawMessage) event {
 	return event{name: EventPostSiteUpdate, site: site, facts: facts}
 }
 
-// payload is the event as a hook sees it, with the plan its stage settled.
-func (e event) payload(settled UpdatePlan) agent.Event {
+// payload is the event as the app reads it.
+func (e event) payload() agent.Event {
 	payload := agent.Event{Name: e.name, Site: e.site, BaseLock: e.baseLock, Facts: e.facts}
 	if e.name == EventPreComposerUpdate {
-		payload.Plan = settled.toAgent()
+		payload.Plan = e.plan.toAgent()
 	}
 	return payload
 }

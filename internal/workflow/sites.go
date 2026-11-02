@@ -9,7 +9,6 @@ import (
 
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
-
 )
 
 // forEachSite runs fn per site concurrently, bounded by config.Concurrency, cancelling the rest
@@ -80,7 +79,7 @@ func (r *run) updateDatabase(ctx context.Context, site string) (json.RawMessage,
 		return nil, err
 	}
 
-	if _, err := r.pipeline.fire(ctx, r.path, r.committer, preSiteUpdate(site, facts)); err != nil {
+	if _, err := r.fire(ctx, preSiteUpdate(site, facts)); err != nil {
 		return nil, err
 	}
 
@@ -88,7 +87,7 @@ func (r *run) updateDatabase(ctx context.Context, site string) (json.RawMessage,
 }
 
 func (r *run) commitSiteChanges(ctx context.Context, site string, facts json.RawMessage) error {
-	if _, err := r.pipeline.fire(ctx, r.path, r.committer, postSiteUpdate(site, facts)); err != nil {
+	if _, err := r.fire(ctx, postSiteUpdate(site, facts)); err != nil {
 		return err
 	}
 
@@ -101,7 +100,7 @@ func (r *run) commitSiteChanges(ctx context.Context, site string, facts json.Raw
 	if exported == "" {
 		return fmt.Errorf("failed to locate the exported configuration: site %s has no config sync directory", site)
 	}
-	if _, err := r.committer.Commit(ctx, "Update configuration "+site, exported); err != nil {
+	if _, err := r.commit(ctx, "Update configuration "+site, exported); err != nil {
 		return fmt.Errorf("failed to commit the exported configuration: %w", err)
 	}
 
