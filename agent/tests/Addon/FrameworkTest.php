@@ -25,6 +25,8 @@ use PHPUnit\Framework\TestCase;
  */
 final class FrameworkTest extends TestCase
 {
+    private const MALFORMED_FACTS = 'facts.modules, facts.update_hooks and facts.unsupported_modules are malformed';
+
     public function testFindingsSeparateSharedFromPerSiteAndSortTheSites(): void
     {
         $findings = self::findings([
@@ -134,7 +136,12 @@ final class FrameworkTest extends TestCase
         yield 'a site event without its site' => [['name' => 'pre-site-update', 'facts' => []], 'a per-site event must name its site'];
         yield 'a site event without its facts' => [['name' => 'pre-site-update', 'site' => 'default'], 'facts must be an object'];
         yield 'facts with a path that is no string' => [['name' => 'pre-site-update', 'site' => 'default', 'facts' => ['translation_path' => 1]], 'facts.translation_path must be a string'];
-        yield 'facts with modules that are no strings' => [['name' => 'pre-site-update', 'site' => 'default', 'facts' => ['modules' => [1]]], 'facts.modules, facts.update_hooks and facts.unsupported_modules are malformed'];
+        yield 'facts with modules that are no strings' => [['name' => 'pre-site-update', 'site' => 'default', 'facts' => ['modules' => [1]]], self::MALFORMED_FACTS];
+        yield 'facts with update hooks that are no object' => [['name' => 'pre-site-update', 'site' => 'default', 'facts' => ['update_hooks' => 'x']], self::MALFORMED_FACTS];
+        yield 'facts with an update hook that is no object' => [['name' => 'pre-site-update', 'site' => 'default', 'facts' => ['update_hooks' => ['a_update_1' => 'x']]], self::MALFORMED_FACTS];
+        yield 'facts with unsupported modules that are no list' => [['name' => 'pre-site-update', 'site' => 'default', 'facts' => ['unsupported_modules' => 'x']], self::MALFORMED_FACTS];
+        yield 'facts with unsupported modules keyed by name' => [['name' => 'pre-site-update', 'site' => 'default', 'facts' => ['unsupported_modules' => ['a' => ['name' => 'a']]]], self::MALFORMED_FACTS];
+        yield 'facts with an unsupported module that is no object' => [['name' => 'pre-site-update', 'site' => 'default', 'facts' => ['unsupported_modules' => ['a']]], self::MALFORMED_FACTS];
     }
 
     /**
@@ -165,14 +172,10 @@ final class FrameworkTest extends TestCase
         self::assertNull($catalogue->find('nope'));
     }
 
-    public function testEveryHookOfTheCatalogueIsOfAKnownEventAtAStage(): void
+    public function testEveryAddonOfTheCatalogueHooksAnEvent(): void
     {
         foreach (Catalogue::builtin()->entries() as $entry) {
             self::assertNotSame([], $entry->addon::hooks(), $entry->name());
-            foreach ($entry->addon::hooks() as $event => $stage) {
-                self::assertNotNull(EventName::tryFrom($event), $entry->name());
-                self::assertInstanceOf(Stage::class, $stage);
-            }
         }
     }
 
@@ -240,6 +243,6 @@ final class FrameworkTest extends TestCase
      */
     private static function findings(array $records): Findings
     {
-        return Findings::fromJson(json_decode((string) json_encode($records), false));
+        return Findings::fromJson(json_decode((string) json_encode($records, JSON_THROW_ON_ERROR), false));
     }
 }

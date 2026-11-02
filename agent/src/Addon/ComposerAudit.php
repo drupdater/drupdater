@@ -4,17 +4,22 @@ declare(strict_types=1);
 
 namespace Drupdater\Agent\Addon;
 
+use Drupdater\Agent\Audit\LockAudit;
+use Drupdater\Agent\Json;
 use Drupdater\Agent\Log;
 
 /**
  * composer_audit: audits the lock before and after the update, so a routine update that closes
  * an advisory says so. Only a security run lets the audit decide the update's scope, and ends the
  * run when there is nothing to fix.
+ *
+ * @phpstan-import-type Advisory from LockAudit
+ * @phpstan-type Abandoned array{packageName: string, replacement: string}
  */
 final class ComposerAudit implements Addon
 {
     /**
-     * @param \Closure(): array{advisories: list<array<string, mixed>>, abandoned: list<array{package: string, replacement: string|null}>} $audit
+     * @param \Closure(): array{advisories: list<Advisory>, abandoned: list<array{package: string, replacement: string|null}>} $audit
      *   LockAudit's audit of the lock as it stands when called
      */
     public function __construct(private readonly Log $log, private readonly \Closure $audit)
@@ -47,9 +52,9 @@ final class ComposerAudit implements Addon
             return $this->before($event, $audit);
         }
 
-        $before = $event->earlier->shared(EventName::PreComposerUpdate)?->finding() ?? ['advisories' => [], 'abandoned' => []];
+        $before = Json::maps(Json::at($event->earlier->shared(EventName::PreComposerUpdate)?->finding(), 'advisories'));
         $this->log->info('security advisories', [
-            'fixed' => count(self::fixed($before['advisories'], $audit['advisories'])),
+            'fixed' => count(self::fixed($before, $audit['advisories'])),
             'unresolved' => count($audit['advisories']),
             'abandoned' => count(self::abandoned($audit['abandoned'])),
         ]);
@@ -66,13 +71,16 @@ final class ComposerAudit implements Addon
         if (!is_array($after)) {
             return null;
         }
-        $before = $findings->shared(EventName::PreComposerUpdate)?->finding() ?? ['advisories' => []];
-        $fixed = self::fixed($before['advisories'], $after['advisories']);
-        $abandoned = self::abandoned($after['abandoned']);
-        if ($fixed === [] && $after['advisories'] === [] && $abandoned === []) {
+        $remaining = Json::maps(Json::at($after, 'advisories'));
+        $fixed = self::fixed(Json::maps(Json::at($findings->shared(EventName::PreComposerUpdate)?->finding(), 'advisories')), $remaining);
+        $abandoned = self::abandoned(array_map(
+            static fn (array $package): array => ['packageName' => Json::string(Json::at($package, 'packageName')), 'replacement' => Json::string(Json::at($package, 'replacement'))],
+            Json::maps(Json::at($after, 'abandoned')),
+        ));
+        if ($fixed === [] && $remaining === [] && $abandoned === []) {
             return null;
         }
-        return ['fixed' => $fixed, 'remaining' => $after['advisories'], 'abandoned' => $abandoned];
+        return ['fixed' => $fixed, 'remaining' => $remaining, 'abandoned' => $abandoned];
     }
 
     /**
@@ -97,21 +105,23 @@ final class ComposerAudit implements Addon
      */
     public static function key(array $advisory): string
     {
-        if (($advisory['cve'] ?? '') !== '') {
-            return 'cve:' . $advisory['cve'];
+        $cve = Json::string(Json::at($advisory, 'cve'));
+        if ($cve !== '') {
+            return 'cve:' . $cve;
         }
-        if (($advisory['advisoryId'] ?? '') !== '') {
-            return 'id:' . $advisory['advisoryId'];
+        $id = Json::string(Json::at($advisory, 'advisoryId'));
+        if ($id !== '') {
+            return 'id:' . $id;
         }
-        return 'pkg:' . json_encode([(string) ($advisory['packageName'] ?? ''), (string) ($advisory['title'] ?? '')], JSON_THROW_ON_ERROR);
+        return 'pkg:' . json_encode([Json::string(Json::at($advisory, 'packageName')), Json::string(Json::at($advisory, 'title'))], JSON_THROW_ON_ERROR);
     }
 
     /**
      * Minus drupal/*: unsupported_modules reports those from drupal.org's release data, and
      * twice would read as two findings.
      *
-     * @param list<array{packageName: string, replacement: string}> $abandoned
-     * @return list<array{packageName: string, replacement: string}>
+     * @param list<Abandoned> $abandoned
+     * @return list<Abandoned>
      */
     public static function abandoned(array $abandoned): array
     {
@@ -119,14 +129,14 @@ final class ComposerAudit implements Addon
     }
 
     /**
-     * @param array{advisories: list<array<string, mixed>>, abandoned: list<array<string, mixed>>} $audit
+     * @param array{advisories: list<array<string, mixed>>, abandoned: list<Abandoned>} $audit
      */
     private function before(Event $event, array $audit): HookResult
     {
         if (!$event->security) {
             return new HookResult($audit);
         }
-        $packages = array_values(array_unique(array_map(static fn (array $advisory): string => $advisory['packageName'], $audit['advisories'])));
+        $packages = array_values(array_unique(array_map(static fn (array $advisory): string => Json::string(Json::at($advisory, 'packageName')), $audit['advisories'])));
         if ($packages === []) {
             throw new AbortRun('No security advisories found');
         }
@@ -140,28 +150,28 @@ final class ComposerAudit implements Addon
      * LockAudit's audit in the report's own names, which the merge request reads; an absent
      * value as "".
      *
-     * @param array{advisories: list<array<string, mixed>>, abandoned: list<array{package: string, replacement: string|null}>} $audit
-     * @return array{advisories: list<array<string, mixed>>, abandoned: list<array{packageName: string, replacement: string}>}
+     * @param array{advisories: list<Advisory>, abandoned: list<array{package: string, replacement: string|null}>} $audit
+     * @return array{advisories: list<array<string, mixed>>, abandoned: list<Abandoned>}
      */
     private static function reportShape(array $audit): array
     {
         return [
             'advisories' => array_map(static fn (array $advisory): array => [
-                'reportedAt' => (string) ($advisory['reported_at'] ?? ''),
-                'severity' => (string) ($advisory['severity'] ?? ''),
-                'advisoryId' => (string) ($advisory['advisory_id'] ?? ''),
-                'cve' => (string) ($advisory['cve'] ?? ''),
+                'reportedAt' => $advisory['reported_at'],
+                'severity' => $advisory['severity'] ?? '',
+                'advisoryId' => $advisory['advisory_id'],
+                'cve' => $advisory['cve'] ?? '',
                 'sources' => array_map(
-                    static fn (array $source): array => ['name' => (string) $source['name'], 'remoteId' => (string) $source['remote_id']],
-                    $advisory['sources'] ?? [],
+                    static fn (array $source): array => ['name' => $source['name'], 'remoteId' => $source['remote_id']],
+                    $advisory['sources'],
                 ),
-                'link' => (string) ($advisory['link'] ?? ''),
-                'packageName' => (string) ($advisory['package'] ?? ''),
-                'affectedVersions' => (string) ($advisory['affected_versions'] ?? ''),
-                'title' => (string) ($advisory['title'] ?? ''),
+                'link' => $advisory['link'] ?? '',
+                'packageName' => $advisory['package'],
+                'affectedVersions' => $advisory['affected_versions'],
+                'title' => $advisory['title'],
             ], $audit['advisories']),
             'abandoned' => array_map(
-                static fn (array $package): array => ['packageName' => $package['package'], 'replacement' => (string) $package['replacement']],
+                static fn (array $package): array => ['packageName' => $package['package'], 'replacement' => $package['replacement'] ?? ''],
                 $audit['abandoned'],
             ),
         ];

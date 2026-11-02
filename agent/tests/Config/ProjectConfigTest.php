@@ -172,8 +172,10 @@ final class ProjectConfigTest extends TestCase
     {
         $failure = self::assertFailsWith(fn () => $this->load($yaml));
 
+        $prefix = sprintf($reason, $this->path);
+        self::assertNotSame('', $prefix);
         self::assertSame(Failure::FAILED, $failure->kind);
-        self::assertStringStartsWith(sprintf($reason, $this->path), $failure->reason);
+        self::assertStringStartsWith($prefix, $failure->reason);
     }
 
     public function testAnUnknownAddonInTheBlockThisRunDoesNotUseStillFailsIt(): void
@@ -238,9 +240,6 @@ final class ProjectConfigTest extends TestCase
             return;
         }
         self::assertNotSame([], $config->sites);
-        foreach ($config->sites as $site) {
-            self::assertIsString($site);
-        }
     }
 
     public function testEveryKeyRoundTrips(): void

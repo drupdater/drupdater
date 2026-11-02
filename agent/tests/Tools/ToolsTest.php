@@ -73,7 +73,7 @@ final class ToolsTest extends TestCase
             'totals' => ['changed_files' => 1, 'errors' => 0],
             'file_diffs' => [['file' => 'web/modules/custom/demo.module', 'diff' => '...', 'applied_rectors' => ['R']]],
             'changed_files' => ['web/modules/custom/demo.module'],
-        ]), '')]);
+        ], JSON_THROW_ON_ERROR), '')]);
 
         $result = Rector::project($runner, new Bin('/bin'), '/agent/rector.php', $project)->process(['web/modules/custom']);
 
@@ -98,7 +98,7 @@ final class ToolsTest extends TestCase
 
     public function testRectorThatFailsOrChangedAFileThatIsGoneIsAFailure(): void
     {
-        $gone = json_encode(['file_diffs' => [['file' => 'missing.php', 'applied_rectors' => []]], 'changed_files' => ['missing.php']]);
+        $gone = json_encode(['file_diffs' => [['file' => 'missing.php', 'applied_rectors' => []]], 'changed_files' => ['missing.php']], JSON_THROW_ON_ERROR);
         foreach ([new ProcessResult(1, '', 'boom'), new ProcessResult(0, '{', ''), new ProcessResult(0, (string) $gone, '')] as $result) {
             try {
                 Rector::project(new FakeProcessRunner([$result]), new Bin('/bin'), 'c', $this->scratchDir())->process(['web']);
@@ -133,7 +133,7 @@ final class ToolsTest extends TestCase
         $facts = $drush->facts('example.com', true);
         $drush->facts('example.com', false);
 
-        self::assertSame('{"modules":["node"],"update_hooks":{}}', json_encode($facts));
+        self::assertSame('{"modules":["node"],"update_hooks":{}}', json_encode($facts, JSON_THROW_ON_ERROR));
         self::assertSame(['/p/vendor/bin/drush', '--include=/agent/resources/drush', 'drupdater:facts'], $runner->runs[0]['command']);
         self::assertSame(['/p/vendor/bin/drush', '--include=/agent/resources/drush', 'drupdater:facts', '--skip-update-status'], $runner->runs[1]['command']);
         self::assertSame(['/p', 'example.com'], [$runner->runs[0]['cwd'], $runner->runs[0]['env']['SITE_NAME']]);

@@ -219,7 +219,7 @@ final class TestDatabaseTest extends TestCase
 
     private function drushStatus(): ProcessResult
     {
-        return new ProcessResult(0, (string) json_encode(['config-sync' => '../config/sync', 'root' => $this->project . '/web']), '');
+        return new ProcessResult(0, (string) json_encode(['config-sync' => '../config/sync', 'root' => $this->project . '/web'], JSON_THROW_ON_ERROR), '');
     }
 
     private function database(?string $webRoot = 'web'): TestDatabase

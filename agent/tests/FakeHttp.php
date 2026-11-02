@@ -30,14 +30,14 @@ final class FakeHttp extends HttpDownloader
     public function get(string $url, array $options = [])
     {
         $this->requests[] = ['url' => $url, 'options' => $options];
-        return new Response(['url' => $url], 200, [], $this->body($url));
+        return new Response(self::request($url), 200, [], $this->body($url));
     }
 
     public function copy(string $url, string $to, array $options = [])
     {
         $this->requests[] = ['url' => $url, 'options' => $options];
         file_put_contents($to, $this->body($url));
-        return new Response(['url' => $url], 200, [], '');
+        return new Response(self::request($url), 200, [], '');
     }
 
     private function body(string $url): string
@@ -49,5 +49,13 @@ final class FakeHttp extends HttpDownloader
             throw $e;
         }
         return $route;
+    }
+
+    /**
+     * @return array{url: non-empty-string}
+     */
+    private static function request(string $url): array
+    {
+        return ['url' => $url !== '' ? $url : throw new \LogicException('a request needs a URL')];
     }
 }

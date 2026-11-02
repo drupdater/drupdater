@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupdater\Agent\Addon;
 
 use Drupdater\Agent\Failure;
+use Drupdater\Agent\Json;
 use Drupdater\Agent\Plugins\AllowPlugins;
 
 /**
@@ -59,11 +60,11 @@ final class ComposerAllowPlugins implements Addon
     /** The plugins it denied, which each need someone to decide whether to trust them. */
     public static function report(Findings $findings): mixed
     {
-        $denied = $findings->shared(EventName::PostComposerUpdate)?->finding();
-        if (!is_array($denied) || $denied === []) {
+        $denied = Json::strings($findings->shared(EventName::PostComposerUpdate)?->finding());
+        if ($denied === []) {
             return null;
         }
         sort($denied, SORT_STRING);
-        return ['added' => array_values($denied)];
+        return ['added' => $denied];
     }
 }

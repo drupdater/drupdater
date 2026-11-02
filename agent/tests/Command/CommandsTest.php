@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace Drupdater\Agent\Tests\Command;
 
+use Composer\Command\BaseCommand;
 use Composer\Console\Application;
 use Drupdater\Agent\Command\AgentCommand;
 use Drupdater\Agent\Command\HandshakeCommand;
 use Drupdater\Agent\CommandProvider;
+use Drupdater\Agent\Json;
 use Drupdater\Agent\Plugin;
+use Drupdater\Agent\Tests\Decoded;
 use Drupdater\Agent\Tests\Scratch;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -21,7 +24,7 @@ final class CommandsTest extends TestCase
     public function testThePluginProvidesEveryCommand(): void
     {
         self::assertSame([\Composer\Plugin\Capability\CommandProvider::class => CommandProvider::class], (new Plugin())->getCapabilities());
-        $names = array_map(fn (AgentCommand $c) => $c->getName(), (new CommandProvider())->getCommands());
+        $names = array_map(static fn (BaseCommand $c): ?string => $c->getName(), (new CommandProvider())->getCommands());
         self::assertSame([
             'drupdater:addons',
             'drupdater:config',
@@ -81,14 +84,14 @@ final class CommandsTest extends TestCase
 
         self::assertSame(1, $tester->execute([]));
         $reply = json_decode($tester->getDisplay(), true);
-        self::assertSame('invalid_request', $reply['error']['kind']);
-        self::assertSame($reason, $reply['error']['reason']);
+        self::assertSame('invalid_request', Json::at($reply, 'error', 'kind'));
+        self::assertSame($reason, Json::at($reply, 'error', 'reason'));
     }
 
     public function testTheReplyIsTheOutputsOnlyLine(): void
     {
         $tester = self::tester(new HandshakeCommand());
-        $tester->setInputs([json_encode(self::fixture('handshake/request.json'))]);
+        $tester->setInputs([json_encode(self::fixture('handshake/request.json'), JSON_THROW_ON_ERROR)]);
         $tester->execute([]);
 
         self::assertSame(1, substr_count(rtrim($tester->getDisplay()), "\n") + 1);
@@ -103,7 +106,7 @@ final class CommandsTest extends TestCase
         $tester = self::tester($command);
         $tester->setInputs([json_encode($request, JSON_THROW_ON_ERROR)]);
         $status = $tester->execute([]);
-        return [$status, json_decode($tester->getDisplay(), true, 512, JSON_THROW_ON_ERROR)];
+        return [$status, Decoded::envelope($tester->getDisplay())];
     }
 
     private static function tester(AgentCommand $command): CommandTester

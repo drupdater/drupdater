@@ -15,6 +15,7 @@ use Drupdater\Agent\DrupalOrg\DrupalOrg;
 use Drupdater\Agent\DrupalOrg\ForkMergeRequest;
 use Drupdater\Agent\DrupalOrg\Issue;
 use Drupdater\Agent\Failure;
+use Drupdater\Agent\Json;
 use Drupdater\Agent\Log;
 use Drupdater\Agent\PatchCheck\PatchChecker;
 use Drupdater\Agent\Patches\PatchDownloader;
@@ -45,7 +46,7 @@ final class ComposerPatchesTest extends TestCase
     private ?\stdClass $written = null;
     private ?DrupalCode $drupalCode = null;
     private ?Issue $issue = null;
-    /** @var array<string, array<string, string>> */
+    /** @var array<string, list<string>> */
     private array $dependencyPatches = [];
     private ?Plan $planResolved = null;
 
@@ -65,7 +66,7 @@ final class ComposerPatchesTest extends TestCase
         self::assertSame([
             ['package' => 'drupal/token', 'patch_description' => 'Local fix', 'patch_path' => 'patches/gone.patch', 'reason' => 'drupal/token is not installed in the project'],
             ['package' => 'drupal/token', 'patch_description' => 'Remote', 'patch_path' => 'https://example.com/r.patch', 'reason' => 'drupal/token is not installed in the project'],
-        ], $result->finding['removed']);
+        ], Json::at($result->finding, 'removed'));
         self::assertEquals(new \stdClass(), $this->written);
         self::assertFileDoesNotExist($this->project . '/patches/gone.patch');
         self::assertSame([['message' => 'Update patches', 'paths' => ['composer.json', 'composer.lock', 'patches/gone.patch']]], self::commits($result));
@@ -77,7 +78,7 @@ final class ComposerPatchesTest extends TestCase
 
         $result = $this->run_(['drupal/token' => ['Remote' => 'https://example.com/r.patch'], 'drupal/empty' => new \stdClass()]);
 
-        self::assertSame(['drupal/token'], array_column($result->finding['removed'], 'package'));
+        self::assertSame(['drupal/token'], array_column(Json::list(Json::at($result->finding, 'removed')), 'package'));
         self::assertEquals(new \stdClass(), $this->written);
     }
 
@@ -90,7 +91,7 @@ final class ComposerPatchesTest extends TestCase
 
         self::assertSame([[
             'package' => 'drupal/token', 'fixed_version' => '1.14.0', 'patch_path' => 'patches/fix.patch', 'patch_description' => 'Local fix', 'new_version' => '1.15.0',
-        ]], $result->finding['conflicts']);
+        ]], Json::at($result->finding, 'conflicts'));
         self::assertEquals([new Pin('drupal/token', '1.14.0')], $result->plan?->keep);
         self::assertNotNull($this->written, 'a conflict is a change, so the patches are written back as they were');
     }
@@ -148,7 +149,7 @@ final class ComposerPatchesTest extends TestCase
 
         $this->run_(['drupal/token' => ['Second' => 'patches/b.patch', 'First' => 'patches/a.patch']]);
 
-        self::assertSame([$this->project . '/patches/b.patch', $this->project . '/patches/a.patch'], end($this->checked)[3]);
+        self::assertSame([$this->project . '/patches/b.patch', $this->project . '/patches/a.patch'], Json::at(end($this->checked), 3));
     }
 
     public function testHoldsBackAPackageWhosePatchesDoNotApplyTogether(): void
@@ -158,7 +159,7 @@ final class ComposerPatchesTest extends TestCase
 
         $result = $this->run_(['drupal/token' => ['First' => 'patches/b.patch', 'Second' => 'patches/a.patch']]);
 
-        self::assertSame([['package' => 'drupal/token', 'fixed_version' => '1.14.0', 'patch_path' => '', 'patch_description' => 'Multiple patches do not apply together', 'new_version' => '1.15.0']], $result->finding['conflicts']);
+        self::assertSame([['package' => 'drupal/token', 'fixed_version' => '1.14.0', 'patch_path' => '', 'patch_description' => 'Multiple patches do not apply together', 'new_version' => '1.15.0']], Json::at($result->finding, 'conflicts'));
     }
 
     public function testAnUncheckablePatchLeavesThePackageUnpinned(): void
@@ -168,7 +169,7 @@ final class ComposerPatchesTest extends TestCase
 
         $result = $this->run_(['drupal/token' => ['Local' => 'patches/a.patch']]);
 
-        self::assertSame([], $result->finding['conflicts']);
+        self::assertSame([], Json::at($result->finding, 'conflicts'));
         self::assertSame([], $result->plan?->keep);
         self::assertContains([
             'level' => 'warning',
@@ -184,7 +185,7 @@ final class ComposerPatchesTest extends TestCase
 
         $result = $this->run_(['drupal/token' => ['First' => 'patches/a.patch', 'Second' => 'patches/b.patch']]);
 
-        self::assertSame([], $result->finding['conflicts']);
+        self::assertSame([], Json::at($result->finding, 'conflicts'));
     }
 
     public function testChecksABranchAtTheCommitItsVersionNames(): void
@@ -204,7 +205,7 @@ final class ComposerPatchesTest extends TestCase
 
         self::assertSame([[
             'package' => 'drupal/token', 'patch_description' => 'Shared', 'patch_path' => 'https://example.com/shared.patch', 'reason' => 'Patch is already applied by a dependency of drupal/token',
-        ]], $result->finding['removed']);
+        ]], Json::at($result->finding, 'removed'));
         self::assertEquals((object) ['drupal/token' => (object) ['Local' => 'patches/local.patch']], $this->written);
         self::assertSame([['message' => 'Update patches', 'paths' => ['composer.json', 'composer.lock']]], self::commits($result), 'a remote patch has no file to commit');
     }
@@ -216,7 +217,7 @@ final class ComposerPatchesTest extends TestCase
 
         $result = $this->run_(['drupal/token' => ['Local' => 'patches/a.patch']]);
 
-        self::assertSame('drupal/token is no longer installed', $result->finding['removed'][0]['reason']);
+        self::assertSame('drupal/token is no longer installed', Json::at($result->finding, 'removed', 0, 'reason'));
         self::assertFileDoesNotExist($this->project . '/patches/a.patch');
     }
 
@@ -255,7 +256,7 @@ final class ComposerPatchesTest extends TestCase
             'patch_description' => 'Token fix',
             'patch_path' => self::ISSUE_PATCH,
             'reason' => 'Issue [#3123456](https://www.drupal.org/node/3123456) is fixed in drupal/token 1.15.0',
-        ]] : [], $result->finding['removed']);
+        ]] : [], Json::at($result->finding, 'removed'));
     }
 
     public function testAFixedIssuesPatchWhoseFileCannotBeRemovedStaysDeclared(): void
@@ -266,7 +267,7 @@ final class ComposerPatchesTest extends TestCase
 
         $result = $this->run_(['drupal/token' => ['Issue #3123456' => 'patches/missing.patch']]);
 
-        self::assertSame([], $result->finding['removed'], 'it would vanish from composer.json unreported');
+        self::assertSame([], Json::at($result->finding, 'removed'), 'it would vanish from composer.json unreported');
         self::assertContains(['level' => 'error', 'message' => 'failed to remove patch', 'context' => ['patch' => 'patches/missing.patch']], $this->log->entries());
     }
 
@@ -279,7 +280,7 @@ final class ComposerPatchesTest extends TestCase
 
         $result = $this->run_(['drupal/token' => ['Token fix' => self::ISSUE_PATCH]]);
 
-        self::assertSame([], $result->finding['removed']);
+        self::assertSame([], Json::at($result->finding, 'removed'));
         self::assertCount(1, $this->checked);
         self::assertContains(['level' => 'error', 'message' => 'failed to search commit history', 'context' => ['error' => 'search failed']], $this->log->entries());
     }
@@ -308,7 +309,7 @@ final class ComposerPatchesTest extends TestCase
 
         $result = $this->run_(['drupal/token' => ['Issue #3123456' => 'patches/missing.patch']]);
 
-        self::assertSame([], $result->finding['updated']);
+        self::assertSame([], Json::at($result->finding, 'updated'));
         self::assertFileDoesNotExist($this->project . '/patches/token/3123456-abc123-fix.diff');
         self::assertContains(['level' => 'debug', 'message' => 'failed to remove old patch file', 'context' => ['patch' => 'patches/missing.patch']], $this->log->entries());
     }
@@ -334,7 +335,7 @@ final class ComposerPatchesTest extends TestCase
         $result = $this->run_(['drupal/token' => [$canonical => 'patches/other.patch', 'old name' => self::ISSUE_PATCH]]);
 
         self::assertSame([$canonical, 'old name'], array_keys((array) $this->written?->{'drupal/token'}));
-        self::assertSame('old name', $result->finding['conflicts'][0]['patch_description'] ?? null);
+        self::assertSame('old name', Json::at($result->finding, 'conflicts', 0, 'patch_description'));
     }
 
     public function testAFixThatCannotBeConfirmedKeepsThePatchWithoutDrupalCode(): void
@@ -345,8 +346,8 @@ final class ComposerPatchesTest extends TestCase
 
         $result = $this->run_(['drupal/token' => ['Token fix' => self::ISSUE_PATCH]]);
 
-        self::assertSame([], $result->finding['removed']);
-        self::assertCount(1, $result->finding['conflicts']);
+        self::assertSame([], Json::at($result->finding, 'removed'));
+        self::assertCount(1, Json::list(Json::at($result->finding, 'conflicts')));
         self::assertContains('patch does not apply and no drupalcode client is configured, keeping current package version', array_column($this->log->entries(), 'message'));
     }
 
@@ -373,7 +374,7 @@ final class ComposerPatchesTest extends TestCase
 
         $new = 'patches/token/3123456-abc123-token_fix_it.diff';
         $description = 'Issue #3123456: [Token: fix it!](https://www.drupal.org/node/3123456)';
-        self::assertSame([['package' => 'drupal/token', 'patch_description' => $description, 'previous_patch_path' => 'patches/token/old.patch', 'new_patch_path' => $new]], $result->finding['updated']);
+        self::assertSame([['package' => 'drupal/token', 'patch_description' => $description, 'previous_patch_path' => 'patches/token/old.patch', 'new_patch_path' => $new]], Json::at($result->finding, 'updated'));
         self::assertSame(self::MERGE_REQUEST . '.diff', $this->downloaded[0]);
         self::assertFileExists($this->project . '/' . $new);
         self::assertFileDoesNotExist($this->project . '/patches/token/old.patch');
@@ -392,7 +393,7 @@ final class ComposerPatchesTest extends TestCase
 
         $result = $this->run_(['drupal/token' => ['Issue #3123456' => 'patches/old.patch']]);
 
-        self::assertCount(1, $result->finding['conflicts']);
+        self::assertCount(1, Json::list(Json::at($result->finding, 'conflicts')));
         self::assertFileDoesNotExist($new);
     }
 
@@ -467,11 +468,11 @@ final class ComposerPatchesTest extends TestCase
     private bool $downloadFails = false;
 
     /**
-     * @param array<string, array<string, string>>|object|null $patches
+     * @param array<string, array<string, string>|\stdClass>|null $patches
      */
     private function run_(mixed $patches, bool $issueFails = false): HookResult
     {
-        return $this->addon($patches === null ? null : json_decode((string) json_encode($patches), false), null, $issueFails)
+        return $this->addon($patches === null ? null : json_decode((string) json_encode($patches, JSON_THROW_ON_ERROR), false), null, $issueFails)
             ->handle(Event::preComposerUpdate($this->project, new Plan()));
     }
 
@@ -479,22 +480,10 @@ final class ComposerPatchesTest extends TestCase
     {
         if ($resolver === null) {
             $resolver = $this->createMock(Resolver::class);
-            $resolver->method('resolve')->willReturnCallback(function (array $only, array $keep, bool $minimal, bool $write): array {
-                self::assertFalse($write, 'composer_patches only dry-runs the update');
-                $this->planResolved = new Plan($only, $keep, $minimal);
-                return $this->operations;
-            });
+            $resolver->method('resolve')->willReturnCallback($this->resolve(...));
         }
         $checker = $this->createMock(PatchChecker::class);
-        $checker->method('check')->willReturnCallback(function (string $name, string $version, string $reference, array $patches): array {
-            $this->checked[] = [$name, $version, $reference, $patches];
-            $key = end($patches) . (count($patches) > 1 ? '|together' : '');
-            $verdict = $this->verdicts[$key] ?? true;
-            if ($verdict instanceof \Exception) {
-                throw $verdict;
-            }
-            return $verdict ? ['outcome' => 'applies'] : ['outcome' => 'rejected', 'patch' => end($patches)];
-        });
+        $checker->method('check')->willReturnCallback($this->check(...));
         $writer = $this->createMock(PatchWriter::class);
         $writer->method('write')->willReturnCallback(function (\stdClass $patches): void {
             $this->written = $patches;
@@ -516,6 +505,33 @@ final class ComposerPatchesTest extends TestCase
         return new ComposerPatches($this->log, static fn (): Project => $project, $resolver, $checker, $writer, $downloader, $drupalOrg, $this->drupalCode);
     }
 
+    /**
+     * @param list<string> $only
+     * @param list<Pin> $keep
+     * @return list<array{action: string, package: string, from: string, to: string}>
+     */
+    private function resolve(array $only, array $keep, bool $minimal, bool $write): array
+    {
+        self::assertFalse($write, 'composer_patches only dry-runs the update');
+        $this->planResolved = new Plan($only, $keep, $minimal);
+        return $this->operations;
+    }
+
+    /**
+     * @param list<string> $patches
+     * @return array{outcome: 'applies'}|array{outcome: 'rejected', patch: string}
+     */
+    private function check(string $name, string $version, string $reference, array $patches): array
+    {
+        $this->checked[] = [$name, $version, $reference, $patches];
+        $last = $patches === [] ? throw new \LogicException('nothing to check') : $patches[count($patches) - 1];
+        $verdict = $this->verdicts[$last . (count($patches) > 1 ? '|together' : '')] ?? true;
+        if ($verdict instanceof \Exception) {
+            throw $verdict;
+        }
+        return $verdict ? ['outcome' => 'applies'] : ['outcome' => 'rejected', 'patch' => $last];
+    }
+
     private function drupalCode(bool $fixed): DrupalCode&\PHPUnit\Framework\MockObject\MockObject
     {
         $drupalCode = $this->createMock(DrupalCode::class);
@@ -525,7 +541,7 @@ final class ComposerPatchesTest extends TestCase
 
     private function writtenOrProposed(HookResult $result): \stdClass
     {
-        return $this->written ?? throw new \LogicException('nothing was written: ' . json_encode($result->finding));
+        return $this->written ?? throw new \LogicException('nothing was written: ' . json_encode($result->finding, JSON_THROW_ON_ERROR));
     }
 
     /**

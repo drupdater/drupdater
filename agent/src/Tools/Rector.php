@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupdater\Agent\Tools;
 
 use Drupdater\Agent\Failure;
+use Drupdater\Agent\Json;
 use Drupdater\Agent\Process\ProcessRunner;
 
 /**
@@ -72,12 +73,12 @@ class Rector
         }
 
         $diffs = [];
-        foreach ((array) ($report['file_diffs'] ?? []) as $diff) {
-            $file = (string) ($diff['file'] ?? '');
+        foreach (Json::list(Json::at($report, 'file_diffs')) as $diff) {
+            $file = Json::string(Json::at($diff, 'file'));
             $this->restoreFileDocBlock($file);
-            $diffs[] = ['file' => $file, 'applied_rectors' => array_values(array_map('strval', (array) ($diff['applied_rectors'] ?? [])))];
+            $diffs[] = ['file' => $file, 'applied_rectors' => Json::strings(Json::at($diff, 'applied_rectors'))];
         }
-        return ['changed_files' => array_values(array_map('strval', (array) ($report['changed_files'] ?? []))), 'file_diffs' => $diffs];
+        return ['changed_files' => Json::strings(Json::at($report, 'changed_files')), 'file_diffs' => $diffs];
     }
 
     private function restoreFileDocBlock(string $file): void

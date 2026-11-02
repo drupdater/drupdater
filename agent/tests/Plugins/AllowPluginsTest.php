@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupdater\Agent\Tests\Plugins;
 
+use Drupdater\Agent\Json;
 use Drupdater\Agent\Plugins\AllowPlugins;
 use Drupdater\Agent\Tests\FixtureProject;
 use Drupdater\Agent\Tests\InProject;
@@ -96,8 +97,10 @@ final class AllowPluginsTest extends TestCase
     {
         $project = $this->fixtureProject(['allow-plugins' => ['*' => true]], withoutPlugins: true);
         $manifest = $this->manifest($project);
-        $manifest->config->{'sort-packages'} = true;
-        file_put_contents($project . '/composer.json', json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
+        $config = $manifest->config;
+        self::assertInstanceOf(\stdClass::class, $config);
+        $config->{'sort-packages'} = true;
+        file_put_contents($project . '/composer.json', json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "\n");
 
         $this->plugins($project)->close(null, true);
 
@@ -121,7 +124,7 @@ final class AllowPluginsTest extends TestCase
 
         $this->plugins($project)->close(new \stdClass(), true);
 
-        self::assertEquals(new \stdClass(), $this->manifest($project)->config->{'allow-plugins'});
+        self::assertEquals(new \stdClass(), Json::at($this->manifest($project), 'config', 'allow-plugins'));
     }
 
     public function testCloseOfASettingItNeverOpenedWritesNothing(): void
@@ -139,10 +142,10 @@ final class AllowPluginsTest extends TestCase
     }
 
     /**
-     * @return array<string, bool>
+     * @return array<string, mixed>
      */
     private function allowPlugins(string $project): array
     {
-        return (array) $this->manifest($project)->config->{'allow-plugins'};
+        return Json::map(Json::at($this->manifest($project), 'config', 'allow-plugins'));
     }
 }

@@ -9,6 +9,7 @@ use Drupdater\Agent\DrupalOrg\DrupalOrg;
 use Drupdater\Agent\DrupalOrg\ForkMergeRequest;
 use Drupdater\Agent\DrupalOrg\Issue;
 use Drupdater\Agent\DrupalOrg\IssueNumber;
+use Drupdater\Agent\Json;
 use Drupdater\Agent\Patches\PatchDownloader;
 use Drupdater\Agent\Tests\FakeHttp;
 use Drupdater\Agent\Tests\Scratch;
@@ -30,7 +31,7 @@ final class DrupalOrgTest extends TestCase
         $http = new FakeHttp([self::NODE => json_encode([
             'nid' => '3123456', 'title' => 'Token fix', 'field_issue_status' => '7', 'url' => 'https://www.drupal.org/node/3123456',
             'field_project' => ['machine_name' => 'token', 'id' => '1'],
-        ])]);
+        ], JSON_THROW_ON_ERROR)]);
 
         $issue = (new DrupalOrg($http))->issue('3123456');
 
@@ -90,7 +91,7 @@ final class DrupalOrgTest extends TestCase
         $http = new FakeHttp([$search => '[{"id":"5678"}]']);
 
         self::assertTrue((new DrupalCode($http, 'secret'))->isFixedIn('drupal', '123456', '11.1.0'));
-        self::assertSame(['PRIVATE-TOKEN: secret'], $http->requests[0]['options']['http']['header']);
+        self::assertSame(['PRIVATE-TOKEN: secret'], Json::at($http->requests, 0, 'options', 'http', 'header'));
         self::assertFalse((new DrupalCode(new FakeHttp([$search => '[]']), 'secret'))->isFixedIn('drupal', '123456', '11.1.0'));
     }
 
@@ -107,7 +108,7 @@ final class DrupalOrgTest extends TestCase
             self::API . '/projects/project%2Fdrupal/merge_requests?source_project_id=5678' => json_encode([
                 ['sha' => '111111', 'web_url' => 'https://git.drupalcode.org/project/drupal/-/merge_requests/2'],
                 ['sha' => '222222', 'web_url' => 'https://git.drupalcode.org/project/drupal/-/merge_requests/1'],
-            ]),
+            ], JSON_THROW_ON_ERROR),
         ]);
 
         self::assertEquals([

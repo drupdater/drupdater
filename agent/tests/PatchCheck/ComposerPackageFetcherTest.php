@@ -79,7 +79,7 @@ final class ComposerPackageFetcherTest extends TestCase
     {
         $package = $this->scratchDir() . '/greeting';
         $this->writeFiles($package, self::PACKAGE_FILES + [
-            'composer.json' => json_encode(['name' => 'fixture/greeting', 'version' => '1.0.0']),
+            'composer.json' => json_encode(['name' => 'fixture/greeting', 'version' => '1.0.0'], JSON_THROW_ON_ERROR),
         ]);
         $project = $this->scratchDir();
         $this->writeFiles($project, ['composer.json' => json_encode([
@@ -88,7 +88,7 @@ final class ComposerPackageFetcherTest extends TestCase
                 ['type' => 'path', 'url' => $package, 'options' => ['symlink' => false]],
                 ['packagist.org' => false],
             ],
-        ])]);
+        ], JSON_THROW_ON_ERROR)]);
 
         $cwd = getcwd();
         chdir($project);

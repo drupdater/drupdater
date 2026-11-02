@@ -11,6 +11,7 @@ use Drupdater\Agent\Addon\TranslationsUpdater;
 use Drupdater\Agent\Addon\UnsupportedModules;
 use Drupdater\Agent\Addon\UpdateHooks;
 use Drupdater\Agent\Failure;
+use Drupdater\Agent\Json;
 use Drupdater\Agent\Log;
 use Drupdater\Agent\Tests\Scratch;
 use Drupdater\Agent\Tools\Drush;
@@ -40,7 +41,7 @@ final class SiteAddonsTest extends TestCase
     {
         $result = (new UpdateHooks(new Log()))->handle(self::preSite('default', new SiteFacts()));
 
-        self::assertSame('{}', json_encode($result->finding));
+        self::assertSame('{}', json_encode($result->finding, JSON_THROW_ON_ERROR));
     }
 
     public function testUpdateHooksReportsBySiteAndHookLeavingOutSitesWithNone(): void
@@ -52,8 +53,8 @@ final class SiteAddonsTest extends TestCase
         ]));
 
         self::assertSame(
-            '{"default":{"token_update_8002":' . json_encode(self::HOOK) . '},"second":{"a_update_1":' . json_encode(self::HOOK) . ',"z_update_1":' . json_encode(self::HOOK) . '}}',
-            json_encode($section),
+            '{"default":{"token_update_8002":' . json_encode(self::HOOK, JSON_THROW_ON_ERROR) . '},"second":{"a_update_1":' . json_encode(self::HOOK, JSON_THROW_ON_ERROR) . ',"z_update_1":' . json_encode(self::HOOK, JSON_THROW_ON_ERROR) . '}}',
+            json_encode($section, JSON_THROW_ON_ERROR),
         );
         self::assertNull(UpdateHooks::report(Records::findings([Records::record('pre-site-update', new \stdClass(), 'default')])));
     }
@@ -98,7 +99,7 @@ final class SiteAddonsTest extends TestCase
             Records::record('pre-site-update', [['name' => 'm', 'installed_version' => '1.0', 'recommended_version' => 'None']], 'alpha'),
         ]));
 
-        self::assertSame('2.0', $section[0]['installed_version'], 'the same answer whichever order the sites finished in');
+        self::assertSame('2.0', Json::at($section, 0, 'installed_version'), 'the same answer whichever order the sites finished in');
     }
 
     public function testTranslationsSkipASiteWithoutLocaleDeployAndSaySo(): void
@@ -147,7 +148,7 @@ final class SiteAddonsTest extends TestCase
         $result = (new TranslationsUpdater(new Log(), $drush))->handle(self::postSite('/p', new SiteFacts(translationPath: $path, modules: ['locale_deploy'])));
 
         self::assertSame([], $result->commits);
-        self::assertStringStartsWith('translation path not available: ', $result->finding['skipped']);
+        self::assertStringStartsWith('translation path not available: ', Json::string(Json::at($result->finding, 'skipped')));
     }
 
     public function testAFailedImportFailsTheHook(): void
@@ -165,7 +166,7 @@ final class SiteAddonsTest extends TestCase
             Records::record('post-site-update', ['skipped' => 'locale_deploy not enabled'], 'second'),
             Records::record('post-site-update', ['path' => 'translations'], 'default', ['Update translations']),
             Records::record('post-site-update', ['path' => 'translations'], 'nothing'),
-        ]))));
+        ])), JSON_THROW_ON_ERROR));
         self::assertNull(TranslationsUpdater::report(Records::findings()));
     }
 

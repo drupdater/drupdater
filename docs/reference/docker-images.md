@@ -7,7 +7,6 @@ supported distribution.
 ## Published images
 
 ```text
-ghcr.io/drupdater/drupdater-php8.2
 ghcr.io/drupdater/drupdater-php8.3
 ghcr.io/drupdater/drupdater-php8.4
 ghcr.io/drupdater/drupdater-php8.5

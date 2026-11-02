@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupdater\Agent\Tools;
 
 use Drupdater\Agent\Failure;
+use Drupdater\Agent\Json;
 use Drupdater\Agent\Process\ProcessRunner;
 
 /**
@@ -41,13 +42,17 @@ class Phpcs
             throw ToolFailure::unreadable('phpcs', $e);
         }
         $files = [];
-        foreach ((array) ($report['files'] ?? []) as $file => $counts) {
-            $files[(string) $file] = ['errors' => (int) ($counts['errors'] ?? 0), 'warnings' => (int) ($counts['warnings'] ?? 0)];
+        foreach (Json::map(Json::at($report, 'files')) as $file => $counts) {
+            $files[$file] = ['errors' => Json::int(Json::at($counts, 'errors')), 'warnings' => Json::int(Json::at($counts, 'warnings'))];
         }
-        $totals = (array) ($report['totals'] ?? []);
+        $totals = Json::at($report, 'totals');
         return [
             'files' => $files,
-            'totals' => ['errors' => (int) ($totals['errors'] ?? 0), 'warnings' => (int) ($totals['warnings'] ?? 0), 'fixable' => (int) ($totals['fixable'] ?? 0)],
+            'totals' => [
+                'errors' => Json::int(Json::at($totals, 'errors')),
+                'warnings' => Json::int(Json::at($totals, 'warnings')),
+                'fixable' => Json::int(Json::at($totals, 'fixable')),
+            ],
         ];
     }
 

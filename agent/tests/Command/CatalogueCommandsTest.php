@@ -13,7 +13,9 @@ use Drupdater\Agent\Command\AgentCommand;
 use Drupdater\Agent\Command\ConfigCommand;
 use Drupdater\Agent\Command\MergeRequestCommand;
 use Drupdater\Agent\Command\ReportCommand;
+use Drupdater\Agent\Json;
 use Drupdater\Agent\Tests\Addon\ScriptedAddon;
+use Drupdater\Agent\Tests\Decoded;
 use Drupdater\Agent\Tests\Scratch;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -146,8 +148,8 @@ final class CatalogueCommandsTest extends TestCase
         [$status, $reply] = self::ask(new MergeRequestCommand(), ['protocol' => 6, 'request' => ['report' => ['mode' => 'normal', 'started_at' => '2026-07-25T09:00:00Z']]]);
 
         self::assertSame(0, $status);
-        self::assertSame('July 2026: Drupal Maintenance Updates', $reply['result']['title']);
-        self::assertStringNotContainsString('##', $reply['result']['description']);
+        self::assertSame('July 2026: Drupal Maintenance Updates', Json::at($reply, 'result', 'title'));
+        self::assertStringNotContainsString('##', Json::string(Json::at($reply, 'result', 'description')));
     }
 
     /**
@@ -205,6 +207,6 @@ final class CatalogueCommandsTest extends TestCase
         $tester->setInputs([$body]);
         $status = $tester->execute([]);
         $output = trim($tester->getDisplay());
-        return [$status, json_decode($output, true, 512, JSON_THROW_ON_ERROR), $output];
+        return [$status, Decoded::envelope($output), $output];
     }
 }

@@ -13,6 +13,7 @@ use Drupdater\Agent\Addon\EventName;
 use Drupdater\Agent\Addon\Findings;
 use Drupdater\Agent\Addon\Services;
 use Drupdater\Agent\Failure;
+use Drupdater\Agent\Json;
 use Drupdater\Agent\Log;
 
 /**
@@ -53,7 +54,7 @@ final class HookCommand extends AgentCommand
         if (!is_array($payload)) {
             throw new Failure(Failure::INVALID_REQUEST, 'event must be an object');
         }
-        $security = $request['run']['security'] ?? false;
+        $security = Json::at($request, 'run', 'security') ?? false;
         if (!is_bool($security)) {
             throw new Failure(Failure::INVALID_REQUEST, 'run.security must be a boolean');
         }

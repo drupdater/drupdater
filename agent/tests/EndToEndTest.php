@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupdater\Agent\Tests;
 
 use Composer\Util\Filesystem;
+use Drupdater\Agent\Json;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Process\Process;
 
@@ -33,7 +34,7 @@ final class EndToEndTest extends TestCase
             'require' => ['drupdater/agent' => '1.0.0'],
             // As in the image: the agent only uses composer-diff's classes, never its command.
             'config' => ['allow-plugins' => ['drupdater/agent' => true, 'ion-bazan/composer-diff' => false]],
-        ]));
+        ], JSON_THROW_ON_ERROR));
         $install = self::composer(['global', 'update', '--no-interaction', '--no-progress']);
         self::assertSame(0, $install->getExitCode(), $install->getErrorOutput());
     }
@@ -47,8 +48,8 @@ final class EndToEndTest extends TestCase
     {
         $reply = $this->ask('drupdater:handshake', $this->scratchDir(), ['protocol' => 6, 'request' => []]);
 
-        self::assertMatchesRegularExpression('/^2\.\d+\.\d+/', $reply['result']['composer_version'], 'the global Composer, not the agent\'s dev copy');
-        self::assertSame(PHP_VERSION, $reply['result']['php_version']);
+        self::assertMatchesRegularExpression('/^2\.\d+\.\d+/', Json::string(Json::at($reply, 'result', 'composer_version')), 'the global Composer, not the agent\'s dev copy');
+        self::assertSame(PHP_VERSION, Json::at($reply, 'result', 'php_version'));
         $reply['result'] = self::fixture('handshake/response.json')['result'];
         self::assertEquals(self::fixture('handshake/response.json'), $reply);
     }
@@ -60,9 +61,9 @@ final class EndToEndTest extends TestCase
 
         $reply = $this->ask('drupdater:config', $this->scratchDir(), ['protocol' => 6, 'request' => ['path' => $dir . '/.drupdater.yaml']]);
 
-        self::assertTrue($reply['ok'], json_encode($reply) ?: '');
-        self::assertSame(['default', 'second'], $reply['result']['sites']);
-        self::assertSame(7_200_000_000_000, $reply['result']['timeout_ns']);
+        self::assertTrue($reply['ok'], json_encode($reply, JSON_THROW_ON_ERROR));
+        self::assertSame(['default', 'second'], Json::at($reply, 'result', 'sites'));
+        self::assertSame(7_200_000_000_000, Json::at($reply, 'result', 'timeout_ns'));
     }
 
     public function testProjectAnswersTheFixture(): void
@@ -93,15 +94,15 @@ final class EndToEndTest extends TestCase
 
         $reply = $this->ask('drupdater:install', $project, self::fixture('install/request.json'));
 
-        self::assertSame(['failed', 'composer install failed'], [$reply['error']['kind'], $reply['error']['reason']]);
-        self::assertStringContainsString($package, $reply['error']['message']);
+        self::assertSame(['failed', 'composer install failed'], [Json::at($reply, 'error', 'kind'), Json::at($reply, 'error', 'reason')]);
+        self::assertStringContainsString($package, Json::string(Json::at($reply, 'error', 'message')));
     }
 
     public function testSiteFactsRunTheProjectsDrushWithTheCommandsTheAgentShips(): void
     {
         $project = $this->scratchDir();
         $this->writeFiles($project, [
-            'composer.json' => json_encode(['name' => 'fixture/site', 'repositories' => [['packagist.org' => false]]]),
+            'composer.json' => json_encode(['name' => 'fixture/site', 'repositories' => [['packagist.org' => false]]], JSON_THROW_ON_ERROR),
             // Answers drupdater:facts only when the agent's own drush commands are where it says.
             'vendor/bin/drush' => "#!/bin/sh\ninclude=\"\${1#--include=}\"\n[ -f \"\$include/Commands/DrupdaterCommands.php\" ] || exit 1\nprintf '{\"site\":\"%s\"}' \"\$SITE_NAME\"\n",
         ]);
@@ -120,9 +121,9 @@ final class EndToEndTest extends TestCase
 
         self::assertEquals(self::fixture('resolve/response.json'), $reply);
         $lock = json_decode((string) file_get_contents($project . '/composer.lock'), true);
-        self::assertSame(['1.1.0', '2.1.0'], array_column($lock['packages'], 'version'));
+        self::assertSame(['1.1.0', '2.1.0'], array_column(Json::list(Json::at($lock, 'packages')), 'version'));
         $manifest = json_decode((string) file_get_contents($project . '/composer.json'), true);
-        self::assertSame(['fixture/a' => '^1.1', 'fixture/b' => '^2.1'], $manifest['require']);
+        self::assertSame(['fixture/a' => '^1.1', 'fixture/b' => '^2.1'], Json::at($manifest, 'require'));
     }
 
     public function testResolveKeepsAPinnedPackageAndUpdatesOnlyWhatItIsAskedTo(): void
@@ -136,8 +137,8 @@ final class EndToEndTest extends TestCase
             'packages' => ['fixture/a'], 'keep' => [], 'minimal_changes' => false,
         ]]);
 
-        self::assertSame(['fixture/b'], array_column($pinned['result']['changes'], 'package'));
-        self::assertSame(['fixture/a'], array_column($only['result']['changes'], 'package'));
+        self::assertSame(['fixture/b'], array_column(Json::list(Json::at($pinned, 'result', 'changes')), 'package'));
+        self::assertSame(['fixture/a'], array_column(Json::list(Json::at($only, 'result', 'changes')), 'package'));
     }
 
     public function testResolveReportsAnUnresolvableUpdateAndLeavesTheLock(): void
@@ -150,7 +151,7 @@ final class EndToEndTest extends TestCase
         ]]);
 
         self::assertFalse($reply['ok']);
-        self::assertSame(['failed', 'composer update failed'], [$reply['error']['kind'], $reply['error']['reason']]);
+        self::assertSame(['failed', 'composer update failed'], [Json::at($reply, 'error', 'kind'), Json::at($reply, 'error', 'reason')]);
         self::assertStringContainsString('fixture/a', $stderr, "Composer's own explanation reaches stderr");
         self::assertSame($lock, file_get_contents($project . '/composer.lock'));
     }
@@ -162,7 +163,7 @@ final class EndToEndTest extends TestCase
 
         $reply = $this->ask('drupdater:resolve', $project, self::fixture('resolve/request.json'));
 
-        self::assertSame(['failed', 'the project has no composer.lock'], [$reply['error']['kind'], $reply['error']['reason']]);
+        self::assertSame(['failed', 'the project has no composer.lock'], [Json::at($reply, 'error', 'kind'), Json::at($reply, 'error', 'reason')]);
     }
 
     public function testAddonsListsTheCatalogueWithoutAProject(): void
@@ -183,23 +184,23 @@ final class EndToEndTest extends TestCase
 
         self::assertSame(
             [['package' => 'fixture/a', 'operation' => 'upgrade', 'from' => '1.0.0', 'to' => '1.1.0', 'dev' => false, 'direct' => true]],
-            $reply['result']['finding'],
+            Json::at($reply, 'result', 'finding'),
         );
-        self::assertSame('info', $reply['log'][0]['level'], 'the agent logs through its envelope, never its own output');
+        self::assertSame('info', Json::at($reply, 'log', 0, 'level'), 'the agent logs through its envelope, never its own output');
     }
 
     public function testComposerAuditOfACleanLockFindsNothing(): void
     {
         $reply = $this->hook($this->lockedProject(), 'composer_audit', ['name' => 'pre-composer-update', 'plan' => []]);
 
-        self::assertSame(['advisories' => [], 'abandoned' => []], $reply['result']['finding']);
+        self::assertSame(['advisories' => [], 'abandoned' => []], Json::at($reply, 'result', 'finding'));
     }
 
     public function testASecurityRunWithNothingToFixEndsWithoutAFailure(): void
     {
         $reply = $this->hook($this->lockedProject(), 'composer_audit', ['name' => 'pre-composer-update', 'plan' => []], security: true);
 
-        self::assertSame('No security advisories found', $reply['result']['abort']);
+        self::assertSame('No security advisories found', Json::at($reply, 'result', 'abort'));
     }
 
     public function testPlatformCheckFindsThisPhpMeetsALockWithoutRequirements(): void
@@ -217,12 +218,12 @@ final class EndToEndTest extends TestCase
         $manifest = (string) file_get_contents($project . '/composer.json');
 
         $opened = $this->hook($project, 'composer_allow_plugins', ['name' => 'pre-composer-update', 'plan' => []]);
-        self::assertSame(['original' => null, 'opened' => true], $opened['result']['finding']);
+        self::assertSame(['original' => null, 'opened' => true], Json::at($opened, 'result', 'finding'));
         $closed = $this->hook($project, 'composer_allow_plugins', ['name' => 'post-composer-update', 'base_lock' => []], [
-            ['event' => 'pre-composer-update', 'site' => '', 'finding' => $opened['result']['finding'], 'committed' => []],
+            ['event' => 'pre-composer-update', 'site' => '', 'finding' => Json::at($opened, 'result', 'finding'), 'committed' => []],
         ]);
 
-        self::assertSame([], $closed['result']['finding']);
+        self::assertSame([], Json::at($closed, 'result', 'finding'));
         self::assertSame($manifest, file_get_contents($project . '/composer.json'));
     }
 
@@ -233,8 +234,8 @@ final class EndToEndTest extends TestCase
 
         $reply = $this->hook($project, 'composer_patches', ['name' => 'pre-composer-update', 'plan' => []]);
 
-        self::assertSame(['removed' => [], 'updated' => [], 'conflicts' => []], $reply['result']['finding']);
-        self::assertSame([], $reply['result']['commits']);
+        self::assertSame(['removed' => [], 'updated' => [], 'conflicts' => []], Json::at($reply, 'result', 'finding'));
+        self::assertSame([], Json::at($reply, 'result', 'commits'));
         self::assertSame($files, [file_get_contents($project . '/composer.json'), file_get_contents($project . '/composer.lock')], 'the dry run is put back');
     }
 
@@ -250,8 +251,8 @@ final class EndToEndTest extends TestCase
             'patch_path' => 'patches/greeting.patch',
             'patch_description' => 'Greet the world',
             'new_version' => '1.1.0',
-        ]], $reply['result']['finding']['conflicts']);
-        self::assertSame([['package' => 'fixture/greeting', 'version' => '1.0.0']], $reply['result']['plan']['keep']);
+        ]], Json::at($reply, 'result', 'finding', 'conflicts'));
+        self::assertSame([['package' => 'fixture/greeting', 'version' => '1.0.0']], Json::at($reply, 'result', 'plan', 'keep'));
     }
 
     public function testComposerPatchesLeavesALockComposerAgreesIsUpToDate(): void
@@ -260,9 +261,9 @@ final class EndToEndTest extends TestCase
 
         $reply = $this->hook($project, 'composer_patches', ['name' => 'pre-composer-update', 'plan' => []]);
 
-        self::assertSame(['fixture/gone'], array_column($reply['result']['finding']['removed'], 'package'));
-        self::assertSame([['message' => 'Update patches', 'paths' => ['composer.json', 'composer.lock']]], $reply['result']['commits']);
-        self::assertObjectNotHasProperty('fixture/gone', $this->manifestOf($project)->extra->patches);
+        self::assertSame(['fixture/gone'], array_column(Json::list(Json::at($reply, 'result', 'finding', 'removed')), 'package'));
+        self::assertSame([['message' => 'Update patches', 'paths' => ['composer.json', 'composer.lock']]], Json::at($reply, 'result', 'commits'));
+        self::assertObjectNotHasProperty('fixture/gone', Decoded::object(Json::at($this->manifestOf($project), 'extra', 'patches')));
         $validate = self::composer(['--working-dir=' . $project, 'validate', '--no-check-publish', '--no-check-all']);
         self::assertSame(0, $validate->getExitCode(), $validate->getOutput() . $validate->getErrorOutput());
     }
@@ -284,7 +285,7 @@ final class EndToEndTest extends TestCase
         $reply = $this->ask('drupdater:hook', $project, ['protocol' => 6, 'request' => [
             'addon' => $addon, 'event' => $event, 'earlier' => $earlier, 'run' => ['security' => $security],
         ]]);
-        self::assertTrue($reply['ok'], json_encode($reply));
+        self::assertTrue($reply['ok'], json_encode($reply, JSON_THROW_ON_ERROR));
         return $reply;
     }
 
@@ -303,9 +304,9 @@ final class EndToEndTest extends TestCase
      */
     private function askWithErrors(string $command, string $project, array $request): array
     {
-        $process = self::composer(['--working-dir=' . $project, $command, '--no-interaction', '--no-ansi'], json_encode($request));
+        $process = self::composer(['--working-dir=' . $project, $command, '--no-interaction', '--no-ansi'], json_encode($request, JSON_THROW_ON_ERROR));
         $lines = explode("\n", trim($process->getOutput()));
-        return [json_decode(end($lines), true, 512, JSON_THROW_ON_ERROR), $process->getErrorOutput()];
+        return [Decoded::envelope(end($lines)), $process->getErrorOutput()];
     }
 
     /**
@@ -316,13 +317,13 @@ final class EndToEndTest extends TestCase
     private function pathProject(): array
     {
         $package = $this->scratchDir();
-        $this->writeFiles($package, self::PACKAGE_FILES + ['composer.json' => json_encode(['name' => 'fixture/lib', 'version' => '1.0.0'])]);
+        $this->writeFiles($package, self::PACKAGE_FILES + ['composer.json' => json_encode(['name' => 'fixture/lib', 'version' => '1.0.0'], JSON_THROW_ON_ERROR)]);
         $project = $this->scratchDir();
         $this->writeFiles($project, ['composer.json' => json_encode([
             'name' => 'fixture/site',
             'repositories' => [['type' => 'path', 'url' => $package, 'options' => ['symlink' => false]], ['packagist.org' => false]],
             'require' => ['fixture/lib' => '1.0.0'],
-        ], JSON_UNESCAPED_SLASHES)]);
+        ], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)]);
         $lock = self::composer(['--working-dir=' . $project, 'update', '--no-install', '--no-interaction']);
         self::assertSame(0, $lock->getExitCode(), $lock->getErrorOutput());
         return [$project, $package];
@@ -345,7 +346,7 @@ final class EndToEndTest extends TestCase
                 ['packagist.org' => false],
             ],
             'require' => ['fixture/a' => '^1.0', 'fixture/b' => '^2.0'],
-        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)]);
+        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)]);
         $lock = self::composer(['--working-dir=' . $project, 'update', '--no-install', '--no-interaction', '--with=fixture/a:1.0.0', '--with=fixture/b:2.0.0']);
         self::assertSame(0, $lock->getExitCode(), $lock->getErrorOutput());
         return $project;
@@ -362,7 +363,7 @@ final class EndToEndTest extends TestCase
         $repositories = [];
         foreach (['1.0.0', '1.1.0'] as $version) {
             $package = $this->scratchDir();
-            $this->writeFiles($package, self::PACKAGE_FILES + ['composer.json' => json_encode(['name' => 'fixture/greeting', 'version' => $version])]);
+            $this->writeFiles($package, self::PACKAGE_FILES + ['composer.json' => json_encode(['name' => 'fixture/greeting', 'version' => $version], JSON_THROW_ON_ERROR)]);
             $repositories[] = ['type' => 'path', 'url' => $package, 'canonical' => false, 'options' => ['symlink' => false]];
         }
         $project = $this->scratchDir();
@@ -372,7 +373,7 @@ final class EndToEndTest extends TestCase
                 'repositories' => [...$repositories, ['packagist.org' => false]],
                 'require' => ['fixture/greeting' => '^1.0'],
                 'extra' => ['patches' => ['fixture/greeting' => ['Greet the world' => 'patches/greeting.patch']] + $morePatches],
-            ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
+            ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
             'patches/greeting.patch' => $patch,
         ]);
         $lock = self::composer(['--working-dir=' . $project, 'update', '--no-install', '--no-interaction', '--with=fixture/greeting:1.0.0']);
@@ -380,7 +381,7 @@ final class EndToEndTest extends TestCase
         return $project;
     }
 
-    private function manifestOf(string $project): \stdClass
+    private function manifestOf(string $project): mixed
     {
         return json_decode((string) file_get_contents($project . '/composer.json'), false, 512, JSON_THROW_ON_ERROR);
     }
@@ -388,9 +389,9 @@ final class EndToEndTest extends TestCase
     private static function lockedVersion(string $package): string
     {
         $lock = json_decode((string) file_get_contents(dirname(__DIR__) . '/composer.lock'), true, 512, JSON_THROW_ON_ERROR);
-        foreach ($lock['packages'] as $locked) {
-            if ($locked['name'] === $package) {
-                return $locked['version'];
+        foreach (Json::maps(Json::at($lock, 'packages')) as $locked) {
+            if (($locked['name'] ?? null) === $package) {
+                return Json::string($locked['version'] ?? null);
             }
         }
         throw new \LogicException($package . ' is not in the agent\'s composer.lock');

@@ -24,10 +24,7 @@ final class InstallCommand extends AgentCommand
 
     protected function handle(array $request): array
     {
-        $install = $this->getApplication()?->find('install');
-        if ($install === null) {
-            throw new Failure(Failure::INTERNAL, 'Composer has no install command');
-        }
+        $install = $this->getApplication()->find('install');
         // drupdater checks the platform itself, against the PHP the sites will run on.
         $input = new ArrayInput(['--no-progress' => true, '--optimize-autoloader' => true, '--ignore-platform-reqs' => true]);
         $input->setInteractive(false);

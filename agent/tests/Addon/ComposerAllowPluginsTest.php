@@ -8,6 +8,7 @@ use Drupdater\Agent\Addon\ComposerAllowPlugins;
 use Drupdater\Agent\Addon\Event;
 use Drupdater\Agent\Addon\Plan;
 use Drupdater\Agent\Failure;
+use Drupdater\Agent\Json;
 use Drupdater\Agent\Plugins\AllowPlugins;
 use Drupdater\Agent\Tests\FixtureProject;
 use Drupdater\Agent\Tests\InProject;
@@ -33,7 +34,7 @@ final class ComposerAllowPluginsTest extends TestCase
         self::assertSame(['dealerdirect/phpcodesniffer-composer-installer'], $closed->finding);
         self::assertEquals(
             (object) ['cweagans/composer-patches' => true, 'drupal/*' => false, 'dealerdirect/phpcodesniffer-composer-installer' => false],
-            $this->manifest($project)->config->{'allow-plugins'},
+            Json::at($this->manifest($project), 'config', 'allow-plugins'),
         );
     }
 
@@ -44,7 +45,7 @@ final class ComposerAllowPluginsTest extends TestCase
         $opened = $this->addon($project)->handle(Event::preComposerUpdate($project, new Plan()));
         $this->addon($project)->handle(Event::postComposerUpdate($project, [], Records::findings([Records::record('pre-composer-update', $opened->finding)])));
 
-        self::assertEquals(new \stdClass(), $this->manifest($project)->config->{'allow-plugins'});
+        self::assertEquals(new \stdClass(), Json::at($this->manifest($project), 'config', 'allow-plugins'));
     }
 
     public function testRefusesToCloseWithoutItsOpeningAndWritesNothing(): void

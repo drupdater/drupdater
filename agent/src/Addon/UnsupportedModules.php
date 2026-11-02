@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupdater\Agent\Addon;
 
+use Drupdater\Agent\Json;
 use Drupdater\Agent\Log;
 
 /**
@@ -55,11 +56,12 @@ final class UnsupportedModules implements Addon
     {
         $byName = [];
         foreach ($findings->sites(EventName::PreSiteUpdate) as $recorded) {
-            foreach ((array) $recorded->finding() as $module) {
-                $byName[(string) $module['name']] = [
-                    'name' => (string) $module['name'],
-                    'installed_version' => (string) ($module['installed_version'] ?? ''),
-                    'recommended_version' => (string) ($module['recommended_version'] ?? ''),
+            foreach (Json::maps($recorded->finding()) as $module) {
+                $name = Json::string(Json::at($module, 'name'));
+                $byName[$name] = [
+                    'name' => $name,
+                    'installed_version' => Json::string(Json::at($module, 'installed_version')),
+                    'recommended_version' => Json::string(Json::at($module, 'recommended_version')),
                 ];
             }
         }

@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Drupdater\Agent\Tests\MergeRequest;
 
 use Drupdater\Agent\Failure;
+use Drupdater\Agent\Json;
 use Drupdater\Agent\MergeRequest\MergeRequest;
+use Drupdater\Agent\Tests\Decoded;
 use Drupdater\Agent\Tests\Fails;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -23,7 +25,7 @@ final class MergeRequestTest extends TestCase
 
     public function testTheDescriptionOfThePublishedExampleIsMadeOfItsSections(): void
     {
-        $addons = self::publishedExample()->addons;
+        $addons = Decoded::object(self::publishedExample()->addons);
 
         $description = MergeRequest::builtin()->description($addons);
 
@@ -43,7 +45,7 @@ final class MergeRequestTest extends TestCase
             'composer_audit',
             'unsupported_modules',
             'update_hooks',
-        ], array_keys(MergeRequest::builtin()->sections(self::publishedExample()->addons)));
+        ], array_keys(MergeRequest::builtin()->sections(Decoded::object(self::publishedExample()->addons))));
     }
 
     public function testTheTitleNamesTheModeAndTheStart(): void
@@ -309,7 +311,7 @@ final class MergeRequestTest extends TestCase
     private static function publishedExample(): \stdClass
     {
         $request = json_decode((string) file_get_contents(__DIR__ . '/../../protocol/merge-request/request.json'), false, 512, JSON_THROW_ON_ERROR);
-        return $request->request->report;
+        return Decoded::object(Json::at($request, 'request', 'report'));
     }
 
     private static function golden(string $name): string
@@ -322,7 +324,7 @@ final class MergeRequestTest extends TestCase
      */
     private static function report(array $report): \stdClass
     {
-        return json_decode((string) json_encode($report), false, 512, JSON_THROW_ON_ERROR);
+        return Decoded::object(json_decode(json_encode($report, JSON_THROW_ON_ERROR), false, 512, JSON_THROW_ON_ERROR));
     }
 
     /**

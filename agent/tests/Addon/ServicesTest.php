@@ -11,6 +11,7 @@ use Drupdater\Agent\Addon\Catalogue;
 use Drupdater\Agent\Addon\Services;
 use Drupdater\Agent\DrupalOrg\DrupalCode;
 use Drupdater\Agent\Failure;
+use Drupdater\Agent\Json;
 use Drupdater\Agent\Log;
 use Drupdater\Agent\Resolve\Resolver;
 use Drupdater\Agent\Tests\FixtureProject;
@@ -67,7 +68,7 @@ final class ServicesTest extends TestCase
         self::assertEquals((object) [
             'Issue #3123456: [Token fix](https://www.drupal.org/i/3123456)' => 'patches/token/3123456-local.patch',
             'Remote fix' => 'https://www.drupal.org/files/issues/3200000-8.patch',
-        ], $services->project()->patches->{'drupal/token'});
+        ], Json::at($services->project()->patches, 'drupal/token'));
     }
 
     public function testTheProjectIsReadAfreshEachTime(): void
@@ -77,8 +78,10 @@ final class ServicesTest extends TestCase
         $before = $services->project();
 
         $manifest = $this->manifest($project);
-        unset($manifest->extra->patches);
-        file_put_contents($project . '/composer.json', json_encode($manifest));
+        $extra = $manifest->extra;
+        self::assertInstanceOf(\stdClass::class, $extra);
+        unset($extra->patches);
+        file_put_contents($project . '/composer.json', json_encode($manifest, JSON_THROW_ON_ERROR));
 
         self::assertNotNull($before->patches);
         self::assertNull($services->project()->patches);
@@ -89,9 +92,12 @@ final class ServicesTest extends TestCase
         $services = $this->services($this->fixtureProject());
 
         putenv(DrupalCode::TOKEN_VARIABLE);
-        self::assertNull($services->drupalCode());
+        $without = $services->drupalCode();
         putenv(DrupalCode::TOKEN_VARIABLE . '=secret');
-        self::assertInstanceOf(DrupalCode::class, $services->drupalCode());
+        $with = $services->drupalCode();
+
+        self::assertNull($without);
+        self::assertInstanceOf(DrupalCode::class, $with);
     }
 
     public function testComposerCannotBeRunAgainWithoutKnowingWhatItWasStartedAs(): void

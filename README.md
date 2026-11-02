@@ -27,7 +27,7 @@ updates to arrive as reviewable PRs on a schedule, instead of as a manual chore.
 ## Quick start
 
 Try it locally against any GitHub/GitLab repo. Pick the image matching your site's PHP
-version (`php8.2`, `php8.3`, `php8.4`, `php8.5`):
+version (`php8.3`, `php8.4`, `php8.5`):
 
 ```bash
 docker run ghcr.io/drupdater/drupdater-php8.3:latest \

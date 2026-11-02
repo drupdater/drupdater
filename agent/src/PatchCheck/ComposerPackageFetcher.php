@@ -7,8 +7,8 @@ namespace Drupdater\Agent\PatchCheck;
 use Composer\Composer;
 use Composer\Downloader\TransportException;
 use Composer\Package\AliasPackage;
-use Composer\Package\BasePackage;
 use Composer\Package\Package;
+use Composer\Package\PackageInterface;
 use Composer\Util\SyncHelper;
 use Drupdater\Agent\Failure;
 
@@ -57,7 +57,7 @@ final class ComposerPackageFetcher implements PackageFetcher
     }
 
     // A lock entry like "dev-1.x abc123" names a commit; the repository only knows the branch head.
-    private static function atReference(BasePackage $package, string $reference): BasePackage
+    private static function atReference(PackageInterface $package, string $reference): PackageInterface
     {
         if ($package instanceof AliasPackage) {
             $package = $package->getAliasOf();

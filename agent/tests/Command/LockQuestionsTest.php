@@ -10,7 +10,9 @@ use Composer\IO\NullIO;
 use Composer\Repository\PlatformRepository;
 use Drupdater\Agent\Command\AgentCommand;
 use Drupdater\Agent\Command\PlatformCheckCommand;
+use Drupdater\Agent\Json;
 use Drupdater\Agent\Platform\PlatformCheck;
+use Drupdater\Agent\Tests\Decoded;
 use Drupdater\Agent\Tests\Scratch;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -53,7 +55,7 @@ final class LockQuestionsTest extends TestCase
     {
         [, $reply] = $this->ask($this->platformCheck('8.3.2'), $this->project(), self::fixture('platform-check/request.json'));
 
-        self::assertSame(['ext-drupdaterfixture'], array_column($reply['result']['unmet'], 'name'));
+        self::assertSame(['ext-drupdaterfixture'], array_column(Json::list(Json::at($reply, 'result', 'unmet')), 'name'));
     }
 
     public function testPlatformCheckReportsTheConstraintAPhpMisses(): void
@@ -62,7 +64,7 @@ final class LockQuestionsTest extends TestCase
 
         self::assertSame(
             ['name' => 'php', 'version' => '9.0.0', 'constraint' => '>=7.4 <9', 'required_by' => 'fixture/safe'],
-            $reply['result']['unmet'][1],
+            Json::at($reply, 'result', 'unmet', 1),
         );
     }
 
@@ -72,7 +74,7 @@ final class LockQuestionsTest extends TestCase
 
         [, $reply] = $this->ask($this->platformCheck('8.3.2'), $project, self::fixture('platform-check/request.json'));
 
-        self::assertSame([], $reply['result']['unmet']);
+        self::assertSame([], Json::at($reply, 'result', 'unmet'));
     }
 
     /**
@@ -118,10 +120,10 @@ final class LockQuestionsTest extends TestCase
             'composer.json' => json_encode([
                 'name' => 'fixture/site',
                 'repositories' => [['type' => 'package', 'package' => $locked], ['packagist.org' => false]],
-                'require' => ['php' => '>=8.3'] + array_fill_keys(array_column($locked, 'name'), '*'),
+                'require' => ['php' => '>=8.3'] + array_fill_keys(Json::strings(array_column($locked, 'name')), '*'),
                 'config' => (object) $config,
-            ], JSON_UNESCAPED_SLASHES),
-            'composer.lock' => json_encode(['packages' => $locked, 'packages-dev' => []], JSON_UNESCAPED_SLASHES),
+            ], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
+            'composer.lock' => json_encode(['packages' => $locked, 'packages-dev' => []], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
         ]);
         return $project;
     }
@@ -140,6 +142,6 @@ final class LockQuestionsTest extends TestCase
         $tester = new CommandTester($command);
         $tester->setInputs([json_encode($request, JSON_THROW_ON_ERROR)]);
         $status = $tester->execute([]);
-        return [$status, json_decode($tester->getDisplay(), true, 512, JSON_THROW_ON_ERROR)];
+        return [$status, Decoded::envelope($tester->getDisplay())];
     }
 }

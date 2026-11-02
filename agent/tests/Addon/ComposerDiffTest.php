@@ -7,6 +7,7 @@ namespace Drupdater\Agent\Tests\Addon;
 use Drupdater\Agent\Addon\ComposerDiff;
 use Drupdater\Agent\Addon\Event;
 use Drupdater\Agent\Failure;
+use Drupdater\Agent\Json;
 use Drupdater\Agent\Log;
 use Drupdater\Agent\Tests\InProject;
 use PHPUnit\Framework\TestCase;
@@ -53,6 +54,17 @@ final class ComposerDiffTest extends TestCase
         ], $result->finding);
     }
 
+    public function testLinksAPackageOnTheProjectsOwnGitlab(): void
+    {
+        $at = static fn (string $version): array => ['packages' => [
+            ['name' => 'fixture/a', 'version' => $version, 'type' => 'library', 'source' => ['type' => 'git', 'url' => 'https://git.example.com/fixture/a.git', 'reference' => $version]],
+        ]];
+
+        $result = $this->diff($at('1.1.0'), $at('1.0.0'), config: ['gitlab-domains' => ['git.example.com']]);
+
+        self::assertSame('https://git.example.com/fixture/a/compare/1.0.0...1.1.0', Json::at($result->finding, 0, 'compare_url'));
+    }
+
     public function testLogsOneLinePerPackageWithoutLinks(): void
     {
         $log = new Log();
@@ -82,7 +94,7 @@ final class ComposerDiffTest extends TestCase
     {
         $at = static fn (string $reference): array => ['packages' => [['name' => 'fixture/a', 'version' => 'dev-main', 'type' => 'library', 'source' => ['type' => 'git', 'url' => 'https://example.com/a.git', 'reference' => $reference]]]];
 
-        self::assertSame(['change'], array_column($this->diff($at('bbbbbbb'), $at('aaaaaaa'))->finding, 'operation'));
+        self::assertSame(['change'], array_column(Json::list($this->diff($at('bbbbbbb'), $at('aaaaaaa'))->finding), 'operation'));
     }
 
     public function testSortsEachHalfByName(): void
@@ -92,7 +104,7 @@ final class ComposerDiffTest extends TestCase
             ['name' => 'fixture/alpha', 'version' => '1.0.0', 'type' => 'library'],
         ], 'packages-dev' => [['name' => 'fixture/beta', 'version' => '1.0.0', 'type' => 'library']]];
 
-        self::assertSame(['fixture/alpha', 'fixture/zeta', 'fixture/beta'], array_column($this->diff($locked, ['packages' => []])->finding, 'package'));
+        self::assertSame(['fixture/alpha', 'fixture/zeta', 'fixture/beta'], array_column(Json::list($this->diff($locked, ['packages' => []])->finding), 'package'));
     }
 
     public function testRefusesAProjectWithoutALock(): void
@@ -116,17 +128,19 @@ final class ComposerDiffTest extends TestCase
     /**
      * @param array<string, mixed> $locked
      * @param array<string, mixed> $base
+     * @param array<string, mixed> $config
      */
-    private function diff(array $locked, array $base, Log $log = new Log()): \Drupdater\Agent\Addon\HookResult
+    private function diff(array $locked, array $base, Log $log = new Log(), array $config = []): \Drupdater\Agent\Addon\HookResult
     {
-        $project = $this->project($locked);
+        $project = $this->project($locked, $config);
         return (new ComposerDiff($log, $this->composer($project)))->handle(Event::postComposerUpdate($project, $base));
     }
 
     /**
      * @param array<string, mixed> $lock
+     * @param array<string, mixed> $config
      */
-    private function project(array $lock): string
+    private function project(array $lock, array $config = []): string
     {
         $project = $this->scratchDir();
         $this->writeFiles($project, [
@@ -135,8 +149,9 @@ final class ComposerDiffTest extends TestCase
                 'repositories' => [['packagist.org' => false]],
                 'require' => ['fixture/a' => '^1.0'],
                 'require-dev' => ['fixture/tool' => '^2.0'],
-            ], JSON_UNESCAPED_SLASHES),
-            'composer.lock' => json_encode($lock + ['packages' => [], 'packages-dev' => []], JSON_UNESCAPED_SLASHES),
+                'config' => (object) $config,
+            ], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
+            'composer.lock' => json_encode($lock + ['packages' => [], 'packages-dev' => []], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
         ]);
         return $project;
     }

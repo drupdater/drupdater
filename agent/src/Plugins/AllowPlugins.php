@@ -9,6 +9,7 @@ use Composer\Config\JsonConfigSource;
 use Composer\Json\JsonFile;
 use Composer\Package\AliasPackage;
 use Composer\Package\BasePackage;
+use Drupdater\Agent\Json;
 
 /**
  * Lets an unattended update install plugins, then denies each new one the project's own rules
@@ -69,7 +70,7 @@ final class AllowPlugins
             if ($original === null && $denied === []) {
                 $this->source->removeConfigSetting('allow-plugins');
                 // open may have had to create config to hold the wildcard.
-                if ((array) ($this->manifest()->config ?? null) === []) {
+                if (Json::map(Json::at($this->manifest(), 'config')) === []) {
                     $this->source->removeProperty('config');
                 }
             }
@@ -79,11 +80,11 @@ final class AllowPlugins
 
     private function current(): \stdClass|bool|null
     {
-        $value = $this->manifest()->config->{'allow-plugins'} ?? null;
+        $value = Json::at($this->manifest(), 'config', 'allow-plugins');
         return $value instanceof \stdClass || is_bool($value) ? $value : null;
     }
 
-    private function manifest(): \stdClass
+    private function manifest(): mixed
     {
         return json_decode((string) file_get_contents($this->composerFile), false, 512, JSON_THROW_ON_ERROR);
     }

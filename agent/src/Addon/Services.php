@@ -14,6 +14,7 @@ use Drupdater\Agent\Audit\LockAudit;
 use Drupdater\Agent\DrupalOrg\DrupalCode;
 use Drupdater\Agent\DrupalOrg\DrupalOrg;
 use Drupdater\Agent\Failure;
+use Drupdater\Agent\Json;
 use Drupdater\Agent\Log;
 use Drupdater\Agent\PatchCheck\ComposerPackageFetcher;
 use Drupdater\Agent\PatchCheck\PatchApplier;
@@ -91,7 +92,7 @@ final class Services
             new ComposerPackageFetcher($this->composer),
             new PatchFiles($this->composer->getLoop()->getHttpDownloader()),
             new PatchApplier(new ProcessExecutor($this->io)),
-            $this->composer->getPackage()->getExtra()['patchLevel'] ?? [],
+            Json::map($this->composer->getPackage()->getExtra()['patchLevel'] ?? null),
         );
     }
 
@@ -137,7 +138,7 @@ final class Services
 
     public function bundledRector(): Rector
     {
-        return Rector::bundled(new ProcessRunner(), new Bin($this->bundledTools), self::rectorConfig(), $this->projectDir(), (string) $this->composer->getConfig()->get('vendor-dir'));
+        return Rector::bundled(new ProcessRunner(), new Bin($this->bundledTools), self::rectorConfig(), $this->projectDir(), Json::string($this->composer->getConfig()->get('vendor-dir')));
     }
 
     public function drush(): Drush
@@ -162,7 +163,7 @@ final class Services
 
     private function projectBin(): Bin
     {
-        return new Bin((string) $this->composer->getConfig()->get('bin-dir'));
+        return new Bin(Json::string($this->composer->getConfig()->get('bin-dir')));
     }
 
     private function composerFile(): string

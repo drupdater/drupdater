@@ -16,7 +16,9 @@ use Drupdater\Agent\Addon\Plan;
 use Drupdater\Agent\Addon\Services;
 use Drupdater\Agent\Command\HookCommand;
 use Drupdater\Agent\Failure;
+use Drupdater\Agent\Json;
 use Drupdater\Agent\Tests\Addon\ScriptedAddon;
+use Drupdater\Agent\Tests\Decoded;
 use Drupdater\Agent\Tests\InProject;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -71,6 +73,20 @@ final class HookCommandTest extends TestCase
         self::assertStringContainsString('"finding":{"saw":{"empty":{}}}', $output, 'an empty object reads back as one');
     }
 
+    public function testARequestWithoutTheRunIsNoSecurityRun(): void
+    {
+        $seen = null;
+        ScriptedAddon::$hook = static function (Event $event) use (&$seen): HookResult {
+            $seen = $event;
+            return new HookResult(null);
+        };
+
+        $this->ask($this->scripted(), ['protocol' => 6, 'request' => ['addon' => 'scripted', 'event' => ['name' => 'post-code-update']]]);
+
+        self::assertInstanceOf(Event::class, $seen);
+        self::assertFalse($seen->security);
+    }
+
     public function testRepliesWithTheCommitsAndThePlanAHookReturns(): void
     {
         ScriptedAddon::$hook = static fn (): HookResult => new HookResult(['n' => 1], [new Commit('Change it', ['a', 'b'])], new Plan(['x/y'], minimalChanges: true));
@@ -115,8 +131,8 @@ final class HookCommandTest extends TestCase
 
         [, $reply] = $this->ask($this->scripted(), self::request(['name' => 'post-code-update']));
 
-        self::assertSame('internal', $reply['error']['kind']);
-        self::assertStringContainsString('proposed a plan on post-code-update', $reply['error']['message']);
+        self::assertSame('internal', Json::at($reply, 'error', 'kind'));
+        self::assertStringContainsString('proposed a plan on post-code-update', Json::string(Json::at($reply, 'error', 'message')));
     }
 
     /**
@@ -182,8 +198,8 @@ final class HookCommandTest extends TestCase
                 'repositories' => [['packagist.org' => false]],
                 'require' => ['fixture/a' => '^1.0'],
                 'require-dev' => ['fixture/tool' => '^2.0'],
-            ], JSON_UNESCAPED_SLASHES),
-            'composer.lock' => json_encode(self::LOCKED, JSON_UNESCAPED_SLASHES),
+            ], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
+            'composer.lock' => json_encode(self::LOCKED, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
         ]);
         $command->setComposer($this->composer($this->project));
         $application = new Application();
@@ -193,6 +209,6 @@ final class HookCommandTest extends TestCase
         $tester->setInputs([json_encode($request, JSON_THROW_ON_ERROR)]);
         $status = $tester->execute([]);
         $output = trim($tester->getDisplay());
-        return [$status, json_decode($output, true, 512, JSON_THROW_ON_ERROR), $output];
+        return [$status, Decoded::envelope($output), $output];
     }
 }

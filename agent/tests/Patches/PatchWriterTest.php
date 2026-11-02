@@ -6,6 +6,7 @@ namespace Drupdater\Agent\Tests\Patches;
 
 use Composer\Package\Locker;
 use Drupdater\Agent\Failure;
+use Drupdater\Agent\Json;
 use Drupdater\Agent\Patches\PatchWriter;
 use Drupdater\Agent\Tests\FixtureProject;
 use Drupdater\Agent\Tests\Scratch;
@@ -30,10 +31,10 @@ final class PatchWriterTest extends TestCase
 
         $this->writer($project)->write(self::patches(self::PATCHES));
 
-        $patches = $this->manifest($project)->extra->patches;
-        self::assertSame(['drupal/token', 'drupal/empty'], array_keys((array) $patches));
-        self::assertEquals(new \stdClass(), $patches->{'drupal/empty'}, 'an empty patch list stays an object');
-        self::assertEquals(self::patches(self::PATCHES)->{'drupal/token'}, $patches->{'drupal/token'});
+        $patches = Json::at($this->manifest($project), 'extra', 'patches');
+        self::assertSame(['drupal/token', 'drupal/empty'], array_keys(Json::map($patches)));
+        self::assertEquals(new \stdClass(), Json::at($patches, 'drupal/empty'), 'an empty patch list stays an object');
+        self::assertEquals(Json::at(self::patches(self::PATCHES), 'drupal/token'), Json::at($patches, 'drupal/token'));
     }
 
     public function testRehashesTheLockAndChangesNothingElseInIt(): void
@@ -55,9 +56,22 @@ final class PatchWriterTest extends TestCase
         $this->writer($project)->write(self::patches('{"drupal/token":{"0":"patches/zero.patch"}}'));
 
         $manifest = $this->manifest($project);
-        self::assertEquals((object) ['0' => 'patches/zero.patch'], $manifest->extra->patches->{'drupal/token'});
+        self::assertEquals((object) ['0' => 'patches/zero.patch'], Json::at($manifest, 'extra', 'patches', 'drupal/token'));
         self::assertSame('fixture/site', $manifest->name, 'the re-encoded file keeps everything else');
-        self::assertEquals((object) ['cweagans/composer-patches' => true, 'drupal/*' => false], $manifest->config->{'allow-plugins'});
+        self::assertSame('web/', Json::at($manifest, 'extra', 'drupal-scaffold', 'locations', 'web-root'), 'and the rest of extra');
+        self::assertEquals((object) ['cweagans/composer-patches' => true, 'drupal/*' => false], Json::at($manifest, 'config', 'allow-plugins'));
+    }
+
+    public function testAddsExtraWhenComposerJsonHasNone(): void
+    {
+        $project = $this->fixtureProject();
+        $manifest = $this->manifest($project);
+        unset($manifest->extra);
+        file_put_contents($project . '/composer.json', json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "\n");
+
+        $this->writer($project)->write(self::patches('{"drupal/token":{"0":"patches/zero.patch"}}'));
+
+        self::assertEquals((object) ['drupal/token' => (object) ['0' => 'patches/zero.patch']], Json::at($this->manifest($project), 'extra', 'patches'));
     }
 
     public function testKeepsTheRestOfComposerJsonAsWritten(): void
@@ -67,7 +81,10 @@ final class PatchWriterTest extends TestCase
 
         $this->writer($project)->write(self::patches(self::PATCHES));
 
-        $head = substr($before, 0, (int) strpos($before, '"patches"'));
+        $at = strpos($before, '"patches"');
+        self::assertIsInt($at);
+        $head = substr($before, 0, $at);
+        self::assertNotSame('', $head);
         self::assertStringStartsWith($head, (string) file_get_contents($project . '/composer.json'), 'everything up to extra.patches is untouched');
     }
 
@@ -107,6 +124,8 @@ final class PatchWriterTest extends TestCase
 
     private static function patches(string $json): \stdClass
     {
-        return json_decode($json, false, 512, JSON_THROW_ON_ERROR);
+        $patches = json_decode($json, false, 512, JSON_THROW_ON_ERROR);
+        self::assertInstanceOf(\stdClass::class, $patches);
+        return $patches;
     }
 }

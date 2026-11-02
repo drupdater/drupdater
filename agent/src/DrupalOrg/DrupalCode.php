@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupdater\Agent\DrupalOrg;
 
 use Composer\Util\HttpDownloader;
+use Drupdater\Agent\Json;
 
 /**
  * git.drupalcode.org, the GitLab holding every project's history and issue forks. It answers no
@@ -54,10 +55,8 @@ class DrupalCode
             sprintf('failed to list the merge requests from the fork of issue %s', $issueId),
         );
         $found = [];
-        foreach (is_array($mergeRequests) ? $mergeRequests : [] as $mergeRequest) {
-            if (is_array($mergeRequest)) {
-                $found[] = new ForkMergeRequest((string) ($mergeRequest['sha'] ?? ''), (string) ($mergeRequest['web_url'] ?? ''));
-            }
+        foreach (Json::maps($mergeRequests) as $mergeRequest) {
+            $found[] = new ForkMergeRequest(Json::string(Json::at($mergeRequest, 'sha')), Json::string(Json::at($mergeRequest, 'web_url')));
         }
         return $found;
     }

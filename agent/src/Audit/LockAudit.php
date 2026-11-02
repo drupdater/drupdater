@@ -17,6 +17,8 @@ use Drupdater\Agent\Failure;
 
 /**
  * The audit of composer.lock, with Composer's Auditor deciding what is ignored.
+ *
+ * @phpstan-type Advisory array{package: string, advisory_id: string, title: string, cve: string|null, link: string|null, severity: string|null, affected_versions: string, reported_at: string, sources: list<array{name: string, remote_id: string}>}
  */
 final class LockAudit
 {
@@ -28,7 +30,7 @@ final class LockAudit
      * Advisories sorted by package, advisory_id, cve and title; abandoned packages by name, with
      * a null replacement when the maintainers named no successor.
      *
-     * @return array{advisories: list<array<string, mixed>>, abandoned: list<array{package: string, replacement: string|null}>}
+     * @return array{advisories: list<Advisory>, abandoned: list<array{package: string, replacement: string|null}>}
      *
      * @throws Failure when there is no lock, or a repository's advisories cannot be fetched
      */
@@ -56,7 +58,7 @@ final class LockAudit
 
     /**
      * @param non-empty-array<\Composer\Package\PackageInterface> $packages
-     * @return list<array<string, mixed>>
+     * @return list<Advisory>
      */
     private function advisories(Auditor $auditor, array $packages): array
     {
@@ -83,7 +85,7 @@ final class LockAudit
     }
 
     /**
-     * @return array<string, mixed>
+     * @return Advisory
      */
     private static function advisory(PartialSecurityAdvisory $advisory): array
     {

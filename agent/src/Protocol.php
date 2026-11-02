@@ -31,7 +31,7 @@ final class Protocol
                 sprintf('drupdater speaks protocol %s, the agent speaks %d', json_encode($decoded['protocol'] ?? null), self::VERSION),
             );
         }
-        return $decoded['request'];
+        return Json::map($decoded['request']);
     }
 
     /**

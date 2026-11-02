@@ -27,7 +27,7 @@ final class ProjectFactsTest extends TestCase
         $application->setAutoExit(false);
         $application->add($command);
         $tester = new CommandTester($command);
-        $tester->setInputs([json_encode(self::fixture('project/request.json'))]);
+        $tester->setInputs([json_encode(self::fixture('project/request.json'), JSON_THROW_ON_ERROR)]);
 
         self::assertSame(0, $tester->execute([]));
         self::assertEquals(self::fixture('project/response.json'), json_decode($tester->getDisplay(), true));
@@ -94,7 +94,7 @@ final class ProjectFactsTest extends TestCase
     public function testFindsCustomProfilesUnderAnotherWebRoot(): void
     {
         $project = $this->scratchDir();
-        $this->writeFiles($project, ['composer.json' => json_encode(['extra' => ['drupal-scaffold' => ['locations' => ['web-root' => 'docroot/']]]])]);
+        $this->writeFiles($project, ['composer.json' => json_encode(['extra' => ['drupal-scaffold' => ['locations' => ['web-root' => 'docroot/']]]], JSON_THROW_ON_ERROR)]);
         mkdir($project . '/docroot/profiles/custom', 0777, true);
 
         $read = $this->read($project);

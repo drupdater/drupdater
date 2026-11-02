@@ -4,13 +4,16 @@
     "type": "composer-plugin",
     "license": "Apache-2.0",
     "require": {
-        "php": ">=8.2",
+        "php": ">=8.3",
         "composer-plugin-api": "^2.6",
         "ion-bazan/composer-diff": "^2.4",
         "symfony/yaml": "^6.4 || ^7.0"
     },
     "require-dev": {
         "composer/composer": "~2.10.0",
+        "infection/infection": "^0.32.7",
+        "phpstan/phpstan": "^2.3",
+        "phpstan/phpstan-phpunit": "^2.1",
         "phpunit/phpunit": "^11.5"
     },
     "autoload": {
@@ -28,10 +31,11 @@
     },
     "config": {
         "allow-plugins": {
-            "ion-bazan/composer-diff": false
+            "ion-bazan/composer-diff": false,
+            "infection/extension-installer": true
         },
         "platform": {
-            "php": "8.2.0"
+            "php": "8.3.0"
         },
         "sort-packages": true
     }
