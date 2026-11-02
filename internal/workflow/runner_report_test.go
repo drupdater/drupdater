@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
+	"github.com/drupdater/drupdater/internal/agent"
 	"github.com/drupdater/drupdater/internal/buildinfo"
 	"github.com/drupdater/drupdater/internal/codehosting"
 	"github.com/drupdater/drupdater/internal/composer"
@@ -335,4 +336,36 @@ func TestReportCarriesTheSectionsTheAgentBuilt(t *testing.T) {
 
 	require.NotNil(t, h.got)
 	assert.Equal(t, map[string]any{"translations_updater": json.RawMessage(`{"fixed":2}`)}, h.got.Addons)
+}
+
+func TestTheRenderPhaseFailsWhenTheAgentCannotBuildTheSections(t *testing.T) {
+	h := newRunHarness(t, true)
+	h.expectFullRun()
+	h.addons = append(h.addons, addon("composer_audit", map[string]Stage{EventPreComposerUpdate: Inspect}))
+	(&scriptedAgent{
+		hooks: map[string]func(agent.HookRequest) (agent.HookReply, error){},
+		report: func(agent.ReportRequest) (agent.ReportReply, error) {
+			return agent.ReportReply{}, errors.New("agent gone")
+		},
+	}).serve(h.composer)
+
+	err := h.run(t)
+
+	require.ErrorContains(t, err, "agent gone")
+	assert.Equal(t, "render merge request", h.got.FailedPhase)
+	assert.Empty(t, h.mergeRequests, "nothing to render without the sections")
+}
+
+func TestTheRenderPhaseFailsOnASectionThatIsNoJSON(t *testing.T) {
+	h := newRunHarness(t, true)
+	h.expectFullRun()
+	h.withSections(map[string]string{"composer_audit": `{"fixed":`})
+
+	err := h.run(t)
+
+	require.ErrorContains(t, err, "failed to encode the report")
+	var syntaxErr *json.SyntaxError
+	require.ErrorAs(t, err, &syntaxErr)
+	assert.Equal(t, "render merge request", h.got.FailedPhase)
+	assert.Empty(t, h.mergeRequests)
 }
