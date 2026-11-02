@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 
 	"github.com/drupdater/drupdater/internal/agent"
@@ -89,7 +88,7 @@ func (s *Sites) database(ctx context.Context, dir string, site string, command s
 // facts refuses anything but an object: the addons decode a site's facts as one.
 func facts(result factsResult, site string) (json.RawMessage, error) {
 	if !bytes.HasPrefix(bytes.TrimSpace(result.Facts), []byte("{")) {
-		return nil, fmt.Errorf("failed to read the facts of site %s: %w", site, errors.New("the agent answered no facts"))
+		return nil, fmt.Errorf("failed to read the facts of site %s: the agent answered no facts", site)
 	}
 	return result.Facts, nil
 }
