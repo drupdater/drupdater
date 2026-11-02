@@ -224,6 +224,9 @@ final class FrameworkTest extends TestCase
         yield 'a sibling with the same prefix' => ['/project-backup/translations', '/project-backup/translations'];
         yield 'already relative' => ['translations', 'translations'];
         yield 'outside the project' => ['/elsewhere/translations', '/elsewhere/translations'];
+        yield 'through the web root\'s parent, as a multisite configures it' => ['/project/web/../translations/', 'translations'];
+        yield 'with redundant separators and dots' => ['/project//./web/sites/./default', 'web/sites/default'];
+        yield 'leaving the project through ..' => ['/project/../elsewhere', '/project/../elsewhere'];
     }
 
     #[DataProvider('drushPaths')]
