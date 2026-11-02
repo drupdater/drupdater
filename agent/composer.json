@@ -26,6 +26,9 @@
         "class": "Drupdater\\Agent\\Plugin"
     },
     "config": {
+        "allow-plugins": {
+            "ion-bazan/composer-diff": false
+        },
         "platform": {
             "php": "8.2.0"
         },
