@@ -41,6 +41,18 @@ func (s *CLI) Report(ctx context.Context, request agent.ReportRequest) (agent.Re
 	return reply, nil
 }
 
+// MergeRequest renders the run's merge request from its report, which is all it may say, so it
+// needs no project either.
+func (s *CLI) MergeRequest(ctx context.Context, request agent.MergeRequestRequest) (agent.MergeRequestReply, error) {
+	reply, err := withoutProject(func(dir string) (agent.MergeRequestReply, error) {
+		return agent.Call[agent.MergeRequestReply](ctx, s.command(dir), "drupdater:merge-request", request)
+	})
+	if err != nil {
+		return agent.MergeRequestReply{}, fmt.Errorf("failed to render the merge request: %w", err)
+	}
+	return reply, nil
+}
+
 func withoutProject[T any](call func(dir string) (T, error)) (T, error) {
 	var zero T
 	dir, err := os.MkdirTemp("", "drupdater-agent-")

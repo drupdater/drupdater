@@ -2,9 +2,10 @@ package workflow
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
-	"github.com/drupdater/drupdater/internal/mergerequest"
+	"github.com/drupdater/drupdater/internal/agent"
 	"go.uber.org/zap"
 )
 
@@ -14,14 +15,15 @@ func (r *run) renderMergeRequest(ctx context.Context) (string, string, error) {
 	if err := r.pipeline.Report(ctx, r.rec); err != nil {
 		return "", "", err
 	}
-	snapshot := r.rec.Snapshot()
-
-	description, err := mergerequest.Description(snapshot)
+	snapshot, err := json.Marshal(r.rec.Snapshot())
 	if err != nil {
-		return "", "", fmt.Errorf("failed to generate description: %w", err)
+		return "", "", fmt.Errorf("failed to encode the report: %w", err)
 	}
-
-	return mergerequest.Title(snapshot), description, nil
+	reply, err := r.composer.MergeRequest(ctx, agent.MergeRequestRequest{Report: snapshot})
+	if err != nil {
+		return "", "", err
+	}
+	return reply.Title, reply.Description, nil
 }
 
 func (r *run) publish(ctx context.Context, updateBranchName, title, description string) error {

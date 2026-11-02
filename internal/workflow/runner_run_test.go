@@ -16,7 +16,6 @@ import (
 	"github.com/drupdater/drupdater/internal/codehosting"
 	"github.com/drupdater/drupdater/internal/composer"
 	"github.com/drupdater/drupdater/internal/config"
-	"github.com/drupdater/drupdater/internal/golden"
 	"github.com/drupdater/drupdater/internal/repo"
 )
 
@@ -27,19 +26,6 @@ func captureDescription(h *runHarness, mr codehosting.MergeRequest, description 
 			*description = got
 			return mr, nil
 		})
-}
-
-func TestRunPublishesTheDependencyUpdateDescription(t *testing.T) {
-	h := newRunHarness(t, false)
-	h.expectPublish()
-	// Captured rather than matched on: as an expectation a changed description fails as an
-	// unexpected call, and the diff that would say what changed is never printed.
-	var description string
-	captureDescription(h, codehosting.MergeRequest{}, &description)
-
-	require.NoError(t, h.run(t))
-
-	golden.Assert(t, "testdata/dependency_update.md", description)
 }
 
 func TestRunPushesTheUpdateBranchWithTheToken(t *testing.T) {
@@ -416,7 +402,7 @@ func TestRunWithAutoMerge(t *testing.T) {
 	h.vcsProvider.EXPECT().EnableAutoMerge(anyCtx, createdMR).Return(nil)
 
 	require.NoError(t, h.run(t))
-	golden.Assert(t, "testdata/dependency_update.md", description)
+	assert.Equal(t, h.got.MergeRequestDescription, description)
 }
 
 // Auto-merge is a convenience on top of work that already succeeded: the branch is pushed and

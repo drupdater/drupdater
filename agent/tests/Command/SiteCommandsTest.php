@@ -69,7 +69,7 @@ final class SiteCommandsTest extends TestCase
     {
         $this->project();
 
-        [$status, $reply] = $this->ask(new SiteFactsCommand(), ['protocol' => 4, 'request' => ['site' => 'default']]);
+        [$status, $reply] = $this->ask(new SiteFactsCommand(), ['protocol' => 5, 'request' => ['site' => 'default']]);
 
         self::assertSame(1, $status);
         self::assertSame(['kind' => 'invalid_request', 'reason' => 'update_status must be a boolean', 'message' => ''], $reply['error']);
@@ -160,7 +160,7 @@ final class SiteCommandsTest extends TestCase
     {
         $this->project();
         foreach ([new SiteInstallCommand(), new SiteDatabaseCommand(), new SiteRestoreCommand()] as $command) {
-            [$status, $reply] = $this->ask($command, ['protocol' => 4, 'request' => ['site' => 'default', 'data_dir' => $dataDir]]);
+            [$status, $reply] = $this->ask($command, ['protocol' => 5, 'request' => ['site' => 'default', 'data_dir' => $dataDir]]);
 
             self::assertSame(1, $status);
             self::assertSame(['kind' => 'invalid_request', 'reason' => 'data_dir must be an existing absolute directory', 'message' => ''], $reply['error']);
@@ -187,7 +187,7 @@ final class SiteCommandsTest extends TestCase
         $this->project();
         $commands = [new SiteFactsCommand(), new SiteUpdateCommand(), new ConfigExportCommand(), new SiteInstallCommand(), new SiteDatabaseCommand(), new SiteRestoreCommand()];
         foreach ($commands as $command) {
-            [$status, $reply] = $this->ask($command, ['protocol' => 4, 'request' => ['site' => $site, 'update_status' => true, 'data_dir' => $this->project]]);
+            [$status, $reply] = $this->ask($command, ['protocol' => 5, 'request' => ['site' => $site, 'update_status' => true, 'data_dir' => $this->project]]);
 
             self::assertSame(1, $status, (string) $command->getName());
             self::assertSame(['kind' => 'invalid_request', 'reason' => 'site must name a directory under sites/', 'message' => ''], $reply['error']);

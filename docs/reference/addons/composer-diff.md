@@ -69,7 +69,7 @@ split and the links.
 Production and dev packages get a table each, wrapped in an open `<details>` block because
 on a large update it can run to hundreds of rows:
 
---8<-- "internal/mergerequest/testdata/composer_diff.md"
+--8<-- "agent/tests/MergeRequest/testdata/composer_diff.md"
 
 If the whole description would exceed GitHub's 65,536-byte limit, the tables are rendered
 without the links.

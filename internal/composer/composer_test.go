@@ -54,7 +54,7 @@ func TestInstallSendsTheFixture(t *testing.T) {
 }
 
 func TestInstallReportsTheAgentsFailure(t *testing.T) {
-	service, _ := fakeAgentCLI(t, `{"protocol":4,"command":"drupdater:install","ok":false,`+
+	service, _ := fakeAgentCLI(t, `{"protocol":5,"command":"drupdater:install","ok":false,`+
 		`"error":{"kind":"failed","reason":"composer install failed","message":"Source path not found"}}`, 1)
 
 	err := service.Install(t.Context(), t.TempDir())

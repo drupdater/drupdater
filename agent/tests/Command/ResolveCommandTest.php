@@ -37,7 +37,7 @@ final class ResolveCommandTest extends TestCase
         $application->setAutoExit(false);
         $application->add($command);
         $tester = new CommandTester($command);
-        $tester->setInputs([json_encode(['protocol' => 4, 'request' => $request])]);
+        $tester->setInputs([json_encode(['protocol' => 5, 'request' => $request])]);
 
         self::assertSame(1, $tester->execute([]));
         $reply = json_decode($tester->getDisplay(), true);

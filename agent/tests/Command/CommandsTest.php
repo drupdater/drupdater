@@ -28,6 +28,7 @@ final class CommandsTest extends TestCase
             'drupdater:handshake',
             'drupdater:hook',
             'drupdater:install',
+            'drupdater:merge-request',
             'drupdater:platform-check',
             'drupdater:project',
             'drupdater:report',
@@ -53,7 +54,7 @@ final class CommandsTest extends TestCase
     public function testAMismatchedProtocolIsRefused(): void
     {
         $request = self::fixture('handshake/request.json');
-        $request['protocol'] = 5;
+        $request['protocol'] = 6;
 
         [$status, $reply] = $this->ask(new HandshakeCommand(), $request);
 
@@ -67,7 +68,7 @@ final class CommandsTest extends TestCase
     public static function unreadableBodies(): iterable
     {
         yield 'not JSON' => ['{', 'the request is not JSON'];
-        yield 'no request object' => ['{"protocol":4}', 'the request has no request object'];
+        yield 'no request object' => ['{"protocol":5}', 'the request has no request object'];
         yield 'not an object' => ['"x"', 'the request has no request object'];
     }
 

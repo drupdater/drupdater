@@ -1,10 +1,10 @@
 {
-  "protocol": 4,
+  "protocol": 5,
   "command": "drupdater:handshake",
   "ok": false,
   "error": {
     "kind": "protocol_mismatch",
-    "reason": "drupdater speaks protocol 5, the agent speaks 4",
+    "reason": "drupdater speaks protocol 6, the agent speaks 5",
     "message": ""
   }
 }

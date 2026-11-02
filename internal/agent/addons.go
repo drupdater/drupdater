@@ -90,3 +90,15 @@ type ReportRequest struct {
 type ReportReply struct {
 	Sections map[string]json.RawMessage `json:"sections"`
 }
+
+// MergeRequestRequest asks drupdater:merge-request to render the merge request from the report.
+type MergeRequestRequest struct {
+	// Report is the run report as published.
+	Report json.RawMessage `json:"report"`
+}
+
+// MergeRequestReply is the merge request's title and description.
+type MergeRequestReply struct {
+	Title       string `json:"title"`
+	Description string `json:"description"`
+}

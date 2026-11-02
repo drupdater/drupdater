@@ -153,7 +153,7 @@ every subsequent run until someone rerolls the patch or the issue is fixed upstr
 
 ## Pull request section
 
---8<-- "internal/mergerequest/testdata/composer_patches.md"
+--8<-- "agent/tests/MergeRequest/testdata/composer_patches.md"
 
 ## Without a Drupal.org token
 

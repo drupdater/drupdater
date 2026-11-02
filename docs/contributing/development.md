@@ -154,11 +154,11 @@ which is the one way a golden file can make tests worse rather than better.
 
 | Golden file | Pins |
 |---|---|
-| `internal/mergerequest/testdata/description.md` | The description rendered from the example report |
-| `internal/mergerequest/testdata/<section>.md` | Each section of that description, from its template |
-| `internal/workflow/testdata/dependency_update.md` | The description a full run with no addon sections produces |
 | `internal/report/testdata/run_report.json` | The whole `--report` document, every reporting addon at once |
 | `agent/protocol/report/response.json` | The sections the agent builds for an example of every reporting addon's findings, which `run_report.json` embeds |
+| `agent/protocol/merge-request/request.json` | That example report, as `drupdater:merge-request` is asked to render it; a Go test fails when it no longer equals `run_report.json` |
+| `agent/tests/MergeRequest/testdata/description.md` | The description rendered from the example report, also in `agent/protocol/merge-request/response.json` |
+| `agent/tests/MergeRequest/testdata/<section>.md` | Each section of that description |
 
 Most of these are embedded into this documentation with `pymdownx.snippets`, so the published
 examples cannot drift from what the code emits. Changing a golden file changes the docs.
@@ -588,7 +588,8 @@ adds the `composer drupdater:*` commands the binary runs them and asks the proje
 Composer through: [`drupdater:addons`](../reference/docker-images.md#drupdater-agent), the
 addon catalogue; [`drupdater:hook`](../reference/docker-images.md#drupdater-agent), one addon's
 hook for one event; [`drupdater:report`](../reference/docker-images.md#drupdater-agent), the
-addons' report sections; [`drupdater:project`](../reference/docker-images.md#drupdater-agent),
+addons' report sections; [`drupdater:merge-request`](../reference/docker-images.md#drupdater-agent),
+the merge request's title and description; [`drupdater:project`](../reference/docker-images.md#drupdater-agent),
 the web root and lock hash; [`drupdater:resolve`](../reference/docker-images.md#drupdater-agent),
 the update itself; [`drupdater:install`](../reference/docker-images.md#drupdater-agent), the
 install; the [site commands](../reference/docker-images.md#drupdater-agent) — `site-facts`,
@@ -605,6 +606,7 @@ each in a method: `composer.Sites` the site commands.
 | `agent/src/Command/` | The commands, each answering one request with one envelope |
 | `agent/src/Tools/`, `Process/` | phpcs, Rector, drush and Composer run as processes |
 | `agent/src/Site/` | A site's throwaway SQLite database: the `settings.php` block and `core.extension.yml` |
+| `agent/src/MergeRequest/` | The merge request's title and description, rendered from the run report, one class per section |
 | `agent/src/DrupalOrg/` | drupal.org's node API and git.drupalcode.org's GitLab API, over Composer's HTTP |
 | `agent/src/Patches/`, `PatchCheck/` | `extra.patches` read, rewritten and test-applied |
 | `agent/src/Resolve/`, `Audit/`, `Plugins/`, `Project/`, `Platform/` | The update, the audit, allow-plugins, the project and the platform, through Composer's own API |
@@ -613,7 +615,7 @@ each in a method: `composer.Sites` the site commands.
 Each command reads one JSON request on stdin and prints one JSON envelope on stdout:
 
 ```json
-{"protocol": 4, "command": "drupdater:hook", "ok": true, "result": {"finding": null, "commits": [], "plan": null, "abort": null}, "log": [{"level": "info", "message": "updating coding styles", "context": {"addon": "code_beautifier"}}]}
+{"protocol": 5, "command": "drupdater:hook", "ok": true, "result": {"finding": null, "commits": [], "plan": null, "abort": null}, "log": [{"level": "info", "message": "updating coding styles", "context": {"addon": "code_beautifier"}}]}
 ```
 
 `log` holds what the command logged, on success and failure alike, and `agent.Call` logs each
@@ -666,20 +668,24 @@ For how these fit together, read [Explanation](../explanation/index.md) — in p
 [How a run works](../explanation/how-a-run-works.md) and [The addon
 architecture](../explanation/addon-architecture.md).
 
-## Description templates
+## Description sections
 
-Templates in `internal/mergerequest/templates/` render the run report into the pull request
-description. Keep them consistent with the existing style:
+The agent renders the run report into the pull request description: `agent/src/MergeRequest/`,
+one `Section` class per section, in the order `MergeRequest::builtin()` lists them. Keep them
+consistent with the existing style:
 
-- Section headers: `## {emoji} **{Title}**`
-- Table cells: always use the `{{ cell }}` helper, which escapes pipe characters and
-  newlines
-- Wrap long sections in `<details>` / `<summary>`, as the existing templates do
-- **Always verify the output with `--dry-run` before shipping a new template**
+- Section headers: `## {emoji} {Title}`
+- Table cells: always go through `Markdown::cell()`, which escapes pipe characters and newlines
+- Read the section through `Read`, so a section of the wrong shape is refused rather than half
+  rendered
+- Wrap long sections in `<details>` / `<summary>`, as the existing ones do
+- **Always verify the output with `--dry-run` before shipping a new section**
 
-Each template has a golden file in `internal/mergerequest/testdata/`, rendered from the
-example report in `internal/report/testdata/run_report.json`. Those files are embedded
-directly into this documentation, so updating one updates the published example too.
+Each section has a golden file in `agent/tests/MergeRequest/testdata/`, rendered from the
+example report in `agent/protocol/merge-request/request.json`, a copy of
+`internal/report/testdata/run_report.json`. The PHP suite has no `-update`: write the new golden
+by hand and read the failure's diff. Those files are embedded directly into this documentation,
+so updating one updates the published example too.
 
 ## Docker image
 

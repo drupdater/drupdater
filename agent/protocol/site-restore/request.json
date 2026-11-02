@@ -1,5 +1,5 @@
 {
-  "protocol": 4,
+  "protocol": 5,
   "request": {
     "site": "default",
     "data_dir": "/tmp/drupdater-sites-fixture"

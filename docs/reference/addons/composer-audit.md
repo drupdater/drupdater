@@ -182,7 +182,7 @@ audit every advisory found beforehand would wrongly read as fixed.
 
 ## Pull request section
 
---8<-- "internal/mergerequest/testdata/composer_audit.md"
+--8<-- "agent/tests/MergeRequest/testdata/composer_audit.md"
 
 Rendered only when there is at least one advisory to show, so a routine update on a healthy
 project carries no security section rather than one saying there was nothing to report.

@@ -794,6 +794,7 @@ func TestRunHandsAddonsTheRunsContextAndCommitter(t *testing.T) {
 		return agent.HookReply{}, nil
 	})
 	mockComposer.EXPECT().Report(anyCtx, mock.Anything).Return(agent.ReportReply{}, nil)
+	mockComposer.EXPECT().MergeRequest(anyCtx, mock.Anything).Return(agent.MergeRequestReply{}, nil)
 	observer := addon("observer", map[string]Stage{
 		EventPreComposerUpdate: Change, EventPostComposerUpdate: Change, EventPostCodeUpdate: Change,
 		EventPreSiteUpdate: Change, EventPostSiteUpdate: Change,

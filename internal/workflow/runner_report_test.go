@@ -95,9 +95,7 @@ func TestReportWrittenOnDryRun(t *testing.T) {
 	assert.True(t, h.got.DryRun)
 	assert.Nil(t, h.got.MergeRequest)
 	assert.NotContains(t, phaseNames(h.got.Phases), "publish")
-	// With no addon renaming it, the title is the maintenance-update default, dated by month.
-	assert.Contains(t, h.got.MergeRequestTitle, ": Drupal Maintenance Updates")
-	assert.Contains(t, h.got.MergeRequestTitle, time.Now().Format("January 2006"))
+	assert.Equal(t, testTitle, h.got.MergeRequestTitle)
 }
 
 // The most valuable case: a run that fails partway leaves a report naming the phase that failed.
@@ -193,8 +191,8 @@ var advisorySection = map[string]string{
 	"composer_audit": `{"remaining":[{"cve":"CVE-2026-1","title":"XSS","severity":"high","packageName":"drupal/core"}]}`,
 }
 
-// A --dry-run assembles a merge request without opening one, which is what makes a broken
-// template visible before a real run has pushed anything.
+// A --dry-run assembles a merge request without opening one, which is what makes a section the
+// agent cannot render visible before a real run has pushed anything.
 func TestReportRecordsMergeRequestContentOnDryRun(t *testing.T) {
 	h := newRunHarness(t, true)
 	h.expectFullRun()
@@ -203,9 +201,8 @@ func TestReportRecordsMergeRequestContentOnDryRun(t *testing.T) {
 	require.NoError(t, h.run(t))
 
 	require.NotNil(t, h.got)
-	assert.Contains(t, h.got.MergeRequestTitle, ": Drupal Maintenance Updates")
-	assert.Contains(t, h.got.MergeRequestDescription, "## 🛡️ Security Report")
-	assert.Contains(t, h.got.MergeRequestDescription, "CVE-2026-1")
+	assert.Equal(t, testTitle, h.got.MergeRequestTitle)
+	assert.Contains(t, h.got.MergeRequestDescription, "rendered from ")
 	assert.Contains(t, phaseNames(h.got.Phases), "render merge request")
 	assert.NotContains(t, phaseNames(h.got.Phases), "publish")
 	assert.Nil(t, h.got.MergeRequest)
@@ -233,20 +230,43 @@ func TestReportedMergeRequestContentIsWhatWasPublished(t *testing.T) {
 	assert.Equal(t, publishedDescription, h.got.MergeRequestDescription)
 }
 
+// The merge request says what the report says: the agent renders it from the report as it stands
+// once every addon has finished, its sections included.
+func TestTheMergeRequestIsRenderedFromTheReportWithItsSections(t *testing.T) {
+	h := newRunHarness(t, true)
+	h.expectFullRun()
+	h.withSections(advisorySection)
+
+	require.NoError(t, h.run(t))
+
+	require.Len(t, h.mergeRequests, 1)
+	var sent struct {
+		Mode              string                     `json:"mode"`
+		StartedAt         string                     `json:"started_at"`
+		MergeRequestTitle string                     `json:"merge_request_title"`
+		Addons            map[string]json.RawMessage `json:"addons"`
+	}
+	require.NoError(t, json.Unmarshal(h.mergeRequests[0], &sent))
+	assert.Equal(t, "normal", sent.Mode)
+	assert.Equal(t, h.got.StartedAt.Format(time.RFC3339Nano), sent.StartedAt)
+	assert.JSONEq(t, advisorySection["composer_audit"], string(sent.Addons["composer_audit"]))
+	assert.Empty(t, sent.MergeRequestTitle, "rendered before the content it renders is recorded")
+}
+
 // A phase like any other, so its failure is attributed rather than unexplained: here a section
-// whose shape the description cannot read.
+// the agent cannot read.
 func TestReportNamesTheRenderPhaseWhenAssemblyFails(t *testing.T) {
 	h := newRunHarness(t, true)
 	h.expectFullRun()
-	h.withSections(map[string]string{"composer_audit": `"not an object"`})
+	h.mergeRequestErr = errors.New("failed to render the merge request: invalid_request (the report's composer_audit section is unreadable)")
 
 	err := h.run(t)
 
-	require.ErrorContains(t, err, "failed to generate description")
+	require.ErrorContains(t, err, "failed to render the merge request")
 	require.NotNil(t, h.got)
 	assert.Equal(t, report.StatusFailed, h.got.Status)
 	assert.Equal(t, "render merge request", h.got.FailedPhase)
-	assert.Contains(t, h.got.Error, "failed to read the report's addon sections")
+	assert.Contains(t, h.got.Error, "composer_audit section is unreadable")
 	// A failure after the branch was created removes it, or the next run would stop on it.
 	h.repository.AssertCalled(t, "SetBranch", mock.Anything, "update-dummy-hash", testHead)
 	h.repository.AssertCalled(t, "RemoveBranch", mock.Anything, "update-dummy-hash")

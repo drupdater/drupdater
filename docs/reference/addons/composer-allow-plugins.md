@@ -63,7 +63,7 @@ sorted by name. Omitted when the update introduced none.
 
 Rendered only when the update introduced new plugins:
 
---8<-- "internal/mergerequest/testdata/composer_allow_plugins.md"
+--8<-- "agent/tests/MergeRequest/testdata/composer_allow_plugins.md"
 
 The commands are copy-pasteable — review each plugin, then run the ones you want to
 allow.
