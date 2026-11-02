@@ -64,8 +64,7 @@ func TestUpdateSharedCodeFailures(t *testing.T) {
 		mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
 
 		err := ws.updateSharedCode(t.Context())
-		require.ErrorIs(t, err, assert.AnError)
-		assert.Contains(t, err.Error(), "post-composer-update hook failed")
+		require.EqualError(t, err, "post-composer-update hook failed: failing: "+assert.AnError.Error())
 	})
 
 	t.Run("staging composer files", func(t *testing.T) {
@@ -98,8 +97,7 @@ func TestUpdateSharedCodeFailures(t *testing.T) {
 		worktree.EXPECT().Commit(anyCtx, mock.Anything, mock.Anything).Return(nil)
 
 		err := ws.updateSharedCode(t.Context())
-		require.ErrorIs(t, err, assert.AnError)
-		assert.Contains(t, err.Error(), "post-code-update hook failed")
+		require.EqualError(t, err, "post-code-update hook failed: failing: "+assert.AnError.Error())
 	})
 
 }
@@ -142,10 +140,10 @@ func TestCreateUpdateBranch(t *testing.T) {
 func TestPostComposerUpdateCarriesTheLockAsCommittedBeforeTheUpdate(t *testing.T) {
 	mockComposer := NewMockComposer(t)
 	worktree := NewMockWorktree(t)
-	s := &scriptedAgent{}
+	s := &scriptedApp{}
 	s.serve(mockComposer)
 	ws := testRun(services{logger: zap.NewNop(), composer: mockComposer}, repo.Checkout{Worktree: worktree, Path: testCheckout},
-		addon("observer", map[string]Stage{EventPostComposerUpdate: Inspect}))
+		addon("observer", map[string]string{EventPostComposerUpdate: "inspect"}))
 	mockComposer.EXPECT().Install(anyCtx, testCheckout).Return(nil)
 	worktree.EXPECT().Committed(anyCtx, "composer.lock").Return([]byte(testBaseLock), nil)
 	worktree.EXPECT().StageGlob(anyCtx, "composer.*").Return(nil)
@@ -153,8 +151,8 @@ func TestPostComposerUpdateCarriesTheLockAsCommittedBeforeTheUpdate(t *testing.T
 	worktree.EXPECT().Commit(anyCtx, mock.Anything, mock.Anything).Return(nil)
 
 	require.NoError(t, ws.updateSharedCode(t.Context()))
-	require.Len(t, s.requests, 1)
-	assert.JSONEq(t, testBaseLock, string(s.requests[0].Event.BaseLock))
+	require.Len(t, s.fired, 1)
+	assert.JSONEq(t, testBaseLock, string(s.fired[0].Event.BaseLock))
 }
 
 // The runner's own commit is signed explicitly, so no identity has to be in git config.
@@ -294,30 +292,28 @@ func TestCleanup(t *testing.T) {
 
 func TestSiteHooksSeeTheFactsReadBeforeAndAfterTheUpdateHooks(t *testing.T) {
 	sites := NewMockSites(t)
-	committer := NewMockCommitter(t)
 	mockComposer := NewMockComposer(t)
-	s := &scriptedAgent{}
+	s := &scriptedApp{}
 	s.serve(mockComposer)
 	ws := testRun(services{logger: zap.NewNop(), sites: sites, composer: mockComposer}, repo.Checkout{Path: "/project"},
-		addon("observer", map[string]Stage{EventPreSiteUpdate: Inspect, EventPostSiteUpdate: Inspect}))
-	ws.committer = committer
+		addon("observer", map[string]string{EventPreSiteUpdate: "inspect", EventPostSiteUpdate: "inspect"}))
 
 	sites.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(nil)
 	sites.EXPECT().Facts(anyCtx, "/project", "site1").Return(json.RawMessage(`{"when":"before"}`), nil)
 	sites.EXPECT().Update(anyCtx, "/project", "site1").Return(json.RawMessage(`{"when":"after"}`), nil)
 	sites.EXPECT().ExportConfiguration(anyCtx, "/project", "site1").Return("config/sync", nil)
-	committer.EXPECT().Commit(anyCtx, "Update configuration site1", []string{"config/sync"}).Return(true, nil)
 	sites.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(nil)
 
 	require.NoError(t, updateSite1(t.Context(), ws))
-	require.Len(t, s.requests, 2)
-	assert.Equal(t, agent.Event{Name: EventPreSiteUpdate, Site: "site1", Facts: json.RawMessage(`{"when":"before"}`)}, s.requests[0].Event)
-	assert.Equal(t, agent.Event{Name: EventPostSiteUpdate, Site: "site1", Facts: json.RawMessage(`{"when":"after"}`)}, s.requests[1].Event)
+	require.Len(t, s.fired, 2)
+	assert.Equal(t, agent.Event{Name: EventPreSiteUpdate, Site: "site1", Facts: json.RawMessage(`{"when":"before"}`)}, s.fired[0].Event)
+	assert.Equal(t, agent.Event{Name: EventPostSiteUpdate, Site: "site1", Facts: json.RawMessage(`{"when":"after"}`)}, s.fired[1].Event)
+	assert.Equal(t, []string{"Update configuration site1"}, s.committed())
 }
 
 func TestUpdateSiteRestoresSettings(t *testing.T) {
 	// newRunner's run has an addon whose hook of failOn fails; none for "".
-	newRunner := func(t *testing.T, failOn ...string) (*run, *MockSites) {
+	newRunner := func(t *testing.T, failOn ...string) (*run, *MockSites, *MockComposer) {
 		t.Helper()
 		sites := NewMockSites(t)
 		mockComposer := NewMockComposer(t)
@@ -325,22 +321,21 @@ func TestUpdateSiteRestoresSettings(t *testing.T) {
 		for _, event := range failOn {
 			addons = append(addons, failingOn(mockComposer, event))
 		}
-		return testRun(services{logger: zap.NewNop(), sites: sites, composer: mockComposer}, repo.Checkout{Path: "/project"}, addons...), sites
+		return testRun(services{logger: zap.NewNop(), sites: sites, composer: mockComposer}, repo.Checkout{Path: "/project"}, addons...), sites, mockComposer
 	}
 
 	t.Run("after a failed pre-site-update hook, which stops the update", func(t *testing.T) {
-		ws, sites := newRunner(t, EventPreSiteUpdate)
+		ws, sites, _ := newRunner(t, EventPreSiteUpdate)
 		sites.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(nil)
 		sites.EXPECT().Facts(anyCtx, "/project", "site1").Return(siteFacts, nil)
 		sites.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(nil).Once()
 
 		err := updateSite1(t.Context(), ws)
-		require.ErrorIs(t, err, assert.AnError)
-		assert.Contains(t, err.Error(), "pre-site-update hook failed")
+		require.EqualError(t, err, "pre-site-update hook failed: failing: "+assert.AnError.Error())
 	})
 
 	t.Run("after its facts cannot be read, which stops the update before any hook", func(t *testing.T) {
-		ws, sites := newRunner(t, EventPreSiteUpdate)
+		ws, sites, _ := newRunner(t, EventPreSiteUpdate)
 		sites.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(nil)
 		sites.EXPECT().Facts(anyCtx, "/project", "site1").Return(nil, assert.AnError)
 		sites.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(nil).Once()
@@ -351,19 +346,18 @@ func TestUpdateSiteRestoresSettings(t *testing.T) {
 	})
 
 	t.Run("after a failed post-site-update hook, which stops the export", func(t *testing.T) {
-		ws, sites := newRunner(t, EventPostSiteUpdate)
+		ws, sites, _ := newRunner(t, EventPostSiteUpdate)
 		sites.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(nil)
 		sites.EXPECT().Facts(anyCtx, "/project", "site1").Return(siteFacts, nil)
 		sites.EXPECT().Update(anyCtx, "/project", "site1").Return(siteFacts, nil)
 		sites.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(nil).Once()
 
 		err := updateSite1(t.Context(), ws)
-		require.ErrorIs(t, err, assert.AnError)
-		assert.Contains(t, err.Error(), "post-site-update hook failed")
+		require.EqualError(t, err, "post-site-update hook failed: failing: "+assert.AnError.Error())
 	})
 
 	t.Run("after a failed update, which stops it before the export", func(t *testing.T) {
-		ws, sites := newRunner(t)
+		ws, sites, _ := newRunner(t)
 		sites.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(nil)
 		sites.EXPECT().Facts(anyCtx, "/project", "site1").Return(siteFacts, nil)
 		sites.EXPECT().Update(anyCtx, "/project", "site1").Return(nil, assert.AnError)
@@ -375,7 +369,7 @@ func TestUpdateSiteRestoresSettings(t *testing.T) {
 	})
 
 	t.Run("with a context another site cancelled", func(t *testing.T) {
-		ws, sites := newRunner(t)
+		ws, sites, _ := newRunner(t)
 		ctx, cancel := context.WithCancel(t.Context())
 		sites.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(nil)
 		sites.EXPECT().Facts(anyCtx, "/project", "site1").Return(siteFacts, nil)
@@ -389,14 +383,12 @@ func TestUpdateSiteRestoresSettings(t *testing.T) {
 	})
 
 	t.Run("a failed restore fails the site", func(t *testing.T) {
-		ws, sites := newRunner(t)
+		ws, sites, mockComposer := newRunner(t)
 		sites.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(nil)
 		sites.EXPECT().Facts(anyCtx, "/project", "site1").Return(siteFacts, nil)
 		sites.EXPECT().Update(anyCtx, "/project", "site1").Return(siteFacts, nil)
 		sites.EXPECT().ExportConfiguration(anyCtx, "/project", "site1").Return("config/sync", nil)
-		committer := NewMockCommitter(t)
-		committer.EXPECT().Commit(anyCtx, "Update configuration site1", []string{"config/sync"}).Return(true, nil)
-		ws.committer = committer
+		expectCommit(mockComposer, "config/sync").Return(agent.CommitReply{Committed: []string{"Update configuration site1"}}, nil)
 		sites.EXPECT().RestoreSettings(anyCtx, "/project", "site1").Return(assert.AnError)
 
 		err := updateSite1(t.Context(), ws)
@@ -405,14 +397,14 @@ func TestUpdateSiteRestoresSettings(t *testing.T) {
 	})
 
 	t.Run("not when configuring failed", func(t *testing.T) {
-		ws, sites := newRunner(t)
+		ws, sites, _ := newRunner(t)
 		sites.EXPECT().ConfigureDatabase(anyCtx, "/project", "site1").Return(assert.AnError)
 
 		require.ErrorIs(t, updateSite1(t.Context(), ws), assert.AnError)
 	})
 
 	t.Run("of every configured site after another failed to configure, naming each failure", func(t *testing.T) {
-		ws, sites := newRunner(t)
+		ws, sites, _ := newRunner(t)
 		ws.config.Sites = []string{"site1", "site2"}
 		ws.config.Concurrency = 2
 		site2Configured := make(chan struct{})
@@ -439,19 +431,20 @@ func TestUpdateSiteRestoresSettings(t *testing.T) {
 // Drupdater commits the exported configuration itself, as it does an addon's changes: Drush's own
 // --commit would run git, its hooks and its identity, in the user's repository.
 func TestCommitSiteChangesCommitsTheExportedConfiguration(t *testing.T) {
-	newRunner := func(t *testing.T, exported string, exportErr error) (*run, *MockCommitter) {
+	newRunner := func(t *testing.T, exported string, exportErr error) (*run, *MockComposer) {
 		t.Helper()
 		sites := NewMockSites(t)
-		committer := NewMockCommitter(t)
+		mockComposer := NewMockComposer(t)
 		sites.EXPECT().ExportConfiguration(anyCtx, "/project", "site1").Return(exported, exportErr)
-		r := testRun(services{logger: zap.NewNop(), sites: sites}, repo.Checkout{Path: "/project"})
-		r.committer = committer
-		return r, committer
+		return testRun(services{logger: zap.NewNop(), sites: sites, composer: mockComposer}, repo.Checkout{Path: "/project", Author: testAuthor}), mockComposer
 	}
 
-	t.Run("the directory it exported into, under the site's own message", func(t *testing.T) {
-		ws, committer := newRunner(t, "config/site1", nil)
-		committer.EXPECT().Commit(anyCtx, "Update configuration site1", []string{"config/site1"}).Return(true, nil)
+	t.Run("the directory it exported into, under the site's own message, by the run's author", func(t *testing.T) {
+		ws, mockComposer := newRunner(t, "config/site1", nil)
+		mockComposer.EXPECT().Commit(anyCtx, "/project", agent.CommitRequest{
+			Author:  agent.Author{Name: testAuthor.Name, Email: testAuthor.Email},
+			Commits: []agent.Commit{{Message: "Update configuration site1", Paths: []string{"config/site1"}}},
+		}).Return(agent.CommitReply{Committed: []string{"Update configuration site1"}}, nil)
 
 		require.NoError(t, ws.commitSiteChanges(t.Context(), "site1", siteFacts))
 	})
@@ -469,9 +462,16 @@ func TestCommitSiteChangesCommitsTheExportedConfiguration(t *testing.T) {
 		require.ErrorIs(t, ws.commitSiteChanges(t.Context(), "site1", siteFacts), assert.AnError)
 	})
 
+	t.Run("a configuration that did not change makes no commit and no failure", func(t *testing.T) {
+		ws, mockComposer := newRunner(t, "config/site1", nil)
+		mockComposer.EXPECT().Commit(anyCtx, "/project", mock.Anything).Return(agent.CommitReply{Committed: []string{}}, nil)
+
+		require.NoError(t, ws.commitSiteChanges(t.Context(), "site1", siteFacts))
+	})
+
 	t.Run("a refused commit", func(t *testing.T) {
-		ws, committer := newRunner(t, "config/site1", nil)
-		committer.EXPECT().Commit(anyCtx, "Update configuration site1", []string{"config/site1"}).Return(false, assert.AnError)
+		ws, mockComposer := newRunner(t, "config/site1", nil)
+		mockComposer.EXPECT().Commit(anyCtx, "/project", mock.Anything).Return(agent.CommitReply{}, assert.AnError)
 
 		err := ws.commitSiteChanges(t.Context(), "site1", siteFacts)
 		require.ErrorIs(t, err, assert.AnError)
@@ -744,7 +744,7 @@ func TestRunFailsWhenScaffoldChangesCannotBeStaged(t *testing.T) {
 
 type runKey struct{}
 
-func TestRunHandsAddonsTheRunsContextAndCommitter(t *testing.T) {
+func TestRunFiresEveryEventInTheRunsContextAndWorkingCopyByItsAuthor(t *testing.T) {
 	sites := NewMockSites(t)
 	repositoryService := NewMockGitService(t)
 	vcsProvider := NewMockPlatform(t)
@@ -757,15 +757,9 @@ func TestRunHandsAddonsTheRunsContextAndCommitter(t *testing.T) {
 
 	worktree := NewMockWorktree(t)
 	worktree.EXPECT().Committed(anyCtx, "composer.lock").Return([]byte(testBaseLock), nil)
-	worktree.EXPECT().Stage(anyCtx, []string{"config/sync"}).Return(nil).Maybe()
 	worktree.EXPECT().StageGlob(anyCtx, mock.Anything).Return(nil)
 	worktree.EXPECT().Unstaged(anyCtx).Return(nil, nil).Once()
 	worktree.EXPECT().Commit(anyCtx, "Update composer.json and composer.lock", mock.Anything).Return(nil)
-	// What an addon committing from post-code-update reaches: the run's own worktree.
-	worktree.EXPECT().Stage(anyCtx, []string{"web/modules/custom/a.php"}).Return(nil)
-	worktree.EXPECT().Staged(anyCtx).Return([]string{"web/modules/custom/a.php"}, nil).Once()
-	worktree.EXPECT().Commit(anyCtx, "Remove deprecations", mock.Anything).Return(nil)
-	worktree.EXPECT().Staged(anyCtx).Return(nil, nil).Once()
 
 	vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail")
 	repositoryService.EXPECT().CloneRepository(anyCtx, config.RepositoryURL, config.Branch, config.Token, repo.Identity{Name: "user", Email: "mail"}).Return(repo.Checkout{Repository: repository, Worktree: worktree, Path: testCheckout, Author: testAuthor}, nil)
@@ -786,18 +780,19 @@ func TestRunHandsAddonsTheRunsContextAndCommitter(t *testing.T) {
 
 	ctx := context.WithValue(t.Context(), runKey{}, "this run")
 	seen := map[string]bool{}
-	mockComposer.EXPECT().RunHook(anyCtx, testCheckout, mock.Anything).RunAndReturn(func(ctx context.Context, _ string, r agent.HookRequest) (agent.HookReply, error) {
-		seen[r.Event.Name] = ctx.Value(runKey{}) == "this run"
-		if r.Event.Name == EventPostCodeUpdate {
-			return agent.HookReply{Commits: []agent.Commit{{Message: "Remove deprecations", Paths: []string{"web/modules/custom/a.php"}}}}, nil
-		}
-		return agent.HookReply{}, nil
+	author := agent.Author{Name: testAuthor.Name, Email: testAuthor.Email}
+	mockComposer.EXPECT().Fire(anyCtx, testCheckout, mock.Anything).RunAndReturn(func(ctx context.Context, _ string, r agent.FireRequest) (agent.FireReply, error) {
+		seen[r.Event.Name] = ctx.Value(runKey{}) == "this run" && r.Author == author
+		return agent.FireReply{Plan: r.Event.Plan}, nil
 	})
-	mockComposer.EXPECT().Report(anyCtx, mock.Anything).Return(agent.ReportReply{}, nil)
+	mockComposer.EXPECT().Commit(anyCtx, testCheckout, agent.CommitRequest{
+		Author:  author,
+		Commits: []agent.Commit{{Message: "Update configuration site1", Paths: []string{"config/sync"}}},
+	}).Return(agent.CommitReply{}, nil)
 	mockComposer.EXPECT().MergeRequest(anyCtx, mock.Anything).Return(agent.MergeRequestReply{}, nil)
-	observer := addon("observer", map[string]Stage{
-		EventPreComposerUpdate: Change, EventPostComposerUpdate: Change, EventPostCodeUpdate: Change,
-		EventPreSiteUpdate: Change, EventPostSiteUpdate: Change,
+	observer := addon("observer", map[string]string{
+		EventPreComposerUpdate: "change", EventPostComposerUpdate: "change", EventPostCodeUpdate: "change",
+		EventPreSiteUpdate: "change", EventPostSiteUpdate: "change",
 	})
 
 	err := New(zap.NewNop(), config, sites, vcsProvider, repositoryService, mockComposer).Run(ctx, []Addon{observer})
@@ -806,11 +801,16 @@ func TestRunHandsAddonsTheRunsContextAndCommitter(t *testing.T) {
 	assert.Equal(t, map[string]bool{
 		"pre-composer-update": true, "post-composer-update": true, "post-code-update": true,
 		"pre-site-update": true, "post-site-update": true,
-	}, seen, "every addon event carries the run's context")
+	}, seen, "every event carries the run's context and author")
 }
 
 // updateSite1 runs the site update phase for site1 alone.
 func updateSite1(ctx context.Context, r *run) error {
 	r.config.Sites = []string{"site1"}
 	return r.updateSites(ctx)
+}
+
+// expectCommit expects the run to ask the app to commit the site1 configuration exported to path.
+func expectCommit(c *MockComposer, path string) *MockComposer_Commit_Call {
+	return c.EXPECT().Commit(anyCtx, "/project", agent.CommitRequest{Commits: []agent.Commit{{Message: "Update configuration site1", Paths: []string{path}}}})
 }

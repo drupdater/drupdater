@@ -51,8 +51,6 @@ type Worktree interface {
 	StageGlob(ctx context.Context, pattern string) error
 	// Unstaged lists the tracked files changed in the working tree but not staged.
 	Unstaged(ctx context.Context) ([]string, error)
-	// Staged lists the files staged for the next commit.
-	Staged(ctx context.Context) ([]string, error)
 	// Commit commits what is staged, by author.
 	Commit(ctx context.Context, message string, author Identity) error
 	// Committed is path's content as committed at HEAD, path relative to the working copy's root.
@@ -411,11 +409,6 @@ func (w *workingCopy) StageGlob(ctx context.Context, pattern string) error {
 
 func (w *workingCopy) Unstaged(ctx context.Context) ([]string, error) {
 	out, err := w.git.run(ctx, w.dir, "diff", "--name-only", "-z")
-	return splitZ(out), err
-}
-
-func (w *workingCopy) Staged(ctx context.Context) ([]string, error) {
-	out, err := w.git.run(ctx, w.dir, "diff", "--cached", "--name-only", "-z")
 	return splitZ(out), err
 }
 

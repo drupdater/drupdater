@@ -67,6 +67,15 @@ RUN composer global config --no-plugins repositories.drupdater-agent \
     composer global config --no-plugins allow-plugins.ion-bazan/composer-diff false; \
     composer global require drupdater/agent:1.0.0
 
+# drupdater's app (app/): fires the run's events at the agent and makes its commits. The binary
+# calls it as /opt/drupdater/app/bin/drupdater (internal/composer.AppPath).
+COPY app/composer.json app/composer.lock /opt/drupdater/app/
+RUN composer install --working-dir=/opt/drupdater/app --no-dev --no-autoloader --no-interaction --no-progress \
+    && composer clear-cache
+COPY app/bin /opt/drupdater/app/bin
+COPY app/src /opt/drupdater/app/src
+RUN composer dump-autoload --working-dir=/opt/drupdater/app --no-dev --classmap-authoritative
+
 COPY --from=build /build/drupdater /opt/drupdater/bin
 
 CMD [""]

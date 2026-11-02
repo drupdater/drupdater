@@ -62,7 +62,6 @@ func TestRunSiteFailureDoesNotPublish(t *testing.T) {
 	h.worktree.EXPECT().Commit(anyCtx, mock.Anything, mock.Anything).Return(nil)
 	h.worktree.EXPECT().StageGlob(anyCtx, mock.Anything).Return(nil)
 	h.worktree.EXPECT().Unstaged(anyCtx).Return(nil, nil).Maybe()
-	h.worktree.EXPECT().Staged(anyCtx).Return(nil, nil).Maybe()
 	h.sites.EXPECT().Install(anyCtx, testCheckout, "site1").Return(nil)
 	h.sites.EXPECT().ConfigureDatabase(anyCtx, testCheckout, "site1").Return(nil)
 	h.sites.EXPECT().RestoreSettings(anyCtx, testCheckout, "site1").Return(nil)
@@ -130,8 +129,8 @@ func TestRunNoChanges(t *testing.T) {
 // before the baseline install, the most expensive step of a run.
 func TestRunAbortedByAnAddonInstallsNoSite(t *testing.T) {
 	h := newRunHarness(t, false)
-	h.withHook("composer_audit", Prepare, func(agent.HookRequest) (agent.HookReply, error) {
-		return agent.HookReply{Abort: "No security advisories found"}, nil
+	h.withPreComposerUpdate("composer_audit", func(agent.FireRequest) (agent.FireReply, error) {
+		return agent.FireReply{Abort: "No security advisories found"}, nil
 	})
 
 	err := h.run(t)
@@ -140,13 +139,13 @@ func TestRunAbortedByAnAddonInstallsNoSite(t *testing.T) {
 	require.True(t, aborted, "got %v", err)
 }
 
-func TestASecurityRunTellsEveryHookItIsOne(t *testing.T) {
+func TestASecurityRunTellsTheAppItIsOne(t *testing.T) {
 	h := newRunHarness(t, false)
 	h.config.Security = true
 	var told []bool
-	h.withHook("composer_audit", Prepare, func(r agent.HookRequest) (agent.HookReply, error) {
+	h.withPreComposerUpdate("composer_audit", func(r agent.FireRequest) (agent.FireReply, error) {
 		told = append(told, r.Run.Security)
-		return agent.HookReply{Abort: "No security advisories found"}, nil
+		return agent.FireReply{Abort: "No security advisories found"}, nil
 	})
 
 	_, aborted := errors.AsType[AbortError](h.run(t))
@@ -155,12 +154,13 @@ func TestASecurityRunTellsEveryHookItIsOne(t *testing.T) {
 	assert.Equal(t, []bool{true}, told)
 }
 
-func TestRunUpdatesAsTheAddonsPlanned(t *testing.T) {
+func TestRunUpdatesAsTheAppPlanned(t *testing.T) {
 	h := newRunHarness(t, false)
 	h.composer.EXPECT().Update(anyCtx, testCheckout, []string{"drupal/core"}, []string{"drupal/core:10.2.0"}, true).
 		Return(nil, nil)
-	h.withHook("pins", Change, proposing(agent.Plan{Keep: []agent.Pin{{Package: "drupal/core", Version: "10.2.0"}}}))
-	h.withHook("narrows", Prepare, proposing(agent.Plan{Only: []string{"drupal/core"}, MinimalChanges: true}))
+	h.withPreComposerUpdate("pins", func(agent.FireRequest) (agent.FireReply, error) {
+		return agent.FireReply{Plan: &agent.Plan{Only: []string{"drupal/core"}, Keep: []agent.Pin{{Package: "drupal/core", Version: "10.2.0"}}, MinimalChanges: true}}, nil
+	})
 
 	err := h.run(t)
 
@@ -220,12 +220,14 @@ func TestRunCreatesTheUpdateBranchAfterTheLastCommit(t *testing.T) {
 
 	var events []string
 	record := func(event string) { events = append(events, event) }
-	// The exported configuration changed, so its commit is not skipped as empty.
-	h.worktree.EXPECT().Staged(anyCtx).Return([]string{"config/sync/system.site.yml"}, nil)
 	h.worktree.EXPECT().Commit(anyCtx, mock.Anything, mock.Anything).RunAndReturn(func(_ context.Context, message string, _ repo.Identity) error {
 		record("commit: " + message)
 		return nil
 	})
+	h.app.commit = func(r agent.CommitRequest) (agent.CommitReply, error) {
+		record("commit: " + r.Commits[0].Message)
+		return agent.CommitReply{Committed: []string{r.Commits[0].Message}}, nil
+	}
 	h.repository.EXPECT().SetBranch(anyCtx, "update-dummy-hash", testHead).RunAndReturn(func(context.Context, string, string) error {
 		record("branch")
 		return nil
@@ -346,8 +348,8 @@ func TestRunFireEventError(t *testing.T) {
 	h := newRunHarness(t, false)
 	// The baseline site install may run before the hook's failure cancels the run.
 	h.expectFullRun()
-	h.withHook("composer_audit", Change, func(agent.HookRequest) (agent.HookReply, error) {
-		return agent.HookReply{}, errors.New("audit unavailable")
+	h.withPreComposerUpdate("composer_audit", func(agent.FireRequest) (agent.FireReply, error) {
+		return agent.FireReply{Failure: "pre-composer-update hook failed: composer_audit: audit unavailable"}, nil
 	})
 
 	err := h.run(t)
@@ -438,12 +440,12 @@ func TestASecondRunLeavesTheFirstRunsBranchAlone(t *testing.T) {
 	h.expectFullRun()
 	// The second run fails resolving its update, before it creates a branch of its own.
 	runs := 0
-	h.withHook("flaky", Prepare, func(agent.HookRequest) (agent.HookReply, error) {
+	h.withPreComposerUpdate("flaky", func(r agent.FireRequest) (agent.FireReply, error) {
 		runs++
 		if runs == 2 {
-			return agent.HookReply{}, assert.AnError
+			return agent.FireReply{}, assert.AnError
 		}
-		return agent.HookReply{}, nil
+		return agent.FireReply{Plan: r.Event.Plan}, nil
 	})
 	runner := h.runner()
 

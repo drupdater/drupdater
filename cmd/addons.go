@@ -31,26 +31,20 @@ func agentAddonCatalog(ctx context.Context, logger *zap.Logger) (addonCatalog, e
 	return newAddonCatalog(addons)
 }
 
-// newAddonCatalog refuses a catalogue the pipeline could not run: an unknown event or stage, or
-// two addons of one name.
+// newAddonCatalog refuses a catalogue the run could not fire: an unknown event, or two addons of
+// one name. The app refuses an unknown stage.
 func newAddonCatalog(addons []agent.Addon) (addonCatalog, error) {
 	var c addonCatalog
 	for _, a := range addons {
 		if slices.ContainsFunc(c.addons, func(known workflow.Addon) bool { return known.Name == a.Name }) {
 			return addonCatalog{}, fmt.Errorf("the agent's catalogue lists %q twice", a.Name)
 		}
-		hooks := make(map[string]workflow.Stage, len(a.Hooks))
-		for event, stageName := range a.Hooks {
+		for event := range a.Hooks {
 			if !slices.Contains(workflow.Events, event) {
 				return addonCatalog{}, fmt.Errorf("addon %q hooks the unknown event %q", a.Name, event)
 			}
-			stage, err := workflow.ParseStage(stageName)
-			if err != nil {
-				return addonCatalog{}, fmt.Errorf("addon %q hooks %s: %w", a.Name, event, err)
-			}
-			hooks[event] = stage
 		}
-		c.addons = append(c.addons, workflow.Addon{Name: a.Name, Hooks: hooks})
+		c.addons = append(c.addons, workflow.Addon{Name: a.Name, Hooks: a.Hooks})
 		switch {
 		case a.Mandatory:
 			c.mandatory = append(c.mandatory, a.Name)

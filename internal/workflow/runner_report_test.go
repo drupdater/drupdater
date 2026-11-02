@@ -330,7 +330,7 @@ func TestReportCarriesTheSectionsTheAgentBuilt(t *testing.T) {
 	h := newRunHarness(t, true)
 	h.expectFullRun()
 	h.withSections(map[string]string{"translations_updater": `{"fixed":2}`})
-	h.withAddons(append(h.addons, addon("quiet_addon", map[string]Stage{EventPostCodeUpdate: Inspect}))...)
+	h.withAddons(append(h.addons, addon("quiet_addon", map[string]string{EventPostCodeUpdate: "inspect"}))...)
 
 	require.NoError(t, h.run(t))
 
@@ -341,13 +341,10 @@ func TestReportCarriesTheSectionsTheAgentBuilt(t *testing.T) {
 func TestTheRenderPhaseFailsWhenTheAgentCannotBuildTheSections(t *testing.T) {
 	h := newRunHarness(t, true)
 	h.expectFullRun()
-	h.addons = append(h.addons, addon("composer_audit", map[string]Stage{EventPreComposerUpdate: Inspect}))
-	(&scriptedAgent{
-		hooks: map[string]func(agent.HookRequest) (agent.HookReply, error){},
-		report: func(agent.ReportRequest) (agent.ReportReply, error) {
-			return agent.ReportReply{}, errors.New("agent gone")
-		},
-	}).serve(h.composer)
+	h.withPreComposerUpdate("composer_audit", recording(`null`, "composer_audit"))
+	h.app.report = func(agent.ReportRequest) (agent.ReportReply, error) {
+		return agent.ReportReply{}, errors.New("agent gone")
+	}
 
 	err := h.run(t)
 

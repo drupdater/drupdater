@@ -24,11 +24,6 @@ func (s *CLI) Addons(ctx context.Context) ([]agent.Addon, error) {
 	return result.Addons, nil
 }
 
-// RunHook runs one addon's hook for one event in the project in dir.
-func (s *CLI) RunHook(ctx context.Context, dir string, request agent.HookRequest) (agent.HookReply, error) {
-	return agent.Call[agent.HookReply](ctx, s.command(dir), "drupdater:hook", request)
-}
-
 // Report builds the addons' report sections from what their hooks found. A section is a function
 // of its findings alone, so it needs no project: it can be asked for after the working copy is gone.
 func (s *CLI) Report(ctx context.Context, request agent.ReportRequest) (agent.ReportReply, error) {

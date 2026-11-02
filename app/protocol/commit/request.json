@@ -1,0 +1,23 @@
+{
+  "protocol": 6,
+  "request": {
+    "author": {
+      "name": "drupdater",
+      "email": "drupdater@localhost"
+    },
+    "commits": [
+      {
+        "message": "Update configuration default",
+        "paths": [
+          "config/sync"
+        ]
+      },
+      {
+        "message": "Update configuration second",
+        "paths": [
+          "config/second"
+        ]
+      }
+    ]
+  }
+}

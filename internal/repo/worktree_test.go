@@ -174,8 +174,7 @@ func TestStage(t *testing.T) {
 
 		require.NoError(t, checkout.Worktree.Stage(t.Context(), "dir"))
 
-		staged, err := checkout.Worktree.Staged(t.Context())
-		require.NoError(t, err)
+		staged := stagedFiles(t, checkout.Path)
 		assert.ElementsMatch(t, []string{"dir/gone.txt", "dir/kept.txt", "dir/new.txt"}, staged)
 	})
 
@@ -185,8 +184,7 @@ func TestStage(t *testing.T) {
 
 		require.NoError(t, checkout.Worktree.Stage(t.Context(), "tracked.txt"))
 
-		staged, err := checkout.Worktree.Staged(t.Context())
-		require.NoError(t, err)
+		staged := stagedFiles(t, checkout.Path)
 		assert.Equal(t, []string{"tracked.txt"}, staged)
 	})
 
@@ -197,8 +195,7 @@ func TestStage(t *testing.T) {
 
 		require.NoError(t, checkout.Worktree.Stage(t.Context(), "missing", "ignored/x.txt", "tracked.txt"))
 
-		staged, err := checkout.Worktree.Staged(t.Context())
-		require.NoError(t, err)
+		staged := stagedFiles(t, checkout.Path)
 		assert.Equal(t, []string{"tracked.txt"}, staged)
 	})
 
@@ -211,8 +208,7 @@ func TestStage(t *testing.T) {
 		require.NoError(t, checkout.Worktree.Stage(t.Context(), "missing"))
 		require.NoError(t, checkout.Worktree.Stage(t.Context()))
 
-		staged, err := checkout.Worktree.Staged(t.Context())
-		require.NoError(t, err)
+		staged := stagedFiles(t, checkout.Path)
 		assert.Empty(t, staged)
 	})
 
@@ -223,8 +219,7 @@ func TestStage(t *testing.T) {
 
 		require.NoError(t, checkout.Worktree.Stage(t.Context(), "t*"))
 
-		staged, err := checkout.Worktree.Staged(t.Context())
-		require.NoError(t, err)
+		staged := stagedFiles(t, checkout.Path)
 		assert.Equal(t, []string{"t*"}, staged)
 	})
 
@@ -275,8 +270,7 @@ func TestStage(t *testing.T) {
 
 		require.NoError(t, checkout.Worktree.StageGlob(t.Context(), "composer.*"))
 
-		staged, err := checkout.Worktree.Staged(t.Context())
-		require.NoError(t, err)
+		staged := stagedFiles(t, checkout.Path)
 		slices.Sort(staged)
 		assert.Equal(t, []string{"composer.json", "composer.lock"}, staged)
 	})

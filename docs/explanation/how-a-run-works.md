@@ -19,10 +19,11 @@ flowchart LR
 Phases run linearly. Their names are exactly the strings that appear in the [run
 report](../reference/run-report.md)'s `phases` list.
 
-Each time the run fires an event, it runs every hook of it in stage order, each as its own
-call to the [Drupdater agent](../reference/docker-images.md#drupdater-agent), where the addons
-live, and commits what a hook asks for before it calls the next — see [Where an addon
-runs](addon-architecture.md#where-an-addon-runs).
+Each time the run fires an event, the [Drupdater app](../reference/docker-images.md#drupdater-app)
+runs every hook of it in stage order, each as its own call to the [Drupdater
+agent](../reference/docker-images.md#drupdater-agent), where the addons live, and commits what
+a hook asks for before it calls the next — see [Where an addon
+runs](addon-architecture.md#where-an-addon-runs). An event no addon hooks starts no process.
 
 ### 1. `acquire working copy`
 

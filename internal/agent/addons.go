@@ -13,7 +13,7 @@ type Addon struct {
 	Hooks map[string]string `json:"hooks"`
 }
 
-// Plan is the update as drupdater:hook carries it: the plan earlier stages settled, or a proposal.
+// Plan is the update as the app reads and merges it.
 type Plan struct {
 	Only           []string `json:"only"`
 	Keep           []Pin    `json:"keep"`
@@ -50,29 +50,10 @@ type Run struct {
 	Security bool `json:"security"`
 }
 
-// HookRequest asks drupdater:hook to run one addon's hook for one event.
-type HookRequest struct {
-	Addon string `json:"addon"`
-	Event Event  `json:"event"`
-	// Earlier is what the addon's own hooks found earlier in the run.
-	Earlier []Finding `json:"earlier"`
-	Run     Run       `json:"run"`
-}
-
-// Commit is one commit a hook asks drupdater to make, of exactly these paths.
+// Commit is one commit of exactly these paths.
 type Commit struct {
 	Message string   `json:"message"`
 	Paths   []string `json:"paths"`
-}
-
-// HookReply is what a hook returned.
-type HookReply struct {
-	Finding json.RawMessage `json:"finding"`
-	Commits []Commit        `json:"commits"`
-	// Plan is the hook's proposal for the update; pre-composer-update only.
-	Plan *Plan `json:"plan"`
-	// Abort is why the run has nothing to do, when a hook found it has not.
-	Abort string `json:"abort"`
 }
 
 // AddonFindings is everything one addon's hooks found over a run.

@@ -33,8 +33,8 @@ type runHarness struct {
 	repository  *MockGitRepository
 	composer    *MockComposer
 	worktree    *MockWorktree
-	// hooks answers the hooks withHook scripted.
-	hooks *scriptedAgent
+	// app answers the events withEvent scripted, and makes every commit asked for.
+	app *scriptedApp
 
 	// path is where the working copy is checked out.
 	path string
@@ -80,6 +80,7 @@ func newRunHarness(t *testing.T, dryRun bool) *runHarness {
 		vcsProvider: NewMockPlatform(t),
 		repository:  NewMockGitRepository(t),
 		composer:    NewMockComposer(t),
+		app:         &scriptedApp{events: map[string]func(agent.FireRequest) (agent.FireReply, error){}},
 		worktree:    NewMockWorktree(t),
 		path:        testCheckout,
 
@@ -99,29 +100,25 @@ func (h *runHarness) expectPublish() { h.update, h.fullRun, h.publish = true, tr
 
 func (h *runHarness) withAddons(addons ...Addon) { h.addons = addons }
 
-// withHook runs an addon whose pre-composer-update hook, at stage, is hook.
-func (h *runHarness) withHook(name string, stage Stage, hook func(agent.HookRequest) (agent.HookReply, error)) {
-	h.addons = append(h.addons, addon(name, map[string]Stage{EventPreComposerUpdate: stage}))
-	if h.hooks == nil {
-		h.hooks = &scriptedAgent{hooks: map[string]func(agent.HookRequest) (agent.HookReply, error){}}
-		h.hooks.serve(h.composer)
-	}
-	h.hooks.hooks[name] = hook
+// withPreComposerUpdate runs an addon hooking pre-composer-update, which the app answers with fire.
+func (h *runHarness) withPreComposerUpdate(name string, fire func(agent.FireRequest) (agent.FireReply, error)) {
+	h.addons = append(h.addons, addon(name, map[string]string{EventPreComposerUpdate: "change"}))
+	h.app.events[EventPreComposerUpdate] = fire
 }
 
 // withSections runs an addon per section, whose hook finds something on pre-composer-update, and
 // an agent that builds each section from it as given, raw JSON.
 func (h *runHarness) withSections(sections map[string]string) {
 	reply := agent.ReportReply{Sections: map[string]json.RawMessage{}}
+	var names []string
 	for name, section := range sections {
-		h.addons = append(h.addons, addon(name, map[string]Stage{EventPreComposerUpdate: Inspect}))
+		h.addons = append(h.addons, addon(name, map[string]string{EventPreComposerUpdate: "inspect"}))
+		names = append(names, name)
 		reply.Sections[name] = json.RawMessage(section)
 	}
 	slices.SortFunc(h.addons, func(a, b Addon) int { return strings.Compare(a.Name, b.Name) })
-	(&scriptedAgent{
-		hooks:  map[string]func(agent.HookRequest) (agent.HookReply, error){},
-		report: func(agent.ReportRequest) (agent.ReportReply, error) { return reply, nil },
-	}).serve(h.composer)
+	h.app.events[EventPreComposerUpdate] = recording(`null`, names...)
+	h.app.report = func(agent.ReportRequest) (agent.ReportReply, error) { return reply, nil }
 }
 
 func (h *runHarness) identity() repo.Identity {
@@ -138,6 +135,7 @@ const testTitle = "Drupal updates"
 func (h *runHarness) expectDefaults() {
 	checkout := repo.Checkout{Repository: h.repository, Worktree: h.worktree, Path: h.path, Author: testAuthor}
 
+	h.app.serve(h.composer)
 	h.composer.EXPECT().Version(anyCtx).
 		RunAndReturn(func(context.Context) (composer.Versions, error) { return h.versions, h.versionsErr }).Maybe()
 	h.vcsProvider.EXPECT().GetUser(mock.Anything).Return("user", "mail").Maybe()
@@ -184,9 +182,7 @@ func (h *runHarness) expectFullRunDefaults() {
 
 	h.worktree.EXPECT().Commit(anyCtx, mock.Anything, mock.Anything).Return(nil).Maybe()
 	h.worktree.EXPECT().StageGlob(anyCtx, mock.Anything).Return(nil).Maybe()
-	h.worktree.EXPECT().Stage(anyCtx, []string{"config/sync"}).Return(nil).Maybe()
 	h.worktree.EXPECT().Unstaged(anyCtx).Return(nil, nil).Maybe()
-	h.worktree.EXPECT().Staged(anyCtx).Return(nil, nil).Maybe()
 
 	for _, site := range h.config.Sites {
 		h.sites.EXPECT().Install(anyCtx, h.path, site).Return(nil).Maybe()

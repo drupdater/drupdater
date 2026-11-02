@@ -26,18 +26,19 @@ resolves to, whether a patch applies, which advisories the lock has — and ther
 Composer's own API, the project's repositories and credentials, rather than a wrapper around
 Composer's console output.
 
-The binary keeps what is about the run rather than about an addon:
+Drupdater itself keeps what is about the run rather than about an addon:
 
 - **Which addons there are.** It asks the agent once, with `drupdater:addons`: each addon's
   name, whether it is [mandatory](#mandatory-versus-configurable) or a normal run's default,
   and the stage it hooks each event at.
-- **When each hook runs.** On each event the binary orders the hooks by [stage](#stages) and
-  runs each as its own `composer drupdater:hook` call, so it can commit what one hook changed
-  before the next one runs.
-- **Git, the plan and the findings.** It makes the [commits](#committing-changes), merges the
-  [proposals](#steering-the-update-through-proposals), and keeps what each hook found. A hook
-  gets its own addon's earlier findings with every call, so the agent keeps no state between
-  calls — each runs in a process of its own.
+- **When each hook runs.** On each event the binary hands the event to the
+  [Drupdater app](../reference/docker-images.md#drupdater-app), which orders the hooks by
+  [stage](#stages) and runs each as its own `composer drupdater:hook` call, so it can commit
+  what one hook changed before the next one runs.
+- **Git, the plan and the findings.** The app makes the [commits](#committing-changes) and
+  merges the [proposals](#steering-the-update-through-proposals); the binary keeps what each
+  hook found. A hook gets its own addon's earlier findings with every call, so neither the app
+  nor the agent keeps state between calls — each runs in a process of its own.
 - **The report.** Once the addons have finished, `drupdater:report` turns their findings into
   their [report sections](#reporting).
 
@@ -85,7 +86,7 @@ A plan has three parts:
   package's patch cannot be made to apply against the new version.
 - **`MinimalChanges`**: ask Composer to disturb as little else as possible.
 
-The runner merges the proposals by fixed rules:
+The app merges the proposals by fixed rules:
 
 | Part | Rule | Disagreement |
 |---|---|---|
@@ -109,13 +110,13 @@ description](#rendering-the-request-description).
 ## Committing changes
 
 Addons never touch git. A hook that changes files returns them as commits in its result, and
-the binary commits exactly those paths — files or directories,
-deletions included — under each message, in order, before the next hook runs. A later stage
+the app commits exactly those paths — files or directories, deletions included — under each
+message, in order, before the next hook runs. A later stage
 therefore sees an earlier stage's change already committed.
 
 Two rules make that safe without any addon knowing about the others:
 
-- **Paths without a change are not committed.** No commit is made, and the binary records with
+- **Paths without a change are not committed.** No commit is made, and the app records with
   the hook's finding which of its commits were, so an addon need not check first whether its
   tool changed anything. `code_beautifier` and `translations_updater` read that back in their
   report sections.
@@ -124,6 +125,10 @@ Two rules make that safe without any addon knowing about the others:
   one addon cannot end up under another's message, whatever order they ran in.
 
 Changes nobody names stay in the working tree, uncommitted.
+
+Sites run their `pre-site-update` hooks concurrently, each event in an app process of its own,
+into one git index: every commit holds an exclusive lock in the working copy's git directory
+while it stages, checks and commits.
 
 ## Stages
 

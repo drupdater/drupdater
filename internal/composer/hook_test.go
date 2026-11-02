@@ -50,39 +50,6 @@ func TestAddonsKeepsTheAgentsFailure(t *testing.T) {
 	assert.Equal(t, agent.Internal, agentErr.Kind)
 }
 
-func TestRunHookSendsTheRequestFixtureAndDecodesItsReply(t *testing.T) {
-	service, sent := fakeAgentCLI(t, agentFixture(t, "hook/response.json"), 0)
-	var request struct {
-		Request agent.HookRequest `json:"request"`
-	}
-	require.NoError(t, json.Unmarshal([]byte(agentFixture(t, "hook/request.json")), &request))
-
-	reply, err := service.RunHook(t.Context(), t.TempDir(), request.Request)
-
-	require.NoError(t, err)
-	body, args := sent()
-	assert.JSONEq(t, agentFixture(t, "hook/request.json"), body)
-	assert.Equal(t, []string{"composer", "drupdater:hook", "--no-interaction", "--no-ansi"}, args)
-	assert.Empty(t, reply.Commits)
-	assert.Nil(t, reply.Plan)
-	assert.Empty(t, reply.Abort)
-	var rows []map[string]any
-	require.NoError(t, json.Unmarshal(reply.Finding, &rows))
-	assert.Equal(t, []any{"fixture/a", "fixture/gone", "fixture/new", "fixture/tool"},
-		[]any{rows[0]["package"], rows[1]["package"], rows[2]["package"], rows[3]["package"]})
-}
-
-func TestRunHookReportsTheAgentsRefusal(t *testing.T) {
-	service, _ := fakeAgentCLI(t, `{"protocol":6,"command":"drupdater:hook","ok":false,`+
-		`"error":{"kind":"invalid_request","reason":"no addon \"nope\" is in the catalogue","message":""}}`, 1)
-
-	_, err := service.RunHook(t.Context(), t.TempDir(), agent.HookRequest{Addon: "nope"})
-
-	agentErr, ok := errors.AsType[*agent.Error](err)
-	require.True(t, ok, "%v", err)
-	assert.Equal(t, agent.InvalidRequest, agentErr.Kind)
-}
-
 func TestReportSendsTheRequestFixtureAndDecodesTheSections(t *testing.T) {
 	service, sent := fakeAgentCLI(t, agentFixture(t, "report/response.json"), 0)
 	var request struct {

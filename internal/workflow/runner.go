@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/drupdater/drupdater/internal/agent"
 	"github.com/drupdater/drupdater/internal/buildinfo"
 	"github.com/drupdater/drupdater/internal/config"
 	"github.com/drupdater/drupdater/internal/repo"
@@ -48,9 +49,8 @@ type run struct {
 	repository GitRepository
 	worktree   Worktree
 	path       string
-	// author signs the run's own commits, as committer signs the addons'.
-	author    repo.Identity
-	committer Committer
+	// author signs every commit of the run, its own and its addons'.
+	author repo.Identity
 }
 
 func newRun(s services, checkout repo.Checkout, pipeline *Pipeline, rec *report.Recorder) *run {
@@ -62,8 +62,22 @@ func newRun(s services, checkout repo.Checkout, pipeline *Pipeline, rec *report.
 		worktree:   checkout.Worktree,
 		path:       checkout.Path,
 		author:     checkout.Author,
-		committer:  newGitCommitter(checkout.Worktree, checkout.Author),
 	}
+}
+
+// fire fires e at the run's addons in its working copy.
+func (r *run) fire(ctx context.Context, e event) (UpdatePlan, error) {
+	return r.pipeline.fire(ctx, r.path, r.author, e)
+}
+
+// commit commits exactly paths, through the app, as an addon's commits are made. It reports
+// whether they held a change to commit.
+func (r *run) commit(ctx context.Context, message string, paths ...string) (bool, error) {
+	reply, err := r.composer.Commit(ctx, r.path, agent.CommitRequest{
+		Author:  agent.Author{Name: r.author.Name, Email: r.author.Email},
+		Commits: []agent.Commit{{Message: message, Paths: paths}},
+	})
+	return len(reply.Committed) > 0, err
 }
 
 // Option configures a Runner. Variadic so adding one does not disturb call sites.

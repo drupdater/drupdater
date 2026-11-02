@@ -1,4 +1,4 @@
-.PHONY: build test test-race test-agent lint-agent mutate-agent test-property fuzz mutate clean mock lint fmt fix run docker-build docker-run docs-serve docs-build help
+.PHONY: build test test-race test-agent lint-agent mutate-agent test-app lint-app mutate-app test-property fuzz mutate clean mock lint fmt fix run docker-build docker-run docs-serve docs-build help
 
 # Variables
 BINARY_NAME=drupdater
@@ -32,6 +32,15 @@ lint-agent: ## Run PHPStan over the agent
 
 mutate-agent: ## Run mutation testing over the agent (Infection; needs pcov or Xdebug)
 	cd agent && composer install --no-interaction --no-progress && vendor/bin/infection --threads=max
+
+test-app: ## Run the app's PHPUnit suite
+	cd app && composer install --no-interaction --no-progress && vendor/bin/phpunit
+
+lint-app: ## Run PHPStan over the app
+	cd app && composer install --no-interaction --no-progress && vendor/bin/phpstan analyse --memory-limit=1G
+
+mutate-app: ## Run mutation testing over the app (Infection; needs pcov or Xdebug)
+	cd app && composer install --no-interaction --no-progress && vendor/bin/infection --threads=max
 
 test-property: ## Run only the property tests, with far more generated cases than `make test`
 	RAPID_CHECKS=10000 go test ./... -run TestProperty

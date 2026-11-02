@@ -3,7 +3,6 @@ package cmd
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -50,33 +49,25 @@ func names(addons []workflow.Addon) []string {
 func TestTheCatalogueReadsTheAgentsAddonsAndTheirStages(t *testing.T) {
 	assert.Equal(t, []string{"composer_allow_plugins", "composer_patches", "composer_diff", "update_hooks", "composer_audit", "unsupported_modules"}, agentCatalog.mandatory)
 	assert.Equal(t, []string{"code_beautifier", "deprecations_remover", "translations_updater", "composer_normalizer"}, agentCatalog.defaults)
-	assert.Equal(t, workflow.Addon{Name: "composer_audit", Hooks: map[string]workflow.Stage{
-		workflow.EventPreComposerUpdate: workflow.Prepare,
-		workflow.EventPostCodeUpdate:    workflow.Inspect,
+	assert.Equal(t, workflow.Addon{Name: "composer_audit", Hooks: map[string]string{
+		workflow.EventPreComposerUpdate: "prepare",
+		workflow.EventPostCodeUpdate:    "inspect",
 	}}, agentCatalog.addons[4])
 }
 
-func TestACatalogueThePipelineCannotRunIsRefused(t *testing.T) {
+func TestACatalogueTheRunCannotFireIsRefused(t *testing.T) {
 	for name, tt := range map[string]struct {
 		addons []agent.Addon
 		want   string
 	}{
 		"an addon twice":   {[]agent.Addon{{Name: "a"}, {Name: "a"}}, `the agent's catalogue lists "a" twice`},
 		"an unknown event": {[]agent.Addon{{Name: "a", Hooks: map[string]string{"post-everything": "change"}}}, `addon "a" hooks the unknown event "post-everything"`},
-		"an unknown stage": {[]agent.Addon{{Name: "a", Hooks: map[string]string{"post-code-update": "later"}}}, `addon "a" hooks post-code-update: unknown stage "later"`},
 	} {
 		t.Run(name, func(t *testing.T) {
 			_, err := newAddonCatalog(tt.addons)
 			require.EqualError(t, err, tt.want)
 		})
 	}
-}
-
-func TestAnUnknownStageKeepsWhyItIsUnknown(t *testing.T) {
-	_, err := newAddonCatalog([]agent.Addon{{Name: "a", Hooks: map[string]string{"post-code-update": "later"}}})
-
-	_, parseErr := workflow.ParseStage("later")
-	require.EqualError(t, errors.Unwrap(err), parseErr.Error())
 }
 
 func TestARunCreatesTheAddonsItsRunTypeRunsInTheirOrder(t *testing.T) {
@@ -93,7 +84,7 @@ func TestARunCreatesTheAddonsItsRunTypeRunsInTheirOrder(t *testing.T) {
 
 	assert.Equal(t, []string{"composer_normalizer", "composer_audit"}, names(normal))
 	assert.Equal(t, []string{"code_beautifier"}, names(security))
-	assert.Equal(t, map[string]workflow.Stage{workflow.EventPostComposerUpdate: workflow.Format}, normal[0].Hooks, "with the hooks the catalogue gives it")
+	assert.Equal(t, map[string]string{workflow.EventPostComposerUpdate: "format"}, normal[0].Hooks, "with the hooks the catalogue gives it")
 }
 
 func TestARunTypeThatRunsNoneCreatesNone(t *testing.T) {

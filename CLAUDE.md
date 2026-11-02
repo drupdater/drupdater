@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Project Does
 
-**Drupdater** is a Go CLI tool, with its addons in a PHP Composer plugin (`agent/`), that automates Drupal site updates: it runs against an existing checkout (or clones one with `--clone` for testing), runs Composer updates, applies code quality fixes (PHPCBF, Rector), updates Drupal config/translations, and opens a merge/pull request on GitHub or GitLab with a detailed changelog.
+**Drupdater** is a Go CLI tool, with its addons in a PHP Composer plugin (`agent/`) and its hook pipeline in a PHP app (`app/`) that is taking over from the Go code, that automates Drupal site updates: it runs against an existing checkout (or clones one with `--clone` for testing), runs Composer updates, applies code quality fixes (PHPCBF, Rector), updates Drupal config/translations, and opens a merge/pull request on GitHub or GitLab with a detailed changelog.
 
 Drupdater itself runs as a step in the project's CI pipeline, which already runs the project's test suite (PHPUnit/Behat/etc.) on the resulting MR/branch. Don't propose or add test-running functionality inside Drupdater — that responsibility belongs to CI, not this tool.
 
@@ -40,6 +40,7 @@ A change to any of the following **must** update its page in the same PR:
 | A workflow phase or event | `docs/explanation/how-a-run-works.md`, `docs/explanation/addon-architecture.md` |
 | Published PHP versions | `docs/reference/docker-images.md` |
 | An agent command | `docs/reference/docker-images.md#drupdater-agent`, `docs/contributing/development.md#the-agent` |
+| An app command | `docs/reference/docker-images.md#drupdater-app`, `docs/contributing/development.md#the-app` |
 
 Verify with `make docs-build` (runs `mkdocs build --strict`, which fails on broken internal links and bad nav entries). Preview with `make docs-serve`.
 
@@ -61,6 +62,9 @@ make test-race      # Run the suite under the race detector (~1 min; CI runs thi
 make test-agent     # The agent's PHPUnit suite (agent/; needs PHP and Composer)
 make lint-agent     # PHPStan over the agent at level max, src and tests, no baseline
 make mutate-agent   # Mutation testing over the agent (Infection; needs pcov or Xdebug)
+make test-app       # The app's PHPUnit suite (app/; needs PHP, Composer and git)
+make lint-app       # PHPStan over the app at level max, src and tests, no baseline
+make mutate-app     # Mutation testing over the app (Infection; needs pcov or Xdebug)
 make test-property  # Only the property tests, with far more generated cases (rapid)
 make fuzz           # Fuzz every target (FUZZTIME=30s each by default)
 make mutate         # Mutation testing over the whole module (mutago, pinned in go.mod)
@@ -102,7 +106,10 @@ Where things live. For *how they work*, read `docs/explanation/` rather than dup
 | `cmd/check.go` | The `check` command and its cheap/full check tiers |
 | `internal/workflow/runner.go` | `Runner.Run` and the nine phases; their bodies in `update.go`, `sites.go`, `branch.go`, `publish.go` |
 | `internal/workflow/addon.go`, `events.go` | `Addon` (a name and a stage per event), `Stage`, the five events and what each hands its hooks, `AbortError` |
-| `internal/workflow/pipeline.go` | Runs each hook in the agent in stage order, commits between hooks, merges the plan, keeps the findings, asks the agent for the report sections |
+| `internal/workflow/pipeline.go` | Fires each event through the app's `internal:fire`, keeps the findings it recorded, asks the agent for the report sections |
+| `app/` | `drupdater/app`, drupdater's PHP console app with its own `vendor/`: `internal:fire` and `internal:commit`, which the binary runs as `/opt/drupdater/app/bin/drupdater`; `protocol/`, its request/reply fixtures |
+| `app/src/Pipeline/` | Firing one event: hooks in stage order, each a `composer drupdater:hook` process, commits between hooks, the plan merge (`UpdatePlan`) |
+| `app/src/Git/` | The git CLI with drupdater's fixed arguments, and `GitCommitter`, which commits exactly the named paths under a lock in the working copy's git directory |
 | `internal/workflow/preflight.go` | Checks shared between `check` and the run's own `preflight` phase |
 | `internal/config/` | `Config`, what a run is invoked with; `.drupdater.yaml`'s part of it comes from the agent's `drupdater:config` |
 | `internal/buildinfo/` | `Version`, set by `-ldflags` |
@@ -120,22 +127,24 @@ Where things live. For *how they work*, read `docs/explanation/` rather than dup
 | `agent/src/Config/` | `.drupdater.yaml` read and checked for `drupdater:config`: defaults, strict keys, legacy layout, Go durations, addon names resolved against the catalogue |
 | `agent/src/MergeRequest/` | The MR title and description, rendered from the run report by `drupdater:merge-request`: one `Section` per section |
 | `agent/resources/` | The Rector config `deprecations_remover` runs with; `drush/`, the `drupdater:*` Drush commands loaded with `drush --include` |
-| `internal/agent/` | `agent.Call`: runs a `composer drupdater:*` command, decodes its envelope, returns an `*agent.Error` with a `Kind` |
+| `internal/agent/` | `agent.Call`: runs a `composer drupdater:*` command, or the app's `internal:*` one, decodes its envelope, returns an `*agent.Error` with a `Kind` |
 | `internal/composer/project.go` | `composer.Project`, what the runner reads of the project: web root and lock hash. Ask again after anything rewrites `composer.json` or the lock |
 | `tools/` | The PHPCS and Rector the image installs to `/opt/drupdater/tools`, so addons install nothing into the project |
 
 ### Invariants worth knowing before editing
 
-- **Addons never call each other.** On `pre-composer-update` they return a `workflow.UpdatePlan` proposal and read the merged plan of earlier stages (`internal/workflow/plan.go`); no event is mutable.
+- **Addons never call each other.** On `pre-composer-update` they return a plan proposal and read the merged plan of earlier stages (`app/src/Pipeline/UpdatePlan.php`); no event is mutable.
 - **A run never touches the user's checkout.** Checkout mode works in a linked worktree (`repo.AddWorktree`), commits are signed explicitly, and nothing writes the repository's git config; the update branch is the only thing a run leaves behind.
-- **Every git operation goes through `repo.Git`**, the git CLI with `commonArgs` (`internal/repo/repo.go`): ownership check off, no hooks, no signing. A token reaches git only through the credential helper's environment, never argv or a config file.
+- **Every git operation goes through `repo.Git`** (`internal/repo/repo.go`), or the app's `Git` (`app/src/Git/Git.php`), the git CLI with the same fixed arguments: ownership check off, no hooks, no signing. A token reaches git only through the credential helper's environment, never argv or a config file.
 - **Addons live in the agent; the binary has no code per addon.** An addon is a PHP class in `agent/src/Addon/` with its hooks, stages and `report()`; Go only knows the catalogue `drupdater:addons` answers. A new capability is a new addon there, never a Go wrapper.
-- **Addons never touch git.** A hook returns the paths it changed as commits in its `HookResult`; the runner's committer (`internal/workflow/commit.go`) commits exactly those, between hooks, and refuses when something else is already staged.
-- **One hook, one agent process.** The pipeline runs each hook as its own `drupdater:hook` call and sends the addon's own earlier findings with it, so an addon keeps no state, and two hooks never share a process. An addon's tools are constructor arguments built by `create(Services)`, so tests build it with doubles.
-- **A new event** is its name in `workflow.Events` and `EventName`, its payload in `workflow/events.go` and `Event::fromRequest()`, and the `fire` call in the runner.
+- **Addons never touch git.** A hook returns the paths it changed as commits in its `HookResult`; the app's committer (`app/src/Git/GitCommitter.php`) commits exactly those, between hooks, and refuses when something else is already staged. The run's own site-config commits go through the same committer, via `internal:commit`.
+- **One hook, one agent process.** The app runs each hook as its own `drupdater:hook` call and sends the addon's own earlier findings with it, so an addon keeps no state, and two hooks never share a process. An addon's tools are constructor arguments built by `create(Services)`, so tests build it with doubles.
+- **The app keeps no state between calls.** The binary sends every addon's findings so far with each `internal:fire` and records what it answers; per-site events fire concurrently in separate app processes, so commits serialize on a `flock` in the working copy's git directory, not a mutex.
+- **The app and the agent share no PHP code**, only the envelope: `app/protocol/` pins the binary↔app exchange, `agent/protocol/` the app↔agent and binary↔agent ones, and all three sides speak one `protocol` version.
+- **A new event** is its name in `workflow.Events`, the agent's `EventName` and the app's `EventName`, its payload in `workflow/events.go`, the app's `Event` and the agent's `Event::fromRequest()`, and the `fire` call in the runner.
 - **Hook stages are load-bearing** on `pre-composer-update` and `post-code-update`. See `docs/explanation/addon-architecture.md` before changing one.
 - **The MR is rendered from the report**, through its JSON, by the agent. An addon reaches the description only via its report section; findings from two addons are joined there, never handed between them.
-- **A new question for Composer or drush goes to the agent, not to its console output.** Go runs no PHP tool itself. The agent answers in JSON with a closed error `Kind`, decided from the exception it caught. A change to a request or reply changes `agent/protocol/` and both sides' tests; a breaking one bumps `protocol` in `agent/src/Protocol.php` and `internal/agent/agent.go` together.
+- **A new question for Composer or drush goes to the agent, not to its console output.** Go runs no PHP tool itself. The agent answers in JSON with a closed error `Kind`, decided from the exception it caught. A change to a request or reply changes `agent/protocol/` (or `app/protocol/`) and both sides' tests; a breaking one bumps `protocol` in `agent/src/Protocol.php`, `app/src/Protocol.php` and `internal/agent/agent.go` together.
 - **The addons' report sections are a published contract.** Renaming a field in an addon's `report()` is a breaking change to `schema_version`. `agent/protocol/report/` pins the sections the agent builds for an example of every addon's findings, and `internal/report/testdata/run_report.json` embeds them, so such a rename fails rather than ships. A new reporting addon belongs in both.
 - **Report types mirror rather than reuse internal types** (`report.PackageChange` vs `composer.PackageChange`) so an internal refactor can't rename a published field.
 - **The report's deferred write is registered first**, so it runs last and is emitted on every exit path.
@@ -191,11 +200,11 @@ Mocks are generated with mockery v3 (config in `.mockery.yml`). After changing a
 
 `mutago` (pinned via the `tool` directive in `go.mod`, configured in `mutago.yaml`) scores whether the tests *assert* rather than merely execute. CI enforces it on the lines a PR changes (`mutation` job in `.github/workflows/go.yml`, fails below 75 % MSI) and reports the whole module weekly (`.github/workflows/mutation.yml`, one matrix leg per package, never blocking). Suppress a genuinely equivalent mutant with a `// mutator-disable-next-line <mutator>` comment and a reason — never by lowering the threshold. Details: `docs/contributing/development.md`.
 
-The agent has the same gate with Infection (`agent/infection.json5`): `agent.yml`'s `mutation` job on changed lines at 75 % MSI, and `mutation.yml`'s `agent` job weekly. An equivalent mutant is ignored in `infection.json5` by mutator and method, with a comment saying why.
+The agent and the app have the same gate with Infection (`agent/infection.json5`, `app/infection.json5`): the `mutation` jobs of `agent.yml` and `app.yml` on changed lines at 75 % MSI, and `mutation.yml`'s `php` job weekly. An equivalent mutant is ignored in `infection.json5` by mutator and method, with a comment saying why.
 
-## Static analysis of the agent
+## Static analysis of the agent and the app
 
-PHPStan runs at `max` over `agent/src` and `agent/tests` with no baseline and no `@phpstan-ignore`. Decoded JSON drupdater does not control is read through `Drupdater\Agent\Json` (`at`, `map`, `list`, `maps`, `string`, `int`, `strings`) rather than cast or indexed blind; a test asserts a decoded shape with `Tests\Decoded`.
+PHPStan runs at `max` over `src` and `tests` of `agent/` and `app/` with no baseline and no `@phpstan-ignore`. Decoded JSON drupdater does not control is read through `Drupdater\Agent\Json` (`at`, `map`, `list`, `maps`, `string`, `int`, `strings`), or the app's own copy `Drupdater\App\Json`, rather than cast or indexed blind; an agent test asserts a decoded shape with `Tests\Decoded`.
 
 ## Property-based testing
 
@@ -211,6 +220,6 @@ Same discipline as properties: a failing input lands in `testdata/fuzz/<target>/
 
 ## Docker
 
-The Dockerfile is multi-stage: stage 1 builds the Go binary, stage 2 is a PHP runtime image (`PHP_VERSION` build arg, default 8.3) with Composer and required PHP extensions. The Go binary is copied into the PHP image as the final artifact.
+The Dockerfile is multi-stage: stage 1 builds the Go binary, stage 2 is a PHP runtime image (`PHP_VERSION` build arg, default 8.3) with Composer, required PHP extensions, the agent (global plugin) and the app (`/opt/drupdater/app`, its own `composer install --no-dev`). The Go binary is copied into the PHP image as the final artifact.
 
 Known gap: the Dockerfile's build stage does **not** pass `-ldflags`, so published images report `drupdater_version: "dev"` in the run report. Documented in `docs/reference/cli/index.md` and `docs/contributing/releasing.md`.

@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace Drupdater\Agent;
 
 /**
- * The envelope every command reads and writes. Keep in step with internal/agent/agent.go.
+ * The envelope every command reads and writes. Keep VERSION in step with app/src/Protocol.php
+ * and internal/agent/agent.go.
  */
 final class Protocol
 {

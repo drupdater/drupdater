@@ -54,7 +54,7 @@ func (r *run) stageScaffoldChanges(ctx context.Context) error {
 func (r *run) resolveUpdate(ctx context.Context) (string, error) {
 	r.logger.Info("resolving dependency updates")
 
-	plan, err := r.pipeline.fire(ctx, r.path, r.committer, preComposerUpdate(UpdatePlan{}))
+	plan, err := r.fire(ctx, preComposerUpdate(UpdatePlan{}))
 	if err != nil {
 		return "", err
 	}
@@ -109,7 +109,7 @@ func (r *run) updateSharedCode(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to read the committed composer.lock: %w", err)
 	}
-	if _, err := r.pipeline.fire(ctx, r.path, r.committer, postComposerUpdate(baseLock)); err != nil {
+	if _, err := r.fire(ctx, postComposerUpdate(baseLock)); err != nil {
 		return err
 	}
 
@@ -123,7 +123,7 @@ func (r *run) updateSharedCode(ctx context.Context) error {
 		return fmt.Errorf("failed to commit composer.json and composer.lock: %w", err)
 	}
 
-	if _, err := r.pipeline.fire(ctx, r.path, r.committer, postCodeUpdate()); err != nil {
+	if _, err := r.fire(ctx, postCodeUpdate()); err != nil {
 		return err
 	}
 

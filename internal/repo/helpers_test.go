@@ -76,3 +76,9 @@ func writeFile(t *testing.T, dir string, name string, content string) {
 	require.NoError(t, os.MkdirAll(filepath.Dir(filepath.Join(dir, name)), 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(content), 0o600))
 }
+
+// stagedFiles lists the files staged for the next commit in dir.
+func stagedFiles(t *testing.T, dir string) []string {
+	t.Helper()
+	return strings.Fields(gitOutput(t, dir, "diff", "--cached", "--name-only"))
+}

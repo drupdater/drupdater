@@ -88,12 +88,36 @@ Built on `php:<version>-cli-trixie`, with:
 - Plus a globally-required Composer plugin,
   [`mglaman/composer-drupal-lenient`](https://github.com/mglaman/composer-drupal-lenient),
   pre-allow-listed.
+- **The Drupdater app** at `/opt/drupdater/app/`, which runs the addons' hooks and makes the
+  run's commits — see below.
 - **The Drupdater agent** at `/opt/drupdater/agent/`, a second global plugin, which holds every
   addon and everything drupdater does to a site — see below. It ships drupdater's own Drush
   commands, the site facts query and the configuration resave, and brings
   [`ion-bazan/composer-diff`](https://github.com/IonBazan/composer-diff) with it as a library;
   that package's own plugin, and with it the `composer diff` command, is disabled.
 - **Bundled tools** at `/opt/drupdater/tools/` — see below.
+
+### Drupdater app
+
+`drupdater/app`, built from `app/` in the Drupdater repository, is a PHP console application
+installed with its own dependencies at `/opt/drupdater/app/`. The binary runs it as
+`/opt/drupdater/app/bin/drupdater` in the working copy, through two hidden commands that read
+one JSON request on stdin and answer with one envelope on stdout, as the agent's do:
+
+| Command | Used by |
+|---|---|
+| `internal:fire` | Every event of a run that at least one addon hooks |
+| `internal:commit` | The `site update` phase's commit of each site's exported configuration |
+
+`internal:fire` carries the event, every addon the run runs with the stage it hooks each event at
+and what its hooks found so far, whether the run is a security run, and the author of the run's
+commits. The app orders the hooks by stage, calls `composer drupdater:hook` once per hook, makes
+the commits each asks for, and merges the `pre-composer-update` proposals. It answers with the
+findings it recorded, the merged plan, and the reason the run has nothing to do or the event
+failed — a failed event still answers with what its earlier hooks found, so the report keeps it.
+
+`internal:commit` commits exactly the paths each commit names, under the same rules as an
+addon's commits: no change, no commit, and nothing else may be staged.
 
 ### Drupdater agent
 
@@ -107,7 +131,7 @@ installing anything into it.
 |---|---|
 | `drupdater:addons` | The `addons` command, and the hooks of the addons a run builds: the addon catalogue |
 | `drupdater:config` | Reading and checking [`.drupdater.yaml`](configuration.md), for a run and the `.drupdater.yaml valid` check |
-| `drupdater:hook` | Every addon hook of every run, one call per hook |
+| `drupdater:hook` | Every addon hook of every run, one call per hook, from the app's `internal:fire` |
 | `drupdater:report` | The [run report](run-report.md#addons)'s addon sections |
 | `drupdater:merge-request` | The `render merge request` phase: the title and description, from the run report |
 | `drupdater:handshake` | The [`drupdater agent installed in Composer`](preflight-checks.md#drupdater-agent-installed-in-composer) preflight check, and the report's [tool versions](run-report.md#composer_version-and-php_version) |
@@ -137,7 +161,8 @@ carries the event — its name, plus what that event hands its hooks: the update
 its facts on the site events — with what the addon's own hooks found earlier in the run, and
 whether the run is a security run. The reply is what the hook returned: its finding, the
 commits it asks for, its proposal for the update, or the reason the run has nothing to do. The
-agent commits nothing itself; drupdater makes the commits before it calls the next hook.
+agent commits nothing itself; the [app](#drupdater-app) makes the commits before it calls the
+next hook.
 
 `drupdater:report` builds the addons' sections of the run report from what their hooks found.
 A section depends on its findings alone, so this too needs no project, and the final report
