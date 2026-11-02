@@ -54,6 +54,17 @@ final class ComposerDiffTest extends TestCase
         ], $result->finding);
     }
 
+    public function testLinksAPackageOnTheProjectsOwnGitlab(): void
+    {
+        $at = static fn (string $version): array => ['packages' => [
+            ['name' => 'fixture/a', 'version' => $version, 'type' => 'library', 'source' => ['type' => 'git', 'url' => 'https://git.example.com/fixture/a.git', 'reference' => $version]],
+        ]];
+
+        $result = $this->diff($at('1.1.0'), $at('1.0.0'), config: ['gitlab-domains' => ['git.example.com']]);
+
+        self::assertSame('https://git.example.com/fixture/a/compare/1.0.0...1.1.0', Json::at($result->finding, 0, 'compare_url'));
+    }
+
     public function testLogsOneLinePerPackageWithoutLinks(): void
     {
         $log = new Log();
@@ -117,17 +128,19 @@ final class ComposerDiffTest extends TestCase
     /**
      * @param array<string, mixed> $locked
      * @param array<string, mixed> $base
+     * @param array<string, mixed> $config
      */
-    private function diff(array $locked, array $base, Log $log = new Log()): \Drupdater\Agent\Addon\HookResult
+    private function diff(array $locked, array $base, Log $log = new Log(), array $config = []): \Drupdater\Agent\Addon\HookResult
     {
-        $project = $this->project($locked);
+        $project = $this->project($locked, $config);
         return (new ComposerDiff($log, $this->composer($project)))->handle(Event::postComposerUpdate($project, $base));
     }
 
     /**
      * @param array<string, mixed> $lock
+     * @param array<string, mixed> $config
      */
-    private function project(array $lock): string
+    private function project(array $lock, array $config = []): string
     {
         $project = $this->scratchDir();
         $this->writeFiles($project, [
@@ -136,6 +149,7 @@ final class ComposerDiffTest extends TestCase
                 'repositories' => [['packagist.org' => false]],
                 'require' => ['fixture/a' => '^1.0'],
                 'require-dev' => ['fixture/tool' => '^2.0'],
+                'config' => (object) $config,
             ], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
             'composer.lock' => json_encode($lock + ['packages' => [], 'packages-dev' => []], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR),
         ]);

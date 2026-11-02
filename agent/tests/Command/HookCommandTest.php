@@ -73,6 +73,20 @@ final class HookCommandTest extends TestCase
         self::assertStringContainsString('"finding":{"saw":{"empty":{}}}', $output, 'an empty object reads back as one');
     }
 
+    public function testARequestWithoutTheRunIsNoSecurityRun(): void
+    {
+        $seen = null;
+        ScriptedAddon::$hook = static function (Event $event) use (&$seen): HookResult {
+            $seen = $event;
+            return new HookResult(null);
+        };
+
+        $this->ask($this->scripted(), ['protocol' => 6, 'request' => ['addon' => 'scripted', 'event' => ['name' => 'post-code-update']]]);
+
+        self::assertInstanceOf(Event::class, $seen);
+        self::assertFalse($seen->security);
+    }
+
     public function testRepliesWithTheCommitsAndThePlanAHookReturns(): void
     {
         ScriptedAddon::$hook = static fn (): HookResult => new HookResult(['n' => 1], [new Commit('Change it', ['a', 'b'])], new Plan(['x/y'], minimalChanges: true));

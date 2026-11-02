@@ -58,7 +58,20 @@ final class PatchWriterTest extends TestCase
         $manifest = $this->manifest($project);
         self::assertEquals((object) ['0' => 'patches/zero.patch'], Json::at($manifest, 'extra', 'patches', 'drupal/token'));
         self::assertSame('fixture/site', $manifest->name, 'the re-encoded file keeps everything else');
+        self::assertSame('web/', Json::at($manifest, 'extra', 'drupal-scaffold', 'locations', 'web-root'), 'and the rest of extra');
         self::assertEquals((object) ['cweagans/composer-patches' => true, 'drupal/*' => false], Json::at($manifest, 'config', 'allow-plugins'));
+    }
+
+    public function testAddsExtraWhenComposerJsonHasNone(): void
+    {
+        $project = $this->fixtureProject();
+        $manifest = $this->manifest($project);
+        unset($manifest->extra);
+        file_put_contents($project . '/composer.json', json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "\n");
+
+        $this->writer($project)->write(self::patches('{"drupal/token":{"0":"patches/zero.patch"}}'));
+
+        self::assertEquals((object) ['drupal/token' => (object) ['0' => 'patches/zero.patch']], Json::at($this->manifest($project), 'extra', 'patches'));
     }
 
     public function testKeepsTheRestOfComposerJsonAsWritten(): void

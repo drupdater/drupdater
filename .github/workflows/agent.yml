@@ -77,7 +77,12 @@ jobs:
       - name: Install
         run: composer install --no-interaction --no-progress
 
+      # diff.relative: Infection runs in agent/ but would read git's paths from the repository root.
       - name: Mutation testing on changed lines
+        env:
+          GIT_CONFIG_COUNT: "1"
+          GIT_CONFIG_KEY_0: diff.relative
+          GIT_CONFIG_VALUE_0: "true"
         run: |
           vendor/bin/infection \
             --threads=max \

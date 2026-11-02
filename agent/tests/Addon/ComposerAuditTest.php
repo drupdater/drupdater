@@ -57,6 +57,31 @@ final class ComposerAuditTest extends TestCase
         self::assertSame(['only' => ['drupal/core', 'other/package', 'drupal/core-recommended', 'drupal/core-composer-scaffold'], 'keep' => [], 'minimal_changes' => true], $result->plan?->toArray());
     }
 
+    public function testASecurityRunNamesEachAffectedPackageOnce(): void
+    {
+        $result = self::audit([self::lockAdvisory('a/a', 'CVE-1'), self::lockAdvisory('a/a', 'CVE-2'), self::lockAdvisory('b/b', 'CVE-3')])
+            ->handle(Event::preComposerUpdate('/p', new Plan(), security: true));
+
+        self::assertSame(['a/a', 'b/b'], $result->plan?->only);
+    }
+
+    public function testAnAbandonedPackagesReplacementIsRecorded(): void
+    {
+        $result = self::audit([], [['package' => 'old/lib', 'replacement' => 'new/lib']])->handle(Event::preComposerUpdate('/p', new Plan()));
+
+        self::assertSame([['packageName' => 'old/lib', 'replacement' => 'new/lib']], Json::at($result->finding, 'abandoned'));
+    }
+
+    public function testWithoutTheAuditBeforeNothingReadsAsFixed(): void
+    {
+        $log = new Log();
+
+        (new ComposerAudit($log, static fn (): array => ['advisories' => [self::lockAdvisory('b/b', 'CVE-2')], 'abandoned' => []]))
+            ->handle(Event::postCodeUpdate('/p'));
+
+        self::assertSame(['fixed' => 0, 'unresolved' => 1, 'abandoned' => 0], Json::at($log->entries(), 0, 'context'));
+    }
+
     public function testASecurityRunWithoutCoreAddsNoCompanions(): void
     {
         $result = self::audit([self::lockAdvisory('other/package', 'CVE-2')])->handle(Event::preComposerUpdate('/p', new Plan(), security: true));
@@ -103,6 +128,15 @@ final class ComposerAuditTest extends TestCase
         ], $section);
     }
 
+    public function testTheReportReadsAnAbandonedPackageAsItsNameAndReplacement(): void
+    {
+        $section = ComposerAudit::report(Records::findings([
+            Records::record('post-code-update', ['advisories' => [], 'abandoned' => [['packageName' => 'old/lib', 'note' => 'x']]]),
+        ]));
+
+        self::assertSame([['packageName' => 'old/lib', 'replacement' => '']], Json::at($section, 'abandoned'));
+    }
+
     public function testTheReportHasEveryListEvenAnEmptyOne(): void
     {
         $section = ComposerAudit::report(Records::findings([
@@ -137,6 +171,14 @@ final class ComposerAuditTest extends TestCase
     {
         $first = ['cve' => '', 'advisoryId' => '', 'packageName' => 'a/a', 'title' => 'One'];
         $second = ['cve' => '', 'advisoryId' => '', 'packageName' => 'a/a', 'title' => 'Two'];
+
+        self::assertSame([$first], ComposerAudit::fixed([$first, $second], [$second]));
+    }
+
+    public function testAdvisoriesWithoutACveOfTwoPackagesDoNotCollide(): void
+    {
+        $first = ['cve' => '', 'advisoryId' => '', 'packageName' => 'a/a', 'title' => 'Same'];
+        $second = ['cve' => '', 'advisoryId' => '', 'packageName' => 'b/b', 'title' => 'Same'];
 
         self::assertSame([$first], ComposerAudit::fixed([$first, $second], [$second]));
     }
