@@ -5,7 +5,7 @@
 - **Go 1.27.1+** — the version in `go.mod`.
 - **`make`**.
 - **Docker** — for `make mock`, the hadolint half of `make lint`, and building images.
-- **PHP 8.2+ and Composer** — for the agent's tests, and for running Drupdater outside its image.
+- **PHP 8.3+ and Composer** — for the agent's tests, and for running Drupdater outside its image.
 
 ```bash
 git clone https://github.com/drupdater/drupdater.git
@@ -728,7 +728,7 @@ make docker-build
 docker build --build-arg PHP_VERSION=8.4 -t drupdater-local:php8.4 .
 ```
 
-`PHP_VERSION` defaults to `8.3`. Released images are built for 8.2, 8.3, 8.4 and 8.5.
+`PHP_VERSION` defaults to `8.3`. Released images are built for 8.3, 8.4 and 8.5.
 
 ## Devcontainer
 
