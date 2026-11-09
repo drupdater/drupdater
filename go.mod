@@ -9,7 +9,7 @@ require (
 	github.com/stretchr/testify v1.12.1
 	gitlab.com/gitlab-org/api/client-go v1.46.0
 	go.uber.org/zap v1.28.0
-	golang.org/x/sync v0.24.0
+	golang.org/x/sync v0.25.0
 	pgregory.net/rapid v1.3.0
 )
 
