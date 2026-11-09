@@ -3,7 +3,7 @@ ARG PHP_VERSION=8.3
 # Pinned to a minor, not `composer:2`: patches carry fixes, minors change defaults, and composer
 # decides what a run does -- so a minor bump is a deliberate commit CI runs against.
 # Named stages because dependabot reads FROM, not COPY --from.
-FROM composer:2.10 AS composer
+FROM composer:2.11 AS composer
 FROM ghcr.io/mlocati/php-extension-installer:2 AS php-extension-installer
 
 # Build go binary.
